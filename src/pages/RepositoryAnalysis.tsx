@@ -10,6 +10,7 @@ import { FileStructure } from "@/components/repository/FileStructure";
 import { CommitHistory } from "@/components/repository/CommitHistory";
 import { Contributors } from "@/components/repository/Contributors";
 import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
+import { RepositoryAnalysisSkeleton } from "@/components/repository/RepositoryAnalysisSkeleton";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
 import {
   Home,
@@ -222,9 +223,7 @@ export default function RepositoryAnalysis() {
     <DashboardLayout>
       <div className="space-y-6">
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading repository...</p>
-          </div>
+          <RepositoryAnalysisSkeleton />
         ) : !repository ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground">Repository not found</p>
