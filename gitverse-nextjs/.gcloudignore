@@ -1,0 +1,19 @@
+# Keep secrets and local artifacts out of Cloud Build uploads
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local dev/build artifacts
+.next
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+
+# Git
+.git
+.gitignore

@@ -1,0 +1,150 @@
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+}
+
+export interface CodeAnalysisRequest {
+  code: string;
+  language: string;
+  analysisType: "explain" | "bugs" | "improve" | "document";
+}
+
+export interface RepositoryContext {
+  name: string;
+  description?: string;
+  languages: string[];
+  stats?: {
+    commits: number;
+    contributors: number;
+    files: number;
+  };
+}
+
+class GeminiService {
+  private chatHistory: ChatMessage[] = [];
+
+  constructor() {}
+
+  private getAuthHeaders(): Record<string, string> {
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("gitverse_token")
+        : null;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  isConfigured(): boolean {
+    // The Gemini API key is server-side; authentication is handled by the caller
+    // (via AuthContext) and enforced by the API route.
+    return true;
+  }
+
+  async chat(message: string, context?: RepositoryContext): Promise<string> {
+    try {
+      // Add repository context to the prompt if provided
+      let enhancedMessage = message;
+      if (context) {
+        const contextInfo = `
+Repository Context:
+- Name: ${context.name}
+${context.description ? `- Description: ${context.description}` : ""}
+- Languages: ${context.languages.join(", ")}
+${context.stats ? `- Stats: ${context.stats.commits} commits, ${context.stats.contributors} contributors, ${context.stats.files} files` : ""}
+
+User Question: ${message}
+`;
+        enhancedMessage = contextInfo;
+      }
+
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.getAuthHeaders(),
+        },
+        body: JSON.stringify({ prompt: enhancedMessage }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data?.error || data?.details || "Failed to get AI response"
+        );
+      }
+
+      const text = data?.response;
+      if (typeof text !== "string") {
+        throw new Error("Invalid response from AI service");
+      }
+
+      // Store in chat history
+      this.chatHistory.push(
+        { role: "user", content: message, timestamp: new Date() },
+        { role: "assistant", content: text, timestamp: new Date() }
+      );
+
+      return text;
+    } catch (error) {
+      console.error("Gemini API error:", error);
+      throw new Error("Failed to get response from AI assistant");
+    }
+  }
+
+  async *chatStream(
+    message: string,
+    context?: RepositoryContext
+  ): AsyncGenerator<string> {
+    try {
+      // Server route isn't streaming; yield the full response once.
+      const text = await this.chat(message, context);
+      yield text;
+    } catch (error) {
+      console.error("Gemini API streaming error:", error);
+      throw new Error("Failed to stream response from AI assistant");
+    }
+  }
+
+  async analyzeCode(request: CodeAnalysisRequest): Promise<string> {
+    try {
+      const res = await fetch("/api/ai/analyze-code", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.getAuthHeaders(),
+        },
+        body: JSON.stringify(request),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data?.error || data?.details || "Failed to analyze code"
+        );
+      }
+
+      const text = data?.analysis;
+      if (typeof text !== "string") {
+        throw new Error("Invalid response from AI service");
+      }
+
+      return text;
+    } catch (error) {
+      console.error("Code analysis error:", error);
+      throw new Error("Failed to analyze code");
+    }
+  }
+
+  getChatHistory(): ChatMessage[] {
+    return this.chatHistory;
+  }
+
+  clearChatHistory(): void {
+    this.chatHistory = [];
+  }
+}
+
+// Export singleton instance
+export const geminiService = new GeminiService();

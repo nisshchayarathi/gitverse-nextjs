@@ -51,16 +51,13 @@ export default function Dashboard() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+
   useEffect(() => {
     fetchRepositories();
   }, []);
 
   const fetchRepositories = async () => {
     try {
-      setLoading(true);
-
       const token = localStorage.getItem("gitverse_token");
       const response = await axios.get(buildApiUrl("/api/repositories"), {
         headers: { Authorization: `Bearer ${token}` },
@@ -196,19 +193,7 @@ export default function Dashboard() {
     }
   };
 
-    if (loading) {
-    return <DashboardSkeleton />;
-    }
-
-    if (error) {
-    return <div className="text-red-500">{error}</div>;
-    }
-
-    if (!data || data.length === 0) {
-    return <div>No data found</div>;
-    }
-  
-    return (
+  return (
     <DashboardLayout>
       <div className="space-y-6">
         {/* Welcome Section */}

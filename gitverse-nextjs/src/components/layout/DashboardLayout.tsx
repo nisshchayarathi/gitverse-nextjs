@@ -1,0 +1,230 @@
+"use client";
+
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
+import {
+  GitBranch,
+  LayoutDashboard,
+  Search,
+  Settings,
+  GitPullRequest,
+  LogOut,
+  User,
+  ChevronLeft,
+  Menu,
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui";
+import { toast } from "@/hooks/use-toast";
+
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+}
+
+export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
+  children,
+}) => {
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out",
+    });
+    router.push("/login");
+  };
+
+  const navItems = [
+    { icon: LayoutDashboard, label: "Visualise", path: "/dashboard" },
+    { icon: Search, label: "Search", path: "/search" },
+    { icon: GitPullRequest, label: "Contribute", path: "/contribute" },
+    { icon: Settings, label: "Settings", path: "/settings" },
+  ];
+
+  const isActive = (path: string) => pathname === path;
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Sidebar - Desktop */}
+      <aside
+        className={`fixed top-0 left-0 z-40 h-screen transition-all duration-300 hidden md:block ${
+          sidebarOpen ? "w-64" : "w-20"
+        }`}
+      >
+        <div className="h-full glass border-r border-border/50 flex flex-col">
+          {/* Logo */}
+          <div className="p-4 border-b border-border/50">
+            <Link href="/dashboard" className="flex items-center gap-3 group">
+              <div className="relative">
+                <GitBranch className="h-8 w-8 text-primary transition-transform group-hover:scale-110" />
+                <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              {sidebarOpen && (
+                <span className="text-xl font-heading font-bold text-foreground">
+                  Git<span className="text-gradient">Verse</span>
+                </span>
+              )}
+            </Link>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 p-4 space-y-2">
+            {navItems.map((item) => (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
+                  isActive(item.path)
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+              >
+                <item.icon className="h-5 w-5 shrink-0" />
+                {sidebarOpen && <span>{item.label}</span>}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Toggle Sidebar Button */}
+          <div className="p-4 border-t border-border/50">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-accent transition-colors"
+            >
+              <ChevronLeft
+                className={`h-5 w-5 transition-transform ${!sidebarOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile Sidebar */}
+      {mobileMenuOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <aside className="fixed top-0 left-0 z-50 h-screen w-64 md:hidden">
+            <div className="h-full glass border-r border-border/50 flex flex-col">
+              {/* Logo */}
+              <div className="p-4 border-b border-border/50">
+                <Link href="/dashboard" className="flex items-center gap-3">
+                  <GitBranch className="h-8 w-8 text-primary" />
+                  <span className="text-xl font-heading font-bold text-foreground">
+                    Git<span className="text-gradient">Verse</span>
+                  </span>
+                </Link>
+              </div>
+
+              {/* Navigation */}
+              <nav className="flex-1 p-4 space-y-2">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
+                      isActive(item.path)
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    }`}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                ))}
+              </nav>
+            </div>
+          </aside>
+        </>
+      )}
+
+      {/* Main Content */}
+      <div
+        className={`transition-all duration-300 ${sidebarOpen ? "md:ml-64" : "md:ml-20"}`}
+      >
+        {/* Top Bar */}
+        <header className="sticky top-0 z-30 glass border-b border-border/50">
+          <div className="px-4 py-3 flex items-center justify-between">
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-2 rounded-lg hover:bg-accent transition-colors md:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <div className="flex-1" />
+
+            {/* User Profile Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="gap-2">
+                  <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center">
+                    {user?.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.name}
+                        className="rounded-full"
+                      />
+                    ) : (
+                      <User className="h-4 w-4 text-primary-foreground" />
+                    )}
+                  </div>
+                  <div className="hidden md:block text-left">
+                    <div className="text-sm font-medium">{user?.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {user?.email}
+                    </div>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 glass">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {user?.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push("/settings")}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="p-6">{children}</main>
+      </div>
+    </div>
+  );
+};

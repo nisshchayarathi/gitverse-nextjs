@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md
+*.log
+.env
+.env.*
+.firebase
+.firebase/
+**/.DS_Store
