@@ -75,7 +75,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to load PR reviews",
-        details: error?.message || "Unknown error",
       },
       { status: 500 },
     );

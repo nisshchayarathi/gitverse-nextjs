@@ -310,6 +310,11 @@ export function AIRepoMentorSection(props: {
               pinnedToBottomRef.current = distanceFromBottom < 120;
             }}
           >
+            {messages.length === 1 && !isLoading && (
+              <div className="text-center text-xs text-muted-foreground py-6">
+                Ask a question about the repository to get started
+              </div>
+            )}
             {messages.map((m, idx) => (
               <div
                 key={idx}
@@ -321,11 +326,10 @@ export function AIRepoMentorSection(props: {
                   </div>
                 )}
                 <div
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                    m.role === "user"
-                      ? "bg-primary/15"
-                      : "bg-white/5 border border-white/10"
-                  }`}
+                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${m.role === "user"
+                    ? "bg-primary/15"
+                    : "bg-white/5 border border-white/10"
+                    }`}
                 >
                   {m.role === "assistant" ? (
                     <MentorMarkdown content={m.content} />
@@ -335,6 +339,19 @@ export function AIRepoMentorSection(props: {
                 </div>
               </div>
             ))}
+            {isLoading && (
+              <div className="flex gap-2 justify-start animate-pulse">
+                {/* Bot avatar skeleton */}
+                <div className="h-7 w-7 rounded-full bg-primary/15" />
+
+                {/* Message bubble skeleton */}
+                <div className="max-w-[85%] rounded-lg px-3 py-3 bg-white/5 border border-white/10 space-y-2">
+                  <div className="h-3 w-3/4 bg-white/10 rounded" />
+                  <div className="h-3 w-full bg-white/10 rounded"/>
+                  <div className="h-3 w-1/2 bg-white/10 rounded" />
+                </div>
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
 

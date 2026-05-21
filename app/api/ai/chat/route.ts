@@ -15,15 +15,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ response });
     }
 
-    if (!repositoryId || !question) {
+    if (prompt !== undefined && typeof prompt !== "string") {
+      return NextResponse.json(
+        { error: "Prompt must be a string" },
+        { status: 400 }
+      );
+    }
+
+    if (repositoryId == null || question == null) {
       return NextResponse.json(
         { error: "Repository ID and question are required" },
         { status: 400 }
       );
     }
 
+    const parsedRepoId = Number(repositoryId);
+    if (!Number.isFinite(parsedRepoId)) {
+      return NextResponse.json(
+        { error: "Repository ID must be a valid number" },
+        { status: 400 }
+      );
+    }
+
+    if (typeof question !== "string" || !question.trim()) {
+      return NextResponse.json(
+        { error: "Question must be a non-empty string" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      conversationHistory !== undefined &&
+      (!Array.isArray(conversationHistory) ||
+        conversationHistory.some(
+          (m: any) =>
+            typeof m !== "object" ||
+            !["user", "assistant"].includes(m.role) ||
+            typeof m.content !== "string"
+        ))
+    ) {
+      return NextResponse.json(
+        { error: "conversationHistory must be an array of {role, content} objects" },
+        { status: 400 }
+      );
+    }
+
     const repository = await repositoryService.getRepository(
-      repositoryId,
+      parsedRepoId,
       user.userId
     );
 
@@ -48,7 +86,7 @@ export async function POST(request: NextRequest) {
     };
 
     const response = await getGeminiService().chatAboutRepository({
-      repositoryId,
+      repositoryId: parsedRepoId,
       question,
       conversationHistory,
       context,
@@ -66,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "Failed to process chat", details: error.message },
+      { error: "Failed to process chat" },
       { status: 500 }
     );
   }

@@ -14,6 +14,8 @@ import {
   CardContent,
   Button,
   Input,
+  EmptyState,
+  Skeleton,
 } from "@/components/ui";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
@@ -149,13 +151,65 @@ export default function SearchPage() {
 
         {/* Repository Grid/List */}
         {loading ? (
-          <div className="text-center py-12 text-muted-foreground">
-            Loading repositories...
-          </div>
+          viewMode === "grid" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="glass">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-lg" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Skeleton className="h-4 w-5/6" />
+                    <Skeleton className="h-4 w-2/3" />
+                    <div className="flex justify-between pt-3 border-t border-border/50">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="glass">
+                  <CardContent className="pt-4 sm:pt-6">
+                    <div className="flex items-center gap-4">
+                      <Skeleton className="h-12 w-12 rounded-lg" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-1/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )
         ) : sortedRepositories.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            No repositories found. Try adjusting your search query.
-          </div>
+          searchQuery ? (
+            <EmptyState
+              icon={Search}
+              title="No Results Found"
+              description="We couldn't find any repositories matching your search query. Try a different term."
+              actionLabel="Clear Search"
+              onAction={() => setSearchQuery("")}
+            />
+          ) : (
+            <EmptyState
+              icon={GitBranch}
+              title="No Repositories Yet"
+              description="You haven't analyzed any repositories. Head to the dashboard to get started!"
+              actionLabel="Go to Dashboard"
+              onAction={() => router.push("/dashboard")}
+            />
+          )
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {sortedRepositories.map((repo, index) => (

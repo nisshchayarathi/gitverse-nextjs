@@ -55,7 +55,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to connect GitHub",
-        details: error?.message || "Unknown error",
       },
       { status: 500 },
     );

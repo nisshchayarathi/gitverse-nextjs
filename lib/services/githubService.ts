@@ -1,5 +1,60 @@
 import axios, { AxiosError, AxiosInstance, isAxiosError } from "axios";
 
+export class GitHubRateLimitError extends Error {
+  retryAfterSeconds: number;
+  constructor(retryAfterSeconds: number) {
+    super(`GitHub API rate limit reached. Please retry after ${retryAfterSeconds} seconds.`);
+    this.name = "GitHubRateLimitError";
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+function sanitizeGitHubHeaders(headers: any): any {
+  if (headers == null) {
+    return headers;
+  }
+
+  if (Array.isArray(headers)) {
+    return headers.map((value) => sanitizeGitHubHeaders(value));
+  }
+
+  if (typeof headers !== "object") {
+    return headers;
+  }
+
+  const source =
+    typeof (headers as any).toJSON === "function" ? (headers as any).toJSON() : headers;
+
+  if (source == null || typeof source !== "object") {
+    return source;
+  }
+
+  const sanitized: Record<string, any> = Array.isArray(source) ? [] : {};
+
+  for (const [key, value] of Object.entries(source)) {
+    if (key.toLowerCase() === "authorization") {
+      sanitized[key] = "[REDACTED]";
+    } else if (value != null && typeof value === "object") {
+      sanitized[key] = sanitizeGitHubHeaders(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized;
+}
+
+export function sanitizeGitHubError(error: any) {
+  if (isAxiosError(error) && error.config) {
+    const safeConfig = {
+      ...error.config,
+      headers: sanitizeGitHubHeaders(error.config.headers),
+    };
+    error.config = safeConfig as any;
+  }
+  return error;
+}
+
 export interface GitHubRepository {
   id: number;
   name: string;
@@ -99,6 +154,52 @@ export class GitHubService {
         ...(token && { Authorization: `Bearer ${token}` }),
       },
     });
+
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (!isAxiosError(error) || !error.config) {
+          throw sanitizeGitHubError(error);
+        }
+
+        const status = error.response?.status;
+        const config = error.config as any;
+
+        if (status === 429 || status === 403) {
+          const rateLimitRemaining = error.response?.headers?.["x-ratelimit-remaining"];
+          if (status === 429 || rateLimitRemaining === "0") {
+            const retryAfterHeader = error.response?.headers?.["retry-after"];
+            const resetHeader = error.response?.headers?.["x-ratelimit-reset"];
+            let retrySeconds = 60;
+
+            if (retryAfterHeader) {
+              retrySeconds = parseInt(retryAfterHeader, 10);
+            } else if (resetHeader) {
+              const resetTime = parseInt(resetHeader, 10) * 1000;
+              retrySeconds = Math.max(1, Math.ceil((resetTime - Date.now()) / 1000));
+            }
+            throw new GitHubRateLimitError(retrySeconds);
+          }
+        }
+
+        const retryStatusCodes = [502, 503, 504];
+        if (
+          (status && retryStatusCodes.includes(status)) ||
+          error.code === "ECONNABORTED" ||
+          !error.response
+        ) {
+          config.retryCount = config.retryCount || 0;
+          if (config.retryCount < 3) {
+            config.retryCount += 1;
+            const backoff = Math.pow(2, config.retryCount) * 1000 + Math.random() * 1000;
+            await new Promise((resolve) => setTimeout(resolve, backoff));
+            return this.client(config);
+          }
+        }
+
+        throw sanitizeGitHubError(error);
+      }
+    );
   }
 
   /**

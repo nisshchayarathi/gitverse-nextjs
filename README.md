@@ -155,6 +155,58 @@ All API routes are available under `/api`:
 - `/api/users/profile` - User profile management
 - `/api/integrations/*` - Git platform integrations
 
+## 📑 API Pagination
+
+To ensure consistent performance and predictability, paginated API endpoints in GitVerse use **cursor-based pagination** instead of traditional offset pagination.
+
+### Query Parameters
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `limit` | `number` | `10` | The maximum number of items to return (clamped to max `50` for safety). |
+| `cursor`| `string` | `null` | The ID of the last item received in the previous page. Omit for the first page. |
+
+### Example Request
+
+```bash
+GET /api/auth/sessions?limit=20&cursor=clq123abc
+```
+
+### Standard Response Format
+
+All paginated endpoints return an object containing an `items` array and a `nextCursor` string. If `nextCursor` is present, it indicates there is more data available.
+
+```json
+{
+  "items": [
+    { "id": "clq123abd", "expires": "2026-05-21T00:00:00.000Z" },
+    { "id": "clq123abe", "expires": "2026-05-20T00:00:00.000Z" }
+  ],
+  "nextCursor": "clq123abf"
+}
+```
+
+### Frontend Consumption Best Practices
+
+When fetching data in the UI (e.g., via infinite scrolling or "Load More" buttons), keep track of the `nextCursor` and pass it to subsequent requests. Avoid duplicate fetches by ensuring UI loading states block concurrent requests.
+
+```javascript
+const loadMore = async () => {
+  if (!nextCursor || isLoading) return;
+  setIsLoading(true);
+  
+  try {
+    const res = await fetch(`/api/auth/sessions?limit=20&cursor=${nextCursor}`);
+    const data = await res.json();
+    
+    setItems((prev) => [...prev, ...data.items]);
+    setNextCursor(data.nextCursor);
+  } finally {
+    setIsLoading(false);
+  }
+};
+```
+
 ## 🚀 Deployment
 
 ### Vercel (Recommended)

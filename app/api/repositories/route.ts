@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to create repository", details: error.message },
+      { error: "Failed to create repository" },
       { status: 500 }
     );
   }

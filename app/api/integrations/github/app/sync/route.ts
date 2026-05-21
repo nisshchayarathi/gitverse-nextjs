@@ -118,7 +118,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to sync GitHub App installation repos",
-        details: error?.message || "Unknown error",
       },
       { status: 500 },
     );

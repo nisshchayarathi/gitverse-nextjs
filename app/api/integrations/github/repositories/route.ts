@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to fetch GitHub repositories", details: error.message },
+      { error: "Failed to fetch GitHub repositories" },
       { status: 500 },
     );
   }

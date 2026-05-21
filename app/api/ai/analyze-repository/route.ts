@@ -9,15 +9,31 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { repositoryId, type } = body;
 
-    if (!repositoryId || !type) {
+    if (repositoryId == null || type == null) {
       return NextResponse.json(
         { error: "Repository ID and analysis type are required" },
         { status: 400 }
       );
     }
 
+    const parsedRepoId = Number(repositoryId);
+    if (!Number.isFinite(parsedRepoId)) {
+      return NextResponse.json(
+        { error: "Repository ID must be a valid number" },
+        { status: 400 }
+      );
+    }
+
+    const validTypes = ["overview", "code-quality", "security", "architecture", "suggestions"];
+    if (typeof type !== "string" || !validTypes.includes(type)) {
+      return NextResponse.json(
+        { error: `Analysis type must be one of: ${validTypes.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
     const repository = await repositoryService.getRepository(
-      repositoryId,
+      parsedRepoId,
       user.userId
     );
 
@@ -45,8 +61,8 @@ export async function POST(request: NextRequest) {
     };
 
     const analysis = await getGeminiService().analyzeRepository({
-      repositoryId,
-      type,
+      repositoryId: parsedRepoId,
+      type: type as "overview" | "code-quality" | "security" | "architecture" | "suggestions",
       context,
     });
 
@@ -61,7 +77,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to analyze repository", details: error.message },
+      { error: "Failed to analyze repository" },
       { status: 500 }
     );
   }

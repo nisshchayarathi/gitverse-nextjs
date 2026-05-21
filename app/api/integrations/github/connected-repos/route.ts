@@ -44,7 +44,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to load connected repos",
-        details: error?.message || "Unknown error",
       },
       { status: 500 },
     );

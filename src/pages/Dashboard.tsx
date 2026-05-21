@@ -23,6 +23,8 @@ import {
   CardContent,
   Button,
   Input,
+  EmptyState,
+  Skeleton,
 } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
@@ -231,33 +233,48 @@ export default function Dashboard() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {stats.map((stat, index) => (
-            <Card
-              key={stat.label}
-              className="glass glass-hover"
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              <CardContent className="pt-4 sm:pt-6">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground mb-1 truncate">
-                      {stat.label}
-                    </p>
-                    <p className="text-2xl sm:text-3xl font-heading font-bold break-words">
-                      {stat.value}
-                    </p>
-                    <p className="text-xs text-accent mt-1 flex items-center gap-1 flex-wrap">
-                      <TrendingUp className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate">{stat.change}</span>
-                    </p>
-                  </div>
-                  <div className="p-2 sm:p-3 rounded-lg bg-primary/10 flex-shrink-0">
-                    <stat.icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="glass">
+                  <CardContent className="pt-4 sm:pt-6">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-3 w-24" />
+                        <Skeleton className="h-8 w-16" />
+                        <Skeleton className="h-3 w-32" />
+                      </div>
+                      <Skeleton className="h-10 w-10 rounded-lg" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            : stats.map((stat, index) => (
+                <Card
+                  key={stat.label}
+                  className="glass glass-hover"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <CardContent className="pt-4 sm:pt-6">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground mb-1 truncate">
+                          {stat.label}
+                        </p>
+                        <p className="text-2xl sm:text-3xl font-heading font-bold break-words">
+                          {stat.value}
+                        </p>
+                        <p className="text-xs text-accent mt-1 flex items-center gap-1 flex-wrap">
+                          <TrendingUp className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{stat.change}</span>
+                        </p>
+                      </div>
+                      <div className="p-2 sm:p-3 rounded-lg bg-primary/10 flex-shrink-0">
+                        <stat.icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -286,13 +303,40 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Loading repositories...
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between p-4 rounded-lg border border-border/50 glass"
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        <Skeleton className="h-10 w-10 rounded-lg" />
+                        <div className="space-y-2 flex-1">
+                          <Skeleton className="h-4 w-1/4" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                      </div>
+                      <div className="flex gap-4">
+                        <Skeleton className="h-4 w-12" />
+                        <Skeleton className="h-4 w-12" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : recentRepositories.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No repositories yet. Add your first repository above!
-                </div>
+                <EmptyState
+                  icon={GitBranch}
+                  title="No Repositories Yet"
+                  description="You haven't analyzed any repositories yet. Enter a GitHub URL above to get started!"
+                  actionLabel="Analyze Repository"
+                  onAction={() => {
+                    const input = document.querySelector('input[type="url"]') as HTMLInputElement;
+                    if (input) {
+                      input.focus();
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
+                />
               ) : (
                 <div className="space-y-3">
                   {recentRepositories.map((repo) => (

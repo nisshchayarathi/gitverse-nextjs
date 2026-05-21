@@ -94,7 +94,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to delete GitHub App data",
-        details: error?.message || "Unknown error",
       },
       { status: 500 },
     );

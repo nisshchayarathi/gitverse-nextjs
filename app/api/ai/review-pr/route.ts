@@ -17,6 +17,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "prUrl is required" }, { status: 400 });
     }
 
+    if (!token) {
+      return NextResponse.json({ error: "token is required" }, { status: 400 });
+    }
+
     const parsed = parsePullRequestUrl(prUrl);
     if (!parsed) {
       return NextResponse.json(
@@ -43,14 +47,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to review PR",
-        details: error?.message || "Unknown error",
       },
       { status: 500 },
     );
   }
-
-  return NextResponse.json(
-    { error: "Failed to review PR", details: "Unexpected fallthrough" },
-    { status: 500 },
-  );
 }
