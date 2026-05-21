@@ -9,7 +9,7 @@ export function RepositoryAnalysisSkeleton() {
 
         <div className="flex-1 space-y-2">
           <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-96" />
+          <Skeleton className="h-4 w-full max-w-md" />
         </div>
       </div>
 
