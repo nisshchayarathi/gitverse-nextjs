@@ -6,6 +6,10 @@
 📁 /home/time_walker/projects/projects/gitverse/gitverse-nextjs/
 ```
 
+## System Requirements
+
+- **Node.js 22.x** is required. See [Supported Node Version](README.md#supported-node-version) in README for details.
+
 ## Immediate Next Steps
 
 ### 1. Open in VS Code

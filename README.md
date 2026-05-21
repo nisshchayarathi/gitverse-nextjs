@@ -41,6 +41,10 @@ Paste a repo → GitVerse builds a visual map + AI onboarding so contributors ca
 - Ask AI questions about files, folders, and architecture
 - Generate analysis jobs and track progress
 
+## Supported Node Version
+
+This project officially supports **Node.js 22.x** (as specified in [package.json](package.json#L4-L6)).
+
 ## Quickstart (local dev)
 
 ```bash
