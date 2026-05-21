@@ -177,7 +177,8 @@ export async function startAnalysisWorkerLoop(opts?: {
 const isMain =
   typeof require !== "undefined" && (require as any).main === module;
 if (isMain) {
-  startAnalysisWorkerLoop().catch((e) => {
+  const once = !!process.env.WORKER_ONCE;
+  startAnalysisWorkerLoop({ once }).catch((e) => {
     console.error("worker fatal:", e);
     process.exit(1);
   });
