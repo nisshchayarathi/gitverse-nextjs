@@ -33,8 +33,56 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.githubService = exports.GitHubService = void 0;
+exports.githubService = exports.GitHubService = exports.GitHubRateLimitError = void 0;
+exports.sanitizeGitHubError = sanitizeGitHubError;
 const axios_1 = __importStar(require("axios"));
+class GitHubRateLimitError extends Error {
+    retryAfterSeconds;
+    constructor(retryAfterSeconds) {
+        super(`GitHub API rate limit reached. Please retry after ${retryAfterSeconds} seconds.`);
+        this.name = "GitHubRateLimitError";
+        this.retryAfterSeconds = retryAfterSeconds;
+    }
+}
+exports.GitHubRateLimitError = GitHubRateLimitError;
+function sanitizeGitHubHeaders(headers) {
+    if (headers == null) {
+        return headers;
+    }
+    if (Array.isArray(headers)) {
+        return headers.map((value) => sanitizeGitHubHeaders(value));
+    }
+    if (typeof headers !== "object") {
+        return headers;
+    }
+    const source = typeof headers.toJSON === "function" ? headers.toJSON() : headers;
+    if (source == null || typeof source !== "object") {
+        return source;
+    }
+    const sanitized = Array.isArray(source) ? [] : {};
+    for (const [key, value] of Object.entries(source)) {
+        if (key.toLowerCase() === "authorization") {
+            sanitized[key] = "[REDACTED]";
+        }
+        else if (value != null && typeof value === "object") {
+            sanitized[key] = sanitizeGitHubHeaders(value);
+        }
+        else {
+            sanitized[key] = value;
+        }
+    }
+    return sanitized;
+}
+function sanitizeGitHubError(error) {
+    if ((0, axios_1.isAxiosError)(error) && error.config) {
+        const safeConfig = {
+            ...error.config,
+            headers: sanitizeGitHubHeaders(error.config.headers),
+        };
+        error.config = safeConfig;
+    }
+    return error;
+}
 class GitHubService {
     client;
     token;
@@ -47,6 +95,42 @@ class GitHubService {
                 "X-GitHub-Api-Version": "2022-11-28",
                 ...(token && { Authorization: `Bearer ${token}` }),
             },
+        });
+        this.client.interceptors.response.use((response) => response, async (error) => {
+            if (!(0, axios_1.isAxiosError)(error) || !error.config) {
+                throw sanitizeGitHubError(error);
+            }
+            const status = error.response?.status;
+            const config = error.config;
+            if (status === 429 || status === 403) {
+                const rateLimitRemaining = error.response?.headers?.["x-ratelimit-remaining"];
+                if (status === 429 || rateLimitRemaining === "0") {
+                    const retryAfterHeader = error.response?.headers?.["retry-after"];
+                    const resetHeader = error.response?.headers?.["x-ratelimit-reset"];
+                    let retrySeconds = 60;
+                    if (retryAfterHeader) {
+                        retrySeconds = parseInt(retryAfterHeader, 10);
+                    }
+                    else if (resetHeader) {
+                        const resetTime = parseInt(resetHeader, 10) * 1000;
+                        retrySeconds = Math.max(1, Math.ceil((resetTime - Date.now()) / 1000));
+                    }
+                    throw new GitHubRateLimitError(retrySeconds);
+                }
+            }
+            const retryStatusCodes = [502, 503, 504];
+            if ((status && retryStatusCodes.includes(status)) ||
+                error.code === "ECONNABORTED" ||
+                !error.response) {
+                config.retryCount = config.retryCount || 0;
+                if (config.retryCount < 3) {
+                    config.retryCount += 1;
+                    const backoff = Math.pow(2, config.retryCount) * 1000 + Math.random() * 1000;
+                    await new Promise((resolve) => setTimeout(resolve, backoff));
+                    return this.client(config);
+                }
+            }
+            throw sanitizeGitHubError(error);
         });
     }
     /**

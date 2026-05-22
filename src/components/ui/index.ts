@@ -6,6 +6,7 @@ export { Spinner, LoadingSpinner } from './Spinner'
 export { Toaster } from './toaster'
 export { toast } from '@/hooks/use-toast'
 export { EmptyState } from './EmptyState'
+export { Skeleton } from './Skeleton'
 export {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -23,4 +24,3 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuRadioGroup,
 } from './dropdown-menu'
-export { Skeleton } from './Skeleton'

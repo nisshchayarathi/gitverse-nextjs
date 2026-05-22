@@ -1,4 +1,34 @@
-import axios, { AxiosInstance } from 'axios'
+import axios, { AxiosInstance, isAxiosError } from 'axios'
+import { getRetryDelayMs } from '@/lib/utils/rateLimit'
+
+export class GitLabRateLimitError extends Error {
+  retryAfterSeconds: number
+  constructor(retryAfterSeconds: number) {
+    super(
+      retryAfterSeconds > 0
+        ? `GitLab API rate limit reached. Please retry after ${retryAfterSeconds} seconds.`
+        : 'GitLab API rate limit reached. Please try again later.',
+    )
+    this.name = 'GitLabRateLimitError'
+    this.retryAfterSeconds = retryAfterSeconds
+  }
+}
+
+function sanitizeGitLabError(error: any) {
+  if (isAxiosError(error) && error.config) {
+    const safeConfig = {
+      ...error.config,
+      headers: error.config.headers
+        ? {
+            ...error.config.headers,
+            'PRIVATE-TOKEN': '[REDACTED]',
+          }
+        : error.config.headers,
+    }
+    error.config = safeConfig as any
+  }
+  return error
+}
 
 export interface GitLabProject {
   id: number
@@ -40,6 +70,51 @@ export class GitLabService {
         ...(token && { 'PRIVATE-TOKEN': token }),
       },
     })
+
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (!isAxiosError(error) || !error.config) {
+          throw sanitizeGitLabError(error)
+        }
+
+        const status = error.response?.status
+        const config = error.config as any
+        config.retryCount = config.retryCount || 0
+
+        if (status === 429) {
+          if (config.retryCount >= 3) {
+            const retryAfterHeader = error.response?.headers?.['retry-after']
+            const retrySeconds = retryAfterHeader
+              ? Math.max(1, parseInt(retryAfterHeader, 10))
+              : 60
+            throw new GitLabRateLimitError(retrySeconds)
+          }
+          config.retryCount += 1
+          const delayMs = getRetryDelayMs(error, config.retryCount) ?? 1000
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
+          return this.client(config)
+        }
+
+        const retryableCodes = [502, 503, 504]
+        if (
+          (status && retryableCodes.includes(status)) ||
+          error.code === 'ECONNABORTED' ||
+          error.code === 'ECONNRESET' ||
+          error.code === 'ETIMEDOUT' ||
+          !error.response
+        ) {
+          if (config.retryCount < 3) {
+            config.retryCount += 1
+            const backoff = Math.pow(2, config.retryCount) * 1000 + Math.random() * 1000
+            await new Promise((resolve) => setTimeout(resolve, backoff))
+            return this.client(config)
+          }
+        }
+
+        throw sanitizeGitLabError(error)
+      },
+    )
   }
 
   /**
@@ -88,7 +163,7 @@ export class GitLabService {
    */
   async getBranches(projectId: string): Promise<any[]> {
     const response = await this.client.get(
-      `/projects/${encodeURIComponent(projectId)}/repository/branches`
+      `/projects/${encodeURIComponent(projectId)}/repository/branches`,
     )
     return response.data
   }
@@ -102,7 +177,7 @@ export class GitLabService {
       ref_name?: string
       per_page?: number
       page?: number
-    }
+    },
   ): Promise<any[]> {
     const response = await this.client.get(
       `/projects/${encodeURIComponent(projectId)}/repository/commits`,
@@ -112,7 +187,7 @@ export class GitLabService {
           per_page: params?.per_page || 100,
           page: params?.page || 1,
         },
-      }
+      },
     )
 
     return response.data
@@ -123,7 +198,7 @@ export class GitLabService {
    */
   async getContributors(projectId: string): Promise<any[]> {
     const response = await this.client.get(
-      `/projects/${encodeURIComponent(projectId)}/repository/contributors`
+      `/projects/${encodeURIComponent(projectId)}/repository/contributors`,
     )
     return response.data
   }
@@ -132,7 +207,10 @@ export class GitLabService {
    * Parse GitLab URL
    */
   static parseGitLabUrl(url: string): { projectPath: string } | null {
-    const patterns = [/gitlab\.com\/([^\/]+\/[^\/]+?)(?:\.git)?$/, /gitlab\.com\/([^\/]+\/[^\/]+)/]
+    const patterns = [
+      /gitlab\.com\/([^\/]+\/[^\/]+?)(?:\.git)?$/,
+      /gitlab\.com\/([^\/]+\/[^\/]+)/,
+    ]
 
     for (const pattern of patterns) {
       const match = url.match(pattern)

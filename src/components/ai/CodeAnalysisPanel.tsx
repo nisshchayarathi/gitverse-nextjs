@@ -7,7 +7,7 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { Card } from "@/components/ui";
+import { Card, EmptyState } from "@/components/ui";
 import { geminiService, CodeAnalysisRequest } from "@/services/gemini";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -300,13 +300,11 @@ export function CodeAnalysisPanel() {
           </h3>
 
           {results.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Code className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No analysis yet</p>
-              <p className="text-sm mt-2">
-                Enter your code and click analyze to get started
-              </p>
-            </div>
+            <EmptyState
+              icon={Code}
+              title="No analysis yet"
+              description="Enter your code and select an analysis option above to get started"
+            />
           ) : (
             <div className="space-y-4 max-h-[600px] overflow-y-auto">
               {results.map((result, index) => {

@@ -3,6 +3,11 @@ import os from "os";
 import prisma from "../lib/prisma";
 import { analysisJobService } from "../lib/services/analysisJobService";
 import { repositoryService } from "../lib/services/repositoryService";
+import {
+  isRateLimitError,
+  extractRetryAfter,
+  sanitizeErrorMessage,
+} from "../lib/utils/rateLimit";
 import type { AnalysisJob } from "@prisma/client";
 
 const POLL_INTERVAL_MS = 2000;
@@ -27,7 +32,7 @@ async function runJob(
     lockMs: number;
     heartbeatIntervalMs: number;
   }
-) {
+): Promise<boolean> {
   let heartbeatTimer: NodeJS.Timeout | null = null;
   let lastProgressWriteAt = 0;
   let lastProgressPercent: number | undefined;
@@ -79,7 +84,7 @@ async function runJob(
           workerId: params.workerId,
           lockMs: params.lockMs,
         })
-        .catch((e) => console.error("heartbeat failed", e));
+        .catch((e) => console.error("heartbeat failed", sanitizeErrorMessage(e)));
     }, params.heartbeatIntervalMs);
 
     if (job.type !== "repository_analysis") {
@@ -96,20 +101,57 @@ async function runJob(
       jobId: job.id,
       workerId: params.workerId,
     });
+    return true;
   } catch (err: any) {
-    const message = err?.message ? String(err.message) : String(err);
-    console.error(`Job ${job.id} failed:`, err);
+    const rateLimited = isRateLimitError(err);
+    const retryAfter = rateLimited ? extractRetryAfter(err) : null;
+    const safeMessage = sanitizeErrorMessage(err);
+
+    if (rateLimited) {
+      console.error(
+        `Job ${job.id} rate limited (attempt ${job.attempts}/${job.maxAttempts})` +
+          (retryAfter ? `, retry after ${retryAfter}s` : "")
+      );
+    } else {
+      console.error(`Job ${job.id} failed: ${safeMessage}`);
+    }
 
     await analysisJobService.markFailed({
       jobId: job.id,
       workerId: params.workerId,
-      error: message,
+      error: safeMessage,
       attempts: job.attempts,
       maxAttempts: job.maxAttempts,
+      retryAfter: retryAfter ?? undefined,
     });
+
+    const shouldRetry = job.attempts < job.maxAttempts;
+    if (!shouldRetry && job.type === "repository_analysis") {
+      await repositoryService.markRepositoryFailed(job.repositoryId, safeMessage);
+    }
+
+    return false;
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
   }
+}
+
+export interface JobOutcome {
+  jobId: string;
+  status: "processed" | "failed" | "errored";
+  error?: string;
+}
+
+export interface AnalysisWorkerSummary {
+  totalJobsScanned: number;
+  jobsProcessed: number;
+  jobsSkipped: number;
+  jobsFailed: number;
+  jobsErrored: number;
+  executionDurationMs: number;
+  earlyStopReason?: string;
+  success: boolean;
+  jobOutcomes: JobOutcome[];
 }
 
 export async function startAnalysisWorkerLoop(opts?: {
@@ -118,7 +160,8 @@ export async function startAnalysisWorkerLoop(opts?: {
   heartbeatIntervalMs?: number;
   lockMs?: number;
   once?: boolean;
-}) {
+  maxJobs?: number;
+}): Promise<AnalysisWorkerSummary> {
   const workerId = opts?.workerId || getWorkerId();
   const pollIntervalMs = opts?.pollIntervalMs ?? POLL_INTERVAL_MS;
   const heartbeatIntervalMs =
@@ -128,6 +171,13 @@ export async function startAnalysisWorkerLoop(opts?: {
   console.log(`analysis worker starting: ${workerId}`);
 
   let stopping = false;
+  const startTimeMs = Date.now();
+  const deadline = opts?.timeBudgetMs ? Date.now() + opts.timeBudgetMs : Infinity;
+  let totalJobsScanned = 0;
+  let jobsProcessed = 0;
+  let jobsSkipped = 0;
+  let jobsFailed = 0;
+  let earlyStopReason: string | undefined;
 
   const shutdown = async (signal: string) => {
     if (stopping) return;
@@ -144,31 +194,90 @@ export async function startAnalysisWorkerLoop(opts?: {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("SIGINT", () => void shutdown("SIGINT"));
 
+  const startTime = Date.now();
+  let jobsProcessed = 0;
+  let jobsSkipped = 0;
+
   while (!stopping) {
+    if (opts?.maxJobs !== undefined && (jobsProcessed + jobsFailed) >= opts.maxJobs) {
+      console.log(`maxJobs limit of ${opts.maxJobs} reached, stopping loop.`);
+      earlyStopReason = "maxJobsReached";
+      break;
+    }
+
     try {
+      if (opts?.timeBudgetMs) {
+        const elapsed = Date.now() - startTime;
+        if (elapsed >= opts.timeBudgetMs) {
+          console.log(`Time budget of ${opts.timeBudgetMs}ms reached (elapsed: ${elapsed}ms). Processed ${jobsProcessed} jobs. Shutting down gracefully...`);
+          break;
+        }
+      }
+
       const job = await analysisJobService.claimNextJob({
         workerId,
         lockMs,
       });
 
       if (!job) {
-        if (opts?.once) return;
+        jobsSkipped++;
+        if (opts?.once || opts?.maxJobs !== undefined) {
+          earlyStopReason = earlyStopReason || "queueEmpty";
+          break;
+        }
         await sleep(pollIntervalMs);
         continue;
       }
 
+      totalJobsScanned++;
       console.log(
         `claimed job ${job.id} (attempt ${job.attempts}/${job.maxAttempts})`
       );
-      await runJob(job, { workerId, lockMs, heartbeatIntervalMs });
+      const isSuccess = await runJob(job, { workerId, lockMs, heartbeatIntervalMs });
+      
+      if (isSuccess) {
+        jobsProcessed++;
+        jobOutcomes.push({ jobId: job.id, status: "processed" });
+      } else {
+        jobsFailed++;
+        jobOutcomes.push({ jobId: job.id, status: "failed" });
+      }
 
-      if (opts?.once) return;
+      if (opts?.once) {
+        earlyStopReason = earlyStopReason || "onceCompleted";
+        break;
+      }
     } catch (e) {
-      console.error("worker loop error:", e);
-      if (opts?.once) return;
+      console.error("worker loop error:", sanitizeErrorMessage(e));
+      if (opts?.once || opts?.maxJobs !== undefined) {
+        return {
+          totalJobsScanned,
+          jobsProcessed,
+          jobsSkipped,
+          jobsFailed,
+          jobsErrored,
+          executionDurationMs: Date.now() - startTimeMs,
+          earlyStopReason: "errorOut",
+          success: false,
+          jobOutcomes,
+        };
+      }
       await sleep(pollIntervalMs);
     }
   }
+
+  const success = jobsFailed === 0 && jobsErrored === 0;
+
+  return {
+    totalJobsScanned,
+    jobsProcessed,
+    jobsSkipped,
+    jobsFailed,
+    jobsErrored,
+    executionDurationMs: Date.now() - startTimeMs,
+    earlyStopReason,
+    success: true,
+  };
 }
 
 // Run as standalone script
@@ -177,7 +286,13 @@ export async function startAnalysisWorkerLoop(opts?: {
 const isMain =
   typeof require !== "undefined" && (require as any).main === module;
 if (isMain) {
-  startAnalysisWorkerLoop().catch((e) => {
+  const once = !!process.env.WORKER_ONCE;
+  const budgetEnv = process.env.WORKER_TIME_BUDGET_MS;
+  const timeBudgetMs = budgetEnv ? parseInt(budgetEnv, 10) : undefined;
+  startAnalysisWorkerLoop({
+    ...(once ? { once } : {}),
+    ...(timeBudgetMs && !Number.isNaN(timeBudgetMs) ? { timeBudgetMs } : {}),
+  }).catch((e) => {
     console.error("worker fatal:", e);
     process.exit(1);
   });

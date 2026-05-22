@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { GitHubAppService } from "@/lib/services/githubAppService";
-import { GitHubService } from "@/lib/services/githubService";
+import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
+import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -108,7 +109,15 @@ export async function POST(request: NextRequest) {
       { status: 200 },
     );
   } catch (error: any) {
-    console.error("GitHub App sync error:", error);
+    console.error("GitHub App sync error:", sanitizeErrorMessage(error));
+
+    if (error instanceof GitHubRateLimitError) {
+      return NextResponse.json(
+        { error: error.message, retryAfter: error.retryAfterSeconds },
+        { status: 429 }
+      );
+    }
+
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },

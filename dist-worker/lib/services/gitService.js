@@ -105,37 +105,10 @@ function normalizeNumstatFilePath(rawPath) {
     }
     return after;
 }
-function shellEscapeSingleQuoted(value) {
-    // Safe for POSIX shells: wrap in single quotes and escape embedded single quotes.
-    return `'${value.replace(/'/g, `'\\''`)}'`;
-}
 class GitService {
     repoPath;
     constructor(repoPath) {
         this.repoPath = repoPath;
-    }
-    async listTreeNames(treePath) {
-        try {
-            const treeish = treePath ? `HEAD:${treePath}` : "HEAD";
-            const { stdout } = await execPromise(`cd "${this.repoPath}" && git ls-tree --name-only ${shellEscapeSingleQuoted(treeish)}`, { timeout: DEFAULT_GIT_TIMEOUT_MS });
-            return stdout
-                .split("\n")
-                .map((s) => s.trim())
-                .filter(Boolean);
-        }
-        catch {
-            return [];
-        }
-    }
-    async showFileAtHead(filePath) {
-        try {
-            const spec = `HEAD:${filePath}`;
-            const { stdout } = await execPromise(`cd "${this.repoPath}" && git show ${shellEscapeSingleQuoted(spec)}`, { timeout: DEFAULT_GIT_TIMEOUT_MS });
-            return typeof stdout === "string" ? stdout : "";
-        }
-        catch {
-            return null;
-        }
     }
     /**
      * Clone a repository to a temporary directory

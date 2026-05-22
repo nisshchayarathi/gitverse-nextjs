@@ -165,6 +165,10 @@ export async function reviewPullRequest(params: {
     params.repo,
     params.number,
   );
+  if (!pr) {
+    throw new Error(`Pull request ${params.owner}/${params.repo}#${params.number} not found. It may have been deleted or access is denied.`);
+  }
+
   const prFiles = await github.getPullRequestFiles(
     params.owner,
     params.repo,

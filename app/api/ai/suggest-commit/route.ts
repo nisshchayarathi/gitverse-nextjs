@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth } from "@/lib/api-auth";
 import { getGeminiService } from "@/lib/services/geminiService";
 
 export async function POST(request: NextRequest) {
@@ -8,13 +8,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { added, modified, deleted, diff } = body;
 
-    const hasValidInput =
-      (Array.isArray(added) && added.length > 0) ||
-      (Array.isArray(modified) && modified.length > 0) ||
-      (Array.isArray(deleted) && deleted.length > 0) ||
-      (typeof diff === "string" && diff.trim().length > 0);
-
-    if (!hasValidInput) {
+    if (
+      (!added || added.length === 0) &&
+      (!modified || modified.length === 0) &&
+      (!deleted || deleted.length === 0) &&
+      !diff
+    ) {
       return NextResponse.json(
         { error: "At least one of added, modified, deleted, or diff is required" },
         { status: 400 }
@@ -38,9 +37,6 @@ export async function POST(request: NextRequest) {
         { status: error.status }
       );
     }
-    return NextResponse.json(
-      { error: "Failed to generate suggestions" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

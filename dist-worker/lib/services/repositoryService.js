@@ -80,39 +80,6 @@ class RepositoryService {
             return null;
         }
     }
-    async tryReadmeFromGit(gitService) {
-        const candidates = [
-            "readme.md",
-            "readme.markdown",
-            "readme.mdx",
-            "readme.txt",
-            "readme.rst",
-            "readme",
-        ];
-        const scanDirs = ["", "docs", ".github"];
-        for (const dir of scanDirs) {
-            const names = await gitService.listTreeNames(dir || undefined);
-            if (!names.length)
-                continue;
-            const byLower = new Map(names.map((n) => [n.toLowerCase(), n]));
-            for (const lower of candidates) {
-                const actual = byLower.get(lower);
-                if (!actual)
-                    continue;
-                const relPath = dir ? `${dir}/${actual}` : actual;
-                const content = await gitService.showFileAtHead(relPath);
-                if (!content)
-                    continue;
-                const trimmed = content.trim();
-                if (!trimmed)
-                    continue;
-                const maxChars = 200_000;
-                const safeText = trimmed.length > maxChars ? trimmed.slice(0, maxChars) : trimmed;
-                return { path: relPath, text: safeText };
-            }
-        }
-        return null;
-    }
     async fetchAndStoreReadme(repositoryId, userId) {
         const repository = await prisma_1.default.repository.findFirst({
             where: { id: repositoryId, userId },
@@ -129,10 +96,7 @@ class RepositoryService {
                 depth: 1,
                 noSingleBranch: false,
             });
-            let readme = await this.tryReadmeFromRepoPath(tempDir);
-            if (!readme) {
-                readme = await this.tryReadmeFromGit(gitService);
-            }
+            const readme = await this.tryReadmeFromRepoPath(tempDir);
             const updated = await prisma_1.default.repository.update({
                 where: { id: repositoryId },
                 data: {
@@ -219,18 +183,7 @@ class RepositoryService {
             gitService = await gitService_1.GitService.cloneRepository(repository.url, tempDir);
             // Capture README early (best-effort)
             await report({ progressPercent: 8, progressMessage: "Reading README" });
-            let readme = await this.tryReadmeFromRepoPath(tempDir);
-            if (!readme) {
-                readme = await this.tryReadmeFromGit(gitService);
-            }
-            console.log(`README capture for repo ${repositoryId}: ${readme ? "found" : "missing"}${readme?.path ? ` (${readme.path})` : ""}`);
-            await report({
-                progressDetails: {
-                    readmeFound: Boolean(readme),
-                    readmePath: readme?.path ?? null,
-                    readmeChars: readme?.text?.length ?? 0,
-                },
-            });
+            const readme = await this.tryReadmeFromRepoPath(tempDir);
             await prisma_1.default.repository.update({
                 where: { id: repositoryId },
                 data: {

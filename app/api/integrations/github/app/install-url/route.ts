@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth } from "@/lib/api-auth";
+import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 import { createSignedState } from "@/lib/utils/signedState";
 
 function getRequiredEnv(name: string): string {
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url }, { status: 200 });
   } catch (error: any) {
-    console.error("GitHub App install-url error:", error);
+    console.error("GitHub App install-url error:", sanitizeErrorMessage(error));
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },

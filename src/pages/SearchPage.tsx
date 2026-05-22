@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
+import { useDebounce } from "@/src/hooks/useDebounce";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Grid, List, GitBranch, Clock, Activity } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -15,7 +16,6 @@ import {
   Button,
   Input,
   EmptyState,
-  Skeleton,
 } from "@/components/ui";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
@@ -41,6 +41,7 @@ export default function SearchPage() {
   const initialUrl = searchParams?.get("repoUrl") || "";
 
   const [searchQuery, setSearchQuery] = useState(initialUrl);
+  const debouncedQuery = useDebounce(searchQuery, 300);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"recent" | "stars" | "name">("recent");
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -66,14 +67,32 @@ export default function SearchPage() {
       setLoading(false);
     }
   };
+  function highlightMatch(text: string, query: string) {
+  if (!query.trim()) return <span>{text}</span>;
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  const parts = text.split(regex);
+  return (
+    <span>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark key={i} className="bg-yellow-200 dark:bg-yellow-800 text-foreground rounded px-0.5">
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </span>
+  );
+}
 
   const filteredRepositories = Array.isArray(repositories)
     ? repositories.filter(
         (repo) =>
-          repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          repo.name.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
           (repo.description || "")
             .toLowerCase()
-            .includes(searchQuery.toLowerCase())
+            .includes(debouncedQuery.toLowerCase())
       )
     : [];
 
@@ -151,47 +170,14 @@ export default function SearchPage() {
 
         {/* Repository Grid/List */}
         {loading ? (
-          viewMode === "grid" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="glass">
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-10 w-10 rounded-lg" />
-                      <div className="space-y-2 flex-1">
-                        <Skeleton className="h-4 w-1/3" />
-                        <Skeleton className="h-3 w-1/2" />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Skeleton className="h-4 w-5/6" />
-                    <Skeleton className="h-4 w-2/3" />
-                    <div className="flex justify-between pt-3 border-t border-border/50">
-                      <Skeleton className="h-4 w-16" />
-                      <Skeleton className="h-4 w-20" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="glass">
-                  <CardContent className="pt-4 sm:pt-6">
-                    <div className="flex items-center gap-4">
-                      <Skeleton className="h-12 w-12 rounded-lg" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-1/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )
+         <div
+  role="status"
+  aria-live="polite"
+  className="flex items-center justify-center py-12 text-muted-foreground motion-safe:animate-pulse motion-reduce:animate-none"
+>
+  <span aria-hidden="true">Loading repositories...</span>
+  <span className="sr-only">Loading repositories...</span>
+</div>
         ) : sortedRepositories.length === 0 ? (
           searchQuery ? (
             <EmptyState
@@ -227,7 +213,7 @@ export default function SearchPage() {
                       </div>
                       <div>
                         <CardTitle className="font-heading text-base sm:text-lg break-all">
-                          {repo.name}
+                          {highlightMatch(repo.name, debouncedQuery)}
                         </CardTitle>
                         <CardDescription className="text-xs font-mono break-all max-w-[180px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[400px]">
                           {repo.url}
@@ -238,7 +224,7 @@ export default function SearchPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-4 line-clamp-2 min-h-[32px]">
-                    {repo.description || "No description available"}
+                    {highlightMatch(repo.description || "No description available", debouncedQuery)}
                   </p>
                   <div className="flex flex-wrap items-center justify-between text-xs sm:text-sm">
                     <div className="flex items-center gap-4 text-muted-foreground">
@@ -290,7 +276,7 @@ export default function SearchPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1">
                         <h3 className="font-heading font-semibold text-base sm:text-lg break-all">
-                          {repo.name}
+                          {highlightMatch(repo.name, debouncedQuery)}
                         </h3>
                         {(repo as any).languages?.[0]?.name && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-accent/10 text-accent">
@@ -299,7 +285,7 @@ export default function SearchPage() {
                         )}
                       </div>
                       <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 min-h-[24px]">
-                        {repo.description || "No description available"}
+                        {highlightMatch(repo.description || "No description available", debouncedQuery)}
                       </p>
                       <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
