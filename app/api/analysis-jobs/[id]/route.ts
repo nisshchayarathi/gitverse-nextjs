@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireAuth, isHttpError } from "@/lib/middleware";
+import { requireAuth, isHttpError } from "@/lib/api-auth";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 
 export async function GET(
@@ -25,7 +25,7 @@ export async function GET(
     });
 
     if (!job) {
-      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
 
     const details = job.progressDetails as { retryAfter?: number; rateLimited?: boolean } | null;
@@ -62,9 +62,6 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(
-      { error: "Failed to get analysis job" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

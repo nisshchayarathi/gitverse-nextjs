@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/middleware";
+import { getAuthUser } from "@/lib/api-auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,9 +15,7 @@ export async function POST(request: NextRequest) {
         const user = await getAuthUser(request);
 
     if (!user) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
 const contentLength = request.headers.get("content-length");
@@ -66,9 +64,6 @@ if (contentLength && Number(contentLength) > MAX_BODY_SIZE) {
     console.error("Logout API Error:", error);
 
     //prevent stack trace from reaching client
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

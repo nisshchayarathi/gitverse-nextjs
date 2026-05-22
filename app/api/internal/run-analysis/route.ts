@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     process.env.ANALYSIS_RUNNER_SECRET &&
     authHeader !== `Bearer ${process.env.ANALYSIS_RUNNER_SECRET}`
   ) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   console.log('Starting analysis cron run...');

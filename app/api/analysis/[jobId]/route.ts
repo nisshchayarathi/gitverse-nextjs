@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware";
+import { requireAuth } from "@/lib/api-auth";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 
 export async function GET(
@@ -25,12 +25,12 @@ export async function GET(
     const job = await analysisJobService.getJob({ jobId, userId: user.userId });
 
     if (!job) {
-      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
 
     return NextResponse.json({ job });
   } catch (error: any) {
     console.error("GET /analysis/:jobId error:", error);
-    return NextResponse.json({ error: "Failed to fetch job" }, { status: 500 });
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

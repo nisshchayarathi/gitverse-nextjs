@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+<<<<<<< HEAD
 import { isHttpError, requireAuth } from "@/lib/middleware";
 import { AnalysisTimeoutError } from "@/lib/errors/AnalysisTimeoutError";
+=======
+import { isHttpError, requireAuth } from "@/lib/api-auth";
+>>>>>>> upstream/main
 import { getGeminiService } from "@/lib/services/geminiService";
 import { repositoryService } from "@/lib/services/repositoryService";
 

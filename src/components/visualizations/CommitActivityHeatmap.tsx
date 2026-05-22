@@ -59,27 +59,9 @@ export function CommitActivityHeatmap({
   } | null>(null);
 
   // =========================================================
-  // CRITICAL FIX: EARLY EXTENDED GUARD FOR PERFORMANCE & SAFETY
+  // CRITICAL FIX: LATE EXTENDED GUARD FOR PERFORMANCE & SAFETY
   // =========================================================
-  if (!repository?.commits || repository.commits.length === 0) {
-    return (
-      <Card className="glass p-4 sm:p-6 flex min-h-[350px] w-full flex-col items-center justify-center rounded-xl border border-dashed border-border/60 text-center">
-        <div className="w-full text-left mb-4">
-          <h3 className="text-base sm:text-lg font-semibold">Commit Activity</h3>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Contribution activity over the last 52 weeks
-          </p>
-        </div>
-        <div className="flex flex-col items-center justify-center py-8">
-          <EmptyState
-            icon={Calendar}
-            title="No commit activity"
-            description="We couldn't find any commit history recorded for this repository."
-          />
-        </div>
-      </Card>
-    );
-  }
+  const hasNoCommits = !repository?.commits || repository.commits.length === 0;
 
   useEffect(() => {
     // Advance the window automatically as time passes (refresh at next local midnight).
@@ -100,7 +82,11 @@ export function CommitActivityHeatmap({
   }, []);
 
   useEffect(() => {
-    if (!svgRef.current) return;
+    if (!svgRef.current || !repository?.commits || repository.commits.length === 0) return;
+
+    if (!repository?.commits || repository.commits.length === 0) {
+      return;
+    }
 
     const data = generateCommitData(repository.commits, now);
     const svg = d3.select(svgRef.current);
@@ -368,6 +354,26 @@ export function CommitActivityHeatmap({
   const selectedCommits = selectedDate
     ? getCommitsForDate(selectedDate.date)
     : [];
+
+  if (hasNoCommits) {
+    return (
+      <Card className="glass p-4 sm:p-6 flex min-h-[350px] w-full flex-col items-center justify-center rounded-xl border border-dashed border-border/60 text-center">
+        <div className="w-full text-left mb-4">
+          <h3 className="text-base sm:text-lg font-semibold">Commit Activity</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Contribution activity over the last 52 weeks
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center py-8">
+          <EmptyState
+            icon={Calendar}
+            title="No commit activity"
+            description="We couldn't find any commit history recorded for this repository."
+          />
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="glass p-4 sm:p-6">

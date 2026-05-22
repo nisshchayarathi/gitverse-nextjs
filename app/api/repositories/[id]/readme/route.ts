@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth } from "@/lib/api-auth";
 import { repositoryService } from "@/lib/services/repositoryService";
 
 export async function POST(
@@ -41,7 +41,7 @@ export async function POST(
     }
 
     if (error?.message === "Repository not found") {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+      return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
 
     return NextResponse.json(

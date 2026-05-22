@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth } from "@/lib/api-auth";
 import { GitHubAppService } from "@/lib/services/githubAppService";
 import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkRateLimit } from '@/src/utils/rateLimit';
+import { checkRateLimit } from '@/utils/rateLimit';
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { generateToken } from "@/lib/auth";
@@ -50,10 +50,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Security: never allow password login for Google-only accounts.
@@ -64,29 +61,20 @@ export async function POST(request: NextRequest) {
         })) > 0;
 
       if (hasGoogleAccount) {
-        return NextResponse.json(
-          { error: "Email already exists. Please sign in with Google." },
-          { status: 401 }
-        );
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
     }
 
     // Verify password
     const passwordHash = user.passwordHash || (user as any).password;
     if (!passwordHash) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const isValidPassword = await bcrypt.compare(password, passwordHash);
 
     if (!isValidPassword) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Generate JWT token
@@ -103,9 +91,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth } from "@/lib/api-auth";
 import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 import { createSignedState } from "@/lib/utils/signedState";
 

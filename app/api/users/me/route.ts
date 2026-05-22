@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/middleware";
+import { requireAuth } from "@/lib/api-auth";
 import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       })) > 0;
 
     if (!userDetails) {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -41,10 +41,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error fetching user:", sanitizeErrorMessage(error));
-    return NextResponse.json(
-      { message: "Failed to fetch user" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -60,11 +57,8 @@ export async function DELETE(request: NextRequest) {
   } catch (error: any) {
     console.error("Error deleting account:", sanitizeErrorMessage(error));
     if (error?.code === "P2025") {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
-    return NextResponse.json(
-      { message: "Failed to delete account" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
