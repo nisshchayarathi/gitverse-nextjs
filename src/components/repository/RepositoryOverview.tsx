@@ -13,14 +13,21 @@ import {
   TrendingUp,
   ExternalLink,
 } from "lucide-react";
+
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
+<<<<<<< HEAD
+=======
   Skeleton,
+>>>>>>> upstream/main
 } from "@/components/ui";
+
+import { EmptyState } from "@/components/ui/EmptyState";
+
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -194,9 +201,21 @@ export const RepositoryOverview = ({
     // Allow common README HTML (like <img align="right" ...>) while keeping things safe.
     const schema: any = {
       ...(defaultSchema as any),
+<<<<<<< HEAD
+
+      // Note: "img" is already in defaultSchema.tagNames, so we don't need to add it manually.
+
+      // Explicitly restrict protocols for attributes to mitigate protocol-based XSS (e.g., javascript:)
+      protocols: {
+        ...((defaultSchema as any).protocols || {}),
+        href: ["http", "https", "mailto"], // Only allow safe URI schemes for links
+      },
+
+=======
       tagNames: Array.from(
         new Set([...(defaultSchema as any).tagNames, "img"]),
       ),
+>>>>>>> upstream/main
       attributes: {
         ...((defaultSchema as any).attributes || {}),
         a: Array.from(

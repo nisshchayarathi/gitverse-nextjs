@@ -260,9 +260,13 @@ export class RepositoryService {
           ? await prisma.commit.findMany({
               where: {
                 repositoryId,
+<<<<<<< HEAD
+                hash: { in: commits.map((c) => c.hash) },
+=======
                 hash: {
                   in: commits.map((commit: { hash: string }) => commit.hash),
                 },
+>>>>>>> upstream/main
               },
               select: { hash: true },
             })
@@ -271,7 +275,11 @@ export class RepositoryService {
 
       // Filter out commits that already exist
       const newCommits = commits.filter(
+<<<<<<< HEAD
+        (commit) => !existingHashes.has(commit.hash),
+=======
         (commit: { hash: string }) => !existingHashes.has(commit.hash),
+>>>>>>> upstream/main
       );
 
       console.log(
@@ -316,14 +324,24 @@ export class RepositoryService {
               ? await prisma.commit.findMany({
                   where: {
                     repositoryId,
+<<<<<<< HEAD
+                    hash: { in: chunk.map((commit) => commit.hash) },
+=======
                     hash: {
                       in: chunk.map((commit: { hash: string }) => commit.hash),
                     },
+>>>>>>> upstream/main
                   },
                   select: { id: true, hash: true },
                 })
               : [];
           const commitIdByHash = new Map(
+<<<<<<< HEAD
+            insertedCommits.map((commit) => [commit.hash, commit.id]),
+          );
+
+          const fileChanges = chunk.flatMap((commit) => {
+=======
             insertedCommits.map((commit: { hash: string; id: number }) => [
               commit.hash,
               commit.id,
@@ -340,6 +358,7 @@ export class RepositoryService {
                 changeType: "added" | "modified" | "deleted";
               }>;
             }) => {
+>>>>>>> upstream/main
             const commitId = commitIdByHash.get(commit.hash);
             if (!commitId || commit.fileChanges.length === 0) return [];
 
@@ -350,8 +369,12 @@ export class RepositoryService {
               changeType: change.changeType,
               commitId,
             }));
+<<<<<<< HEAD
+          });
+=======
             },
           );
+>>>>>>> upstream/main
 
           if (fileChanges.length > 0) {
             await prisma.fileChange.createMany({

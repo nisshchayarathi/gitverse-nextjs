@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Check Errors: TypeScript",
+      "type": "shell",
+      "command": "npm run typecheck",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Check Errors: Next Build",
+      "type": "shell",
+      "command": "npm run build",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

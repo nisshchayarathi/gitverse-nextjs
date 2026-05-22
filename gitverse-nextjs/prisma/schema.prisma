@@ -1,0 +1,334 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  DONE
+  FAILED
+}
+
+enum PullRequestStatus {
+  OPEN
+  CLOSED
+  MERGED
+  FAILED
+}
+
+model User {
+  id                    Int          @id @default(autoincrement())
+  email                 String       @unique
+  passwordHash          String?      @map("password_hash") // Optional for OAuth users
+  name                  String
+  emailVerified         DateTime?    @map("email_verified")
+  image                 String?      @map("avatar_url")
+  emailNotifications    Boolean      @default(true) @map("email_notifications")
+  pushNotifications     Boolean      @default(false) @map("push_notifications")
+  weeklyDigest          Boolean      @default(true) @map("weekly_digest")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+  repositories          Repository[]
+  analysisJobs          AnalysisJob[]
+  accounts              Account[]
+  sessions              Session[]
+  githubAccount         GitHubAccount?
+  githubRepos           GitHubRepo[]
+
+  @@map("users")
+}
+
+model GitHubAccount {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @unique @map("user_id")
+  githubUserId BigInt   @unique @map("github_user_id")
+  username     String   @map("username")
+  accessToken  String   @map("access_token") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([username])
+  @@map("github_accounts")
+}
+
+model GitHubRepo {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  repoFullName String   @map("repo_full_name")
+  installationId BigInt? @map("installation_id")
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pullRequests PullRequest[]
+
+  @@unique([userId, repoFullName])
+  @@index([installationId])
+  @@index([enabled])
+  @@map("github_repos")
+}
+
+model PullRequest {
+  id        Int               @id @default(autoincrement())
+  repoId    Int               @map("repo_id")
+  prNumber  Int               @map("pr_number")
+  title     String
+  author    String
+  headSha   String            @map("head_sha")
+  htmlUrl   String            @map("html_url")
+  status    PullRequestStatus @default(OPEN)
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  repo    GitHubRepo  @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  reviews PRReview[]
+
+  @@unique([repoId, prNumber])
+  @@index([repoId])
+  @@index([headSha])
+  @@map("pull_requests")
+}
+
+model PRReview {
+  id            Int      @id @default(autoincrement())
+  pullRequestId Int      @map("pull_request_id")
+  headSha       String   @map("head_sha")
+  reviewText    String   @map("review_text") @db.Text
+  rawJson       Json     @map("raw_json")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  pullRequest PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+
+  @@unique([pullRequestId, headSha])
+  @@index([createdAt])
+  @@map("pr_reviews")
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             Int     @map("user_id")
+  type               String
+  provider           String
+  providerAccountId  String  @map("provider_account_id")
+  refresh_token      String? @db.Text
+  access_token       String? @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       Int      @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Repository {
+  id             Int           @id @default(autoincrement())
+  name           String
+  url            String
+  description    String?
+  readmePath     String?       @map("readme_path")
+  readmeText     String?       @map("readme_text") @db.Text
+  readmeFetchedAt DateTime?    @map("readme_fetched_at")
+  defaultBranch  String        @default("main") @map("default_branch")
+  isPrivate      Boolean       @default(false) @map("is_private")
+  stars          Int           @default(0)
+  forks          Int           @default(0)
+  size           Int           @default(0) // Size in bytes
+  lastAnalyzedAt DateTime?     @map("last_analyzed_at")
+  status         String        @default("pending") // pending, analyzing, completed, failed
+  userId         Int           @map("user_id")
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  branches       Branch[]
+  commits        Commit[]
+  files          File[]
+  contributors   Contributor[]
+  languages      Language[]
+  analysisJobs   AnalysisJob[]
+
+  @@map("repositories")
+}
+
+model AnalysisJob {
+  id             String    @id @default(uuid()) @db.Uuid
+  status         JobStatus @default(QUEUED)
+  type           String    @default("repository_analysis")
+
+  repositoryId   Int       @map("repository_id")
+  repository     Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  userId         Int       @map("user_id")
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(3) @map("max_attempts")
+  nextRunAt      DateTime  @default(now()) @map("next_run_at")
+
+  progressPercent Int?     @map("progress_percent")
+  progressMessage String?  @map("progress_message")
+  progressDetails Json?    @map("progress_details")
+
+  lockedAt       DateTime? @map("locked_at")
+  lockedBy       String?   @map("locked_by")
+  lockExpiresAt  DateTime? @map("lock_expires_at")
+
+  startedAt      DateTime? @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+
+  error          String?
+
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, nextRunAt])
+  @@index([lockExpiresAt])
+  @@index([repositoryId])
+  @@index([userId])
+  @@map("analysis_jobs")
+}
+
+model Branch {
+  id           Int        @id @default(autoincrement())
+  name         String
+  isDefault    Boolean    @default(false) @map("is_default")
+  isProtected  Boolean    @default(false) @map("is_protected")
+  commitCount  Int        @default(0) @map("commit_count")
+  lastCommitAt DateTime?  @map("last_commit_at")
+  repositoryId Int        @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  @@unique([repositoryId, name])
+  @@map("branches")
+}
+
+model Commit {
+  id           Int        @id @default(autoincrement())
+  hash         String
+  shortHash    String     @map("short_hash")
+  message      String
+  description  String?
+  authorName   String     @map("author_name")
+  authorEmail  String     @map("author_email")
+  authorAvatar String?    @map("author_avatar")
+  committedAt  DateTime   @map("committed_at")
+  branch       String
+  parents      String[]   @default([]) // Parent commit hashes for merge/branch tracking
+  refs         String[]   @default([]) // Git ref decorations from %D (branches, remotes, HEAD -> ...)
+  tags         String[]   @default([]) // Git tags associated with this commit
+  additions    Int        @default(0)
+  deletions    Int        @default(0)
+  filesChanged Int        @default(0) @map("files_changed")
+  repositoryId Int        @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  fileChanges  FileChange[]
+
+  @@unique([repositoryId, hash])
+  @@index([repositoryId, committedAt])
+  @@map("commits")
+}
+
+model File {
+  id           Int          @id @default(autoincrement())
+  path         String
+  name         String
+  extension    String?
+  size         Int          @default(0)
+  language     String?
+  lines        Int          @default(0)
+  repositoryId Int          @map("repository_id")
+  repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  changes      FileChange[]
+
+  @@unique([repositoryId, path])
+  @@index([repositoryId])
+  @@index([path])
+  @@map("files")
+}
+
+model FileChange {
+  id        Int      @id @default(autoincrement())
+  path      String
+  additions Int      @default(0)
+  deletions Int      @default(0)
+  changeType String  @map("change_type") // added, modified, deleted
+  commitId  Int      @map("commit_id")
+  commit    Commit   @relation(fields: [commitId], references: [id], onDelete: Cascade)
+  fileId    Int?     @map("file_id")
+  file      File?    @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("file_changes")
+}
+
+model Contributor {
+  id           Int        @id @default(autoincrement())
+  name         String
+  email        String
+  avatar       String?
+  commits      Int        @default(0)
+  additions    Int        @default(0)
+  deletions    Int        @default(0)
+  percentage   Float      @default(0)
+  firstCommit  DateTime   @map("first_commit")
+  lastCommit   DateTime   @map("last_commit")
+  repositoryId Int        @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  @@unique([repositoryId, email])
+  @@map("contributors")
+}
+
+model Language {
+  id           Int        @id @default(autoincrement())
+  name         String
+  percentage   Float
+  bytes        Int        @default(0)
+  lines        Int        @default(0)
+  color        String?
+  repositoryId Int        @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@unique([repositoryId, name])
+  @@map("languages")
+}

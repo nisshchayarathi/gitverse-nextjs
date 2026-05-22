@@ -1,3 +1,4 @@
+import DashboardSkeleton from '../components/DashboardSkeleton';
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,7 @@ export default function Dashboard() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [error] = useState("");
 
   useEffect(() => {
     fetchRepositories();
@@ -58,6 +60,8 @@ export default function Dashboard() {
 
   const fetchRepositories = async () => {
     try {
+      setLoading(true);
+
       const token = localStorage.getItem("gitverse_token");
       const response = await axios.get(buildApiUrl("/api/repositories"), {
         headers: { Authorization: `Bearer ${token}` },
@@ -191,9 +195,21 @@ export default function Dashboard() {
     } finally {
       setAnalyzing(false);
     }
-  };
+  }; 
 
-  return (
+    if (loading) {
+    return <DashboardSkeleton />;
+    }
+
+    if (error) {
+    return <div className="text-red-500">{error}</div>;
+    }
+
+    if (!repositories || repositories.length === 0) {
+    return <div>No repositories found</div>;
+    }
+  
+    return (
     <DashboardLayout>
       <div className="space-y-6">
         {/* Welcome Section */}

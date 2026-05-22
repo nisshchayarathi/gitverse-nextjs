@@ -112,13 +112,39 @@ async function runJob(
   }
 }
 
+<<<<<<< HEAD
+export interface JobOutcome {
+  jobId: string;
+  status: "processed" | "failed" | "errored";
+  error?: string;
+}
+
+export interface AnalysisWorkerSummary {
+  totalJobsScanned: number;
+  jobsProcessed: number;
+  jobsSkipped: number;
+  jobsFailed: number;
+  jobsErrored: number;
+  executionDurationMs: number;
+  earlyStopReason?: string;
+  success: boolean;
+  jobOutcomes: JobOutcome[];
+}
+
+=======
+>>>>>>> upstream/main
 export async function startAnalysisWorkerLoop(opts?: {
   workerId?: string;
   pollIntervalMs?: number;
   heartbeatIntervalMs?: number;
   lockMs?: number;
   once?: boolean;
+<<<<<<< HEAD
+  maxJobs?: number;
+}): Promise<AnalysisWorkerSummary> {
+=======
 }) {
+>>>>>>> upstream/main
   const workerId = opts?.workerId || getWorkerId();
   const pollIntervalMs = opts?.pollIntervalMs ?? POLL_INTERVAL_MS;
   const heartbeatIntervalMs =
@@ -128,6 +154,16 @@ export async function startAnalysisWorkerLoop(opts?: {
   console.log(`analysis worker starting: ${workerId}`);
 
   let stopping = false;
+<<<<<<< HEAD
+  const startTimeMs = Date.now();
+  const deadline = opts?.timeBudgetMs ? Date.now() + opts.timeBudgetMs : Infinity;
+  let totalJobsScanned = 0;
+  let jobsProcessed = 0;
+  let jobsSkipped = 0;
+  let jobsFailed = 0;
+  let earlyStopReason: string | undefined;
+=======
+>>>>>>> upstream/main
 
   const shutdown = async (signal: string) => {
     if (stopping) return;
@@ -144,7 +180,21 @@ export async function startAnalysisWorkerLoop(opts?: {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("SIGINT", () => void shutdown("SIGINT"));
 
+<<<<<<< HEAD
+  const startTime = Date.now();
+  let jobsProcessed = 0;
+  let jobsSkipped = 0;
+
   while (!stopping) {
+    if (opts?.maxJobs !== undefined && (jobsProcessed + jobsFailed) >= opts.maxJobs) {
+      console.log(`maxJobs limit of ${opts.maxJobs} reached, stopping loop.`);
+      earlyStopReason = "maxJobsReached";
+      break;
+    }
+
+=======
+  while (!stopping) {
+>>>>>>> upstream/main
     try {
       const job = await analysisJobService.claimNextJob({
         workerId,
@@ -152,7 +202,15 @@ export async function startAnalysisWorkerLoop(opts?: {
       });
 
       if (!job) {
+<<<<<<< HEAD
+        jobsSkipped++;
+        if (opts?.once || opts?.maxJobs !== undefined) {
+          earlyStopReason = earlyStopReason || "queueEmpty";
+          break;
+        }
+=======
         if (opts?.once) return;
+>>>>>>> upstream/main
         await sleep(pollIntervalMs);
         continue;
       }
@@ -162,6 +220,43 @@ export async function startAnalysisWorkerLoop(opts?: {
       );
       await runJob(job, { workerId, lockMs, heartbeatIntervalMs });
 
+<<<<<<< HEAD
+      if (opts?.once) {
+        earlyStopReason = earlyStopReason || "onceCompleted";
+        break;
+      }
+    } catch (e) {
+      console.error("worker loop error:", sanitizeErrorMessage(e));
+      if (opts?.once || opts?.maxJobs !== undefined) {
+        return {
+          totalJobsScanned,
+          jobsProcessed,
+          jobsSkipped,
+          jobsFailed,
+          jobsErrored,
+          executionDurationMs: Date.now() - startTimeMs,
+          earlyStopReason: "errorOut",
+          success: false,
+          jobOutcomes,
+        };
+      }
+      await sleep(pollIntervalMs);
+    }
+  }
+
+  const success = jobsFailed === 0 && jobsErrored === 0;
+
+  return {
+    totalJobsScanned,
+    jobsProcessed,
+    jobsSkipped,
+    jobsFailed,
+    jobsErrored,
+    executionDurationMs: Date.now() - startTimeMs,
+    earlyStopReason,
+    success: true,
+  };
+=======
       if (opts?.once) return;
     } catch (e) {
       console.error("worker loop error:", e);
@@ -169,6 +264,7 @@ export async function startAnalysisWorkerLoop(opts?: {
       await sleep(pollIntervalMs);
     }
   }
+>>>>>>> upstream/main
 }
 
 // Run as standalone script
