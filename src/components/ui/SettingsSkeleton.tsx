@@ -8,7 +8,7 @@ export const SettingsSkeleton: React.FC = () => {
       <div>
         <Skeleton className="h-10 w-60" />
         <div className="mt-2">
-          <Skeleton className="h-4 w-96" />
+          <Skeleton className="h-4 w-full max-w-[24rem]" />
         </div>
       </div>
 

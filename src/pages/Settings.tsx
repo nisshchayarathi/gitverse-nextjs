@@ -61,6 +61,7 @@ export default function Settings() {
       const token = localStorage.getItem("gitverse_token");
       const res = await axios.get(buildApiUrl("/api/users/me"), {
         withCredentials: true,
+        timeout: 5000,
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
 
