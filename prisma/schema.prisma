@@ -90,6 +90,7 @@ model GitHubRepo {
   pullRequests PullRequest[]
 
   @@unique([userId, repoFullName])
+  @@index([userId, enabled, repoFullName])
   @@index([repoFullName, enabled, installationId])
   @@index([installationId])
   @@index([enabled])
