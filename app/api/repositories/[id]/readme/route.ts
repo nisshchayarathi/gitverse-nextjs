@@ -7,7 +7,6 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
-    const user = await requireAuth(request);
     const id = Number(params.id);
 
     if (!Number.isInteger(id) || id <= 0) {
@@ -16,6 +15,8 @@ export async function POST(
         { status: 400 },
       );
     }
+
+    const user = await requireAuth(request);
 
     const repository = await repositoryService.fetchAndStoreReadme(
       id,

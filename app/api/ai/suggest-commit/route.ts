@@ -4,9 +4,17 @@ import { getGeminiService } from "@/lib/services/geminiService";
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAuth(request);
-    const body = await request.json();
-    const { added, modified, deleted, diff } = body;
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
+    const { added, modified, deleted, diff } = body || {};
 
     if (
       (!added || added.length === 0) &&
@@ -19,6 +27,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    await requireAuth(request);
 
     const suggestions = await getGeminiService().suggestCommitMessage({
       added: added || [],

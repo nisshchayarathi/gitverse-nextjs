@@ -5,8 +5,6 @@ import { analysisJobService } from "@/lib/services/analysisJobService";
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
-
     let body;
     try {
       body = await request.json();
@@ -25,12 +23,6 @@ export async function POST(request: NextRequest) {
     }
 
     const { name, url, description } = body;
-
-    console.log("Create repository request:", {
-      name,
-      url,
-      userId: user.userId,
-    });
 
     if (name === undefined || name === null) {
       return NextResponse.json(
@@ -121,6 +113,14 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+
+    const user = await requireAuth(request);
+
+    console.log("Create repository request:", {
+      name,
+      url,
+      userId: user.userId,
+    });
 
     const repository = await repositoryService.createRepository({
       name: trimmedName,

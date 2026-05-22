@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware";
+import { requireAuth, isHttpError } from "@/lib/middleware";
 import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
 import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 import { repositoryService } from "@/lib/services/repositoryService";
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
-    const body = await request.json();
-    const { url, token } = body;
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
+    const { url, token } = body || {};
 
     if (!url) {
       return NextResponse.json(
@@ -32,6 +40,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const user = await requireAuth(request);
+
     const github = new GitHubService(token);
     const repoData = await github.getRepository(parsed.owner, parsed.repo);
 
@@ -52,6 +62,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ repository, source: "github" }, { status: 201 });
   } catch (error: any) {
     console.error("GitHub import error:", sanitizeErrorMessage(error));
+
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
+    }
 
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(

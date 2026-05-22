@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware";
+import { requireAuth, isHttpError } from "@/lib/middleware";
 import {
   parsePullRequestUrl,
   reviewPullRequest,
@@ -7,9 +7,16 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAuth(request);
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
 
-    const body = await request.json();
     const prUrl = body?.prUrl as string | undefined;
     const token = body?.token as string | undefined;
 
@@ -31,6 +38,8 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    await requireAuth(request);
     const result = await reviewPullRequest({
       owner: parsed.owner,
       repo: parsed.repo,
@@ -44,6 +53,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("PR review error:", error);
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
+    }
     return NextResponse.json(
       {
         error: "Failed to review PR",

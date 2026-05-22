@@ -198,7 +198,7 @@ export class GitHubService {
 
         const retryStatusCodes = [409, 502, 503, 504];
         if (
-          (status && retryableCodes.includes(status)) ||
+          (status && retryStatusCodes.includes(status)) ||
           error.code === "ECONNABORTED" ||
           error.code === "ECONNRESET" ||
           error.code === "ETIMEDOUT" ||

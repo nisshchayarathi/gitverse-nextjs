@@ -6,6 +6,10 @@
  * Requires the dev server to be running on http://localhost:3000
  */
 
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
+dotenv.config();
+
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 
 interface TestResult {
@@ -60,12 +64,17 @@ async function test(
 
   results.push(result);
 
+  const green = "\x1b[32m";
+  const red = "\x1b[31m";
+  const reset = "\x1b[0m";
+  const cyan = "\x1b[36m";
+
   console.log(
-    `${passed ? "✓" : "✗"} ${method} ${endpoint} → ${response.status} (expected ${expectedStatus})`,
+    `${passed ? green + "✓" : red + "✗"}${reset} ${cyan}${method}${reset} ${endpoint} → ${passed ? green : red}${response.status}${reset} (expected ${expectedStatus})`,
   );
 
   if (!passed) {
-    console.log(`  Response: ${JSON.stringify(data, null, 2)}`);
+    console.log(`  Response: ${red}${JSON.stringify(data, null, 2)}${reset}`);
   }
 
   return result;
@@ -312,17 +321,23 @@ async function runTests() {
   );
 
   // Summary
-  console.log("\n--- Summary ---");
+  const green = "\x1b[32m";
+  const red = "\x1b[31m";
+  const reset = "\x1b[0m";
+  const cyan = "\x1b[36m";
+
+  console.log(`\n${cyan}--- Summary ---${reset}`);
   const passed = results.filter((r) => r.passed).length;
   const total = results.length;
-  console.log(`${passed}/${total} tests passed`);
+  const summaryColor = passed === total ? green : red;
+  console.log(`${summaryColor}${passed}/${total} tests passed${reset}`);
 
   if (passed < total) {
-    console.log("\nFailed tests:");
+    console.log(`\n${red}Failed tests:${reset}`);
     results
       .filter((r) => !r.passed)
       .forEach((r) => {
-        console.log(`  - ${r.method} ${r.endpoint}: got ${r.status}`);
+        console.log(`  - ${red}${r.method} ${r.endpoint}${reset}: got ${red}${r.status}${reset}`);
       });
     process.exit(1);
   }

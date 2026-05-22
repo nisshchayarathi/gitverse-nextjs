@@ -7,7 +7,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await requireAuth(request);
     const id = Number(params.id);
 
     if (!Number.isInteger(id) || id <= 0) {
@@ -16,6 +15,8 @@ export async function GET(
         { status: 400 }
       );
     }
+
+    const user = await requireAuth(request);
 
     const stats = await repositoryService.getRepositoryStats(id, user.userId);
 

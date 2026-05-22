@@ -41,3 +41,7 @@ next-env.d.ts
 # temp
 /tmp
 /temp
+
+# database data
+/pgdata
+

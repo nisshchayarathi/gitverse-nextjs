@@ -5,8 +5,6 @@ import { repositoryService } from "@/lib/services/repositoryService";
 
 export async function POST(request: NextRequest) {
   try {
-
-    const user = await requireAuth(request);
     let body;
 
     try {
@@ -30,6 +28,7 @@ export async function POST(request: NextRequest) {
 
     // Free-form mode: client provides a prebuilt prompt
     if (typeof prompt === "string" && prompt.trim()) {
+      await requireAuth(request);
       const response = await getGeminiService().chatRaw(prompt);
 
       return NextResponse.json({ response });
@@ -70,6 +69,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const user = await requireAuth(request);
 
     const repository = await repositoryService.getRepository(
       parsedRepositoryId,

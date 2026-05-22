@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 
 export const dynamic = "force-dynamic";
 
@@ -83,7 +83,7 @@ export default function RepositoryAnalysis() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const pollingStartedAt = useRef<number | null>(null);
-  // Tracks last time progress changed — prevents falsely timing out active jobs
+  // Tracks last time progress changed ï¿½ prevents falsely timing out active jobs
   const lastProgressAt = useRef<number | null>(null);
   const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -206,7 +206,7 @@ export default function RepositoryAnalysis() {
       // Use functional setJob so we always compare against the latest job
       // state, avoiding the stale-closure bug where the polling loop holds
       // an old snapshot of job and never sees progress-only updates.
-      setJob((prevJob) => {
+      setJob((prevJob: any) => {
         const prevPercent = prevJob?.progressPercent ?? null;
         const prevMessage = prevJob?.progressMessage ?? null;
         const nextPercent = nextJob?.progressPercent ?? null;
@@ -525,3 +525,6 @@ export default function RepositoryAnalysis() {
     </DashboardLayout>
   );
 }
+
+
+

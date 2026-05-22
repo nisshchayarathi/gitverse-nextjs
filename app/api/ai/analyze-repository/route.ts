@@ -7,16 +7,17 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
-    const user = await requireAuth(request);
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
 
-    const body = await request.json();
-    const { repositoryId, type } = body;
-
-    console.log("[RunAnalysis] Started", {
-      userId: user.userId,
-      repositoryId,
-      type,
-    });
+    const { repositoryId, type } = body || {};
 
     if (!repositoryId || !type) {
       return NextResponse.json(
@@ -24,6 +25,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const user = await requireAuth(request);
+
+    console.log("[RunAnalysis] Started", {
+      userId: user.userId,
+      repositoryId,
+      type,
+    });
 
     const repository = await repositoryService.getRepository(
       repositoryId,

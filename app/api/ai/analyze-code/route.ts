@@ -4,9 +4,17 @@ import { getGeminiService } from "@/lib/services/geminiService";
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAuth(request);
-    const body = await request.json();
-    const { code, language, analysisType, context } = body;
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
+    const { code, language, analysisType, context } = body || {};
 
     if (!code || !language || !analysisType) {
       return NextResponse.json(
@@ -21,6 +29,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    await requireAuth(request);
 
     const analysis = await getGeminiService().analyzeCode({
       code,

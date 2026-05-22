@@ -26,9 +26,17 @@ type Repository = {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
-    const body = await request.json();
-    const { repositoryId, filePath } = body;
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
+    const { repositoryId, filePath } = body || {};
 
     if (!repositoryId || !filePath) {
       return NextResponse.json(
@@ -36,6 +44,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const user = await requireAuth(request);
 
     const repository = (await repositoryService.getRepository(
       repositoryId,

@@ -8,7 +8,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await requireAuth(request);
     const id = Number(params.id);
 
     if (!Number.isInteger(id) || id <= 0) {
@@ -17,6 +16,8 @@ export async function GET(
         { status: 400 }
       );
     }
+
+    const user = await requireAuth(request);
 
     const repository = await repositoryService.getRepository(id, user.userId);
 
@@ -70,7 +71,6 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await requireAuth(request);
     const id = Number(params.id);
 
     if (!Number.isInteger(id) || id <= 0) {
@@ -79,6 +79,8 @@ export async function DELETE(
         { status: 400 }
       );
     }
+
+    const user = await requireAuth(request);
 
     await repositoryService.deleteRepository(id, user.userId);
 
