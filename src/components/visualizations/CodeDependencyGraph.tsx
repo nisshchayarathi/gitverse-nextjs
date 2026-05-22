@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import { Card, EmptyState } from "@/components/ui";
-import { Network } from "lucide-react";
+import { Card } from "@/components/ui";
 
 interface Node {
   id: string;
@@ -112,13 +111,23 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  const graphData = generateDependencyGraph(repository);
-
   useEffect(() => {
     if (!svgRef.current) return;
 
+    const graphData = generateDependencyGraph(repository);
+
     // If no data, show empty state
     if (graphData.nodes.length === 0) {
+      const svg = d3.select(svgRef.current);
+      svg.selectAll("*").remove();
+      svg
+        .append("text")
+        .attr("x", "50%")
+        .attr("y", "50%")
+        .attr("text-anchor", "middle")
+        .attr("dominant-baseline", "middle")
+        .attr("fill", "rgba(255,255,255,0.4)")
+        .text("No files found in repository");
       return;
     }
 
@@ -347,35 +356,25 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           </div>
         </div>
       </div>
-      {graphData.nodes.length === 0 ? (
-        <EmptyState
-          icon={Network}
-          title="No file dependencies available"
-          description="We couldn't generate a file dependency graph because this repository has no file structure metadata."
-        />
-      ) : (
-        <>
-          <div className="glass rounded-lg p-4 sm:p-6">
-            <h3 className="text-base sm:text-lg font-semibold mb-4">
-              Code Dependencies
-            </h3>
-            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-              <svg
-                ref={svgRef}
-                width="100%"
-                height="auto"
-                className="text-foreground min-h-96 sm:min-h-96"
-                style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
-                viewBox="0 0 900 600"
-                preserveAspectRatio="xMidYMid meet"
-              />
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
-            💡 Drag nodes to reposition • Scroll to zoom • Hover for details
-          </p>
-        </>
-      )}
+      <div className="glass rounded-lg p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-semibold mb-4">
+          Code Dependencies
+        </h3>
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <svg
+            ref={svgRef}
+            width="100%"
+            height="auto"
+            className="text-foreground min-h-96 sm:min-h-96"
+            style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
+            viewBox="0 0 900 600"
+            preserveAspectRatio="xMidYMid meet"
+          />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
+        💡 Drag nodes to reposition • Scroll to zoom • Hover for details
+      </p>
       <div
   ref={tooltipRef}
   className="

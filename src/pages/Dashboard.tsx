@@ -23,7 +23,6 @@ import {
   CardContent,
   Button,
   Input,
-  EmptyState,
 } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
@@ -291,19 +290,9 @@ export default function Dashboard() {
                   Loading repositories...
                 </div>
               ) : recentRepositories.length === 0 ? (
-                <EmptyState
-                  icon={GitBranch}
-                  title="No Repositories Yet"
-                  description="You haven't analyzed any repositories yet. Enter a GitHub URL above to get started!"
-                  actionLabel="Analyze Repository"
-                  onAction={() => {
-                    const input = document.querySelector('input[type="url"]') as HTMLInputElement;
-                    if (input) {
-                      input.focus();
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }
-                  }}
-                />
+                <div className="text-center py-8 text-muted-foreground">
+                  No repositories yet. Add your first repository above!
+                </div>
               ) : (
                 <div className="space-y-3">
                   {recentRepositories.map((repo) => (

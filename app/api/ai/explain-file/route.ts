@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to explain file" },
+      { error: "Failed to explain file", details: error.message },
       { status: 500 }
     );
   }

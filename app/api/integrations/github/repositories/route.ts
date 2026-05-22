@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth } from "@/lib/middleware";
-import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
+import { GitHubService } from "@/lib/services/githubService";
 import prisma from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "No GitHub token or GitHub App repos found in DB. If you installed the app but weren't redirected back, set the GitHub App Setup URL to /api/integrations/github/app/callback, or use the Sync Installation option in Contribute.",
+            "No GitHub token or GitHub App repos found in DB. If you installed the app but weren’t redirected back, set the GitHub App Setup URL to /api/integrations/github/app/callback, or use the Sync Installation option in Contribute.",
         },
         { status: 400 },
       );
@@ -55,14 +55,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ repositories, source: "github-app-db" });
   } catch (error: any) {
     console.error("GitHub repositories error:", error);
-
-    if (error instanceof GitHubRateLimitError) {
-      return NextResponse.json(
-        { error: error.message, retryAfter: error.retryAfterSeconds },
-        { status: 429 }
-      );
-    }
-
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
@@ -70,7 +62,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to fetch GitHub repositories" },
+      { error: "Failed to fetch GitHub repositories", details: error.message },
       { status: 500 },
     );
   }

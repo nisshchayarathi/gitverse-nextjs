@@ -94,27 +94,18 @@ export class AnalysisJobService {
     error: string;
     attempts: number;
     maxAttempts: number;
-    retryAfter?: number;
   }): Promise<void> {
     const shouldRetry = params.attempts < params.maxAttempts;
 
     if (shouldRetry) {
-      const delay = params.retryAfter
-        ? params.retryAfter * 1000
-        : computeBackoffMs(params.attempts);
-      const retryLabel = params.retryAfter
-        ? `Rate limited, retrying`
-        : `Retrying`;
+      const delay = computeBackoffMs(params.attempts);
       await prisma.analysisJob.update({
         where: { id: params.jobId },
         data: {
           status: "QUEUED",
           nextRunAt: new Date(Date.now() + delay),
-          progressMessage: `${retryLabel} in ${Math.round(delay / 1000)}s`,
+          progressMessage: `Retrying in ${Math.round(delay / 1000)}s`,
           error: params.error,
-          ...(params.retryAfter
-            ? { progressDetails: { retryAfter: params.retryAfter, rateLimited: true } }
-            : {}),
           lockedAt: null,
           lockedBy: null,
           lockExpiresAt: null,

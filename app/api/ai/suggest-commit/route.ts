@@ -8,18 +8,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { added, modified, deleted, diff } = body;
 
-    if (
-      (!added || added.length === 0) &&
-      (!modified || modified.length === 0) &&
-      (!deleted || deleted.length === 0) &&
-      !diff
-    ) {
-      return NextResponse.json(
-        { error: "At least one of added, modified, deleted, or diff is required" },
-        { status: 400 }
-      );
-    }
-
     const suggestions = await getGeminiService().suggestCommitMessage({
       added: added || [],
       modified: modified || [],
@@ -38,7 +26,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to generate suggestions" },
+      { error: "Failed to generate suggestions", details: error.message },
       { status: 500 }
     );
   }

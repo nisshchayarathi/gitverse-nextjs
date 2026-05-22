@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to analyze code" },
+      { error: "Failed to analyze code", details: error.message },
       { status: 500 }
     );
   }

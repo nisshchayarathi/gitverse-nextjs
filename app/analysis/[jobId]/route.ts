@@ -14,14 +14,6 @@ export async function GET(
       return NextResponse.json({ error: "Missing jobId" }, { status: 400 });
     }
 
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidPattern.test(jobId)) {
-      return NextResponse.json(
-        { error: "Invalid job ID format. Expected a UUID" },
-        { status: 400 }
-      );
-    }
-
     const job = await analysisJobService.getJob({ jobId, userId: user.userId });
 
     if (!job) {

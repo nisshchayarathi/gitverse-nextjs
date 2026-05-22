@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
-import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
+import { GitHubService } from "@/lib/services/githubService";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
 
 export async function POST(request: NextRequest) {
@@ -46,14 +46,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ account: toJsonSafe(account) }, { status: 200 });
   } catch (error: any) {
     console.error("GitHub connect error:", error);
-
-    if (error instanceof GitHubRateLimitError) {
-      return NextResponse.json(
-        { error: error.message, retryAfter: error.retryAfterSeconds },
-        { status: 429 }
-      );
-    }
-
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
@@ -63,6 +55,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to connect GitHub",
+        details: error?.message || "Unknown error",
       },
       { status: 500 },
     );

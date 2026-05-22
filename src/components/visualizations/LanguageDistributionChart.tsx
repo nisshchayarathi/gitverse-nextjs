@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import { Card, EmptyState } from "@/components/ui";
-import { BarChart3 } from "lucide-react";
+import { Card } from "@/components/ui";
 
 interface LanguageData {
   name: string;
@@ -215,50 +214,46 @@ export function LanguageDistributionChart({
           Interactive breakdown of codebase languages
         </p>
       </div>
-      {languageData.length === 0 ? (
-        <EmptyState
-          icon={BarChart3}
-          title="No language data"
-          description="We couldn't detect any programming languages in this repository."
+      <div className="flex items-center justify-center overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <svg
+          ref={svgRef}
+          width="100%"
+          height="auto"
+          viewBox="0 0 400 400"
+          preserveAspectRatio="xMidYMid meet"
+          className="text-foreground max-w-md"
         />
-      ) : (
-        <>
-          <div className="flex items-center justify-center overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-            <svg
-              ref={svgRef}
-              width="100%"
-              height="auto"
-              viewBox="0 0 400 400"
-              preserveAspectRatio="xMidYMid meet"
-              className="text-foreground max-w-md"
-            />
-          </div>
-          <div className="mt-4 space-y-2">
-            {languageData.map((lang) => (
-              <div
-                key={lang.name}
-                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs sm:text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded flex-shrink-0"
-                    style={{ backgroundColor: lang.color }}
-                  />
-                  <span className="font-medium">{lang.name}</span>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3 text-muted-foreground">
-                  <span className="truncate">
-                    {lang.lines.toLocaleString()} lines
-                  </span>
-                  <span className="font-semibold flex-shrink-0">
-                    {lang.percentage.toFixed(2)}%
-                  </span>
-                </div>
+      </div>
+      <div className="mt-4 space-y-2">
+        {languageData.length > 0 ? (
+          languageData.map((lang) => (
+            <div
+              key={lang.name}
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs sm:text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded flex-shrink-0"
+                  style={{ backgroundColor: lang.color }}
+                />
+                <span className="font-medium">{lang.name}</span>
               </div>
-            ))}
-          </div>
-        </>
-      )}
+              <div className="flex items-center gap-2 sm:gap-3 text-muted-foreground">
+                <span className="truncate">
+                  {lang.lines.toLocaleString()} lines
+                </span>
+                <span className="font-semibold flex-shrink-0">
+                  {lang.percentage.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-xs sm:text-sm text-muted-foreground text-center">
+            No language data available
+          </p>
+        )}
+      </div>
       <div
   ref={tooltipRef}
   className="

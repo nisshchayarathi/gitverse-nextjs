@@ -41,19 +41,6 @@ Paste a repo → GitVerse builds a visual map + AI onboarding so contributors ca
 - Ask AI questions about files, folders, and architecture
 - Generate analysis jobs and track progress
 
-## Getting Started
-
-The canonical onboarding and setup guide is:
-
-- [GETTING_STARTED.md](./GETTING_STARTED.md)
-
-Additional setup docs:
-
-- [START_HERE.md](./START_HERE.md)
-- [GOOGLE_OAUTH_SETUP.md](./GOOGLE_OAUTH_SETUP.md)
-- [GOOGLE_OAUTH_INTEGRATION.md](./GOOGLE_OAUTH_INTEGRATION.md)
-- [QUICKSTART_OAUTH.md](./QUICKSTART_OAUTH.md)
-
 ## Quickstart (local dev)
 
 ```bash
@@ -168,80 +155,20 @@ All API routes are available under `/api`:
 - `/api/users/profile` - User profile management
 - `/api/integrations/*` - Git platform integrations
 
-## 📑 API Pagination
-
-To ensure consistent performance and predictability, paginated API endpoints in GitVerse use **cursor-based pagination** instead of traditional offset pagination.
-
-### Query Parameters
-
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `limit` | `number` | `10` | The maximum number of items to return (clamped to max `50` for safety). |
-| `cursor`| `string` | `null` | The ID of the last item received in the previous page. Omit for the first page. |
-
-### Example Request
-
-```bash
-GET /api/auth/sessions?limit=20&cursor=clq123abc
-```
-
-### Standard Response Format
-
-All paginated endpoints return an object containing an `items` array and a `nextCursor` string. If `nextCursor` is present, it indicates there is more data available.
-
-```json
-{
-  "items": [
-    { "id": "clq123abd", "expires": "2026-05-21T00:00:00.000Z" },
-    { "id": "clq123abe", "expires": "2026-05-20T00:00:00.000Z" }
-  ],
-  "nextCursor": "clq123abf"
-}
-```
-
-### Frontend Consumption Best Practices
-
-When fetching data in the UI (e.g., via infinite scrolling or "Load More" buttons), keep track of the `nextCursor` and pass it to subsequent requests. Avoid duplicate fetches by ensuring UI loading states block concurrent requests.
-
-```javascript
-const loadMore = async () => {
-  if (!nextCursor || isLoading) return;
-  setIsLoading(true);
-  
-  try {
-    const res = await fetch(`/api/auth/sessions?limit=20&cursor=${nextCursor}`);
-    const data = await res.json();
-    
-    setItems((prev) => [...prev, ...data.items]);
-    setNextCursor(data.nextCursor);
-  } finally {
-    setIsLoading(false);
-  }
-};
-```
-
 ## 🚀 Deployment
 
 ### Vercel (Recommended)
 
-1. Push your code to GitHub.
-2. Import the project in the [Vercel dashboard](https://vercel.com/new).
-3. Under **Settings → Environment Variables**, add every variable listed in the [Environment Variables](#-environment-variables) section below. Vercel automatically makes them available at build time and runtime.
-   - For `NEXTAUTH_URL`, set the value to your Vercel deployment URL (e.g. `https://gitverse.vercel.app`). In local development, set it to `http://localhost:3000` in your `.env.local` to avoid missing-URL warnings.
-   - Mark sensitive secrets (e.g. `JWT_SECRET`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_SECRET`, `GEMINI_API_KEY`) as **Sensitive** in Vercel so they are never exposed in logs.
-4. Click **Deploy**.
-
-> **Tip:** Vercel re-deploys automatically on every push to `main`. If you update an environment variable in the dashboard, trigger a redeploy from **Deployments → Redeploy** for the new value to take effect.
+1. Push your code to GitHub
+2. Import project in Vercel
+3. Add environment variables in Vercel dashboard
+4. Deploy!
 
 ### Docker
 
 ```bash
 docker build -t gitverse-nextjs .
-docker run -p 3000:3000 \
-  -e DATABASE_URL="..." \
-  -e JWT_SECRET="..." \
-  -e GEMINI_API_KEY="..." \
-  gitverse-nextjs
+docker run -p 3000:3000 gitverse-nextjs
 ```
 
 ### Firebase App Hosting (Cloud Run)
@@ -274,145 +201,22 @@ firebase deploy
 
 ## 📝 Environment Variables
 
-Copy `.env.example` to `.env.local` and fill in the values before starting the dev server:
+Required:
 
-```bash
-cp .env.example .env.local
-```
+- `DATABASE_URL` - PostgreSQL connection string
+- `JWT_SECRET` - JWT secret key
+- `GEMINI_API_KEY` - Google Gemini API key
 
-> **Never commit `.env.local` or any file containing real secrets.** It is already listed in `.gitignore`.
+OAuth (Google / NextAuth):
 
-### Required Variables
+- `NEXTAUTH_URL` - Deployed base URL (e.g. `https://<your-domain>`)
+- `NEXTAUTH_SECRET` - Session/JWT signing secret (generate with `openssl rand -base64 32`)
+- `GOOGLE_CLIENT_ID` - Google OAuth client id
+- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
 
-| Variable | Description | How to obtain |
-| :--- | :--- | :--- |
-| `DATABASE_URL` | PostgreSQL connection string (with SSL) | Create a free database on [Neon](https://neon.tech) → **Connection Details** → copy the connection string. Append `?sslmode=require&schema=public` if not already present. |
-| `JWT_SECRET` | Secret used to sign custom JWT tokens | Generate with `openssl rand -base64 32` or any random string ≥ 32 characters. |
-| `GEMINI_API_KEY` | Google Gemini API key for AI features | Go to [Google AI Studio](https://aistudio.google.com/app/apikey) → **Create API key**. |
+Optional:
 
-### OAuth / NextAuth Variables
-
-| Variable | Description | How to obtain |
-| :--- | :--- | :--- |
-| `NEXTAUTH_URL` | Canonical base URL of your deployment | Set to `http://localhost:3000` in development. On Vercel, set to your deployment URL (e.g. `https://gitverse.vercel.app`). |
-| `NEXTAUTH_SECRET` | Secret used to sign NextAuth session tokens | Generate with `openssl rand -base64 32`. Must be a strong random string. |
-| `GOOGLE_CLIENT_ID` | Google OAuth 2.0 client ID | [Google Cloud Console](https://console.cloud.google.com) → **APIs & Services → Credentials → Create Credentials → OAuth client ID** (Web application). |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 client secret | Obtained alongside `GOOGLE_CLIENT_ID` in the same step above. |
-
-### GitHub App Variables (for PR reviews)
-
-| Variable | Description | How to obtain |
-| :--- | :--- | :--- |
-| `GITHUB_APP_ID` | Numeric ID of your GitHub App | [GitHub Developer Settings](https://github.com/settings/apps) → create or open your App → copy **App ID**. |
-| `GITHUB_APP_PRIVATE_KEY` | RSA private key for the GitHub App | In your GitHub App settings → **Generate a private key** → paste contents with literal `\n` line breaks. |
-| `GITHUB_APP_SLUG` | URL slug of your GitHub App | The part after `github.com/apps/` in the App's public URL. |
-| `GITHUB_WEBHOOK_SECRET` | Secret to verify webhook payloads | Set any strong random string here and enter the same value in your GitHub App's webhook configuration. |
-
-### Optional Variables
-
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `NEXT_PUBLIC_API_URL` | Base URL for client-side API calls | Current domain (e.g. `http://localhost:3000`) |
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase API key (App Hosting only) | Not required for local dev or Vercel |
-| `GITHUB_APP_STATE_SECRET` | Additional signing secret for OAuth state | Falls back to `NEXTAUTH_SECRET` if unset |
-
-### Google OAuth Redirect URIs
-
-Add these **Authorized redirect URIs** in Google Cloud Console → **OAuth client**:
-
-| Environment | URI |
-| :--- | :--- |
-| Local dev | `http://localhost:3000/api/auth/callback/google` |
-| Vercel | `https://<your-domain>/api/auth/callback/google` |
-
----
-
-## 🛠️ Troubleshooting
-
-### `Error: PrismaClientInitializationError` / Cannot connect to database
-
-**Cause:** `DATABASE_URL` is missing, malformed, or the database is unreachable.
-
-**Fix:**
-1. Verify `.env.local` contains `DATABASE_URL` and the value is correct.
-2. Ensure your Neon database is not paused (Neon free-tier databases sleep after inactivity — open the Neon console to wake it).
-3. Confirm the connection string includes `?sslmode=require`.
-4. Run `npm run prisma:generate` followed by `npm run prisma:migrate` after any schema change.
-
-### `[next-auth][error][OAUTH_CALLBACK_ERROR]` during Google Sign-In
-
-**Cause:** `NEXTAUTH_URL`, `GOOGLE_CLIENT_ID`, or `GOOGLE_CLIENT_SECRET` is wrong, or the redirect URI is not registered in Google Cloud Console.
-
-**Fix:**
-1. Double-check `NEXTAUTH_URL` matches the origin you are accessing (including protocol and port).
-2. In Google Cloud Console → **OAuth client** → **Authorized redirect URIs**, ensure `<NEXTAUTH_URL>/api/auth/callback/google` is listed.
-3. On Vercel, set `NEXTAUTH_URL` to the exact deployment URL (no trailing slash).
-
-### `Error: NEXTAUTH_SECRET is not set`
-
-**Cause:** `NEXTAUTH_SECRET` is missing from the environment.
-
-**Fix:** Generate a secret and add it to `.env.local`:
-
-```bash
-openssl rand -base64 32
-```
-
-On Vercel, add it under **Settings → Environment Variables**.
-
-### AI features return `500` / Gemini errors
-
-**Cause:** `GEMINI_API_KEY` is missing or invalid.
-
-**Fix:**
-1. Confirm `GEMINI_API_KEY` is set in `.env.local`.
-2. Verify the key is active in [Google AI Studio](https://aistudio.google.com/app/apikey).
-3. Check that the Gemini API is enabled for your Google Cloud project.
-
-### Environment variables not picked up after editing `.env.local`
-
-**Fix:** Restart the development server — Next.js reads `.env.local` only at startup:
-
-```bash
-# Stop the server (Ctrl+C), then:
-npm run dev
-```
-
-On Vercel, trigger a redeploy (**Deployments → ⋯ → Redeploy**) after changing any environment variable in the dashboard.
-
-### `prisma:migrate` fails with `P3009` or migration drift
-
-**Cause:** Local database is out of sync with the migration history.
-
-**Fix (development only — do not run in production):**
-
-```bash
-npx prisma migrate reset
-npm run prisma:migrate
-```
-
-### Port 3000 already in use
-
-**Fix:** Kill the process using port 3000, or start on a different port:
-
-```bash
-# Windows
-netstat -ano | findstr :3000
-taskkill /PID <PID> /F
-
-# macOS / Linux
-lsof -ti:3000 | xargs kill -9
-
-# Or run on a different port
-npm run dev -- -p 3001
-```
-
-### Build fails on Vercel with `Type error` or missing module
-
-**Fix:**
-1. Ensure all required environment variables are set in the Vercel dashboard — missing vars can cause build-time type errors.
-2. Run `npm run build` locally first to catch errors before pushing.
-3. Check that your Node.js version in Vercel matches the one used locally (see `engines` in `package.json`).
+- `NEXT_PUBLIC_API_URL` - API URL for client-side (defaults to current domain)
 
 ## 🤝 Contributing
 
@@ -434,6 +238,6 @@ This project is licensed under the MIT License.
 - NeonDB for serverless PostgreSQL
 - All contributors and users of GitVerse
 
-
+---
 
 Made with ❤️ by the GitVerse Team

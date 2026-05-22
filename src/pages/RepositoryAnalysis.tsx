@@ -20,15 +20,12 @@ import {
   BarChart3,
   ArrowLeft,
   Trash2,
-  Activity,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
-import { EmptyState } from "@/components/ui";
 import { buildApiUrl } from "@/services/apiConfig";
-import { RepositoryAnalysisSkeleton } from "@/components/ui/RepositoryAnalysisSkeleton";
 
 type TabType =
   | "overview"
@@ -225,15 +222,13 @@ export default function RepositoryAnalysis() {
     <DashboardLayout>
       <div className="space-y-6">
         {loading ? (
-          <RepositoryAnalysisSkeleton />
-        ) : !job ? (
-          <EmptyState
-            icon={Activity}
-            title="No analysis jobs found"
-            description="We couldn't find any analysis history for this repository. Run your first analysis to get started!"
-            actionLabel="Go to Dashboard"
-            onAction={() => router.push("/dashboard")}
-          />
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading repository...</p>
+          </div>
+        ) : !repository ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Repository not found</p>
+          </div>
         ) : (
           <>
             {/* Header with back button */}
