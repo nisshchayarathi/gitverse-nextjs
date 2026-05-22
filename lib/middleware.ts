@@ -71,17 +71,10 @@ export async function middleware(request: NextRequest) {
 
     const userId = token.sub; 
 
-   
-    const resourceOwnerId = request.headers.get("x-resource-owner-id");
+   // REMOVE header-based ownership check (untrusted input)
 
-
-    if (resourceOwnerId && resourceOwnerId !== userId) {
- 
-      return NextResponse.json(
-        { error: "Forbidden: You do not have access to this resource." },
-        { status: 403 }
-      );
-    }
+// Ownership validation must be handled in route handlers
+// where the actual resource can be verified server-side
 
     return NextResponse.next();
 
