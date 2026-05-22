@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/middleware";
-import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
+import { requireAuth, isHttpError } from "@/lib/middleware";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,14 +35,21 @@ export async function GET(request: NextRequest) {
       email: userDetails.email,
       image: userDetails.image,
       createdAt: userDetails.createdAt,
-      avatarUrl: (userDetails as any).image,
+      avatarUrl: userDetails.image,
       isGoogleLinked: hasGoogleAccount,
     });
-  } catch (error: any) {
-    console.error("Error fetching user:", sanitizeErrorMessage(error));
+  } catch (error: unknown) {
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: error.status },
+      );
+    }
+
+    console.error("Error fetching user:", error);
     return NextResponse.json(
       { message: "Failed to fetch user" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -57,14 +63,23 @@ export async function DELETE(request: NextRequest) {
     });
 
     return NextResponse.json({ message: "Account deleted" });
-  } catch (error: any) {
-    console.error("Error deleting account:", sanitizeErrorMessage(error));
-    if (error?.code === "P2025") {
+  } catch (error: unknown) {
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: error.status },
+      );
+    }
+
+    const prismaError = error as { code?: string };
+    if (prismaError?.code === "P2025") {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
+
+    console.error("Error deleting account:", error);
     return NextResponse.json(
       { message: "Failed to delete account" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

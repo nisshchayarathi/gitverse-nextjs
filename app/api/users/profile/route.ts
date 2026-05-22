@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/middleware";
-import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
+import { requireAuth, isHttpError } from "@/lib/middleware";
 import bcrypt from "bcryptjs";
+
+interface ProfileUpdateData {
+  name: string;
+  email: string;
+  image?: string;
+  passwordHash?: string;
+}
 
 export async function PUT(request: NextRequest) {
   try {
@@ -13,7 +19,14 @@ export async function PUT(request: NextRequest) {
     if (!name || !email) {
       return NextResponse.json(
         { message: "Name and email are required" },
-        { status: 400 }
+        { status: 400 },
+      );
+    }
+
+    if (typeof name !== "string" || typeof email !== "string") {
+      return NextResponse.json(
+        { message: "Name and email must be strings" },
+        { status: 400 },
       );
     }
 
@@ -27,7 +40,7 @@ export async function PUT(request: NextRequest) {
     if (existingUser) {
       return NextResponse.json(
         { message: "Email is already in use" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -53,14 +66,14 @@ export async function PUT(request: NextRequest) {
             message:
               "Changing email will unlink your Google account. Please provide newPassword to set a new password.",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       if (newPassword.length < 8) {
         return NextResponse.json(
           { message: "Password must be at least 8 characters" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -70,7 +83,7 @@ export async function PUT(request: NextRequest) {
       });
     }
 
-    const updateData: any = { name, email };
+    const updateData: ProfileUpdateData = { name, email };
 
     if (isEmailChanging && hasLinkedGoogle) {
       updateData.passwordHash = await bcrypt.hash(newPassword, 10);
@@ -94,13 +107,20 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       ...updatedUser,
-      avatarUrl: (updatedUser as any).image,
+      avatarUrl: updatedUser.image,
     });
-  } catch (error: any) {
-    console.error("Error updating profile:", sanitizeErrorMessage(error));
+  } catch (error: unknown) {
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: error.status },
+      );
+    }
+
+    console.error("Error updating profile:", error);
     return NextResponse.json(
       { message: "Failed to update profile" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
