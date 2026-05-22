@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosInstance, isAxiosError } from "axios";
-import { getRetryDelayMs } from "@/lib/utils/rateLimit";
+import { getRetryDelayMs, withRetry } from "@/lib/utils/rateLimit";
 
 export class GitHubRateLimitError extends Error {
   retryAfterSeconds: number;
@@ -28,7 +28,9 @@ function sanitizeGitHubHeaders(headers: any): any {
   }
 
   const source =
-    typeof (headers as any).toJSON === "function" ? (headers as any).toJSON() : headers;
+    typeof (headers as any).toJSON === "function"
+      ? (headers as any).toJSON()
+      : headers;
 
   if (source == null || typeof source !== "object") {
     return source;
@@ -174,18 +176,23 @@ export class GitHubService {
 
         const isRateLimit = status === 429 || status === 403;
         if (isRateLimit) {
-          const rateLimitRemaining = error.response?.headers?.["x-ratelimit-remaining"];
+          const rateLimitRemaining =
+            error.response?.headers?.["x-ratelimit-remaining"];
           if (status === 429 || rateLimitRemaining === "0") {
             if (config.retryCount >= 3) {
               const retryAfterHeader = error.response?.headers?.["retry-after"];
-              const resetHeader = error.response?.headers?.["x-ratelimit-reset"];
+              const resetHeader =
+                error.response?.headers?.["x-ratelimit-reset"];
               let retrySeconds = 60;
 
               if (retryAfterHeader) {
                 retrySeconds = parseInt(retryAfterHeader, 10);
               } else if (resetHeader) {
                 const resetTime = parseInt(resetHeader, 10) * 1000;
-                retrySeconds = Math.max(1, Math.ceil((resetTime - Date.now()) / 1000));
+                retrySeconds = Math.max(
+                  1,
+                  Math.ceil((resetTime - Date.now()) / 1000),
+                );
               }
               throw new GitHubRateLimitError(retrySeconds);
             }
@@ -198,7 +205,7 @@ export class GitHubService {
 
         const retryStatusCodes = [409, 502, 503, 504];
         if (
-          (status && retryableCodes.includes(status)) ||
+          (status && retryStatusCodes.includes(status)) ||
           error.code === "ECONNABORTED" ||
           error.code === "ECONNRESET" ||
           error.code === "ETIMEDOUT" ||
@@ -206,28 +213,19 @@ export class GitHubService {
         ) {
           if (config.retryCount < 3) {
             config.retryCount += 1;
-            const backoff = Math.pow(2, config.retryCount) * 1000 + Math.random() * 1000;
-            console.log(`Retrying GitHub API request ${config.url} (attempt ${config.retryCount}) due to ${status || error.code}...`);
+            const backoff =
+              Math.pow(2, config.retryCount) * 1000 + Math.random() * 1000;
+            console.log(
+              `Retrying GitHub API request ${config.url} (attempt ${config.retryCount}) due to ${status || error.code}...`,
+            );
             await new Promise((resolve) => setTimeout(resolve, backoff));
             return this.client(config);
           }
         }
 
         throw sanitizeGitHubError(error);
-      }
+      },
     );
-  }
-
-  /**
-   * Get authenticated user information
-   */
-  async getAuthenticatedUser(): Promise<GitHubUser> {
-    if (!this.token) {
-      throw new Error("GitHub token required for authentication");
-    }
-
-    const response = await this.client.get("/user");
-    return response.data;
   }
 
   /**
@@ -235,7 +233,10 @@ export class GitHubService {
    */
   async getRepository(owner: string, repo: string): Promise<GitHubRepository | null> {
     try {
-      const response = await this.client.get(`/repos/${owner}/${repo}`);
+      const response = await withRetry(
+        () => this.client.get(`/repos/${owner}/${repo}`),
+        { maxRetries: 3 }
+      );
       const data = response.data as GitHubRepository;
       
       // Detect renamed repositories safely
@@ -254,8 +255,48 @@ export class GitHubService {
     }
   }
 
+    const response = await withRetry(() => this.client.get("/user"), {
+      maxRetries: 3,
+    });
+    return response.data;
+  }
+
   /**
-   * List user repositories
+   * Get repository information
+   */
+  async getRepository(
+    owner: string,
+    repo: string,
+  ): Promise<GitHubRepository | null> {
+    try {
+      const response = await withRetry(
+        () => this.client.get(`/repos/${owner}/${repo}`),
+        { maxRetries: 3 }
+      );
+      const data = response.data as GitHubRepository;
+
+      // Detect renamed repositories safely
+      const expectedFullName = `${owner}/${repo}`.toLowerCase();
+      if (data.full_name && data.full_name.toLowerCase() !== expectedFullName) {
+        console.warn(
+          `GitHub repository renamed: requested ${expectedFullName}, but received ${data.full_name}`,
+        );
+      }
+
+      return data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        console.warn(
+          `GitHub repository not found (404): ${owner}/${repo}. It may have been deleted or access was lost.`,
+        );
+        return null;
+      }
+      throw sanitizeGitHubError(error);
+    }
+  }
+
+  /**
+   * List user repositories with pagination support and automatic retries
    */
   async listUserRepositories(
     username?: string,
@@ -265,21 +306,88 @@ export class GitHubService {
       direction?: "asc" | "desc";
       per_page?: number;
       page?: number;
+      max_pages?: number;
     },
-  ): Promise<GitHubRepository[]> {
+  ): Promise<{
+    repositories: GitHubRepository[];
+    nextPage?: number;
+    totalCount?: number;
+  }> {
     const endpoint = username ? `/users/${username}/repos` : "/user/repos";
+    const per_page = Math.min(Math.max(params?.per_page ?? 30, 1), 100);
+    const page = Math.max(params?.page ?? 1, 1);
+    const max_pages = Math.max(params?.max_pages ?? 1, 1); // Default: fetch only 1 page
 
-    const response = await this.client.get(endpoint, {
-      params: {
-        type: params?.type || "owner",
-        sort: params?.sort || "updated",
-        direction: params?.direction || "desc",
-        per_page: params?.per_page || 30,
-        page: params?.page || 1,
-      },
-    });
+    const allRepos: GitHubRepository[] = [];
+    let nextPage: number | undefined;
+    let totalCount: number | undefined;
 
-    return response.data;
+    for (
+      let currentPage = page;
+      currentPage < page + max_pages;
+      currentPage++
+    ) {
+      try {
+        const response = await withRetry(
+          () =>
+            this.client.get(endpoint, {
+              params: {
+                type: params?.type || "owner",
+                sort: params?.sort || "updated",
+                direction: params?.direction || "desc",
+                per_page,
+                page: currentPage,
+              },
+            }),
+          { maxRetries: 3 },
+        );
+
+        const repos: GitHubRepository[] = response.data;
+        allRepos.push(...repos);
+
+        // Parse Link header for pagination
+        const linkHeader = response.headers.link;
+        if (linkHeader) {
+          const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+          if (nextMatch) {
+            // Extract page number from next link
+            const nextUrl = new URL(nextMatch[1]);
+            const nextPageNum = nextUrl.searchParams.get("page");
+            if (nextPageNum) {
+              nextPage = parseInt(nextPageNum, 10);
+            }
+          }
+        }
+
+        // If fewer repos than requested, we've reached the end
+        if (repos.length < per_page) {
+          nextPage = undefined;
+          break;
+        }
+
+        // Stop if this is the last page we're fetching
+        if (currentPage === page + max_pages - 1) {
+          // nextPage may already be set from Link header
+          break;
+        }
+      } catch (error) {
+        // If it's a rate limit error and we already got some repos, return what we have
+        if (error instanceof GitHubRateLimitError && allRepos.length > 0) {
+          return {
+            repositories: allRepos,
+            nextPage: currentPage, // Indicate where to resume
+            totalCount,
+          };
+        }
+        throw error;
+      }
+    }
+
+    return {
+      repositories: allRepos,
+      nextPage,
+      totalCount,
+    };
   }
 
   /**
@@ -310,7 +418,9 @@ export class GitHubService {
    */
   async getBranches(owner: string, repo: string): Promise<GitHubBranch[]> {
     try {
-      const response = await this.client.get(`/repos/${owner}/${repo}/branches`);
+      const response = await this.client.get(
+        `/repos/${owner}/${repo}/branches`,
+      );
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {
@@ -334,14 +444,18 @@ export class GitHubService {
     },
   ): Promise<GitHubCommit[]> {
     try {
-      const response = await this.client.get(`/repos/${owner}/${repo}/commits`, {
-        params: {
-          sha: params?.sha,
-          path: params?.path,
-          per_page: params?.per_page || 100,
-          page: params?.page || 1,
-        },
-      });
+      const response = await withRetry(
+        () =>
+          this.client.get(`/repos/${owner}/${repo}/commits`, {
+            params: {
+              sha: params?.sha,
+              path: params?.path,
+              per_page: params?.per_page || 100,
+              page: params?.page || 1,
+            },
+          }),
+        { maxRetries: 3 }
+      );
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && (error.response?.status === 404 || error.response?.status === 409)) {
@@ -360,8 +474,9 @@ export class GitHubService {
     sha: string,
   ): Promise<GitHubCommit | null> {
     try {
-      const response = await this.client.get(
-        `/repos/${owner}/${repo}/commits/${sha}`,
+      const response = await withRetry(
+        () => this.client.get(`/repos/${owner}/${repo}/commits/${sha}`),
+        { maxRetries: 3 }
       );
       return response.data;
     } catch (error) {
@@ -381,8 +496,9 @@ export class GitHubService {
     pullNumber: number,
   ): Promise<GitHubPullRequest | null> {
     try {
-      const response = await this.client.get(
-        `/repos/${owner}/${repo}/pulls/${pullNumber}`,
+      const response = await withRetry(
+        () => this.client.get(`/repos/${owner}/${repo}/pulls/${pullNumber}`),
+        { maxRetries: 3 }
       );
       return response.data;
     } catch (error) {
@@ -408,14 +524,15 @@ export class GitHubService {
     const all: GitHubPullRequestFile[] = [];
     try {
       for (let page = 1; page <= maxPages; page++) {
-        const response = await this.client.get(
-          `/repos/${owner}/${repo}/pulls/${pullNumber}/files`,
-          {
-            params: {
-              per_page: perPage,
-              page,
-            },
-          },
+        const response = await withRetry(
+          () =>
+            this.client.get(`/repos/${owner}/${repo}/pulls/${pullNumber}/files`, {
+              params: {
+                per_page: perPage,
+                page,
+              },
+            }),
+          { maxRetries: 3 }
         );
 
         const items: GitHubPullRequestFile[] = response.data;
@@ -448,9 +565,12 @@ export class GitHubService {
 
     // Preferred: issue comment (PRs are issues in GitHub).
     try {
-      const response = await this.client.post(
-        `/repos/${owner}/${repo}/issues/${pullNumber}/comments`,
-        { body },
+      const response = await withRetry(
+        () =>
+          this.client.post(`/repos/${owner}/${repo}/issues/${pullNumber}/comments`, {
+            body,
+          }),
+        { maxRetries: 3 }
       );
       return response.data;
     } catch (err: unknown) {
@@ -469,12 +589,13 @@ export class GitHubService {
         message.toLowerCase().includes("issues")
       ) {
         // Fallback: create a PR review (shows up in PR conversation as a review comment).
-        const response = await this.client.post(
-          `/repos/${owner}/${repo}/pulls/${pullNumber}/reviews`,
-          {
-            body,
-            event: "COMMENT",
-          },
+        const response = await withRetry(
+          () =>
+            this.client.post(`/repos/${owner}/${repo}/pulls/${pullNumber}/reviews`, {
+              body,
+              event: "COMMENT",
+            }),
+          { maxRetries: 3 }
         );
 
         // Shape to match the issue-comment return type.
@@ -496,12 +617,18 @@ export class GitHubService {
     repo: string,
   ): Promise<Record<string, number>> {
     try {
-      const response = await this.client.get(`/repos/${owner}/${repo}/languages`);
+      const response = await withRetry(
+        () => this.client.get(`/repos/${owner}/${repo}/languages`),
+        { maxRetries: 3 }
+      );
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {
         return {};
       }
+      throw sanitizeGitHubError(error);
+    }
+  }
       throw sanitizeGitHubError(error);
     }
   }
@@ -520,8 +647,9 @@ export class GitHubService {
     }>
   > {
     try {
-      const response = await this.client.get(
-        `/repos/${owner}/${repo}/contributors`,
+      const response = await withRetry(
+        () => this.client.get(`/repos/${owner}/${repo}/contributors`),
+        { maxRetries: 3 }
       );
       return response.data;
     } catch (error) {
@@ -544,15 +672,19 @@ export class GitHubService {
       page?: number;
     },
   ): Promise<{ items: GitHubRepository[]; total_count: number }> {
-    const response = await this.client.get("/search/repositories", {
-      params: {
-        q: query,
-        sort: params?.sort,
-        order: params?.order || "desc",
-        per_page: params?.per_page || 30,
-        page: params?.page || 1,
-      },
-    });
+    const response = await withRetry(
+      () =>
+        this.client.get("/search/repositories", {
+          params: {
+            q: query,
+            sort: params?.sort,
+            order: params?.order || "desc",
+            per_page: params?.per_page || 30,
+            page: params?.page || 1,
+          },
+        }),
+      { maxRetries: 3 }
+    );
 
     return response.data;
   }
@@ -580,15 +712,22 @@ export class GitHubService {
   }
 
   /**
-   * Validate GitHub token
+   * Get repository branches
    */
-  async validateToken(): Promise<boolean> {
+  async getBranches(owner: string, repo: string): Promise<GitHubBranch[]> {
     try {
-      await this.getAuthenticatedUser();
-      return true;
-    } catch {
-      return false;
+      const response = await withRetry(
+        () => this.client.get(`/repos/${owner}/${repo}/branches`),
+        { maxRetries: 3 }
+      );
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        return [];
+      }
+      throw sanitizeGitHubError(error);
     }
+  }
   }
 }
 

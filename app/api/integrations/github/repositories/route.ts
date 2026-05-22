@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth } from "@/lib/middleware";
-import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
+import {
+  GitHubService,
+  GitHubRateLimitError,
+} from "@/lib/services/githubService";
 import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 import prisma from "@/lib/prisma";
+
+function clampInt(
+  value: string | null,
+  fallback: number,
+  min: number,
+  max: number,
+) {
+  const n = value == null ? NaN : Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(n)));
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,6 +24,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const tokenFromBody = (body?.token as string | undefined)?.trim();
     const username = (body?.username as string | undefined)?.trim();
+    const page = clampInt(body?.page as string | null, 1, 1, 1000);
+    const per_page = clampInt(body?.per_page as string | null, 30, 1, 100);
 
     const token =
       tokenFromBody ||
@@ -22,8 +38,18 @@ export async function POST(request: NextRequest) {
 
     if (token) {
       const github = new GitHubService(token);
-      const repositories = await github.listUserRepositories(username);
-      return NextResponse.json({ repositories, source: "user-token" });
+      const result = await github.listUserRepositories(username, {
+        page,
+        per_page,
+        max_pages: 1, // Single page by default for Vercel safety
+      });
+      return NextResponse.json({
+        repositories: result.repositories,
+        source: "user-token",
+        page,
+        per_page,
+        nextPage: result.nextPage,
+      });
     }
 
     // GitHub App flow fallback: return repos we already learned from installation callback.
@@ -53,14 +79,19 @@ export async function POST(request: NextRequest) {
       _enabled: r.enabled,
     }));
 
-    return NextResponse.json({ repositories, source: "github-app-db" });
+    return NextResponse.json({
+      repositories,
+      source: "github-app-db",
+      page: 1,
+      per_page: repos.length,
+    });
   } catch (error: any) {
     console.error("GitHub repositories error:", sanitizeErrorMessage(error));
 
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(
         { error: error.message, retryAfter: error.retryAfterSeconds },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
