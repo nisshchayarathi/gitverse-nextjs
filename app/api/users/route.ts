@@ -20,6 +20,16 @@ export const runtime = "nodejs";
  *
  * Response: `PaginatedResponse<UserSummary>`
  */
+/**
+ * GET /api/users
+ *
+ * Retrieves a paginated list of registered users.
+ * To protect Personally Identifiable Information (PII) and prevent email harvesting,
+ * the users' email addresses are excluded from the database response.
+ *
+ * @param request - The incoming HTTP NextRequest.
+ * @returns A JSON response containing a PaginatedResponse envelope of UserSummary records.
+ */
 export async function GET(request: NextRequest) {
   try {
     await requireAuth(request);
@@ -35,7 +45,6 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         name: true,
-        email: true,
         image: true,
         createdAt: true,
       },

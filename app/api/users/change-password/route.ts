@@ -3,6 +3,16 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { requireAuth, isHttpError } from "@/lib/middleware";
 
+/**
+ * POST /api/users/change-password
+ *
+ * Securely modifies the password of the currently authenticated user.
+ * Validates the current password if one is already set on the account,
+ * enforces a minimum password length of 8 characters, and securely hashes the new password before storage.
+ *
+ * @param request - The incoming HTTP NextRequest containing currentPassword and newPassword fields.
+ * @returns A JSON response with status code 200 on success, or a 400/401/404/500 error response.
+ */
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);

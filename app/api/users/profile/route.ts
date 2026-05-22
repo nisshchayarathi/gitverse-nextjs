@@ -10,6 +10,17 @@ interface ProfileUpdateData {
   passwordHash?: string;
 }
 
+/**
+ * PUT /api/users/profile
+ *
+ * Updates the profile details (name, email, avatar, and optional password) of the authenticated user.
+ * If the user's email is changing and they have a linked Google account, their Google account is
+ * securely unlinked, and they must provide a new password. Both the Google account unlinking
+ * and user profile update are performed atomically in a single Prisma transaction.
+ *
+ * @param request - The incoming HTTP NextRequest containing updated profile fields.
+ * @returns A JSON response with the updated User details and status code 200, or a 400/401/500 error response.
+ */
 export async function PUT(request: NextRequest) {
   try {
     const user = await requireAuth(request);
@@ -76,11 +87,6 @@ export async function PUT(request: NextRequest) {
           { status: 400 },
         );
       }
-
-      // Unlink Google account (prevents Google sign-in for this user unless re-linked).
-      await prisma.account.deleteMany({
-        where: { userId: user.userId, provider: "google" },
-      });
     }
 
     const updateData: ProfileUpdateData = { name, email };
@@ -89,20 +95,29 @@ export async function PUT(request: NextRequest) {
       updateData.passwordHash = await bcrypt.hash(newPassword, 10);
     }
 
-    if (avatar && (avatar.startsWith("data:") || avatar.startsWith("http"))) {
+    if (typeof avatar === "string" && (avatar.startsWith("data:") || avatar.startsWith("http"))) {
       updateData.image = avatar;
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: user.userId },
-      data: updateData,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        image: true,
-        createdAt: true,
-      },
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      if (isEmailChanging && hasLinkedGoogle) {
+        // Unlink Google account atomically within the transaction
+        await tx.account.deleteMany({
+          where: { userId: user.userId, provider: "google" },
+        });
+      }
+
+      return await tx.user.update({
+        where: { id: user.userId },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          createdAt: true,
+        },
+      });
     });
 
     return NextResponse.json({

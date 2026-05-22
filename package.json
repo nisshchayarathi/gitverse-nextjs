@@ -40,7 +40,6 @@
     "@types/d3": "^7.4.3",
     "@types/pg": "^8.16.0",
     "axios": "^1.13.2",
-    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",

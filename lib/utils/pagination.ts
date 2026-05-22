@@ -43,7 +43,7 @@ export function parsePaginationParams(
   const rawLimit = searchParams.get("limit");
   let limit = DEFAULT_LIMIT;
 
-  if (rawLimit !== null) {
+  if (rawLimit !== null && rawLimit.trim() !== "") {
     const parsed = Number(rawLimit);
     if (Number.isFinite(parsed)) {
       limit = Math.max(MIN_LIMIT, Math.min(MAX_LIMIT, Math.floor(parsed)));
@@ -54,7 +54,7 @@ export function parsePaginationParams(
   const rawCursor = searchParams.get("cursor");
   let cursor: number | null = null;
 
-  if (rawCursor !== null) {
+  if (rawCursor !== null && rawCursor.trim() !== "") {
     const parsed = Number(rawCursor);
     if (Number.isFinite(parsed) && parsed > 0) {
       cursor = Math.floor(parsed);
@@ -85,6 +85,10 @@ export function buildPaginatedResponse<T extends { id: number }>(
   items: T[],
   limit: number,
 ): PaginatedResponse<T> {
+  if (limit <= 0 || !Number.isFinite(limit)) {
+    throw new Error("Limit must be a positive, finite integer");
+  }
+
   const hasMore = items.length > limit;
 
   // Trim the sentinel row so the consumer only sees `limit` items.

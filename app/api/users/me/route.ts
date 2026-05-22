@@ -5,6 +5,15 @@ import { requireAuth, isHttpError } from "@/lib/middleware";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+/**
+ * GET /api/users/me
+ *
+ * Retrieves the profile information of the currently authenticated user,
+ * including basic profile fields and checking whether a Google account is linked.
+ *
+ * @param request - The incoming HTTP NextRequest.
+ * @returns A JSON response with the user's details and status code 200, or a 401/404/500 error response.
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request);
@@ -54,6 +63,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * DELETE /api/users/me
+ *
+ * Permanently deletes the account of the currently authenticated user.
+ *
+ * @param request - The incoming HTTP NextRequest.
+ * @returns A JSON response confirming deletion and status code 200, or a 401/404/500 error response.
+ */
 export async function DELETE(request: NextRequest) {
   try {
     const user = await requireAuth(request);

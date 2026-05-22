@@ -65,7 +65,6 @@ describe("GET /api/users API Route", () => {
       select: {
         id: true,
         name: true,
-        email: true,
         image: true,
         createdAt: true,
       },
@@ -104,7 +103,6 @@ describe("GET /api/users API Route", () => {
       select: {
         id: true,
         name: true,
-        email: true,
         image: true,
         createdAt: true,
       },

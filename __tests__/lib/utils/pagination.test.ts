@@ -93,6 +93,26 @@ describe("parsePaginationParams", () => {
     const result = parsePaginationParams(params({ cursor: "NaN" }));
     expect(result.cursor).toBeNull();
   });
+
+  it("ignores empty string limit", () => {
+    const result = parsePaginationParams(params({ limit: "" }));
+    expect(result.limit).toBe(DEFAULT_LIMIT);
+  });
+
+  it("ignores empty string cursor", () => {
+    const result = parsePaginationParams(params({ cursor: "" }));
+    expect(result.cursor).toBeNull();
+  });
+
+  it("ignores whitespace-only limit", () => {
+    const result = parsePaginationParams(params({ limit: "   " }));
+    expect(result.limit).toBe(DEFAULT_LIMIT);
+  });
+
+  it("ignores whitespace-only cursor", () => {
+    const result = parsePaginationParams(params({ cursor: "   " }));
+    expect(result.cursor).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -176,5 +196,12 @@ describe("buildPaginatedResponse", () => {
     expect(result.data).toHaveLength(1);
     expect(result.pagination.hasMore).toBe(false);
     expect(result.pagination.nextCursor).toBeNull();
+  });
+
+  it("throws an error when limit is 0 or negative or invalid", () => {
+    expect(() => buildPaginatedResponse([], 0)).toThrow("Limit must be a positive, finite integer");
+    expect(() => buildPaginatedResponse([], -5)).toThrow("Limit must be a positive, finite integer");
+    expect(() => buildPaginatedResponse([], NaN)).toThrow("Limit must be a positive, finite integer");
+    expect(() => buildPaginatedResponse([], Infinity)).toThrow("Limit must be a positive, finite integer");
   });
 });
