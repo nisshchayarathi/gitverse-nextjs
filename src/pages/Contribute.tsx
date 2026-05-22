@@ -18,6 +18,7 @@ import {
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
+  Skeleton,
 } from "@/components/ui";
 
 type GitHubRepoApiItem = {
@@ -74,6 +75,7 @@ export default function Contribute() {
 
   const [historyRepoFullName, setHistoryRepoFullName] = useState<string>("");
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyRepos, setHistoryRepos] = useState<ReviewHistoryRepo[]>([]);
 
@@ -186,6 +188,7 @@ export default function Contribute() {
 
       const repos = Array.isArray(res.data?.repos) ? res.data.repos : [];
       setHistoryRepos(repos as ReviewHistoryRepo[]);
+      setHistoryLoaded(true);
     } catch (e: any) {
       const message =
         e?.response?.data?.error ||
@@ -445,13 +448,15 @@ export default function Contribute() {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    disabled={isBusy || repos.length === 0}
+                    disabled={isBusy || (repos.length === 0 && busyAction !== "refreshRepos")}
                   >
-                    {repos.length === 0
-                      ? "No repos loaded"
-                      : selectedRepoFullNames.size > 0
-                        ? `${selectedRepoFullNames.size} selected`
-                        : "Choose repositories"}
+                    {busyAction === "refreshRepos"
+                      ? "Loading repositories..."
+                      : repos.length === 0
+                        ? "No repos loaded"
+                        : selectedRepoFullNames.size > 0
+                          ? `${selectedRepoFullNames.size} selected`
+                          : "Choose repositories"}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -534,7 +539,12 @@ export default function Contribute() {
                 <select
                   className="w-full h-10 rounded-md border border-border bg-background/50 px-3 text-sm"
                   value={historyRepoFullName}
-                  onChange={(e) => setHistoryRepoFullName(e.target.value)}
+                  onChange={(e) => {
+                    setHistoryRepoFullName(e.target.value);
+                    setHistoryRepos([]);
+                    setHistoryLoaded(false);
+                    setHistoryError(null);
+                  }}
                 >
                   {connectedRepos.filter((r) => r.enabled).length === 0 && (
                     <option value="">No enabled repos</option>
@@ -559,13 +569,31 @@ export default function Contribute() {
               </div>
             </div>
 
-            {historyError && (
+            {historyLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-40 rounded" />
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg border border-border/50 bg-background/40 p-3 space-y-3"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <Skeleton className="h-5 w-2/3" />
+                        <Skeleton className="h-4 w-32" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Skeleton className="h-3.5 w-1/2" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : historyError ? (
               <div className="text-sm text-red-500 border border-red-500/30 bg-red-500/10 rounded-md p-3">
                 {historyError}
               </div>
-            )}
-
-            {historyRepos.length > 0 && (
+            ) : historyRepos.length > 0 ? (
               <div className="space-y-3">
                 {historyRepos.map((repo) => (
                   <div key={repo.id} className="space-y-2">
@@ -627,6 +655,15 @@ export default function Contribute() {
                   </div>
                 ))}
               </div>
+            ) : (
+              historyLoaded && (
+                <div className="text-center py-8 text-muted-foreground border border-dashed border-border/50 rounded-lg bg-background/20">
+                  <p className="text-sm">No stored webhook reviews found for this repository.</p>
+                  <p className="text-xs mt-1 text-muted-foreground/75">
+                    Reviews will appear here automatically when PR webhooks are triggered.
+                  </p>
+                </div>
+              )
             )}
           </CardContent>
         </Card>

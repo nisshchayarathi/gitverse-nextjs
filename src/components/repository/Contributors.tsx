@@ -11,7 +11,7 @@ import {
   Clock,
   Zap,
 } from "lucide-react";
-import { Card } from "@/components/ui";
+import { Card, EmptyState } from "@/components/ui";
 import { useState, useRef, useEffect } from "react";
 
 interface Contributor {
@@ -125,7 +125,17 @@ export function Contributors({ repository }: ContributorsProps) {
       </div>
 
       {/* Stats overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {contributors.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="No contributors found"
+          description="We couldn't find any contributor activity in this repository."
+          actionLabel="Refresh Data"
+          onAction={() => window.location.reload()}
+        />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="glass p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10">
@@ -310,6 +320,8 @@ export function Contributors({ repository }: ContributorsProps) {
           );
         })}
       </div>
+        </>
+      )}
 
       {/* Selected contributor modal */}
       {selectedContributor && (
