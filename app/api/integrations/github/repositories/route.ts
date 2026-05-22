@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/api-auth";
-import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
-import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
+import { isHttpError, requireAuth } from "@/lib/middleware";
+import { GitHubService } from "@/lib/services/githubService";
 import prisma from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
@@ -22,24 +21,8 @@ export async function POST(request: NextRequest) {
 
     if (token) {
       const github = new GitHubService(token);
-      const valid = await github.validateToken();
-      if (!valid) {
-        return NextResponse.json(
-          {
-            error:
-              "Your GitHub token is invalid or has expired. Reconnect your GitHub account to continue.",
-          },
-          { status: 401 },
-        );
-      }
       const repositories = await github.listUserRepositories(username);
-      return NextResponse.json(
-        { repositories, source: "user-token" },
-        { 
-          status: 200,
-          headers: { "Cache-Control": "no-store" }
-        }
-      );
+      return NextResponse.json({ repositories, source: "user-token" });
     }
 
     // GitHub App flow fallback: return repos we already learned from installation callback.
@@ -53,12 +36,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "No GitHub token or GitHub App repos found in DB. If you installed the app but weren't redirected back, set the GitHub App Setup URL to /api/integrations/github/app/callback, or use the Sync Installation option in Contribute.",
+            "No GitHub token or GitHub App repos found in DB. If you installed the app but weren’t redirected back, set the GitHub App Setup URL to /api/integrations/github/app/callback, or use the Sync Installation option in Contribute.",
         },
-        { 
-          status: 400,
-          headers: { "Cache-Control": "no-store" }
-        },
+        { status: 400 },
       );
     }
 
@@ -72,41 +52,18 @@ export async function POST(request: NextRequest) {
       _enabled: r.enabled,
     }));
 
-    return NextResponse.json(
-      { repositories, source: "github-app-db" },
-      { 
-        status: 200,
-        headers: { "Cache-Control": "no-store" }
-      }
-    );
+    return NextResponse.json({ repositories, source: "github-app-db" });
   } catch (error: any) {
-    console.error("GitHub repositories error:", sanitizeErrorMessage(error));
-
-    if (error instanceof GitHubRateLimitError) {
-      return NextResponse.json(
-        { error: error.message, retryAfter: error.retryAfterSeconds },
-        { 
-          status: 429,
-          headers: { "Cache-Control": "no-store" }
-        }
-      );
-    }
-
+    console.error("GitHub repositories error:", error);
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { 
-          status: error.status,
-          headers: { "Cache-Control": "no-store" }
-        },
+        { status: error.status },
       );
     }
     return NextResponse.json(
       { error: "Failed to fetch GitHub repositories" },
-      { 
-        status: 500,
-        headers: { "Cache-Control": "no-store" }
-      },
+      { status: 500 },
     );
   }
 }

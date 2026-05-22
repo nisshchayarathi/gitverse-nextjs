@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireAuth } from "@/lib/middleware";
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!userDetails) {
-      return NextResponse.json({ error: "Not Found" }, { status: 404 });
+      return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
     const passwordHash =
@@ -47,7 +47,10 @@ export async function POST(request: NextRequest) {
       );
 
       if (!isPasswordValid) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        return NextResponse.json(
+          { message: "Current password is incorrect" },
+          { status: 401 }
+        );
       }
     }
 
@@ -61,6 +64,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Password changed successfully" });
   } catch (error: any) {
     console.error("Error changing password:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { message: "Failed to change password" },
+      { status: 500 }
+    );
   }
 }

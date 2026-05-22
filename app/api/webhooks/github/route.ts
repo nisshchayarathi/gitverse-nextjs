@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyGitHubWebhookSignature } from "@/lib/utils/githubWebhook";
 import { GitHubAppService } from "@/lib/services/githubAppService";
 import { GitHubService } from "@/lib/services/githubService";
-import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 import prisma from "@/lib/prisma";
 import {
   formatPRReviewMarkdown,
@@ -37,22 +36,12 @@ function shouldHandlePullRequestAction(action: string | undefined): boolean {
   );
 }
 
-function noStoreResponse(data: unknown, status = 200) {
-  return NextResponse.json(data, {
-    status,
-    headers: { "Cache-Control": "no-store" },
-  });
-}
-
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
 
-  const deliveryId = request.headers.get("x-github-delivery") || "unknown";
   const signature = request.headers.get("x-hub-signature-256");
   const event = request.headers.get("x-github-event");
   const secret = process.env.GITHUB_WEBHOOK_SECRET || "";
-
-  console.log(`webhook delivery ${deliveryId}: event=${event}`);
 
   if (
     !verifyGitHubWebhookSignature({
@@ -61,35 +50,45 @@ export async function POST(request: NextRequest) {
       webhookSecret: secret,
     })
   ) {
-    console.warn(`webhook delivery ${deliveryId}: invalid signature`);
-    return noStoreResponse({ error: "Invalid signature", deliveryId }, 401);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
   if (event !== "pull_request") {
-    return noStoreResponse({ ok: true, ignored: true, event, deliveryId });
+    return NextResponse.json(
+      { ok: true, ignored: true, event },
+      { status: 200 },
+    );
   }
 
   let payload: PullRequestWebhookPayload;
   try {
     payload = JSON.parse(rawBody);
   } catch {
-    console.warn(`webhook delivery ${deliveryId}: invalid JSON`);
-    return noStoreResponse({ error: "Invalid JSON", deliveryId }, 400);
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
   const action = payload.action;
   if (!shouldHandlePullRequestAction(action)) {
-    return noStoreResponse({ ok: true, ignored: true, action, deliveryId });
+    return NextResponse.json(
+      { ok: true, ignored: true, action },
+      { status: 200 },
+    );
   }
 
   // Ignore draft PRs until they become ready_for_review
   if (payload.pull_request?.draft && action !== "ready_for_review") {
-    return noStoreResponse({ ok: true, ignored: true, reason: "draft", deliveryId });
+    return NextResponse.json(
+      { ok: true, ignored: true, reason: "draft" },
+      { status: 200 },
+    );
   }
 
   // Avoid replying to bots (including ourselves)
   if (payload.sender?.type === "Bot") {
-    return noStoreResponse({ ok: true, ignored: true, reason: "bot", deliveryId });
+    return NextResponse.json(
+      { ok: true, ignored: true, reason: "bot" },
+      { status: 200 },
+    );
   }
 
   const owner = payload.repository?.owner?.login;
@@ -98,28 +97,48 @@ export async function POST(request: NextRequest) {
   const installationId = payload.installation?.id;
 
   if (!owner || !repo || !number || !installationId) {
-    console.warn(`webhook delivery ${deliveryId}: missing required fields`);
-    return noStoreResponse({ error: "Missing required fields", deliveryId }, 400);
+    return NextResponse.json(
+      {
+        error: "Missing required fields",
+        details: { owner, repo, number, installationId },
+      },
+      { status: 400 },
+    );
   }
 
   try {
     const repoFullName = `${owner}/${repo}`;
 
     // Gate by DB selection: only auto-review repos that users explicitly enabled.
-    // Verify the installation strictly matches the authenticated webhook payload to enforce ownership.
+    // Hackathon scope: if *any* user enabled this repo, we process and attach the PR to that GitHubRepo row.
     const enabledRepo = await prisma.gitHubRepo.findFirst({
       where: {
         repoFullName,
         enabled: true,
-        installationId: BigInt(installationId),
+        OR: [
+          { installationId: BigInt(installationId) },
+          { installationId: null },
+        ],
       },
       orderBy: [{ updatedAt: "desc" }],
     });
 
     if (!enabledRepo) {
-      console.log(`webhook delivery ${deliveryId}: repo not enabled (${repoFullName})`);
-      return noStoreResponse({ ok: true, ignored: true, reason: "repo_not_enabled", deliveryId });
+      return NextResponse.json(
+        { ok: true, ignored: true, reason: "repo_not_enabled", repoFullName },
+        { status: 200 },
+      );
     }
+
+    // Backfill installationId for future lookups.
+    await prisma.gitHubRepo.updateMany({
+      where: {
+        repoFullName,
+        enabled: true,
+        installationId: null,
+      },
+      data: { installationId: BigInt(installationId) },
+    });
 
     const app = new GitHubAppService();
     const installationToken =
@@ -129,9 +148,12 @@ export async function POST(request: NextRequest) {
     const pr = await github.getPullRequest(owner, repo, number);
     const headSha = pr?.head?.sha;
     if (!headSha) {
-      return noStoreResponse(
-        { error: "Missing head SHA from GitHub PR response" },
-        500
+      return NextResponse.json(
+        {
+          error: "Missing head SHA from GitHub PR response",
+          details: { owner, repo, number },
+        },
+        { status: 500 },
       );
     }
 
@@ -180,13 +202,17 @@ export async function POST(request: NextRequest) {
       });
     } catch (e: any) {
       if (e?.code === "P2002") {
-        console.log(`webhook delivery ${deliveryId}: already reviewed (PR #${number}, sha=${headSha})`);
-        return noStoreResponse({
-          ok: true,
-          ignored: true,
-          reason: "already_reviewed",
-          deliveryId,
-        });
+        return NextResponse.json(
+          {
+            ok: true,
+            ignored: true,
+            reason: "already_reviewed",
+            repoFullName,
+            prNumber: number,
+            headSha,
+          },
+          { status: 200 },
+        );
       }
       throw e;
     }
@@ -251,22 +277,26 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return noStoreResponse({
-      ok: true,
-      posted: postedUrl,
-      postError,
-      deliveryId,
-      stored: {
-        pullRequestId: prRecord.id,
-        prReviewId: reviewRow.id,
-        headSha,
+    return NextResponse.json(
+      {
+        ok: true,
+        posted: postedUrl,
+        postError,
+        stored: {
+          pullRequestId: prRecord.id,
+          prReviewId: reviewRow.id,
+          headSha,
+        },
       },
-    });
+      { status: 200 },
+    );
   } catch (error: any) {
-    console.error(`webhook delivery ${deliveryId}: ${sanitizeErrorMessage(error)}`);
-    return noStoreResponse(
-      { error: "Failed to process PR webhook", deliveryId },
-      500
+    console.error("GitHub webhook PR review error:", error);
+    return NextResponse.json(
+      {
+        error: "Failed to process PR webhook",
+      },
+      { status: 500 },
     );
   }
 }

@@ -53,6 +53,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [error] = useState("");
+
   useEffect(() => {
     fetchRepositories();
   }, []);

@@ -41,24 +41,8 @@ model User {
   sessions              Session[]
   githubAccount         GitHubAccount?
   githubRepos           GitHubRepo[]
-  passwordResetTokens   PasswordResetToken[]
 
   @@map("users")
-}
-
-model PasswordResetToken {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @map("user_id")
-  tokenHash String   @unique @map("token_hash") // SHA-256 of the raw token; raw token only lives in the email link
-  expiresAt DateTime @map("expires_at")
-  usedAt    DateTime? @map("used_at")           // set when consumed; null = still valid
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@map("password_reset_tokens")
 }
 
 model GitHubAccount {
@@ -76,7 +60,6 @@ model GitHubAccount {
   @@map("github_accounts")
 }
 
-
 model GitHubRepo {
   id           Int      @id @default(autoincrement())
   userId       Int      @map("user_id")
@@ -90,10 +73,8 @@ model GitHubRepo {
   pullRequests PullRequest[]
 
   @@unique([userId, repoFullName])
-  @@index([repoFullName, enabled, installationId])
   @@index([installationId])
   @@index([enabled])
-  @@index([updatedAt])
   @@map("github_repos")
 }
 
@@ -150,8 +131,6 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@index([userId, provider])
   @@map("accounts")
 }
 
@@ -162,8 +141,6 @@ model Session {
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([expires])
   @@map("sessions")
 }
 
@@ -202,7 +179,6 @@ model Repository {
   languages      Language[]
   analysisJobs   AnalysisJob[]
 
-  @@index([userId])
   @@map("repositories")
 }
 
@@ -241,7 +217,6 @@ model AnalysisJob {
   @@index([lockExpiresAt])
   @@index([repositoryId])
   @@index([userId])
-  @@index([status, lockExpiresAt, nextRunAt])
   @@map("analysis_jobs")
 }
 
@@ -320,7 +295,6 @@ model FileChange {
   file      File?    @relation(fields: [fileId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@index([commitId])
   @@map("file_changes")
 }
 

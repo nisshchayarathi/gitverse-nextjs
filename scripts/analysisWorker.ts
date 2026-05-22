@@ -3,11 +3,6 @@ import os from "os";
 import prisma from "../lib/prisma";
 import { analysisJobService } from "../lib/services/analysisJobService";
 import { repositoryService } from "../lib/services/repositoryService";
-import {
-  isRateLimitError,
-  extractRetryAfter,
-  sanitizeErrorMessage,
-} from "../lib/utils/rateLimit";
 import type { AnalysisJob } from "@prisma/client";
 
 const POLL_INTERVAL_MS = 2000;
@@ -32,7 +27,7 @@ async function runJob(
     lockMs: number;
     heartbeatIntervalMs: number;
   }
-): Promise<boolean> {
+) {
   let heartbeatTimer: NodeJS.Timeout | null = null;
   let lastProgressWriteAt = 0;
   let lastProgressPercent: number | undefined;
@@ -84,7 +79,7 @@ async function runJob(
           workerId: params.workerId,
           lockMs: params.lockMs,
         })
-        .catch((e) => console.error("heartbeat failed", sanitizeErrorMessage(e)));
+        .catch((e) => console.error("heartbeat failed", e));
     }, params.heartbeatIntervalMs);
 
     if (job.type !== "repository_analysis") {
@@ -101,41 +96,23 @@ async function runJob(
       jobId: job.id,
       workerId: params.workerId,
     });
-    return true;
   } catch (err: any) {
-    const rateLimited = isRateLimitError(err);
-    const retryAfter = rateLimited ? extractRetryAfter(err) : null;
-    const safeMessage = sanitizeErrorMessage(err);
-
-    if (rateLimited) {
-      console.error(
-        `Job ${job.id} rate limited (attempt ${job.attempts}/${job.maxAttempts})` +
-          (retryAfter ? `, retry after ${retryAfter}s` : "")
-      );
-    } else {
-      console.error(`Job ${job.id} failed: ${safeMessage}`);
-    }
+    const message = err?.message ? String(err.message) : String(err);
+    console.error(`Job ${job.id} failed:`, err);
 
     await analysisJobService.markFailed({
       jobId: job.id,
       workerId: params.workerId,
-      error: safeMessage,
+      error: message,
       attempts: job.attempts,
       maxAttempts: job.maxAttempts,
-      retryAfter: retryAfter ?? undefined,
     });
-
-    const shouldRetry = job.attempts < job.maxAttempts;
-    if (!shouldRetry && job.type === "repository_analysis") {
-      await repositoryService.markRepositoryFailed(job.repositoryId, safeMessage);
-    }
-
-    return false;
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
   }
 }
 
+<<<<<<< HEAD
 export interface JobOutcome {
   jobId: string;
   status: "processed" | "failed" | "errored";
@@ -154,14 +131,20 @@ export interface AnalysisWorkerSummary {
   jobOutcomes: JobOutcome[];
 }
 
+=======
+>>>>>>> upstream/main
 export async function startAnalysisWorkerLoop(opts?: {
   workerId?: string;
   pollIntervalMs?: number;
   heartbeatIntervalMs?: number;
   lockMs?: number;
   once?: boolean;
+<<<<<<< HEAD
   maxJobs?: number;
 }): Promise<AnalysisWorkerSummary> {
+=======
+}) {
+>>>>>>> upstream/main
   const workerId = opts?.workerId || getWorkerId();
   const pollIntervalMs = opts?.pollIntervalMs ?? POLL_INTERVAL_MS;
   const heartbeatIntervalMs =
@@ -171,6 +154,7 @@ export async function startAnalysisWorkerLoop(opts?: {
   console.log(`analysis worker starting: ${workerId}`);
 
   let stopping = false;
+<<<<<<< HEAD
   const startTimeMs = Date.now();
   const deadline = opts?.timeBudgetMs ? Date.now() + opts.timeBudgetMs : Infinity;
   let totalJobsScanned = 0;
@@ -178,6 +162,8 @@ export async function startAnalysisWorkerLoop(opts?: {
   let jobsSkipped = 0;
   let jobsFailed = 0;
   let earlyStopReason: string | undefined;
+=======
+>>>>>>> upstream/main
 
   const shutdown = async (signal: string) => {
     if (stopping) return;
@@ -194,6 +180,7 @@ export async function startAnalysisWorkerLoop(opts?: {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("SIGINT", () => void shutdown("SIGINT"));
 
+<<<<<<< HEAD
   const startTime = Date.now();
   let jobsProcessed = 0;
   let jobsSkipped = 0;
@@ -205,44 +192,35 @@ export async function startAnalysisWorkerLoop(opts?: {
       break;
     }
 
+=======
+  while (!stopping) {
+>>>>>>> upstream/main
     try {
-      if (opts?.timeBudgetMs) {
-        const elapsed = Date.now() - startTime;
-        if (elapsed >= opts.timeBudgetMs) {
-          console.log(`Time budget of ${opts.timeBudgetMs}ms reached (elapsed: ${elapsed}ms). Processed ${jobsProcessed} jobs. Shutting down gracefully...`);
-          break;
-        }
-      }
-
       const job = await analysisJobService.claimNextJob({
         workerId,
         lockMs,
       });
 
       if (!job) {
+<<<<<<< HEAD
         jobsSkipped++;
         if (opts?.once || opts?.maxJobs !== undefined) {
           earlyStopReason = earlyStopReason || "queueEmpty";
           break;
         }
+=======
+        if (opts?.once) return;
+>>>>>>> upstream/main
         await sleep(pollIntervalMs);
         continue;
       }
 
-      totalJobsScanned++;
       console.log(
         `claimed job ${job.id} (attempt ${job.attempts}/${job.maxAttempts})`
       );
-      const isSuccess = await runJob(job, { workerId, lockMs, heartbeatIntervalMs });
-      
-      if (isSuccess) {
-        jobsProcessed++;
-        jobOutcomes.push({ jobId: job.id, status: "processed" });
-      } else {
-        jobsFailed++;
-        jobOutcomes.push({ jobId: job.id, status: "failed" });
-      }
+      await runJob(job, { workerId, lockMs, heartbeatIntervalMs });
 
+<<<<<<< HEAD
       if (opts?.once) {
         earlyStopReason = earlyStopReason || "onceCompleted";
         break;
@@ -278,6 +256,15 @@ export async function startAnalysisWorkerLoop(opts?: {
     earlyStopReason,
     success: true,
   };
+=======
+      if (opts?.once) return;
+    } catch (e) {
+      console.error("worker loop error:", e);
+      if (opts?.once) return;
+      await sleep(pollIntervalMs);
+    }
+  }
+>>>>>>> upstream/main
 }
 
 // Run as standalone script
@@ -287,12 +274,7 @@ const isMain =
   typeof require !== "undefined" && (require as any).main === module;
 if (isMain) {
   const once = !!process.env.WORKER_ONCE;
-  const budgetEnv = process.env.WORKER_TIME_BUDGET_MS;
-  const timeBudgetMs = budgetEnv ? parseInt(budgetEnv, 10) : undefined;
-  startAnalysisWorkerLoop({
-    ...(once ? { once } : {}),
-    ...(timeBudgetMs && !Number.isNaN(timeBudgetMs) ? { timeBudgetMs } : {}),
-  }).catch((e) => {
+  startAnalysisWorkerLoop({ once }).catch((e) => {
     console.error("worker fatal:", e);
     process.exit(1);
   });

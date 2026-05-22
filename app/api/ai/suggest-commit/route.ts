@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/api-auth";
+import { isHttpError, requireAuth } from "@/lib/middleware";
 import { getGeminiService } from "@/lib/services/geminiService";
 
 export async function POST(request: NextRequest) {
@@ -37,6 +37,9 @@ export async function POST(request: NextRequest) {
         { status: error.status }
       );
     }
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to generate suggestions" },
+      { status: 500 }
+    );
   }
 }

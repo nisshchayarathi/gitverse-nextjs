@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/api-auth";
+import { isHttpError, requireAuth } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
-import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,28 +33,21 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { account: toJsonSafe(account), repos: toJsonSafe(repos) },
-      { 
-        status: 200,
-        headers: { "Cache-Control": "no-store" }
-      },
+      { status: 200 },
     );
   } catch (error: any) {
-    console.error("GitHub connected repos error:", sanitizeErrorMessage(error));
+    console.error("GitHub connected repos error:", error);
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { 
-          status: error.status,
-          headers: { "Cache-Control": "no-store" }
-        },
+        { status: error.status },
       );
     }
     return NextResponse.json(
-      { error: "Failed to load connected repos" },
-      { 
-        status: 500,
-        headers: { "Cache-Control": "no-store" }
+      {
+        error: "Failed to load connected repos",
       },
+      { status: 500 },
     );
   }
 }

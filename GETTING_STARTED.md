@@ -4,7 +4,7 @@ This is the Next.js version of GitVerse, migrated from the Vite + React version 
 
 ## Prerequisites
 
-- Node.js 22.x installed (see [Supported Node Version](README.md#supported-node-version))
+- Node.js 18+ installed
 - PostgreSQL database (NeonDB recommended)
 - Google Gemini AI API key
 
@@ -28,13 +28,13 @@ cp .env.example .env.local
 Edit `.env.local` and fill in your values:
 
 ```env
-# Database - Get from [https://neon.tech](https://neon.tech)
+# Database - Get from https://neon.tech
 DATABASE_URL=postgresql://user:password@host/database?sslmode=require&schema=public
 
 # JWT Secret - Generate a secure random string
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 
-# Gemini AI - Get from [https://makersuite.google.com/app/apikey](https://makersuite.google.com/app/apikey)
+# Gemini AI - Get from https://makersuite.google.com/app/apikey
 GEMINI_API_KEY=your_gemini_api_key_here
 
 # NextAuth (required for Google login)
@@ -47,7 +47,7 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 
 # Optional: Base URL for API calls
 # Leave unset to use same-origin `/api/...` (recommended).
-# If you set it, avoid a trailing slash (e.g. [https://example.com](https://example.com), not [https://example.com/](https://example.com/))
+# If you set it, avoid a trailing slash (e.g. https://example.com, not https://example.com/)
 # NEXT_PUBLIC_API_URL=http://localhost:3000
 ```
 
@@ -108,44 +108,12 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### Running the App
 
-Note on Background Tasks: For standard local development, background tasks are handled seamlessly by Next.js API routes. The legacy worker script is optional and generally not required.
-
 ```bash
 npm run dev          # Development server
 npm run build        # Production build
 npm start            # Production server
 npm run lint         # Lint code
 ```
-
-### Legacy Worker (Optional)
-
-If you are testing specific background workflows locally that mimic a custom non-serverless deployment, you can optionally run the worker:
-
-```bash
-npm run worker       # Run background tasks (Legacy / Optional)
-```
-
-### Analysis Worker & Cron Runner
-
-GitVerse uses a background worker to process repository analysis jobs. The worker is triggered by a cron scheduler and runs one pass through the job queue each time it is called.
-
-**Local development** — trigger a single pass manually:
-
-```bash
-WORKER_ONCE=1 npm run worker:dev
-```
-
-**Production setup** — see the full guide: [docs/cron-setup.md](./docs/cron-setup.md)
-
-Quick summary of deployment options:
-
-| Option | Best for |
-|---|---|
-| Vercel Cron Jobs (`vercel.json`) | Vercel deployments |
-| GitHub Actions (`.github/workflows/run-analysis-cron.yml`) | Any deployment, free tier |
-| Long-running worker server (`npm run worker:server`) | Docker / VPS / Cloud Run |
-
-The cron endpoint is `GET /api/internal/run-analysis` and is protected by `ANALYSIS_RUNNER_SECRET`.
 
 ### Database Management
 
@@ -198,15 +166,12 @@ All endpoints are prefixed with `/api`:
 
 ### Vercel (Recommended)
 
-Vercel automatically handles background processes via serverless functions, so the worker script is not needed for this deployment method.
-
 1. Push code to GitHub
 2. Import in Vercel dashboard
 3. Add environment variables
 4. Deploy automatically
 
 ### Docker
-If self-hosting via Docker, run the primary application container. If your deployment uses queue-based background processing, run the legacy worker as a separate process/container.
 
 ```bash
 docker build -t gitverse-nextjs .
@@ -214,15 +179,10 @@ docker run -p 3000:3000 gitverse-nextjs
 ```
 
 ### Manual Deployment
-For deployments on custom servers (e.g., EC2, VPS) where serverless functions aren't available, run the app build. If queue-based background processing is enabled, also run the worker script (for example via PM2/systemd).
 
 ```bash
 npm run build
 npm start
-
-# In a separate terminal or using a process manager like PM2:
-npm run worker
-
 ```
 
 ## Troubleshooting

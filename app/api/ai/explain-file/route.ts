@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/api-auth";
+import { isHttpError, requireAuth } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 
 type RepositoryFile = {
@@ -43,13 +43,19 @@ export async function POST(request: NextRequest) {
     )) as Repository;
 
     if (!repository) {
-      return NextResponse.json({ error: "Not Found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Repository not found" },
+        { status: 404 }
+      );
     }
 
     const file = repository.files.find((f) => f.path === filePath);
 
     if (!file) {
-      return NextResponse.json({ error: "Not Found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "File not found in repository" },
+        { status: 404 }
+      );
     }
 
     const explanation = `File: ${file.path}\nSize: ${file.size} bytes\nLanguage: ${file.language || "Unknown"}\n\nThis is a ${file.extension || "file"} in the repository.`;
@@ -67,6 +73,9 @@ export async function POST(request: NextRequest) {
         { status: error.status }
       );
     }
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to explain file" },
+      { status: 500 }
+    );
   }
 }
