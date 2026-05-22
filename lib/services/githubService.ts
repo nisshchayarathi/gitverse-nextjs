@@ -526,7 +526,7 @@ export class GitHubService {
 
   /**
    * Post a comment on a pull request (PR comments are issue comments in GitHub API)
-   * Uses idempotency token to prevent duplicate comments on retries
+   * Note: Axios interceptor retries on transient errors (502/503/504); 429s throw GitHubRateLimitError.
    */
   async postPullRequestComment(
     owner: string,
@@ -538,43 +538,11 @@ export class GitHubService {
       throw new Error("Comment body is required");
     }
 
-    // Generate a unique idempotency token for this comment
-    const idempotencyToken = `<!-- gv-token:${Date.now()}-${Math.random().toString(36).slice(2, 9)} -->`;
-    const bodyWithToken = `${body}\n\n${idempotencyToken}`;
-
     // Preferred: issue comment (PRs are issues in GitHub).
     try {
-      // Check if this exact comment already exists (idempotency check)
-      try {
-        const existingComments = await this.client.get(
-          `/repos/${owner}/${repo}/issues/${pullNumber}/comments`,
-          { params: { per_page: 100 } },
-        );
-        const isDuplicate =
-          Array.isArray(existingComments.data) &&
-          existingComments.data.some((c: any) =>
-            c.body?.includes(idempotencyToken),
-          );
-        if (isDuplicate) {
-          // Comment already exists; return a fake response to indicate success
-          const existingComment = existingComments.data.find((c: any) =>
-            c.body?.includes(idempotencyToken),
-          );
-          return {
-            id: existingComment?.id || 0,
-            html_url: existingComment?.html_url || "",
-          };
-        }
-      } catch (checkErr) {
-        // If we can't check existing comments, proceed with posting (fail-open)
-        console.warn(
-          "Could not check for existing comments; proceeding with post",
-        );
-      }
-
       const response = await this.client.post(
         `/repos/${owner}/${repo}/issues/${pullNumber}/comments`,
-        { body: bodyWithToken },
+        { body },
       );
       return response.data;
     } catch (err: unknown) {
@@ -596,7 +564,7 @@ export class GitHubService {
         const response = await this.client.post(
           `/repos/${owner}/${repo}/pulls/${pullNumber}/reviews`,
           {
-            body: bodyWithToken,
+            body,
             event: "COMMENT",
           },
         );

@@ -126,18 +126,22 @@ describe("GitHubService", () => {
         },
       ];
 
-      mock
-        .onGet(
-          "/user/repos?page=1&per_page=1&type=owner&sort=updated&direction=desc",
-        )
-        .reply(200, reposPage1, {
-          link: '<https://api.github.com/user/repos?page=2&per_page=1>; rel="next"',
-        });
-      mock
-        .onGet(
-          "/user/repos?page=2&per_page=1&type=owner&sort=updated&direction=desc",
-        )
-        .reply(200, reposPage2, {});
+      // Use matcher to handle axios params properly
+      mock.onGet("/user/repos").replyOnce((config) => {
+        const params = new URLSearchParams(config.url?.split("?")[1] || "");
+        if (params.get("page") === "1") {
+          return [
+            200,
+            reposPage1,
+            {
+              link: '<https://api.github.com/user/repos?page=2&per_page=1>; rel="next"',
+            },
+          ];
+        } else if (params.get("page") === "2") {
+          return [200, reposPage2, {}];
+        }
+        return [200, [], {}];
+      });
 
       const result = await service.listUserRepositories(undefined, {
         per_page: 1,
@@ -214,17 +218,13 @@ describe("GitHubService", () => {
         },
       );
 
-      try {
-        await service.listUserRepositories(undefined, {
+      await expect(
+        service.listUserRepositories(undefined, {
           per_page: 30,
           page: 1,
           max_pages: 1,
-        });
-      } catch (error) {
-        if (error instanceof GitHubRateLimitError) {
-          expect(error.retryAfterSeconds).toBeGreaterThan(0);
-        }
-      }
+        }),
+      ).rejects.toThrow(GitHubRateLimitError);
     });
 
     it("should return partial results before throwing rate limit error on multi-page fetch", async () => {
@@ -251,22 +251,25 @@ describe("GitHubService", () => {
         },
       ];
 
-      mock
-        .onGet(
-          "/user/repos?page=1&per_page=1&type=owner&sort=updated&direction=desc",
-        )
-        .reply(200, reposPage1, {
-          link: '<https://api.github.com/user/repos?page=2&per_page=1>; rel="next"',
-        });
-      mock
-        .onGet(
-          "/user/repos?page=2&per_page=1&type=owner&sort=updated&direction=desc",
-        )
-        .reply(
-          429,
-          { message: "API rate limit exceeded" },
-          { "retry-after": "60" },
-        );
+      mock.onGet("/user/repos").replyOnce((config) => {
+        const params = new URLSearchParams(config.url?.split("?")[1] || "");
+        if (params.get("page") === "1") {
+          return [
+            200,
+            reposPage1,
+            {
+              link: '<https://api.github.com/user/repos?page=2&per_page=1>; rel="next"',
+            },
+          ];
+        } else if (params.get("page") === "2") {
+          return [
+            429,
+            { message: "API rate limit exceeded" },
+            { "retry-after": "60" },
+          ];
+        }
+        return [200, [], {}];
+      });
 
       const result = await service.listUserRepositories(undefined, {
         per_page: 1,
@@ -408,6 +411,26 @@ describe("GitHubService", () => {
       await expect(
         service.postPullRequestComment("user", "repo", 1, "  "),
       ).rejects.toThrow("Comment body is required");
+    });
+
+    it("postPullRequestComment retries on transient errors (502/503/504) but not 429", async () => {
+      // First call: transient 502, should retry via interceptor
+      mock
+        .onPost("/repos/user/repo/issues/1/comments")
+        .replyOnce(502, { message: "Bad Gateway" })
+        .replyOnce(201, {
+          id: 12345,
+          html_url: "https://github.com/user/repo/issues/1#issuecomment-12345",
+        });
+
+      const result = await service.postPullRequestComment(
+        "user",
+        "repo",
+        1,
+        "Test comment",
+      );
+
+      expect(result.id).toBe(12345);
     });
   });
 

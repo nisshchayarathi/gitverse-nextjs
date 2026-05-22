@@ -8,7 +8,7 @@ import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 import prisma from "@/lib/prisma";
 
 function clampInt(
-  value: string | null,
+  value: string | number | null | undefined,
   fallback: number,
   min: number,
   max: number,
@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const tokenFromBody = (body?.token as string | undefined)?.trim();
     const username = (body?.username as string | undefined)?.trim();
-    const page = clampInt(body?.page as string | null, 1, 1, 1000);
-    const per_page = clampInt(body?.per_page as string | null, 30, 1, 100);
+    const page = clampInt(body?.page, 1, 1, 1000);
+    const per_page = clampInt(body?.per_page, 30, 1, 100);
 
     const token =
       tokenFromBody ||
@@ -79,22 +79,20 @@ export async function POST(request: NextRequest) {
       _enabled: r.enabled,
     }));
 
-    // Honor page/per_page pagination parameters for DB fallback
-    const parsedPage = clampInt(body?.page as string | null, 1, 1, 1000);
-    const parsedPerPage = clampInt(
-      body?.per_page as string | null,
-      repos.length,
-      1,
-      100,
-    );
-    const start = (parsedPage - 1) * parsedPerPage;
-    const pageItems = repositories.slice(start, start + parsedPerPage);
+    // Reuse the parsed pagination values (same defaults as token path)
+    const start = (page - 1) * per_page;
+    const pageItems = repositories.slice(start, start + per_page);
+
+    // Compute nextPage: if we have more items than the current page, there's a next page
+    const totalPages = Math.ceil(repositories.length / per_page);
+    const nextPage = page < totalPages ? page + 1 : undefined;
 
     return NextResponse.json({
       repositories: pageItems,
       source: "github-app-db",
-      page: parsedPage,
-      per_page: parsedPerPage,
+      page,
+      per_page,
+      nextPage,
     });
   } catch (error: any) {
     console.error("GitHub repositories error:", sanitizeErrorMessage(error));

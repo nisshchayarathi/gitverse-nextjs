@@ -3,7 +3,7 @@
 <details>
 <summary>🤖 Prompt for all review comments with AI agents</summary>
 
-```
+```text
 Verify each finding against current code. Fix only still-valid issues, skip the
 rest with a brief reason, keep changes minimal, and validate.
 
@@ -149,11 +149,11 @@ Reviewing files that changed from the base of the PR and between 426548cb8bfbda7
 <details>
 <summary>📒 Files selected for processing (5)</summary>
 
-* `GITHUB_RATELIMIT_IMPLEMENTATION.md`
-* `IMPLEMENTATION_CHECKLIST.md`
-* `app/api/integrations/github/repositories/route.ts`
-* `lib/services/githubService.test.ts`
-* `lib/services/githubService.ts`
+- `GITHUB_RATELIMIT_IMPLEMENTATION.md`
+- `IMPLEMENTATION_CHECKLIST.md`
+- `app/api/integrations/github/repositories/route.ts`
+- `lib/services/githubService.test.ts`
+- `lib/services/githubService.ts`
 
 </details>
 
