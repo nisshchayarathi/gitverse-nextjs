@@ -1,3 +1,4 @@
+import DashboardSkeleton from '../components/DashboardSkeleton';
 "use client";
 
 export const dynamic = "force-dynamic";
@@ -51,8 +52,7 @@ export default function Dashboard() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error] = useState("");
   useEffect(() => {
     fetchRepositories();
   }, []);
