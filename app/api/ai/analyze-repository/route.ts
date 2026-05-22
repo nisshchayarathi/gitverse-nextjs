@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth } from "@/lib/middleware";
+import { AnalysisTimeoutError } from "@/lib/errors/AnalysisTimeoutError";
 import { getGeminiService } from "@/lib/services/geminiService";
 import { repositoryService } from "@/lib/services/repositoryService";
 
@@ -15,8 +16,6 @@ const VALID_ANALYSIS_TYPES = [
 ] as const;
 
 type AnalysisType = (typeof VALID_ANALYSIS_TYPES)[number];
-
-
 
 interface LanguageEntry {
   name: string;
@@ -56,7 +55,6 @@ interface ErrorResponse {
   meta: ResponseMeta;
 }
 
-
 const log = {
   info: (event: string, data?: Record<string, unknown>) =>
     console.log(JSON.stringify({ level: "info", event, ...data, ts: new Date().toISOString() })),
@@ -68,11 +66,14 @@ const log = {
     console.error(JSON.stringify({ level: "error", event, ...data, ts: new Date().toISOString() })),
 };
 
+
 function isValidAnalysisType(value: string): value is AnalysisType {
   return (VALID_ANALYSIS_TYPES as readonly string[]).includes(value);
 }
 
-function buildContext(repository: Awaited<ReturnType<typeof repositoryService.getRepository>>): RepositoryContext {
+function buildContext(
+  repository: Awaited<ReturnType<typeof repositoryService.getRepository>>
+): RepositoryContext {
   return {
     languages:
       repository.languages?.map((l: LanguageEntry) => ({
@@ -87,35 +88,51 @@ function buildContext(repository: Awaited<ReturnType<typeof repositoryService.ge
       })) ?? [],
 
     commits:
-      repository.commits?.slice(0, MAX_COMMITS).map((c: { message: string; authorName: string; committedAt?: Date }) => ({
-        message: c.message,
-        author: c.authorName,
-        date: c.committedAt?.toISOString(),
-      })) ?? [],
+      repository.commits
+        ?.slice(0, MAX_COMMITS)
+        .map((c: { message: string; authorName: string; committedAt?: Date }) => ({
+          message: c.message,
+          author: c.authorName,
+          date: c.committedAt?.toISOString(),
+        })) ?? [],
   };
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse<SuccessResponse | ErrorResponse>> {
+export async function POST(
+  request: NextRequest
+): Promise<NextResponse<SuccessResponse | ErrorResponse>> {
   const startTime = Date.now();
-  const noStoreHeaders = { "Cache-Control": "no-store" };
+  const noStoreHeaders = { "Cache-Control": "no-store" as const };
 
   const duration = () => Date.now() - startTime;
 
   const errorResponse = (
     message: string,
-    status: number,
-    extra?: Record<string, unknown>
+    status: number
   ): NextResponse<ErrorResponse> =>
     NextResponse.json(
-      { error: message, meta: { duration: duration(), success: false }, ...extra },
+      { error: message, meta: { duration: duration(), success: false } },
       { status, headers: noStoreHeaders }
     );
 
   try {
     const user = await requireAuth(request);
+    let repositoryId: unknown;
+    let type: unknown;
 
-    const body = await request.json();
-    const { repositoryId, type } = body as { repositoryId: unknown; type: unknown };
+    try {
+      const body: unknown = await request.json();
+
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        log.warn("validation_failed", { reason: "non_object_body", userId: user.userId });
+        return errorResponse("Request body must be a JSON object", 400);
+      }
+
+      ({ repositoryId, type } = body as Record<string, unknown>);
+    } catch {
+      log.warn("validation_failed", { reason: "malformed_json", userId: user.userId });
+      return errorResponse("Request body is not valid JSON", 400);
+    }
 
     if (typeof repositoryId !== "string" || repositoryId.trim() === "") {
       log.warn("validation_failed", { reason: "invalid_repository_id", userId: user.userId });
@@ -142,6 +159,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SuccessRe
 
     log.info("analysis_started", { repositoryId, type, userId: user.userId });
 
+
     const repository = await repositoryService.getRepository(repositoryId, user.userId);
 
     if (!repository || repository.userId !== user.userId) {
@@ -150,13 +168,28 @@ export async function POST(request: NextRequest): Promise<NextResponse<SuccessRe
     }
 
     const context = buildContext(repository);
+    const controller = new AbortController();
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
-    const analysisPromise = getGeminiService().analyzeRepository({ repositoryId, type, context });
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Analysis timeout exceeded")), ANALYSIS_TIMEOUT_MS)
-    );
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => {
+        controller.abort();                          // cancels the Gemini SDK request
+        reject(new AnalysisTimeoutError());
+      }, ANALYSIS_TIMEOUT_MS);
+    });
 
-    const analysis = await Promise.race([analysisPromise, timeoutPromise]);
+    let analysis: unknown;
+    try {
+      const analysisPromise = getGeminiService().analyzeRepository({
+        repositoryId,
+        type,
+        context,
+        signal: controller.signal,                  // GeminiService forwards this to generateContent()
+      });
+      analysis = await Promise.race([analysisPromise, timeoutPromise]);
+    } finally {
+      clearTimeout(timeoutHandle);                   // prevents timer leak on the success path
+    }
 
     log.info("analysis_completed", { repositoryId, type, userId: user.userId, duration: duration() });
 
@@ -166,14 +199,19 @@ export async function POST(request: NextRequest): Promise<NextResponse<SuccessRe
     );
 
   } catch (error: unknown) {
+
     if (isHttpError(error)) {
-      const status = error.status === 403 ? 404 : error.status;
-      log.warn("http_error", { status, message: error.message });
-      return errorResponse(error.message, status);
+      const is403 = error.status === 403;
+      const status = is403 ? 404 : error.status;
+      // Remap 403 message too — returning the real reason under a 404 status
+      // still leaks that the resource exists but access was denied.
+      const message = is403 ? "Resource not found" : error.message;
+      log.warn("http_error", { originalStatus: error.status, status, message: error.message });
+      return errorResponse(message, status);
     }
 
+    const isTimeout = error instanceof AnalysisTimeoutError;
     const message = error instanceof Error ? error.message : "Unknown error";
-    const isTimeout = message === "Analysis timeout exceeded";
 
     log.error("unhandled_error", { message, isTimeout, duration: duration() });
 
