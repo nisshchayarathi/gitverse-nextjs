@@ -10,7 +10,7 @@ import { FileStructure } from "@/components/repository/FileStructure";
 import { CommitHistory } from "@/components/repository/CommitHistory";
 import { Contributors } from "@/components/repository/Contributors";
 import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
-// import { RepositoryAnalysisSkeleton } from "@/components/repository/RepositoryAnalysisSkeleton";
+import { RepositoryAnalysisSkeleton } from "@/components/repository/RepositoryAnalysisSkeleton";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
 import {
   Home,
@@ -23,7 +23,6 @@ import {
   Trash2,
   Activity,
 } from "lucide-react";
-import { Skeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -225,35 +224,7 @@ export default function RepositoryAnalysis() {
     <DashboardLayout>
       <div className="space-y-6">
         {loading ? (
-<div className="space-y-6">
-  {/* Header Skeleton */}
-  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-    <Skeleton className="h-10 w-10 rounded-lg" />
-    <div className="flex-1 space-y-2">
-      <Skeleton className="h-8 w-1/4" />
-      <Skeleton className="h-4 w-1/3" />
-    </div>
-    <Skeleton className="h-10 w-10 rounded-lg" />
-  </div>
-
-  {/* Tabs Skeleton */}
-  <div className="glass rounded-lg p-2">
-    <div className="flex gap-2 overflow-x-auto">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <Skeleton key={i} className="h-10 w-24 rounded-lg" />
-      ))}
-    </div>
-  </div>
-
-  {/* Content Skeleton */}
-  <div className="space-y-4">
-    <Skeleton className="h-48 w-full rounded-lg" />
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Skeleton className="h-32 w-full rounded-lg" />
-      <Skeleton className="h-32 w-full rounded-lg" />
-    </div>
-  </div>
-</div>
+           <RepositoryAnalysisSkeleton />
         ) : !job ? (
   <div className="text-center py-12 flex flex-col items-center gap-4">
     <Activity className="h-12 w-12 text-muted-foreground/50" />
