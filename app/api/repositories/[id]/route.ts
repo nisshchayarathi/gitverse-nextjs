@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { repositoryService } from "@/lib/services/repositoryService";
 
@@ -9,11 +9,11 @@ export async function GET(
 ) {
   try {
     const user = await requireAuth(request);
-    const id = parseInt(params.id);
+    const id = Number(params.id);
 
-    if (isNaN(id)) {
+    if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json(
-        { error: "Invalid repository ID" },
+        { error: "Invalid repository ID. Must be a positive integer." },
         { status: 400 }
       );
     }
@@ -21,10 +21,7 @@ export async function GET(
     const repository = await repositoryService.getRepository(id, user.userId);
 
     if (!repository) {
-      return NextResponse.json(
-        { error: "Repository not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
 
     const latestJob = await prisma.analysisJob.findFirst({
@@ -58,10 +55,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(
-      { error: "Failed to get repository" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -71,11 +65,11 @@ export async function DELETE(
 ) {
   try {
     const user = await requireAuth(request);
-    const id = parseInt(params.id);
+    const id = Number(params.id);
 
-    if (isNaN(id)) {
+    if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json(
-        { error: "Invalid repository ID" },
+        { error: "Invalid repository ID. Must be a positive integer." },
         { status: 400 }
       );
     }
@@ -93,13 +87,10 @@ export async function DELETE(
       );
     }
 
-    if (error.message === "Repository not found") {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+    if (error?.message === "Repository not found") {
+      return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
 
-    return NextResponse.json(
-      { error: "Failed to delete repository" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

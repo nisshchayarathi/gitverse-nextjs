@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
+import { useDebounce } from "@/src/hooks/useDebounce";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Grid, List, GitBranch, Clock, Activity } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -40,6 +41,7 @@ export default function SearchPage() {
   const initialUrl = searchParams?.get("repoUrl") || "";
 
   const [searchQuery, setSearchQuery] = useState(initialUrl);
+  const debouncedQuery = useDebounce(searchQuery, 300);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"recent" | "stars" | "name">("recent");
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -65,14 +67,32 @@ export default function SearchPage() {
       setLoading(false);
     }
   };
+  function highlightMatch(text: string, query: string) {
+  if (!query.trim()) return <span>{text}</span>;
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  const parts = text.split(regex);
+  return (
+    <span>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark key={i} className="bg-yellow-200 dark:bg-yellow-800 text-foreground rounded px-0.5">
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </span>
+  );
+}
 
   const filteredRepositories = Array.isArray(repositories)
     ? repositories.filter(
         (repo) =>
-          repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          repo.name.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
           (repo.description || "")
             .toLowerCase()
-            .includes(searchQuery.toLowerCase())
+            .includes(debouncedQuery.toLowerCase())
       )
     : [];
 
@@ -150,9 +170,14 @@ export default function SearchPage() {
 
         {/* Repository Grid/List */}
         {loading ? (
-          <div className="text-center py-12 text-muted-foreground">
-            Loading repositories...
-          </div>
+         <div
+  role="status"
+  aria-live="polite"
+  className="flex items-center justify-center py-12 text-muted-foreground motion-safe:animate-pulse motion-reduce:animate-none"
+>
+  <span aria-hidden="true">Loading repositories...</span>
+  <span className="sr-only">Loading repositories...</span>
+</div>
         ) : sortedRepositories.length === 0 ? (
           searchQuery ? (
             <EmptyState
@@ -188,7 +213,7 @@ export default function SearchPage() {
                       </div>
                       <div>
                         <CardTitle className="font-heading text-base sm:text-lg break-all">
-                          {repo.name}
+                          {highlightMatch(repo.name, debouncedQuery)}
                         </CardTitle>
                         <CardDescription className="text-xs font-mono break-all max-w-[180px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[400px]">
                           {repo.url}
@@ -199,7 +224,7 @@ export default function SearchPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-4 line-clamp-2 min-h-[32px]">
-                    {repo.description || "No description available"}
+                    {highlightMatch(repo.description || "No description available", debouncedQuery)}
                   </p>
                   <div className="flex flex-wrap items-center justify-between text-xs sm:text-sm">
                     <div className="flex items-center gap-4 text-muted-foreground">
@@ -251,7 +276,7 @@ export default function SearchPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1">
                         <h3 className="font-heading font-semibold text-base sm:text-lg break-all">
-                          {repo.name}
+                          {highlightMatch(repo.name, debouncedQuery)}
                         </h3>
                         {(repo as any).languages?.[0]?.name && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-accent/10 text-accent">
@@ -260,7 +285,7 @@ export default function SearchPage() {
                         )}
                       </div>
                       <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 min-h-[24px]">
-                        {repo.description || "No description available"}
+                        {highlightMatch(repo.description || "No description available", debouncedQuery)}
                       </p>
                       <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">

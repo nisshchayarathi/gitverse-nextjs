@@ -18,6 +18,10 @@ interface TestResult {
 
 const results: TestResult[] = [];
 
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-key";
+
 async function test(
   endpoint: string,
   method: string,
@@ -30,7 +34,10 @@ async function test(
   };
 
   if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    const actualToken = token === "test-token"
+      ? jwt.sign({ userId: 1, email: "test@example.com" }, JWT_SECRET)
+      : token;
+    headers.Authorization = `Bearer ${actualToken}`;
   }
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
@@ -151,9 +158,108 @@ async function runTests() {
     "test-token",
   );
 
-  // Test 11: Invalid repository ID
+  // Test 10a: Create repository with invalid URL protocol
+  await test(
+    "/api/repositories",
+    "POST",
+    { name: "test-repo", url: "ftp://github.com/owner/repo" },
+    400,
+    "test-token",
+  );
+
+  // Test 10b: Create repository with invalid name type
+  await test(
+    "/api/repositories",
+    "POST",
+    { name: 123, url: "https://github.com/owner/repo" },
+    400,
+    "test-token",
+  );
+
+  // Test 10c: Create repository with name too long
+  await test(
+    "/api/repositories",
+    "POST",
+    { name: "a".repeat(101), url: "https://github.com/owner/repo" },
+    400,
+    "test-token",
+  );
+
+  // Test 10d: Create repository with URL too long
+  await test(
+    "/api/repositories",
+    "POST",
+    { name: "test-repo", url: "https://" + "a".repeat(2005) },
+    400,
+    "test-token",
+  );
+
+  // Test 10e: Create repository with invalid description type
+  await test(
+    "/api/repositories",
+    "POST",
+    { name: "test-repo", url: "https://github.com/owner/repo", description: 123 },
+    400,
+    "test-token",
+  );
+
+  // Test 10f: Create repository with description too long
+  await test(
+    "/api/repositories",
+    "POST",
+    { name: "test-repo", url: "https://github.com/owner/repo", description: "a".repeat(1005) },
+    400,
+    "test-token",
+  );
+
+  // Test 11: Invalid repository ID (alphabetic)
   await test(
     "/api/repositories/abc",
+    "GET",
+    null,
+    400,
+    "test-token",
+  );
+
+  // Test 11a: Invalid repository ID (negative)
+  await test(
+    "/api/repositories/-5",
+    "GET",
+    null,
+    400,
+    "test-token",
+  );
+
+  // Test 11b: Invalid repository ID (float)
+  await test(
+    "/api/repositories/3.14",
+    "GET",
+    null,
+    400,
+    "test-token",
+  );
+
+  // Test 11c: Invalid repository ID for analyze
+  await test(
+    "/api/repositories/-1/analyze",
+    "POST",
+    null,
+    400,
+    "test-token",
+  );
+
+  // Test 11d: Invalid repository ID for readme
+  await test(
+    "/api/repositories/-1/readme",
+    "POST",
+    null,
+    400,
+    "test-token",
+  );
+
+  // Test 11e: Invalid repository ID for stats
+  await test(
+    "/api/repositories/-1/stats",
     "GET",
     null,
     400,

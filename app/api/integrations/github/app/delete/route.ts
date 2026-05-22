@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth } from "@/lib/api-auth";
 import { GitHubAppService } from "@/lib/services/githubAppService";
+import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
       { status: 200 },
     );
   } catch (error: any) {
-    console.error("GitHub App delete error:", error);
+    console.error("GitHub App delete error:", sanitizeErrorMessage(error));
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
