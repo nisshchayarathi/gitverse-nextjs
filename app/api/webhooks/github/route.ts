@@ -266,10 +266,21 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error("GitHub webhook PR review error:", sanitizeErrorMessage(error));
-    return noStoreResponse(
-      { error: "Failed to process PR webhook" },
-      500
+    const safeError = isAxiosError(error)
+      ? {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+          url: error.config?.url,
+        }
+      : error;
+    console.error("GitHub webhook PR review error:", safeError);
+    return NextResponse.json(
+      {
+        error: "Failed to process PR webhook",
+        details: error?.message || "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }

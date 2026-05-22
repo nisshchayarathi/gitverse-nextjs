@@ -135,6 +135,7 @@ model Account {
 
   @@unique([provider, providerAccountId])
   @@index([userId])
+  @@index([userId, provider])
   @@map("accounts")
 }
 

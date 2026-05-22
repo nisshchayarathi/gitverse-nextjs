@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import dns from "dns";
 import { OAuth2Client } from "google-auth-library";
+import { withRetry, sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 import type {
   Adapter,
   AdapterAccount,
@@ -213,47 +214,27 @@ const googleTokenVerifier = isGoogleConfigured
   ? new OAuth2Client({ clientId: googleClientId! })
   : null;
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isTransientNetworkError(error: unknown) {
-  const anyErr = error as any;
-  const code = anyErr?.code as string | undefined;
-  const message = (anyErr?.message as string | undefined) || "";
-
-  return (
-    code === "ETIMEDOUT" ||
-    code === "ECONNRESET" ||
-    code === "EAI_AGAIN" ||
-    code === "ENOTFOUND" ||
-    message.includes("ETIMEDOUT") ||
-    message.includes("ECONNRESET")
-  );
-}
-
 async function verifyGoogleIdToken(idToken: string) {
   if (!googleTokenVerifier || !googleClientId) {
     throw new Error("Google OAuth is not configured");
   }
 
-  // Retry once for intermittent network/cert-fetch issues.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      return await googleTokenVerifier.verifyIdToken({
+  return withRetry(
+    async () => {
+      return await googleTokenVerifier!.verifyIdToken({
         idToken,
         audience: googleClientId,
       });
-    } catch (err) {
-      if (attempt === 0 && isTransientNetworkError(err)) {
-        await sleep(200);
-        continue;
-      }
-      throw err;
+    },
+    {
+      maxRetries: 3,
+      onRetry: (attempt, err, delayMs) => {
+        console.warn(
+          `[auth] Google token verification failed (attempt ${attempt}), retrying in ${delayMs}ms. Error: ${sanitizeErrorMessage(err)}`
+        );
+      },
     }
-  }
-
-  throw new Error("Google token verification failed");
+  );
 }
 
 if ((googleClientId || googleClientSecret) && !isGoogleConfigured) {
@@ -482,8 +463,7 @@ export const authOptions: NextAuthOptions = {
         } catch (err: any) {
           // Avoid logging secrets/tokens. Provide enough context to diagnose.
           console.error("[auth] google oauth callback failed", {
-            message: err?.message,
-            code: err?.code,
+            message: sanitizeErrorMessage(err),
             providerAccountId: account?.providerAccountId,
             hasUserEmail: !!user?.email,
           });

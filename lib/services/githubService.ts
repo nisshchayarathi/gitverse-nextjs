@@ -196,6 +196,7 @@ export class GitHubService {
           }
         }
 
+        const retryableCodes = [409, 502, 503, 504];
         if (
           (status && [409, 502, 503, 504].includes(status)) ||
           error.code === "ECONNABORTED" ||

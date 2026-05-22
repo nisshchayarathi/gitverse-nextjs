@@ -28,7 +28,6 @@ export async function POST(request: NextRequest) {
 
     console.log("Create repository request:", {
       name,
-      url,
       userId: user.userId,
     });
 
@@ -159,7 +158,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ repositories });
   } catch (error: any) {
-    console.error("List repositories error:", error);
+    console.error("List repositories error:", error instanceof Error ? error.message : "Unknown error");
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },

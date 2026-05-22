@@ -83,6 +83,11 @@ export default function RepositoryAnalysis() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const pollingStartedAt = useRef<number | null>(null);
+  // Tracks last time progress changed — prevents falsely timing out active jobs
+  const lastProgressAt = useRef<number | null>(null);
+  const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // â”€â”€ Elapsed seconds ticker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Tracks last time progress changed  prevents falsely timing out active jobs
   const lastProgressAt = useRef<number | null>(null);
   const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
@@ -105,11 +110,13 @@ export default function RepositoryAnalysis() {
     };
   }, [isAnalyzing, analysisTimedOut]);
 
+  // â”€â”€ Initial fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   //  Initial fetch 
   useEffect(() => {
     fetchRepository();
   }, [id]);
 
+  // â”€â”€ Job polling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   //  Job polling 
   useEffect(() => {
     const repoStatus = repository?.status as string | undefined;
@@ -142,6 +149,7 @@ export default function RepositoryAnalysis() {
     const poll = async () => {
       if (stopped) return;
 
+      // â”€â”€ Timeout guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       //  Timeout guard 
       if (
         lastProgressAt.current &&
@@ -173,6 +181,7 @@ export default function RepositoryAnalysis() {
   // analysisTimedOut included so Check Again restarts polling
   }, [repository?.status, repository?.latestJob?.id, job?.id, job?.status, analysisTimedOut]);
 
+  // â”€â”€ Data fetchers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   //  Data fetchers 
   const fetchRepository = async () => {
     if (!id) return;
@@ -237,6 +246,7 @@ export default function RepositoryAnalysis() {
     }
   };
 
+  // ---------------- Delete ----------------
   //  Delete 
   const handleDeleteRepository = async () => {
     if (!id) return;
@@ -264,6 +274,7 @@ export default function RepositoryAnalysis() {
     }
   };
 
+  // â”€â”€ Tab content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   //  Tab content 
   const renderContent = () => {
     switch (activeTab) {
@@ -277,6 +288,7 @@ export default function RepositoryAnalysis() {
     }
   };
 
+  // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   //  Helpers 
   const formatElapsed = (secs: number) => {
     if (secs < 60) return `${secs}s`;
@@ -286,6 +298,7 @@ export default function RepositoryAnalysis() {
   const progressPercent = job?.progressPercent ?? 0;
   const progressMessage = job?.progressMessage || "Queued";
 
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   //  Render 
   return (
     <DashboardLayout>
@@ -323,6 +336,7 @@ export default function RepositoryAnalysis() {
                   </p>
                   {isAnalyzing && !analysisTimedOut && (
                     <span className="flex items-center gap-1 text-xs text-primary">
+                      <span className="animate-pulse">â—‰</span>
                       <span className="animate-pulse"></span>
                       Analyzing...
                     </span>
@@ -338,6 +352,7 @@ export default function RepositoryAnalysis() {
               </button>
             </div>
 
+            {/* â”€â”€ Analyzing spinner (with timeout awareness) â”€â”€ */}
             {/*  Analyzing spinner (with timeout awareness)  */}
             {isAnalyzing && !analysisTimedOut ? (
               <div className="glass rounded-lg p-12 text-center space-y-6">
@@ -378,6 +393,7 @@ export default function RepositoryAnalysis() {
                       <p className="text-xs text-yellow-400 flex items-start gap-2">
                         <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
                         Still queued after {formatElapsed(elapsedSeconds)}. 
+                        The worker runs every 5 minutes via GitHub Actions â€” 
                         The worker runs every 5 minutes via GitHub Actions - 
                         it should pick this up shortly.
                       </p>
@@ -398,6 +414,7 @@ export default function RepositoryAnalysis() {
               </div>
 
             ) : analysisTimedOut || analysisError ? (
+              /* â”€â”€ Timeout / error state â”€â”€ */
               /*  Timeout / error state  */
               <div className="glass rounded-lg p-12 text-center space-y-6">
                 <div className="flex justify-center">
@@ -439,6 +456,7 @@ export default function RepositoryAnalysis() {
               </div>
 
             ) : (
+              /* â”€â”€ Done â€” show tabs â”€â”€ */
               /*  Done - show tabs  */
               <>
                 <div className="glass rounded-lg p-2">

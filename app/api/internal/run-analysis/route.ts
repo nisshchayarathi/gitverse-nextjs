@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { startAnalysisWorkerLoop } from '../../../../scripts/analysisWorker';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // max Vercel function duration (if supported by plan)
+export const maxDuration = 300; // Allow maximum serverless execution time
 
 export async function GET(request: Request) {
-  // Simple auth check for internal cron
+  // Simple auth check for internal cron jobs
   const authHeader = request.headers.get('authorization');
   if (
     process.env.ANALYSIS_RUNNER_SECRET &&
@@ -14,26 +14,44 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  console.log('Starting analysis cron run...');
+  const { searchParams } = new URL(request.url);
+  const timeBudgetStr = searchParams.get('timeBudgetMs');
+  
+  // Default to 45 seconds (45000ms) to allow graceful shutdown before typical 60s timeout
+  // Can be configured via query parameter for longer-running environments
+  let timeBudgetMs = 45000;
+  if (timeBudgetStr) {
+    const parsed = parseInt(timeBudgetStr, 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      timeBudgetMs = parsed;
+    }
+  }
 
   try {
-    // Run the worker loop in "once" mode so it returns after one pass through the queue
-    const metrics = await startAnalysisWorkerLoop({ 
-      once: true
+    const startTime = Date.now();
+    console.log(`Starting analysis cron run with time budget: ${timeBudgetMs}ms`);
+
+    // Run the worker loop. It will exit when timeBudgetMs is reached or if it runs out of jobs (since it's not a daemon in this context)
+    // Wait, we don't want it to run indefinitely if there are no jobs.
+    // If we set once=false, it will loop until timeBudgetMs. If there are no jobs, it will sleep.
+    // That's acceptable since we want it to process as many jobs as possible within the budget.
+    // However, if we just want it to process one job and exit, we'd set once: true.
+    // Let's pass once: false so it acts as a queue processor within the time budget.
+    await startAnalysisWorkerLoop({ 
+      once: false, 
+      timeBudgetMs 
     });
     
-    console.log(`Finished analysis cron run. Summary:`, metrics);
+    const elapsed = Date.now() - startTime;
+    console.log(`Finished analysis cron run in ${elapsed}ms`);
     
     return NextResponse.json({ 
-      success: metrics.success, 
-      message: 'Analysis worker execution completed',
-      metrics
+      success: true, 
+      message: `Cron execution finished in ${elapsed}ms`,
+      elapsedMs: elapsed
     });
   } catch (error: any) {
     console.error('run-analysis cron error:', error instanceof Error ? error.message : "Unknown error");
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      success: false
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

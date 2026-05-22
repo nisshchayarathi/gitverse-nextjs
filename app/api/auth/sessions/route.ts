@@ -47,6 +47,10 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Fetch sessions error:", error);
+    return NextResponse.json(
+      { error: "An unexpected error occurred" },
+      { status: 500 }
+    );
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

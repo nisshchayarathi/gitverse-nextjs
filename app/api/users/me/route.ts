@@ -30,15 +30,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }
 
-    return NextResponse.json({
-      id: userDetails.id,
-      name: userDetails.name,
-      email: userDetails.email,
-      image: userDetails.image,
-      createdAt: userDetails.createdAt,
-      avatarUrl: (userDetails as any).image,
-      isGoogleLinked: hasGoogleAccount,
-    });
+    return NextResponse.json(
+      {
+        id: userDetails.id,
+        name: userDetails.name,
+        email: userDetails.email,
+        image: userDetails.image,
+        createdAt: userDetails.createdAt,
+        avatarUrl: (userDetails as any).image,
+        isGoogleLinked: hasGoogleAccount,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
   } catch (error: any) {
     console.error("Error fetching user:", sanitizeErrorMessage(error));
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -55,7 +62,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: "Account deleted" });
   } catch (error: any) {
-    console.error("Error deleting account:", sanitizeErrorMessage(error));
+    console.error("Error deleting account:", error instanceof Error ? error.message : "Unknown error");
     if (error?.code === "P2025") {
       return NextResponse.json({ error: "Not Found" }, { status: 404 });
     }

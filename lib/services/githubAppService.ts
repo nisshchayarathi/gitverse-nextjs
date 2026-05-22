@@ -1,5 +1,7 @@
 import axios, { isAxiosError } from "axios";
 import jwt from "jsonwebtoken";
+import { withRetry, extractRetryAfter } from "@/lib/utils/rateLimit";
+import { GitHubRateLimitError } from "@/lib/services/githubService";
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name];
@@ -58,24 +60,37 @@ export class GitHubAppService {
 
     const appJwt = this.createAppJwt();
     try {
-      const response = await axios.post(
-        `https://api.github.com/app/installations/${installationId}/access_tokens`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${appJwt}`,
-            Accept: "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
-        },
-      );
+      return await withRetry(
+        async () => {
+          const response = await axios.post(
+            `https://api.github.com/app/installations/${installationId}/access_tokens`,
+            {},
+            {
+              headers: {
+                Authorization: `Bearer ${appJwt}`,
+                Accept: "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+              },
+            },
+          );
 
-      const token = response.data?.token as string | undefined;
-      if (!token) {
-        throw new Error("Failed to obtain installation access token");
+          const token = response.data?.token as string | undefined;
+          if (!token) {
+            throw new Error("Failed to obtain installation access token");
+          }
+          return token;
+        },
+        {
+          maxRetries: 3,
+          onRetry: (attempt, _err, delayMs) => {
+            console.warn(`[GitHubAppService] Retrying access token fetch for installation ${installationId} (attempt ${attempt}) in ${delayMs}ms`);
+          }
+        }
+      );
+    } catch (err: any) {
+      if (isAxiosError(err) && err.response?.status === 429) {
+        throw new GitHubRateLimitError(extractRetryAfter(err) ?? 60);
       }
-      return token;
-    } catch (err) {
       throw sanitizeAppError(err);
     }
   }
@@ -87,17 +102,30 @@ export class GitHubAppService {
 
     const appJwt = this.createAppJwt();
     try {
-      await axios.delete(
-        `https://api.github.com/app/installations/${installationId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${appJwt}`,
-            Accept: "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
+      await withRetry(
+        async () => {
+          await axios.delete(
+            `https://api.github.com/app/installations/${installationId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${appJwt}`,
+                Accept: "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+              },
+            },
+          );
         },
+        {
+          maxRetries: 3,
+          onRetry: (attempt, _err, delayMs) => {
+            console.warn(`[GitHubAppService] Retrying uninstall for installation ${installationId} (attempt ${attempt}) in ${delayMs}ms`);
+          }
+        }
       );
-    } catch (err) {
+    } catch (err: any) {
+      if (isAxiosError(err) && err.response?.status === 429) {
+        throw new GitHubRateLimitError(extractRetryAfter(err) ?? 60);
+      }
       throw sanitizeAppError(err);
     }
   }

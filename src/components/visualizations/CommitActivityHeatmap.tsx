@@ -57,6 +57,7 @@ export function CommitActivityHeatmap({
     date: string;
     count: number;
   } | null>(null);
+  const hasCommits = Boolean(repository?.commits && repository.commits.length > 0);
 
   // =========================================================
   // CRITICAL FIX: LATE EXTENDED GUARD FOR PERFORMANCE & SAFETY
@@ -82,6 +83,9 @@ export function CommitActivityHeatmap({
   }, []);
 
   useEffect(() => {
+    if (!svgRef.current) return;
+    if (!hasCommits) return;
+    if (!svgRef.current || hasNoCommits) return;
     if (!svgRef.current || !repository?.commits || repository.commits.length === 0) return;
 
     if (!repository?.commits || repository.commits.length === 0) {
@@ -338,7 +342,7 @@ export function CommitActivityHeatmap({
       .attr("fill", "currentColor")
       .attr("font-size", "10px")
       .text("More");
-  }, [repository, now]);
+  }, [repository, now, hasCommits]);
 
   const getCommitsForDate = (date: string) => {
     return (
@@ -355,6 +359,7 @@ export function CommitActivityHeatmap({
     ? getCommitsForDate(selectedDate.date)
     : [];
 
+  if (!hasCommits) {
   if (hasNoCommits) {
     return (
       <Card className="glass p-4 sm:p-6 flex min-h-[350px] w-full flex-col items-center justify-center rounded-xl border border-dashed border-border/60 text-center">
