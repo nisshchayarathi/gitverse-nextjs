@@ -259,8 +259,7 @@ export class RepositoryService {
               select: { hash: true },
             })
           : [];
-      const existingHashes = new Set(existingCommits.map((c) => c.hash));
-
+      const existingHashes = new Set(existingCommits.map((c: { hash: string }) => c.hash));
       // Filter out commits that already exist
       const newCommits = commits.filter(
         (commit) => !existingHashes.has(commit.hash),

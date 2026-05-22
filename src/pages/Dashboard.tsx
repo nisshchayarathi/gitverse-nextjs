@@ -194,7 +194,7 @@ export default function Dashboard() {
     } finally {
       setAnalyzing(false);
     }
-  };
+  }; 
 
     if (loading) {
     return <DashboardSkeleton />;
@@ -204,8 +204,8 @@ export default function Dashboard() {
     return <div className="text-red-500">{error}</div>;
     }
 
-    if (!data || data.length === 0) {
-    return <div>No data found</div>;
+    if (!repositories || repositories.length === 0) {
+    return <div>No repositories found</div>;
     }
   
     return (
