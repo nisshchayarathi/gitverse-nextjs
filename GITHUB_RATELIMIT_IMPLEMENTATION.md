@@ -50,6 +50,7 @@ async listUserRepositories(
 - Returns `nextPage` when more results available
 - Handles rate limits gracefully; returns partial results if rates exhausted after getting some repos
 - **Design Decision:** Server returns single page by default; client requests subsequent pages via `page` param
+- **Timeout Budget:** Single-page request must complete within 10 seconds (Vercel serverless limit)
 
 ### 2. API Endpoint Updates
 
@@ -111,7 +112,7 @@ if (error instanceof GitHubRateLimitError) {
 
 - **Single-page request:** ~200-500ms (including retries)
 - **Retries:** Up to 3 attempts with exponential backoff
-- **Total max latency:** ~30 seconds (well under 10-minute timeout)
+- **Total max latency:** ~30 seconds (well under 10-second Vercel timeout constraint)
 - ✓ **Safe for serverless cold starts**
 
 ### Memory Usage

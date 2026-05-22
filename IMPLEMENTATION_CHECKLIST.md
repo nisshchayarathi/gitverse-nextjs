@@ -139,7 +139,7 @@
 
 ## Summary
 
-✅ **Implementation complete and ready for testing.**
+✅ **Implementation implemented — pending verification.**
 
 All acceptance criteria met:
 
@@ -149,4 +149,6 @@ All acceptance criteria met:
 - Backward compatible
 - Error handling with `retryAfter` guidance
 
-**Estimated Impact:** 60-80% reduction in rate-limit failures for typical usage patterns.
+**Estimated Impact:** 60-80% reduction in rate-limit failures for typical usage patterns (Expected, untested).
+
+**TODO:** Run mocked unit tests (tests/retry.test.ts, tests/pagination.test.ts) and integration tests before production deployment.

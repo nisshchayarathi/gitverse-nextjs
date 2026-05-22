@@ -79,19 +79,34 @@ export async function POST(request: NextRequest) {
       _enabled: r.enabled,
     }));
 
+    // Honor page/per_page pagination parameters for DB fallback
+    const parsedPage = clampInt(body?.page as string | null, 1, 1, 1000);
+    const parsedPerPage = clampInt(
+      body?.per_page as string | null,
+      repos.length,
+      1,
+      100,
+    );
+    const start = (parsedPage - 1) * parsedPerPage;
+    const pageItems = repositories.slice(start, start + parsedPerPage);
+
     return NextResponse.json({
-      repositories,
+      repositories: pageItems,
       source: "github-app-db",
-      page: 1,
-      per_page: repos.length,
+      page: parsedPage,
+      per_page: parsedPerPage,
     });
   } catch (error: any) {
     console.error("GitHub repositories error:", sanitizeErrorMessage(error));
 
     if (error instanceof GitHubRateLimitError) {
+      const headers =
+        error.retryAfterSeconds !== undefined
+          ? { "Retry-After": String(error.retryAfterSeconds) }
+          : undefined;
       return NextResponse.json(
         { error: error.message, retryAfter: error.retryAfterSeconds },
-        { status: 429 },
+        { status: 429, headers },
       );
     }
 

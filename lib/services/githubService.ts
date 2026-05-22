@@ -203,7 +203,7 @@ export class GitHubService {
           }
         }
 
-        const retryStatusCodes = [409, 502, 503, 504];
+        const retryStatusCodes = [502, 503, 504];
         if (
           (status && retryStatusCodes.includes(status)) ||
           error.code === "ECONNABORTED" ||
@@ -231,48 +231,12 @@ export class GitHubService {
   /**
    * Get repository information
    */
-  async getRepository(owner: string, repo: string): Promise<GitHubRepository | null> {
-    try {
-      const response = await withRetry(
-        () => this.client.get(`/repos/${owner}/${repo}`),
-        { maxRetries: 3 }
-      );
-      const data = response.data as GitHubRepository;
-      
-      // Detect renamed repositories safely
-      const expectedFullName = `${owner}/${repo}`.toLowerCase();
-      if (data.full_name && data.full_name.toLowerCase() !== expectedFullName) {
-        console.warn(`GitHub repository renamed: requested ${expectedFullName}, but received ${data.full_name}`);
-      }
-      
-      return data;
-    } catch (error) {
-      if (isAxiosError(error) && error.response?.status === 404) {
-        console.warn(`GitHub repository not found (404): ${owner}/${repo}. It may have been deleted or access was lost.`);
-        return null;
-      }
-      throw sanitizeGitHubError(error);
-    }
-  }
-
-    const response = await withRetry(() => this.client.get("/user"), {
-      maxRetries: 3,
-    });
-    return response.data;
-  }
-
-  /**
-   * Get repository information
-   */
   async getRepository(
     owner: string,
     repo: string,
   ): Promise<GitHubRepository | null> {
     try {
-      const response = await withRetry(
-        () => this.client.get(`/repos/${owner}/${repo}`),
-        { maxRetries: 3 }
-      );
+      const response = await this.client.get(`/repos/${owner}/${repo}`);
       const data = response.data as GitHubRepository;
 
       // Detect renamed repositories safely
@@ -289,6 +253,21 @@ export class GitHubService {
         console.warn(
           `GitHub repository not found (404): ${owner}/${repo}. It may have been deleted or access was lost.`,
         );
+        return null;
+      }
+      throw sanitizeGitHubError(error);
+    }
+  }
+
+  /**
+   * Get currently authenticated user
+   */
+  async getCurrentUser(): Promise<GitHubUser | null> {
+    try {
+      const response = await this.client.get("/user");
+      return response.data as GitHubUser;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
         return null;
       }
       throw sanitizeGitHubError(error);
@@ -328,19 +307,15 @@ export class GitHubService {
       currentPage++
     ) {
       try {
-        const response = await withRetry(
-          () =>
-            this.client.get(endpoint, {
-              params: {
-                type: params?.type || "owner",
-                sort: params?.sort || "updated",
-                direction: params?.direction || "desc",
-                per_page,
-                page: currentPage,
-              },
-            }),
-          { maxRetries: 3 },
-        );
+        const response = await this.client.get(endpoint, {
+          params: {
+            type: params?.type || "owner",
+            sort: params?.sort || "updated",
+            direction: params?.direction || "desc",
+            per_page,
+            page: currentPage,
+          },
+        });
 
         const repos: GitHubRepository[] = response.data;
         allRepos.push(...repos);
@@ -444,21 +419,23 @@ export class GitHubService {
     },
   ): Promise<GitHubCommit[]> {
     try {
-      const response = await withRetry(
-        () =>
-          this.client.get(`/repos/${owner}/${repo}/commits`, {
-            params: {
-              sha: params?.sha,
-              path: params?.path,
-              per_page: params?.per_page || 100,
-              page: params?.page || 1,
-            },
-          }),
-        { maxRetries: 3 }
+      const response = await this.client.get(
+        `/repos/${owner}/${repo}/commits`,
+        {
+          params: {
+            sha: params?.sha,
+            path: params?.path,
+            per_page: params?.per_page || 100,
+            page: params?.page || 1,
+          },
+        },
       );
       return response.data;
     } catch (error) {
-      if (isAxiosError(error) && (error.response?.status === 404 || error.response?.status === 409)) {
+      if (
+        isAxiosError(error) &&
+        (error.response?.status === 404 || error.response?.status === 409)
+      ) {
         return []; // 409 Conflict means repository is empty
       }
       throw sanitizeGitHubError(error);
@@ -474,9 +451,8 @@ export class GitHubService {
     sha: string,
   ): Promise<GitHubCommit | null> {
     try {
-      const response = await withRetry(
-        () => this.client.get(`/repos/${owner}/${repo}/commits/${sha}`),
-        { maxRetries: 3 }
+      const response = await this.client.get(
+        `/repos/${owner}/${repo}/commits/${sha}`,
       );
       return response.data;
     } catch (error) {
@@ -496,9 +472,8 @@ export class GitHubService {
     pullNumber: number,
   ): Promise<GitHubPullRequest | null> {
     try {
-      const response = await withRetry(
-        () => this.client.get(`/repos/${owner}/${repo}/pulls/${pullNumber}`),
-        { maxRetries: 3 }
+      const response = await this.client.get(
+        `/repos/${owner}/${repo}/pulls/${pullNumber}`,
       );
       return response.data;
     } catch (error) {
@@ -524,15 +499,14 @@ export class GitHubService {
     const all: GitHubPullRequestFile[] = [];
     try {
       for (let page = 1; page <= maxPages; page++) {
-        const response = await withRetry(
-          () =>
-            this.client.get(`/repos/${owner}/${repo}/pulls/${pullNumber}/files`, {
-              params: {
-                per_page: perPage,
-                page,
-              },
-            }),
-          { maxRetries: 3 }
+        const response = await this.client.get(
+          `/repos/${owner}/${repo}/pulls/${pullNumber}/files`,
+          {
+            params: {
+              per_page: perPage,
+              page,
+            },
+          },
         );
 
         const items: GitHubPullRequestFile[] = response.data;
@@ -552,6 +526,7 @@ export class GitHubService {
 
   /**
    * Post a comment on a pull request (PR comments are issue comments in GitHub API)
+   * Uses idempotency token to prevent duplicate comments on retries
    */
   async postPullRequestComment(
     owner: string,
@@ -563,14 +538,43 @@ export class GitHubService {
       throw new Error("Comment body is required");
     }
 
+    // Generate a unique idempotency token for this comment
+    const idempotencyToken = `<!-- gv-token:${Date.now()}-${Math.random().toString(36).slice(2, 9)} -->`;
+    const bodyWithToken = `${body}\n\n${idempotencyToken}`;
+
     // Preferred: issue comment (PRs are issues in GitHub).
     try {
-      const response = await withRetry(
-        () =>
-          this.client.post(`/repos/${owner}/${repo}/issues/${pullNumber}/comments`, {
-            body,
-          }),
-        { maxRetries: 3 }
+      // Check if this exact comment already exists (idempotency check)
+      try {
+        const existingComments = await this.client.get(
+          `/repos/${owner}/${repo}/issues/${pullNumber}/comments`,
+          { params: { per_page: 100 } },
+        );
+        const isDuplicate =
+          Array.isArray(existingComments.data) &&
+          existingComments.data.some((c: any) =>
+            c.body?.includes(idempotencyToken),
+          );
+        if (isDuplicate) {
+          // Comment already exists; return a fake response to indicate success
+          const existingComment = existingComments.data.find((c: any) =>
+            c.body?.includes(idempotencyToken),
+          );
+          return {
+            id: existingComment?.id || 0,
+            html_url: existingComment?.html_url || "",
+          };
+        }
+      } catch (checkErr) {
+        // If we can't check existing comments, proceed with posting (fail-open)
+        console.warn(
+          "Could not check for existing comments; proceeding with post",
+        );
+      }
+
+      const response = await this.client.post(
+        `/repos/${owner}/${repo}/issues/${pullNumber}/comments`,
+        { body: bodyWithToken },
       );
       return response.data;
     } catch (err: unknown) {
@@ -589,13 +593,12 @@ export class GitHubService {
         message.toLowerCase().includes("issues")
       ) {
         // Fallback: create a PR review (shows up in PR conversation as a review comment).
-        const response = await withRetry(
-          () =>
-            this.client.post(`/repos/${owner}/${repo}/pulls/${pullNumber}/reviews`, {
-              body,
-              event: "COMMENT",
-            }),
-          { maxRetries: 3 }
+        const response = await this.client.post(
+          `/repos/${owner}/${repo}/pulls/${pullNumber}/reviews`,
+          {
+            body: bodyWithToken,
+            event: "COMMENT",
+          },
         );
 
         // Shape to match the issue-comment return type.
@@ -617,18 +620,14 @@ export class GitHubService {
     repo: string,
   ): Promise<Record<string, number>> {
     try {
-      const response = await withRetry(
-        () => this.client.get(`/repos/${owner}/${repo}/languages`),
-        { maxRetries: 3 }
+      const response = await this.client.get(
+        `/repos/${owner}/${repo}/languages`,
       );
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {
         return {};
       }
-      throw sanitizeGitHubError(error);
-    }
-  }
       throw sanitizeGitHubError(error);
     }
   }
@@ -647,9 +646,8 @@ export class GitHubService {
     }>
   > {
     try {
-      const response = await withRetry(
-        () => this.client.get(`/repos/${owner}/${repo}/contributors`),
-        { maxRetries: 3 }
+      const response = await this.client.get(
+        `/repos/${owner}/${repo}/contributors`,
       );
       return response.data;
     } catch (error) {
@@ -672,19 +670,15 @@ export class GitHubService {
       page?: number;
     },
   ): Promise<{ items: GitHubRepository[]; total_count: number }> {
-    const response = await withRetry(
-      () =>
-        this.client.get("/search/repositories", {
-          params: {
-            q: query,
-            sort: params?.sort,
-            order: params?.order || "desc",
-            per_page: params?.per_page || 30,
-            page: params?.page || 1,
-          },
-        }),
-      { maxRetries: 3 }
-    );
+    const response = await this.client.get("/search/repositories", {
+      params: {
+        q: query,
+        sort: params?.sort,
+        order: params?.order || "desc",
+        per_page: params?.per_page || 30,
+        page: params?.page || 1,
+      },
+    });
 
     return response.data;
   }
@@ -709,25 +703,6 @@ export class GitHubService {
     }
 
     return null;
-  }
-
-  /**
-   * Get repository branches
-   */
-  async getBranches(owner: string, repo: string): Promise<GitHubBranch[]> {
-    try {
-      const response = await withRetry(
-        () => this.client.get(`/repos/${owner}/${repo}/branches`),
-        { maxRetries: 3 }
-      );
-      return response.data;
-    } catch (error) {
-      if (isAxiosError(error) && error.response?.status === 404) {
-        return [];
-      }
-      throw sanitizeGitHubError(error);
-    }
-  }
   }
 }
 
