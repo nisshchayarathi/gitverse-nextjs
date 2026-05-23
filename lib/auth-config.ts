@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import GithubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
@@ -213,6 +214,21 @@ const googleTokenVerifier = isGoogleConfigured
   ? new OAuth2Client({ clientId: googleClientId! })
   : null;
 
+const githubClientId = process.env.GITHUB_CLIENT_ID;
+const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
+
+const isGithubConfigured =
+  !!githubClientId &&
+  !!githubClientSecret &&
+  !looksLikePlaceholder(githubClientId) &&
+  !looksLikePlaceholder(githubClientSecret);
+
+if ((githubClientId || githubClientSecret) && !isGithubConfigured) {
+  console.warn(
+    "[auth] GitHub OAuth is not fully configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to real values (not placeholders), then restart the dev server."
+  );
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -308,6 +324,19 @@ export const authOptions: NextAuthOptions = {
           }),
         ]
       : []),
+    ...(isGithubConfigured
+      ? [
+          GithubProvider({
+            clientId: githubClientId!,
+            clientSecret: githubClientSecret!,
+            authorization: {
+              params: {
+                scope: "read:user user:email",
+              },
+            },
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -327,8 +356,8 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid email or password");
         }
 
-        // Security: never allow password login for Google-only accounts.
-        // A "Google-only" account has no local passwordHash, but does have a linked Google provider account.
+        // Security: never allow password login for OAuth-only accounts.
+        // An OAuth-only account has no local passwordHash, but does have a linked provider account.
         if (!user.passwordHash) {
           const hasGoogleAccount =
             (await prisma.account.count({
@@ -338,6 +367,17 @@ export const authOptions: NextAuthOptions = {
           if (hasGoogleAccount) {
             throw new Error(
               "Email already exists. Please sign in with Google."
+            );
+          }
+
+          const hasGithubAccount =
+            (await prisma.account.count({
+              where: { userId: user.id, provider: "github" },
+            })) > 0;
+
+          if (hasGithubAccount) {
+            throw new Error(
+              "Email already exists. Please sign in with GitHub."
             );
           }
 
@@ -490,6 +530,51 @@ export const authOptions: NextAuthOptions = {
           throw err;
         }
       }
+
+      if (account?.provider === "github") {
+        try {
+          if (user.email) {
+            const existingUser = await prisma.user.findUnique({
+              where: { email: user.email },
+            });
+
+            if (existingUser) {
+              // Upsert GitHubAccount to keep token and username fresh on every sign-in
+              const githubProfile = profile as
+                | { login?: string; id?: number }
+                | undefined;
+              const githubUsername = githubProfile?.login;
+              const githubUserId = githubProfile?.id;
+
+              if (githubUsername && githubUserId && account.access_token) {
+                await prisma.githubAccount.upsert({
+                  where: { userId: existingUser.id },
+                  create: {
+                    userId: existingUser.id,
+                    githubUserId: BigInt(githubUserId),
+                    username: githubUsername,
+                    accessToken: account.access_token,
+                  },
+                  update: {
+                    githubUserId: BigInt(githubUserId),
+                    username: githubUsername,
+                    accessToken: account.access_token,
+                  },
+                });
+              }
+            }
+          }
+        } catch (err: any) {
+          console.error("[auth] github oauth callback failed", {
+            message: err?.message,
+            code: err?.code,
+            providerAccountId: account?.providerAccountId,
+            hasUserEmail: !!user?.email,
+          });
+          throw err;
+        }
+      }
+
       return true;
     },
   },
