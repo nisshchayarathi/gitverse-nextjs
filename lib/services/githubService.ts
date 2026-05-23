@@ -167,7 +167,8 @@ export class GitHubService {
 
         if (status === 429 || status === 403) {
           const rateLimitRemaining = error.response?.headers?.["x-ratelimit-remaining"];
-          if (status === 429 || rateLimitRemaining === "0") {
+          const hasLimitHeader = error.response?.headers?.["x-ratelimit-limit"] != null;
+          if (status === 429 || rateLimitRemaining === "0" || (status === 403 && hasLimitHeader && rateLimitRemaining === "0")) {
             const retryAfterHeader = error.response?.headers?.["retry-after"];
             const resetHeader = error.response?.headers?.["x-ratelimit-reset"];
             let retrySeconds = 60;
