@@ -20,6 +20,7 @@ FROM base AS deps
 ENV NPM_CONFIG_INCLUDE=dev
 
 # Install dependencies (incl. dev deps for build)
+# Copy package manifests first to optimize layer caching
 COPY package.json package-lock.json* ./
 RUN npm ci
 
