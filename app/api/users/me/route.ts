@@ -37,6 +37,10 @@ export async function GET(request: NextRequest) {
       createdAt: userDetails.createdAt,
       avatarUrl: (userDetails as any).image,
       isGoogleLinked: hasGoogleAccount,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+      },
     });
   } catch (error: any) {
     console.error("Error fetching user:", error);
