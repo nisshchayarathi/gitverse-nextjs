@@ -1,5 +1,5 @@
 import { GitBranch, Clock, User, CheckCircle, GitCommit } from "lucide-react";
-import { Card, EmptyState } from "@/components/ui";
+import { Card } from "@/components/ui";
 import { useState } from "react";
 
 interface Branch {
@@ -109,16 +109,6 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
       return "bg-purple-500/20 text-purple-500 border-purple-500/30";
     return "bg-green-500/20 text-green-500 border-green-500/30";
   };
-
-  if (branches.length === 0) {
-    return (
-      <EmptyState
-        icon={GitBranch}
-        title="No branches found"
-        description="We couldn't find any branches in this repository."
-      />
-    );
-  }
 
   return (
     <div className="space-y-6">

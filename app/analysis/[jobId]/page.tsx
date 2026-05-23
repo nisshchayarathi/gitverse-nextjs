@@ -1,24 +1,40 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { EmptyState } from "@/components/ui";
-import { Activity } from "lucide-react";
 
 export default function AnalysisJobPage() {
   const router = useRouter();
 
   return (
-    <DashboardLayout>
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <EmptyState
-          icon={Activity}
-          title="No Analysis Jobs Found"
-          description="You haven't created any analysis jobs yet."
-          actionLabel="Create New Job"
-          onAction={() => router.push("/analyze")}
-        />
-      </div>
-    </DashboardLayout>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: "100vh",
+      textAlign: "center",
+      padding: "2rem"
+    }}>
+      <h2 style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>
+        No Analysis Jobs Found
+      </h2>
+      <p style={{ color: "#888", marginBottom: "1.5rem" }}>
+        You haven't created any analysis jobs yet.
+      </p>
+      <button
+        onClick={() => router.push("/analyze")}
+        style={{
+          backgroundColor: "#2563eb",
+          color: "white",
+          padding: "0.5rem 1.5rem",
+          borderRadius: "8px",
+          border: "none",
+          cursor: "pointer",
+          fontSize: "1rem"
+        }}
+      >
+        + Create New Job
+      </button>
+    </div>
   );
 }

@@ -1,8 +1,8 @@
+import { sanitizeError } from "@/lib/middleware";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { GitHubAppService } from "@/lib/services/githubAppService";
-import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
-import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
+import { GitHubService } from "@/lib/services/githubService";
 import { verifySignedState } from "@/lib/utils/signedState";
 
 type InstallState = { userId: number; ts: number; nonce?: string };
@@ -126,15 +126,7 @@ export async function GET(request: NextRequest) {
     redirectUrl.searchParams.set("installation_id", String(installationId));
     return NextResponse.redirect(redirectUrl);
   } catch (e: any) {
-    console.error("GitHub App callback error:", sanitizeErrorMessage(e));
-
-    if (e instanceof GitHubRateLimitError) {
-      redirectUrl.searchParams.set("install", "error");
-      redirectUrl.searchParams.set("reason", "rate_limit");
-      redirectUrl.searchParams.set("retryAfter", String(e.retryAfterSeconds));
-      return NextResponse.redirect(redirectUrl);
-    }
-
+    console.error("GitHub App callback error:", sanitizeError(e));
     redirectUrl.searchParams.set("install", "error");
     redirectUrl.searchParams.set("reason", e?.message || "unknown");
     return NextResponse.redirect(redirectUrl);

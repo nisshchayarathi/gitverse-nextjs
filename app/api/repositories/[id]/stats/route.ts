@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { requireAuth , sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 
 export async function GET(
@@ -8,29 +8,31 @@ export async function GET(
 ) {
   try {
     const user = await requireAuth(request);
-    const id = Number(params.id);
+    const id = parseInt(params.id);
 
-    if (!Number.isInteger(id) || id <= 0) {
+    if (isNaN(id)) {
       return NextResponse.json(
-        { error: "Invalid repository ID. Must be a positive integer." },
+        { error: "Invalid repository ID" },
         { status: 400 }
       );
     }
 
     const stats = await repositoryService.getRepositoryStats(id, user.userId);
 
-    return NextResponse.json({ stats });
-  } catch (error: any) {
-    console.error("Get repository stats error:", error);
-    if (isHttpError(error)) {
+    if (!stats) {
       return NextResponse.json(
-        { error: error.message },
-        { status: error.status }
+        { error: "Repository not found" },
+        { status: 404 }
       );
     }
-    if (error?.message === "Repository not found") {
-      return NextResponse.json({ error: error.message }, { status: 404 });
-    }
+
+    return NextResponse.json({ stats }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+      },
+    });
+  } catch (error: any) {
+    console.error("Get repository stats error:", sanitizeError(error));
     return NextResponse.json(
       { error: "Failed to get repository statistics" },
       { status: 500 }

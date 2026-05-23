@@ -2,9 +2,8 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShortcutHint } from "@/components/ui/ShortcutHint";
 import {
   GitBranch,
   TrendingUp,
@@ -29,6 +28,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
+import { toast } from "@/hooks/use-toast";
 
 interface Repository {
   id: string;
@@ -52,44 +52,10 @@ export default function Dashboard() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-  fetchRepositories();
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    const active = document.activeElement;
-
-    const isTyping =
-      active instanceof HTMLInputElement ||
-      active instanceof HTMLTextAreaElement ||
-      active instanceof HTMLSelectElement ||
-     (active instanceof HTMLElement && active.isContentEditable);
-
-    if (e.key === "/" && !isTyping) {
-      e.preventDefault();
-      searchRef.current?.focus();
-    }
-
-  if (
-  e.key === "/" &&
-  !e.ctrlKey &&
-  !e.metaKey &&
-  !e.altKey &&
-  !e.shiftKey &&
-  !isTyping
-) {
-    setRepoUrl("");
-    searchRef.current?.blur();
-    }
-  };
-
-  window.addEventListener("keydown", handleKeyDown);
-
-  return () => {
-    window.removeEventListener("keydown", handleKeyDown);
-  };
-}, []);
+    fetchRepositories();
+  }, []);
 
   const fetchRepositories = async () => {
     try {
@@ -180,7 +146,7 @@ export default function Dashboard() {
         }))
     : [];
 
-  const handleAnalyze = async () => {
+    const handleAnalyze = async () => {
     if (!repoUrl.trim()) return;
 
     setAnalyzing(true);
@@ -222,7 +188,12 @@ export default function Dashboard() {
       setRepoUrl("");
     } catch (error: any) {
       console.error("Error creating repository:", error);
-      alert(error.response?.data?.error || "Failed to analyze repository");
+      const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to analyze repository";
+      toast({
+        title: "Analysis Failed",
+        description: errMsg,
+        variant: "destructive",
+      });
     } finally {
       setAnalyzing(false);
     }
@@ -248,7 +219,6 @@ export default function Dashboard() {
               <Input
                 type="url"
                 placeholder="https://github.com/username/repository"
-                ref={searchRef}
                 value={repoUrl}
                 onChange={(e) => setRepoUrl(e.target.value)}
                 className="flex-1 bg-background/50"
@@ -263,8 +233,6 @@ export default function Dashboard() {
                 {analyzing ? "Analyzing..." : "Analyze Repository"}
               </Button>
             </div>
-              <ShortcutHint />
-            
           </CardContent>
         </Card>
 

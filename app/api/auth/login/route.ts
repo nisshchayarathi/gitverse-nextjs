@@ -1,30 +1,11 @@
+import { sanitizeError } from "@/lib/middleware";
 import { NextRequest, NextResponse } from "next/server";
-import { checkRateLimit } from '@/src/utils/rateLimit';
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { generateToken } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
-// 1. EXTRACT IP AND CHECK RATE LIMIT FIRST
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    const ip = forwardedFor?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown-ip';
-    
-    const rateLimitResult = checkRateLimit(ip);
-    
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        { 
-          status: 429, 
-          headers: {
-            'Retry-After': rateLimitResult.retryAfter?.toString() || '900'
-          }
-        }
-      );
-    }
-
-    // 2. PARSE BODY
     const body = await request.json();
     const { email, password } = body;
 
@@ -32,14 +13,6 @@ export async function POST(request: NextRequest) {
     if (!email || !password) {
       return NextResponse.json(
         { error: "Email and password are required" },
-        { status: 400 }
-      );
-    }
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "Please provide a valid email address" },
         { status: 400 }
       );
     }
@@ -57,6 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Security: never allow password login for Google-only accounts.
+    // A "Google-only" account is a user without a local password, but with a linked Google OAuth account.
     if (!user.passwordHash) {
       const hasGoogleAccount =
         (await prisma.account.count({
@@ -102,7 +76,7 @@ export async function POST(request: NextRequest) {
       token,
     });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("Login error:", sanitizeError(error));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

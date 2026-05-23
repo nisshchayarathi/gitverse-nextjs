@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { repositoryService } from "@/lib/services/repositoryService";
 
@@ -9,11 +9,11 @@ export async function GET(
 ) {
   try {
     const user = await requireAuth(request);
-    const id = Number(params.id);
+    const id = parseInt(params.id);
 
-    if (!Number.isInteger(id) || id <= 0) {
+    if (isNaN(id)) {
       return NextResponse.json(
-        { error: "Invalid repository ID. Must be a positive integer." },
+        { error: "Invalid repository ID" },
         { status: 400 }
       );
     }
@@ -49,7 +49,7 @@ export async function GET(
 
     return NextResponse.json({ repository, latestJob });
   } catch (error: any) {
-    console.error("Get repository error:", error);
+    console.error("Get repository error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(
@@ -71,11 +71,11 @@ export async function DELETE(
 ) {
   try {
     const user = await requireAuth(request);
-    const id = Number(params.id);
+    const id = parseInt(params.id);
 
-    if (!Number.isInteger(id) || id <= 0) {
+    if (isNaN(id)) {
       return NextResponse.json(
-        { error: "Invalid repository ID. Must be a positive integer." },
+        { error: "Invalid repository ID" },
         { status: 400 }
       );
     }
@@ -84,7 +84,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Repository deleted successfully" });
   } catch (error: any) {
-    console.error("Delete repository error:", error);
+    console.error("Delete repository error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(
@@ -93,7 +93,7 @@ export async function DELETE(
       );
     }
 
-    if (error?.message === "Repository not found") {
+    if (error.message === "Repository not found") {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
 

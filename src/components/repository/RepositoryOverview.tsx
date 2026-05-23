@@ -19,13 +19,12 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  EmptyState,
+  Skeleton,
 } from "@/components/ui";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { EmptyState } from "@/components/ui/EmptyState";
 
 interface RepositoryData {
   id: string;
@@ -142,6 +141,9 @@ export const RepositoryOverview = ({
   }));
 
   const hasUsableReadme = Boolean(readmeText && readmeText !== "doesnt exist");
+  const isAnalyzing =
+    repositoryData?.status === "pending" ||
+    repositoryData?.status === "analyzing";
 
   const githubRawBase = (() => {
     const url = String(repositoryData?.url || "");
@@ -189,23 +191,14 @@ export const RepositoryOverview = ({
   };
 
   const readmeSanitizeSchema = (() => {
-    // Refined schema for sanitizing README markdown
-    // Allows common README HTML (like alignment/size attributes for images, collapsible details, etc.)
-    // while preventing XSS, protocol-based exploits, and DOM clobbering.
+    // Allow common README HTML (like <img align="right" ...>) while keeping things safe.
     const schema: any = {
       ...(defaultSchema as any),
-      
-      // Note: "img" is already in defaultSchema.tagNames, so we don't need to add it manually.
-
-      // Explicitly restrict protocols for attributes to mitigate protocol-based XSS (e.g., javascript:)
-      protocols: {
-        ...((defaultSchema as any).protocols || {}),
-        href: ["http", "https", "mailto"], // Only allow safe URI schemes for links
-      },
-
+      tagNames: Array.from(
+        new Set([...(defaultSchema as any).tagNames, "img"]),
+      ),
       attributes: {
         ...((defaultSchema as any).attributes || {}),
-        // Allow target and rel attributes for links (essential for external links)
         a: Array.from(
           new Set([
             ...(((defaultSchema as any).attributes?.a as any[]) || []),
@@ -213,14 +206,12 @@ export const RepositoryOverview = ({
             "rel",
           ]),
         ),
-        // Allow standard image attributes used in READMEs (alignment, sizing, and lazy loading)
         img: ["src", "alt", "title", "width", "height", "align", "loading"],
       },
     };
 
     return schema;
   })();
-
 
   const formatTimeAgo = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -372,32 +363,24 @@ export const RepositoryOverview = ({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0 sm:pt-0">
-            {languages.length > 0 ? (
-              languages.map((lang: any) => (
-                <div key={lang.name}>
-                  <div className="flex items-center justify-between mb-2 gap-2">
-                    <span className="text-xs sm:text-sm font-medium truncate">
-                      {lang.name}
-                    </span>
-                    <span className="text-xs sm:text-sm text-muted-foreground flex-shrink-0">
-                      {lang.percentage}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div
-                      className={`${lang.color} h-2 rounded-full transition-all`}
-                      style={{ width: `${lang.percentage}%` }}
-                    />
-                  </div>
+            {languages.map((lang: any) => (
+              <div key={lang.name}>
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <span className="text-xs sm:text-sm font-medium truncate">
+                    {lang.name}
+                  </span>
+                  <span className="text-xs sm:text-sm text-muted-foreground flex-shrink-0">
+                    {lang.percentage}%
+                  </span>
                 </div>
-              ))
-            ) : (
-              <EmptyState
-                icon={Code}
-                title="No language data"
-                description="We couldn't detect any programming languages."
-              />
-            )}
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className={`${lang.color} h-2 rounded-full transition-all`}
+                    style={{ width: `${lang.percentage}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 
@@ -412,34 +395,26 @@ export const RepositoryOverview = ({
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
-            {recentActivity.length > 0 ? (
-              <div className="space-y-3 sm:space-y-4">
-                {recentActivity.map((activity: any, index: number) => (
-                  <div key={index} className="flex items-start gap-2 sm:gap-3">
-                    <div className="mt-1 p-1.5 rounded-full bg-accent/10 flex-shrink-0">
-                      <Activity className="h-3 w-3 text-accent" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm">
-                        <span className="font-medium">{activity.user}</span>{" "}
-                        <span className="text-muted-foreground break-words">
-                          {activity.message}
-                        </span>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {activity.time}
-                      </p>
-                    </div>
+            <div className="space-y-3 sm:space-y-4">
+              {recentActivity.map((activity: any, index: number) => (
+                <div key={index} className="flex items-start gap-2 sm:gap-3">
+                  <div className="mt-1 p-1.5 rounded-full bg-accent/10 flex-shrink-0">
+                    <Activity className="h-3 w-3 text-accent" />
                   </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={Activity}
-                title="No activity history"
-                description="No recent commits recorded."
-              />
-            )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm">
+                      <span className="font-medium">{activity.user}</span>{" "}
+                      <span className="text-muted-foreground break-words">
+                        {activity.message}
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {activity.time}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -456,7 +431,22 @@ export const RepositoryOverview = ({
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-3">
-            {hasUsableReadme ? (
+            {isAnalyzing && !hasUsableReadme ? (
+              <div className="bg-background/50 border border-border/50 rounded-lg p-4 space-y-4" aria-busy="true" aria-label="Loading README">
+                <Skeleton className="h-8 w-1/3 sm:w-1/4" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-11/12" />
+                  <Skeleton className="h-4 w-5/6" />
+                </div>
+                <div className="pt-4 space-y-2">
+                  <Skeleton className="h-6 w-1/4 sm:w-1/5" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-4/5" />
+                  <Skeleton className="h-32 w-full mt-4" />
+                </div>
+              </div>
+            ) : hasUsableReadme ? (
               <div className="bg-background/50 border border-border/50 rounded-lg p-3 max-h-96 overflow-auto text-sm leading-relaxed">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}

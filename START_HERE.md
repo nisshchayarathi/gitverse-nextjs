@@ -6,10 +6,6 @@
 📁 /home/time_walker/projects/projects/gitverse/gitverse-nextjs/
 ```
 
-## System Requirements
-
-- **Node.js 22.x** is officially supported. See [Supported Node Version](README.md#supported-node-version) in README for details.
-
 ## Immediate Next Steps
 
 ### 1. Open in VS Code
@@ -244,24 +240,7 @@ git push origin main
 4. Review Prisma docs: https://prisma.io/docs
 
 ---
-## Validation Notes
 
-The AI API routes validate request inputs before processing.
-
-Invalid requests return a `400 Bad Request` response with a helpful error message instead of exposing stack traces.
-
-Examples:
-- Empty or missing `code`
-- Empty or missing `language`
-- Unsupported `analysisType`
-- Oversized code snippets
-
-Example response:
-
-```json
-{
-  "error": "Code must be a non-empty string"
-}
 ## 🚀 You're All Set!
 
 Your project has been successfully migrated to Next.js with:

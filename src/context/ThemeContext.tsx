@@ -13,17 +13,13 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>('light')
- 
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-
+    setMounted(true)
     const saved = localStorage.getItem('theme')
     if (saved) {
       setTheme(saved as Theme)
-    } else {
-      // Respect system preference on first visit
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      setTheme(prefersDark ? 'dark' : 'light')
     }
   }, [])
 
@@ -39,6 +35,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
+  }
+
+  if (!mounted) {
+    return null
   }
 
   return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>

@@ -120,37 +120,6 @@ When deploying to production:
 3. Ensure all environment variables are set in your production environment
 4. Run the database migration in production
 
-## Provider Rate Limits & Retry Strategies
-
-When GitVerse integrates with third-party providers (like GitHub or Google), it natively handles rate limiting and transient failures to ensure robust operation.
-
-### Rate Limit Behavior (HTTP 429)
-
-If a provider returns a `429 Too Many Requests` response, GitVerse will safely catch the error and surface a standardized response to the client. The frontend will typically display a message like:
-`"Rate limit reached. Please retry after X seconds."`
-
-GitVerse extracts the `retryAfter` or reset timing directly from the provider's HTTP headers and propagates it safely without exposing internal API responses.
-
-### Retry with Exponential Backoff
-
-For transient network failures or safe server errors (e.g., `502`, `503`, `504`), GitVerse employs an automatic exponential backoff mechanism.
-
-**Retry Flow Example:**
-- Attempt 1: Immediate Execution
-- Attempt 2: 1s delay
-- Attempt 3: 2s delay
-- Attempt 4: 4s delay
-
-This prevents infinite retry loops and respects provider rate limits while improving overall system reliability.
-
-## Secure Logging Practices
-
-To protect sensitive information, GitVerse enforces strict token sanitization requirements across all provider integrations:
-
-1. **Token Redaction:** Never log raw OAuth access tokens, `Authorization` headers, or provider credentials.
-2. **Error Sanitization:** If an HTTP fetch fails, the underlying `AxiosError` or `fetch` error is sanitized to strip out sensitive config and request headers before it reaches `console.error`.
-3. **Safe Debugging:** Logs will output the HTTP status code, safe message strings, and endpoint paths (excluding query string secrets) to preserve debuggability without compromising security.
-
 ## Troubleshooting
 
 ### Error: "redirect_uri_mismatch"
