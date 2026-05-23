@@ -26,10 +26,11 @@ function intUserId(id: string) {
 }
 
 function toAdapterUser(user: any): AdapterUser {
+  if (!user) throw new Error("User object is null or undefined");
   return {
     id: String(user.id),
-    email: user.email,
-    name: user.name,
+    email: user.email ?? "",
+    name: user.name ?? user.email ?? "Unknown",
     image: user.image ?? null,
     emailVerified: user.emailVerified ?? null,
   };
