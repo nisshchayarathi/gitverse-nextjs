@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ analysis, analysisType });
   } catch (error: any) {
-    console.error("Code analysis error:", error);
+    console.error("Code analysis error:", sanitizeError(error));
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },

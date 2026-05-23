@@ -96,7 +96,7 @@ export async function PUT(request: NextRequest) {
       avatarUrl: (updatedUser as any).image,
     });
   } catch (error: any) {
-    console.error("Error updating profile:", error);
+    console.error("Error updating profile:", sanitizeError(error));
     return NextResponse.json(
       { message: "Failed to update profile" },
       { status: 500 }

@@ -32,7 +32,7 @@ export async function POST(
       },
     });
   } catch (error: any) {
-    console.error("Fetch README error:", error);
+    console.error("Fetch README error:", sanitizeError(error));
 
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(

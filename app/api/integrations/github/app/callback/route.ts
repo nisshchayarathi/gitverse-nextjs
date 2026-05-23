@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
     redirectUrl.searchParams.set("installation_id", String(installationId));
     return NextResponse.redirect(redirectUrl);
   } catch (e: any) {
-    console.error("GitHub App callback error:", e);
+    console.error("GitHub App callback error:", sanitizeError(e));
     redirectUrl.searchParams.set("install", "error");
     redirectUrl.searchParams.set("reason", e?.message || "unknown");
     return NextResponse.redirect(redirectUrl);

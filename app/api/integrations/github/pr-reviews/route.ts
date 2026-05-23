@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ repos: toJsonSafe(repos) }, { status: 200 });
   } catch (error: any) {
-    console.error("GitHub PR reviews error:", error);
+    console.error("GitHub PR reviews error:", sanitizeError(error));
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },

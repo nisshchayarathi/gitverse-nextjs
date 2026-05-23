@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ repos: toJsonSafe(repos) }, { status: 200 });
   } catch (error: any) {
-    console.error("GitHub select repos error:", error);
+    console.error("GitHub select repos error:", sanitizeError(error));
     
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(

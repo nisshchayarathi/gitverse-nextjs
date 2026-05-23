@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ account: toJsonSafe(account) }, { status: 200 });
   } catch (error: any) {
-    console.error("GitHub connect error:", error);
+    console.error("GitHub connect error:", sanitizeError(error));
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ suggestions });
   } catch (error: any) {
-    console.error("Commit suggestion error:", error);
+    console.error("Commit suggestion error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(

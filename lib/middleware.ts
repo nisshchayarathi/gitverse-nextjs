@@ -62,3 +62,15 @@ export function isHttpError(error: unknown): error is HttpError {
     typeof (error as any).status === "number"
   );
 }
+
+export function sanitizeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  try {
+    const str = String(error);
+    return str.length > 200 ? str.substring(0, 200) + "..." : str;
+  } catch {
+    return "Unknown error";
+  }
+}

@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       file: { path: file.path, language: file.language },
     });
   } catch (error: any) {
-    console.error("File explanation error:", error);
+    console.error("File explanation error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(

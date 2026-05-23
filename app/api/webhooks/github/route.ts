@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
       { status: 200 },
     );
   } catch (error: any) {
-    console.error("GitHub webhook PR review error:", error);
+    console.error("GitHub webhook PR review error:", sanitizeError(error));
     return NextResponse.json(
       {
         error: "Failed to process PR webhook",

@@ -64,7 +64,7 @@ export async function GET(
       },
     });
   } catch (error: any) {
-    console.error("Get analysis job error:", error);
+    console.error("Get analysis job error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(

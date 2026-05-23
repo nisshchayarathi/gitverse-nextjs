@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ repository, source: "github" }, { status: 201 });
   } catch (error: any) {
-    console.error("GitHub import error:", error);
+    console.error("GitHub import error:", sanitizeError(error));
 
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(

@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ repositories, source: "github-app-db" });
   } catch (error: any) {
-    console.error("GitHub repositories error:", error);
+    console.error("GitHub repositories error:", sanitizeError(error));
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },

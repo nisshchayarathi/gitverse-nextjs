@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ analysis, type });
   } catch (error: any) {
-    console.error("Repository analysis error:", error);
+    console.error("Repository analysis error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(

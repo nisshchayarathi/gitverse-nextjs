@@ -45,7 +45,7 @@ function kickProductionWorker() {
   if (process.env.NODE_ENV !== "production") return;
 
   void triggerAnalysisWorkerWorkflow().catch((error) => {
-    console.error("Failed to dispatch analysis worker workflow:", error);
+    console.error("Failed to dispatch analysis worker workflow:", sanitizeError(error));
   });
 }
 
@@ -106,7 +106,7 @@ export async function POST(
       { status: 202 }
     );
   } catch (error: any) {
-    console.error("Analyze repository error:", error);
+    console.error("Analyze repository error:", sanitizeError(error));
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
