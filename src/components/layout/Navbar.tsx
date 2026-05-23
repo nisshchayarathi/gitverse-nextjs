@@ -5,12 +5,9 @@ import Link from 'next/link'
 import { GitBranch, Menu, X } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { Button } from '@/components/ui'
-import { useTheme } from '@/context/ThemeContext'
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
-  const { theme, toggleTheme } = useTheme()
-
   const navLinks = [
     { name: 'Features', href: '#features' },
     { name: 'How it Works', href: '#how-it-works' },
@@ -48,19 +45,6 @@ export const Navbar: React.FC = () => {
           {/* CTA Buttons + Theme Toggle */}
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
-            {/* Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              aria-pressed={theme === 'dark'}
-              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-300"
-            >
-              {theme === 'light' ? (
-                <Moon className="h-5 w-5" />
-              ) : (
-                <Sun className="h-5 w-5" />
-              )}
-            </button>
             <Button className="bg-gradient-primary hover:opacity-90 transition-opacity" asChild>
               <Link href="/login">Sign In</Link>
             </Button>
