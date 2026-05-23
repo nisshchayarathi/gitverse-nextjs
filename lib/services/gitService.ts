@@ -163,6 +163,10 @@ export class GitService {
     destination: string,
     opts?: { depth?: number; noSingleBranch?: boolean },
   ): Promise<GitService> {
+    // Sanitize repo URL to protect against shell injection
+    if (url.includes(" ") || url.includes(";") || url.includes("&") || url.includes("|") || url.includes("`") || url.includes("$")) {
+      throw new Error("Invalid character in repository URL");
+    }
     try {
       await fs.mkdir(destination, { recursive: true });
       const depth = Math.max(1, Math.min(opts?.depth ?? 1000, 1000));
