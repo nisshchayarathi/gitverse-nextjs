@@ -255,7 +255,7 @@ gitverse-nextjs/
 │   │   │   └── migration.sql
 │   │   └── migration_lock.toml
 │   └── schema.prisma              # Database schema
-├── prisma.config.ts
+│
 ├── public/                        # Static assets
 │   ├── .gitkeep
 │   └── readme/
