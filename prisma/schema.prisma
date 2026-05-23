@@ -213,10 +213,16 @@ model AnalysisJob {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
+  // Worker queue: fetch next jobs to process
   @@index([status, nextRunAt])
+  // Worker lock cleanup: find and release expired locks
   @@index([lockExpiresAt])
-  @@index([repositoryId])
-  @@index([userId])
+  // List all jobs for a repository (used in repository detail view)
+  @@index([repositoryId, createdAt(sort: Desc)])
+  // List all jobs for a user (used in dashboard)
+  @@index([userId, createdAt(sort: Desc)])
+  // Composite: filter by repo + status (e.g. find active jobs for a repo)
+  @@index([repositoryId, status])
   @@map("analysis_jobs")
 }
 
