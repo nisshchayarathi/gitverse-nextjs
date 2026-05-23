@@ -49,6 +49,7 @@ export const Navbar: React.FC = () => {
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
+              aria-pressed={theme === 'dark'}
               aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
               className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-300"
             >
@@ -70,6 +71,7 @@ export const Navbar: React.FC = () => {
           <div className="md:hidden flex items-center gap-2">
             <button
               onClick={toggleTheme}
+              aria-pressed={theme === 'dark'}
               aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
               className="p-2 text-muted-foreground hover:text-foreground transition-colors"
             >
