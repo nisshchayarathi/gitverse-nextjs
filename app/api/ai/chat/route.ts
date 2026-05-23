@@ -11,6 +11,31 @@ export async function POST(request: NextRequest) {
 
     // Free-form mode: client provides a prebuilt prompt.
     if (typeof prompt === "string" && prompt.trim()) {
+      // Input size limit
+      if (prompt.length > 2000) {
+        return NextResponse.json(
+          { error: "Prompt exceeds maximum allowed length of 2000 characters" },
+          { status: 400 }
+        );
+      }
+
+      // Block prompt injection patterns
+      const blockedPatterns = [
+        /ignore (all |previous |above )?instructions/i,
+        /system prompt/i,
+        /you are now/i,
+        /jailbreak/i,
+        /forget (all |your |previous )?instructions/i,
+      ];
+
+      const isBlocked = blockedPatterns.some((pattern) => pattern.test(prompt));
+      if (isBlocked) {
+        return NextResponse.json(
+          { error: "Prompt contains restricted content" },
+          { status: 400 }
+        );
+      }
+
       const response = await getGeminiService().chatRaw(prompt);
       return NextResponse.json({ response });
     }
