@@ -1,6 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
-import { GitBranch, Twitter, Github, Linkedin, Mail } from 'lucide-react'
+import { GitBranch, Twitter, Github, Linkedin, Mail} from 'lucide-react'
 
 export const Footer: React.FC = () => {
   return (
@@ -108,33 +108,33 @@ export const Footer: React.FC = () => {
         <div className="mt-12 pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm">© 2026 GitVerse. All rights reserved.</p>
           <div className="flex space-x-6 mt-4 md:mt-0">
+
             <a
-              href="https://twitter.com"
+              href="https://x.com/nisshchayarathi"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-primary transition-colors"
             >
               <Twitter size={20} />
             </a>
+
             <a
-              href="https://github.com"
+              href="https://github.com/nisshchayarathi"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-primary transition-colors"
             >
               <Github size={20} />
             </a>
+
             <a
-              href="https://linkedin.com"
+              href="https://www.linkedin.com/in/nisshchayarathi/"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-primary transition-colors"
             >
               <Linkedin size={20} />
-            </a>
-            <a href="mailto:hello@gitverse.com" className="hover:text-primary transition-colors">
-              <Mail size={20} />
-            </a>
+           </a>
           </div>
         </div>
       </div>
