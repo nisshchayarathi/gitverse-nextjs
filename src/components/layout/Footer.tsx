@@ -4,19 +4,28 @@ import { GitBranch, Twitter, Github, Linkedin, Mail } from 'lucide-react'
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="bg-muted/30 text-muted-foreground border-t border-border/50">
+    <footer className="bg-muted/30 text-foreground/80 border-t border-border/50">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="col-span-1">
-            <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="p-2 bg-primary rounded-lg">
-                <GitBranch className="text-primary-foreground" size={24} />
-              </div>
-              <span className="text-xl font-heading font-bold text-foreground">
-                Git<span className="text-gradient">Verse</span>
-              </span>
-            </Link>
+ <Link
+  href="/"
+  aria-label="GitVerse home page"
+  className="flex items-center gap-2 mb-4 focus:outline-none focus:ring-2 focus:ring-primary rounded-md"
+>
+  <div className="p-2 bg-primary rounded-lg">
+    <GitBranch
+      aria-hidden="true"
+      className="text-primary-foreground"
+      size={24}
+    />
+  </div>
+
+  <span className="text-xl font-heading font-bold text-foreground">
+    Git<span className="text-gradient">Verse</span>
+  </span>
+</Link>       
             <p className="text-sm">
               Contribution made easy with repo visualization and PR Mentor.
             </p>
@@ -103,6 +112,7 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
         </div>
+  )
 
         {/* Bottom Section */}
         <div className="mt-12 pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center">
@@ -111,30 +121,37 @@ export const Footer: React.FC = () => {
             <a
               href="https://twitter.com"
               target="_blank"
+              aria-label="Visit GitVerse Twitter page"
               rel="noopener noreferrer"
-              className="hover:text-primary transition-colors"
+              className="hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-sm"
             >
-              <Twitter size={20} />
+             <Twitter aria-hidden="true" size={20} />
             </a>
             <a
               href="https://github.com"
               target="_blank"
+              aria-label="Visit GitVerse GitHub repository"
               rel="noopener noreferrer"
-              className="hover:text-primary transition-colors"
+              className="hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-sm"
             >
-              <Github size={20} />
+             <Github aria-hidden="true" size={20} />
             </a>
             <a
               href="https://linkedin.com"
               target="_blank"
+              aria-label="Visit GitVerse LinkedIn page"
               rel="noopener noreferrer"
-              className="hover:text-primary transition-colors"
+              className="hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-sm"
             >
-              <Linkedin size={20} />
+             <Linkedin aria-hidden="true" size={20} />
             </a>
-            <a href="mailto:hello@gitverse.com" className="hover:text-primary transition-colors">
-              <Mail size={20} />
-            </a>
+            <a
+  href="mailto:hello@gitverse.com"
+  aria-label="Send email to GitVerse"
+  className="hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-sm"
+>
+  <Mail aria-hidden="true" size={20} />
+</a>
           </div>
         </div>
       </div>

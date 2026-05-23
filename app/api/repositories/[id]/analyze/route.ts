@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
-import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
 import prisma from "@/lib/prisma";
 
 function normalizeKnownRepoHttpUrl(input: string): string | null {
@@ -38,14 +37,6 @@ function kickLocalRunner(request: NextRequest) {
     headers: secret ? { "x-analysis-runner-secret": secret } : undefined,
   }).catch(() => {
     // Best-effort only.
-  });
-}
-
-function kickProductionWorker() {
-  if (process.env.NODE_ENV !== "production") return;
-
-  void triggerAnalysisWorkerWorkflow().catch((error) => {
-    console.error("Failed to dispatch analysis worker workflow:", sanitizeError(error));
   });
 }
 
@@ -99,7 +90,6 @@ export async function POST(
     });
 
     kickLocalRunner(request);
-    kickProductionWorker();
 
     return NextResponse.json(
       { message: "Job queued", jobId: job.id, status: job.status },

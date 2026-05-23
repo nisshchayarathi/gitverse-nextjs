@@ -316,30 +316,16 @@ export class RepositoryService {
               ? await prisma.commit.findMany({
                   where: {
                     repositoryId,
-                    hash: {
-                      in: chunk.map((commit: { hash: string }) => commit.hash),
-                    },
+                    hash: { in: chunk.map((commit) => commit.hash) },
                   },
                   select: { id: true, hash: true },
                 })
               : [];
           const commitIdByHash = new Map(
-            insertedCommits.map((commit: { hash: string; id: number }) => [
-              commit.hash,
-              commit.id,
-            ]),
+            insertedCommits.map((commit) => [commit.hash, commit.id]),
           );
 
-          const fileChanges = chunk.flatMap(
-            (commit: {
-              hash: string;
-              fileChanges: Array<{
-                path: string;
-                additions: number;
-                deletions: number;
-                changeType: "added" | "modified" | "deleted";
-              }>;
-            }) => {
+          const fileChanges = chunk.flatMap((commit) => {
             const commitId = commitIdByHash.get(commit.hash);
             if (!commitId || commit.fileChanges.length === 0) return [];
 
@@ -350,8 +336,7 @@ export class RepositoryService {
               changeType: change.changeType,
               commitId,
             }));
-            },
-          );
+          });
 
           if (fileChanges.length > 0) {
             await prisma.fileChange.createMany({

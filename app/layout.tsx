@@ -18,7 +18,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ThemeProvider>
           <NextAuthProvider>
             <AuthProvider>
-              {children}
+              <main>
+                {children}
+              </main>
+
               <Toaster />
             </AuthProvider>
           </NextAuthProvider>

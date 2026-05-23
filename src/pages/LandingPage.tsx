@@ -417,9 +417,10 @@ export default function LandingPage() {
             >
               <Card className="glass glass-hover">
                 <CardHeader>
-                  <CardTitle className="font-heading flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5 text-primary" /> AI Mentor
-                  </CardTitle>
+                  <div className="font-heading font-semibold flex items-center gap-2 text-lg">
+                  <MessageSquare className="h-5 w-5 text-primary" />
+                  AI Mentor
+                  </div>
                   <CardDescription>
                     See how GitVerse explains code changes in real time.
                   </CardDescription>
@@ -441,10 +442,10 @@ export default function LandingPage() {
 
               <Card className="glass glass-hover">
                 <CardHeader>
-                  <CardTitle className="font-heading flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-accent" /> PR Quality
-                    Score
-                  </CardTitle>
+                 <div className="font-heading font-semibold flex items-center gap-2 text-lg">
+               <Sparkles className="h-5 w-5 text-accent" />
+               PR Quality Score
+               </div>
                   <CardDescription>
                     Quick signal before you merge.
                   </CardDescription>

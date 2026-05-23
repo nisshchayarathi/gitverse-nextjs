@@ -280,17 +280,12 @@ class RepositoryService {
                         ? await prisma_1.default.commit.findMany({
                             where: {
                                 repositoryId,
-                                hash: {
-                                    in: chunk.map((commit) => commit.hash),
-                                },
+                                hash: { in: chunk.map((commit) => commit.hash) },
                             },
                             select: { id: true, hash: true },
                         })
                         : [];
-                    const commitIdByHash = new Map(insertedCommits.map((commit) => [
-                        commit.hash,
-                        commit.id,
-                    ]));
+                    const commitIdByHash = new Map(insertedCommits.map((commit) => [commit.hash, commit.id]));
                     const fileChanges = chunk.flatMap((commit) => {
                         const commitId = commitIdByHash.get(commit.hash);
                         if (!commitId || commit.fileChanges.length === 0)

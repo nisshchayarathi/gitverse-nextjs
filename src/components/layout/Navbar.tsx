@@ -17,9 +17,13 @@ export const Navbar: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
+          <Link
+              href="/"
+              aria-label="GitVerse home page"
+              className="flex items-center gap-2 group focus:outline-none focus:ring-2 focus:ring-primary rounded-md"
+              >
             <div className="relative">
-              <GitBranch className="h-8 w-8 text-primary transition-transform group-hover:scale-110" />
+              <GitBranch aria-hidden="true" className="h-8 w-8 text-primary transition-transform group-hover:scale-110" />
               <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             <span className="text-xl font-heading font-bold text-foreground">
@@ -33,7 +37,7 @@ export const Navbar: React.FC = () => {
               <a
                 key={link.name}
                 href={link.href}
-                className="text-muted-foreground hover:text-foreground transition-colors font-medium"
+               className="text-foreground/80 hover:text-foreground transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-primary rounded-sm"
               >
                 {link.name}
               </a>
@@ -53,8 +57,9 @@ export const Navbar: React.FC = () => {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="md:hidden p-2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-md"
             aria-label="Toggle menu"
+            aria-expanded={isOpen}
           >
             {isOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
@@ -68,7 +73,7 @@ export const Navbar: React.FC = () => {
                 <a
                   key={link.name}
                   href={link.href}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
+                 className="text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-sm"
                   onClick={() => setIsOpen(false)}
                 >
                   {link.name}

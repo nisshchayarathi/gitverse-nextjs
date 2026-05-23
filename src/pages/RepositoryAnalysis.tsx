@@ -119,10 +119,40 @@ export default function RepositoryAnalysis() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Timeout / stuck state
+  const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  const pollingStartedAt = useRef<number | null>(null);
+  // Tracks last time progress changed — prevents falsely timing out active jobs
+  const lastProgressAt = useRef<number | null>(null);
+  const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // â”€â”€ Elapsed seconds ticker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  useEffect(() => {
+    if (isAnalyzing && !analysisTimedOut) {
+      elapsedTimer.current = setInterval(() => {
+        if (pollingStartedAt.current) {
+          setElapsedSeconds(
+            Math.floor((Date.now() - pollingStartedAt.current) / 1000)
+          );
+        }
+      }, 1000);
+    } else {
+      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
+    }
+    return () => {
+      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
+    };
+  }, [isAnalyzing, analysisTimedOut]);
+
+  // â”€â”€ Initial fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     fetchRepository();
   }, [id]);
 
+  // â”€â”€ Job polling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     // Poll job status (lightweight) while analyzing.
     const repoStatus = repository?.status as string | undefined;
@@ -146,6 +176,23 @@ export default function RepositoryAnalysis() {
 
     const poll = async () => {
       if (stopped) return;
+
+      // â”€â”€ Timeout guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      if (
+        lastProgressAt.current &&
+        Date.now() - lastProgressAt.current > ANALYSIS_TIMEOUT_MS
+      ) {
+        stopped = true;
+        setAnalysisTimedOut(true);
+        setIsAnalyzing(false);
+        setAnalysisError(
+          "Analysis has been queued for over 8 minutes without progress. " +
+          "The background worker may not be running. Please try again later " +
+          "or contact the maintainer."
+        );
+        return;
+      }
+
       await fetchJob(jobId);
       if (stopped) return;
       setTimeout(poll, intervalMs);
@@ -159,6 +206,7 @@ export default function RepositoryAnalysis() {
     };
   }, [repository?.status, repository?.latestJob?.id, job?.id, job?.status]);
 
+  // â”€â”€ Data fetchers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchRepository = async () => {
     if (!id) return;
     setError(null);
@@ -214,7 +262,19 @@ export default function RepositoryAnalysis() {
       );
 
       const nextJob = response.data.job || response.data;
-      setJob(nextJob);
+      // Use functional setJob so we always compare against the latest job
+      // state, avoiding the stale-closure bug where the polling loop holds
+      // an old snapshot of job and never sees progress-only updates.
+      setJob((prevJob: any) => {
+        const prevPercent = prevJob?.progressPercent ?? null;
+        const prevMessage = prevJob?.progressMessage ?? null;
+        const nextPercent = nextJob?.progressPercent ?? null;
+        const nextMessage = nextJob?.progressMessage ?? null;
+        if (nextPercent !== prevPercent || nextMessage !== prevMessage) {
+          lastProgressAt.current = Date.now();
+        }
+        return nextJob;
+      });
 
       if (nextJob?.status === "DONE") {
         // Job finished — refresh repository once to load results.
@@ -275,6 +335,7 @@ export default function RepositoryAnalysis() {
     }
   };
 
+  
   const renderContent = () => {
     switch (activeTab) {
       case "overview":
@@ -294,7 +355,27 @@ export default function RepositoryAnalysis() {
     }
   };
 
-  return (
+const lastAnalyzedDate = repository?.lastAnalyzedAt
+  ? new Date(repository.lastAnalyzedAt)
+  : null;
+
+const formattedLastAnalyzed =
+  lastAnalyzedDate && !isNaN(lastAnalyzedDate.getTime())
+    ? new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(lastAnalyzedDate)
+    : "Not available";
+
+const formatElapsed = (secs: number) => {
+  if (secs < 60) return `${secs}s`;
+  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+};
+
+const progressPercent = job?.progressPercent ?? 0;
+const progressMessage = job?.progressMessage || "Queued";
+
+return (
     <DashboardLayout>
       <div className="space-y-6">
         {loading ? (
@@ -342,23 +423,24 @@ export default function RepositoryAnalysis() {
                 <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
                   {repository?.url || ""}
                 </p>
-                <div className="flex flex-col gap-1 mt-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <StatusBadge
-                      status={
-                        error
-                          ? "failed"
-                          : repository?.status || job?.status || "pending"
-                      }
-                      isAnalyzing={isAnalyzing}
-                    />
-                  </div>
-                  {error && (
-                    <p className="text-xs sm:text-sm text-red-500 font-medium mt-1">
-                      {error}
-                    </p>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <p className="text-xs text-muted-foreground">
+                Status:{" "}
+                <span className="capitalize">{repository.status}</span>
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  Last analyzed:{" "}
+                  <span>{formattedLastAnalyzed}</span>
+                </p>
+
+                {isAnalyzing && (
+                <span className="flex items-center gap-1 text-xs text-primary">
+                <span className="animate-pulse">â—</span>
+                Analyzing...
+                </span>
                   )}
-                </div>
+              </div>
               </div>
               {/* Delete button only if repository exists */}
               {repository && (
@@ -372,8 +454,9 @@ export default function RepositoryAnalysis() {
               )}
             </div>
 
-            {isAnalyzing ? (
-              <div className="glass rounded-lg p-12 text-center space-y-4 animate-pulse">
+            {/* â”€â”€ Analyzing spinner (with timeout awareness) â”€â”€ */}
+            {isAnalyzing && !analysisTimedOut ? (
+              <div className="glass rounded-lg p-12 text-center space-y-6">
                 <div className="flex justify-center">
                   <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
                 </div>
@@ -392,6 +475,18 @@ export default function RepositoryAnalysis() {
                         ? job.progressMessage
                         : "This may take a few moments depending on the repository size..."}
                   </p>
+
+                  {/* Warn if queued too long (>60s with no progress) */}
+                  {elapsedSeconds > 60 && progressPercent === 0 && (
+                    <div className="mt-4 max-w-sm mx-auto p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                      <p className="text-xs text-yellow-400 flex items-start gap-2">
+                        <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                        Still queued after {formatElapsed(elapsedSeconds)}. 
+                        The worker runs every 5 minutes via GitHub Actions â€” 
+                        it should pick this up shortly.
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-center gap-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
@@ -404,8 +499,10 @@ export default function RepositoryAnalysis() {
                   </div>
                 </div>
               </div>
-            ) : error && !repository ? (
-              <div className="glass rounded-lg p-12 text-center space-y-4 animate-fade-in-up">
+
+            ) : analysisTimedOut || analysisError ? (
+              /* â”€â”€ Timeout / error state â”€â”€ */
+              <div className="glass rounded-lg p-12 text-center space-y-6">
                 <div className="flex justify-center">
                   <XCircle className="h-12 w-12 text-red-500" />
                 </div>
@@ -423,6 +520,7 @@ export default function RepositoryAnalysis() {
                 </button>
               </div>
             ) : (
+              /* â”€â”€ Done â€” show tabs â”€â”€ */
               <>
                 {/* Tab navigation */}
                 <div className="glass rounded-lg p-2 animate-fade-in-up">
