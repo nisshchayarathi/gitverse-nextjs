@@ -83,7 +83,7 @@ gitverse-nextjs/
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── workflows/
 │       └── run-analysis-cron.yml
-├── app/                           # API routes
+├── app/                           # Next.js App Router
 │   ├── analysis/
 │   │   └── [jobId]/
 │   │       └── page.tsx
