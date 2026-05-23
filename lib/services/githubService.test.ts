@@ -126,10 +126,9 @@ describe("GitHubService", () => {
         },
       ];
 
-      // Use matcher to handle axios params properly
       mock.onGet("/user/repos").replyOnce((config) => {
-        const params = new URLSearchParams(config.url?.split("?")[1] || "");
-        if (params.get("page") === "1") {
+        const page = Number(config.params?.page);
+        if (page === 1) {
           return [
             200,
             reposPage1,
@@ -137,7 +136,7 @@ describe("GitHubService", () => {
               link: '<https://api.github.com/user/repos?page=2&per_page=1>; rel="next"',
             },
           ];
-        } else if (params.get("page") === "2") {
+        } else if (page === 2) {
           return [200, reposPage2, {}];
         }
         return [200, [], {}];
@@ -252,8 +251,8 @@ describe("GitHubService", () => {
       ];
 
       mock.onGet("/user/repos").replyOnce((config) => {
-        const params = new URLSearchParams(config.url?.split("?")[1] || "");
-        if (params.get("page") === "1") {
+        const page = Number(config.params?.page);
+        if (page === 1) {
           return [
             200,
             reposPage1,
@@ -261,7 +260,7 @@ describe("GitHubService", () => {
               link: '<https://api.github.com/user/repos?page=2&per_page=1>; rel="next"',
             },
           ];
-        } else if (params.get("page") === "2") {
+        } else if (page === 2) {
           return [
             429,
             { message: "API rate limit exceeded" },
@@ -413,8 +412,7 @@ describe("GitHubService", () => {
       ).rejects.toThrow("Comment body is required");
     });
 
-    it("postPullRequestComment retries on transient errors (502/503/504) but not 429", async () => {
-      // First call: transient 502, should retry via interceptor
+    it("postPullRequestComment retries on transient 502 and succeeds", async () => {
       mock
         .onPost("/repos/user/repo/issues/1/comments")
         .replyOnce(502, { message: "Bad Gateway" })
@@ -431,6 +429,20 @@ describe("GitHubService", () => {
       );
 
       expect(result.id).toBe(12345);
+    });
+
+    it("postPullRequestComment throws GitHubRateLimitError on 429", async () => {
+      mock
+        .onPost("/repos/user/repo/issues/1/comments")
+        .reply(
+          429,
+          { message: "API rate limit exceeded" },
+          { "retry-after": "0" },
+        );
+
+      await expect(
+        service.postPullRequestComment("user", "repo", 1, "Test comment"),
+      ).rejects.toBeInstanceOf(GitHubRateLimitError);
     });
   });
 
