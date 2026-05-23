@@ -14,6 +14,9 @@ function getRequiredEnv(name: string): string {
 }
 
 function parseRepositorySlug(repository: string): { owner: string; repo: string } {
+  if (!repository || typeof repository !== "string") {
+    throw new Error("Repository slug must be a non-empty string");
+  }
   const parts = repository.split("/").filter(Boolean);
   if (parts.length !== 2) {
     throw new Error("GITHUB_WORKFLOW_REPOSITORY must be in the form owner/repo");
