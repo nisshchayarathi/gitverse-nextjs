@@ -113,6 +113,7 @@ module.exports = {
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
         float: 'float 3s ease-in-out infinite',
         'graph-draw': 'graph-draw 2s ease-out forwards',
+        'fade-in-slow': 'fade-in 1s ease-out forwards',
       },
     },
   },
