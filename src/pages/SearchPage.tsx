@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
+import { TOKEN_KEY } from "../utils/authToken";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Grid, List, GitBranch, Clock, Activity } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -54,7 +55,7 @@ export default function SearchPage() {
   const fetchRepositories = async () => {
      setError("");
     try {
-      const token = localStorage.getItem("gitverse_token");
+      const token = localStorage.getItem(TOKEN_KEY);
       const response = await axios.get(buildApiUrl("/api/repositories"), {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -91,7 +92,7 @@ finally {
           repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (repo.description || "")
             .toLowerCase()
-            .includes(searchQuery.toLowerCase())
+            .includes(searchQuery.toLowerCase()),
       )
     : [];
 
@@ -386,7 +387,7 @@ finally {
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
                       {new Date(
-                        (repo as any).lastAnalyzedAt || (repo as any).createdAt
+                        (repo as any).lastAnalyzedAt || (repo as any).createdAt,
                       ).toLocaleDateString()}
                     </div>
                   </div>
@@ -446,7 +447,7 @@ finally {
                           <Clock className="h-4 w-4" />
                           {new Date(
                             (repo as any).lastAnalyzedAt ||
-                              (repo as any).createdAt
+                              (repo as any).createdAt,
                           ).toLocaleDateString()}
                         </div>
                       </div>

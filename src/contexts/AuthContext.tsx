@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { useSession } from "next-auth/react";
 import { buildApiUrl } from "../services/apiConfig";
+import { TOKEN_KEY } from "../utils/authToken";
 
 interface User {
   id: string;
@@ -27,7 +28,6 @@ interface AuthContextType {
   updateUser: (data: Partial<User>) => void;
 }
 
-const TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY ?? "gitverse_token";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 

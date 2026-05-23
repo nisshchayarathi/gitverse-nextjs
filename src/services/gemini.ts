@@ -1,3 +1,5 @@
+import { TOKEN_KEY } from "../utils/authToken";
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -27,7 +29,7 @@ class GeminiService {
   private getAuthHeaders(): Record<string, string> {
     const token =
       typeof window !== "undefined"
-        ? localStorage.getItem("gitverse_token")
+        ? localStorage.getItem(TOKEN_KEY)
         : null;
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
@@ -72,7 +74,7 @@ User Question: ${message}
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(
-          data?.error || data?.details || "Failed to get AI response"
+          data?.error || data?.details || "Failed to get AI response",
         );
       }
 
@@ -120,7 +122,7 @@ User Question: ${message}
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(
-          data?.error || data?.details || "Failed to analyze code"
+          data?.error || data?.details || "Failed to analyze code",
         );
       }
 

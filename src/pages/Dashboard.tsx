@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import { useState, useEffect } from "react";
+import { TOKEN_KEY } from "../utils/authToken";
 import { useRouter } from "next/navigation";
 import {
   GitBranch,
@@ -146,7 +147,7 @@ export default function Dashboard() {
 
   const fetchRepositories = async () => {
     try {
-      const token = localStorage.getItem("gitverse_token");
+      const token = localStorage.getItem(TOKEN_KEY);
       const response = await axios.get(buildApiUrl("/api/repositories?limit=1000"), {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -258,7 +259,7 @@ export default function Dashboard() {
 
     setAnalyzing(true);
     try {
-      const token = localStorage.getItem("gitverse_token");
+      const token = localStorage.getItem(TOKEN_KEY);
 
       // Extract owner and name for recent storage
       const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");

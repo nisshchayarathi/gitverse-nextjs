@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { TOKEN_KEY } from "../../utils/authToken";
 import { Bot, Loader2, Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -231,7 +232,7 @@ export function AIRepoMentorSection(props: {
 
       const token =
         typeof window !== "undefined"
-          ? localStorage.getItem("gitverse_token")
+          ? localStorage.getItem(TOKEN_KEY)
           : null;
 
       const res = await fetch(buildApiUrl("/api/ai/chat"), {
@@ -351,10 +352,11 @@ export function AIRepoMentorSection(props: {
                   </div>
                 )}
                 <div
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${m.role === "user"
-                    ? "bg-primary/15"
-                    : "bg-white/5 border border-white/10"
-                    }`}
+                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                    m.role === "user"
+                      ? "bg-primary/15"
+                      : "bg-white/5 border border-white/10"
+                  }`}
                 >
                   {m.role === "assistant" ? (
                     <MentorMarkdown content={m.content} />

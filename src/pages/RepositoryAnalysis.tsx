@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useRef } from "react";
+import { TOKEN_KEY } from "../utils/authToken";
 import { useParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RepositoryOverview } from "@/components/repository/RepositoryOverview";
@@ -69,7 +70,13 @@ const tabs: Tab[] = [
   },
 ];
 
-const StatusBadge = ({ status, isAnalyzing }: { status: string; isAnalyzing: boolean }) => {
+const StatusBadge = ({
+  status,
+  isAnalyzing,
+}: {
+  status: string;
+  isAnalyzing: boolean;
+}) => {
   const s = status?.toLowerCase() || "pending";
 
   if (isAnalyzing || s === "analyzing" || s === "processing") {
@@ -183,7 +190,7 @@ export default function RepositoryAnalysis() {
     setError(null);
 
     try {
-      const token = localStorage.getItem("gitverse_token");
+      const token = localStorage.getItem(TOKEN_KEY);
       const response = await axios.get(buildApiUrl(`/api/repositories/${id}`), {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -198,7 +205,10 @@ export default function RepositoryAnalysis() {
       if (response.data.latestJob) {
         setJob(response.data.latestJob);
         if (response.data.latestJob.status === "FAILED") {
-          setError(response.data.latestJob.error || "Analysis failed. Please try again later.");
+          setError(
+            response.data.latestJob.error ||
+              "Analysis failed. Please try again later.",
+          );
         }
       }
       setLoading(false);
@@ -218,11 +228,15 @@ export default function RepositoryAnalysis() {
         err.response?.data?.error ||
           err.response?.data?.message ||
           err.message ||
-          "Analysis failed. Please try again later."
+          "Analysis failed. Please try again later.",
       );
       toast({
         title: "Error fetching repository",
-        description: err.response?.data?.error || err.response?.data?.message || err.message || "Failed to load repository data.",
+        description:
+          err.response?.data?.error ||
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to load repository data.",
         variant: "destructive",
       });
       setLoading(false);
@@ -233,7 +247,7 @@ export default function RepositoryAnalysis() {
     if (!jobId) return;
 
     try {
-      const token = localStorage.getItem("gitverse_token");
+      const token = localStorage.getItem(TOKEN_KEY);
       const response = await axios.get(
         buildApiUrl(`/api/analysis-jobs/${jobId}`),
         {
@@ -265,19 +279,17 @@ export default function RepositoryAnalysis() {
       }
     } catch (err: any) {
       console.error("Error fetching analysis job:", err);
-      
       const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "Failed to connect to the analysis service.";
-      
-      // 1. Surface inline error state
       setError(errorMessage);
-      
-      // 2. Stop polling
       setIsAnalyzing(false);
 
-      // 3. Show a one-time toast notification
       toast({
         title: "Error checking analysis status",
-        description: err.response?.data?.error || err.response?.data?.message || err.message || "Failed to connect to the analysis service.",
+        description:
+          err.response?.data?.error ||
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to connect to the analysis service.",
         variant: "destructive",
       });
     }
@@ -288,7 +300,7 @@ export default function RepositoryAnalysis() {
     setIsDeleting(true);
 
     try {
-      const token = localStorage.getItem("gitverse_token");
+      const token = localStorage.getItem(TOKEN_KEY);
       await axios.delete(buildApiUrl(`/api/repositories/${id}`), {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -448,10 +460,10 @@ export default function RepositoryAnalysis() {
                   <XCircle className="h-12 w-12 text-red-500" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg text-red-500">Failed to Load Repository</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {error}
-                  </p>
+                  <h3 className="font-semibold text-lg text-red-500">
+                    Failed to Load Repository
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">{error}</p>
                 </div>
                 <button
                   onClick={() => fetchRepository()}

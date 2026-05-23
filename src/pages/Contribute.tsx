@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback } from "react";
+import { TOKEN_KEY } from "../utils/authToken";
 import axios from "axios";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { buildApiUrl } from "@/services/apiConfig";
@@ -84,7 +85,7 @@ export default function Contribute() {
   const isBusy = busyAction != null;
 
   const getAuthHeaders = useCallback(() => {
-    const token = localStorage.getItem("gitverse_token");
+    const token = localStorage.getItem(TOKEN_KEY);
     return { Authorization: `Bearer ${token}` };
   }, []);
 

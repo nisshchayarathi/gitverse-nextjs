@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { TOKEN_KEY } from "../utils/authToken";
 import { User, Lock, Shield, Trash2, AlertCircle, Save, Cpu } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
@@ -59,7 +60,7 @@ export default function Settings() {
   const fetchUserInfo = useCallback(async () => {
     setUserFetchStatus("loading");
     try {
-      const token = localStorage.getItem("gitverse_token");
+      const token = localStorage.getItem(TOKEN_KEY);
       const res = await axios.get(buildApiUrl("/api/users/me"), {
         withCredentials: true,
         timeout: 5000,
@@ -187,7 +188,7 @@ export default function Settings() {
         }
       }
 
-      const token = localStorage.getItem("gitverse_token");
+      const token = localStorage.getItem(TOKEN_KEY);
       const response = await axios.put(
         buildApiUrl("/api/users/profile"),
         {
@@ -203,7 +204,7 @@ export default function Settings() {
           // If user is logged in via legacy JWT, send the Bearer token.
           withCredentials: true,
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        }
+        },
       );
 
       if (response.status === 200) {
@@ -253,7 +254,7 @@ export default function Settings() {
 
     setIsLoading(true);
     try {
-      const token = localStorage.getItem("gitverse_token");
+      const token = localStorage.getItem(TOKEN_KEY);
       const response = await axios.post(
         buildApiUrl("/api/users/change-password"),
         {
@@ -263,7 +264,7 @@ export default function Settings() {
         {
           withCredentials: true,
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        }
+        },
       );
 
       if (response.status === 200) {
@@ -336,7 +337,7 @@ export default function Settings() {
 
     setIsDeletingAccount(true);
     try {
-      const token = localStorage.getItem("gitverse_token");
+      const token = localStorage.getItem(TOKEN_KEY);
       await axios.delete(buildApiUrl("/api/users/me"), {
         withCredentials: true,
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
