@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { repositoryService } from "@/lib/services/repositoryService";
 
@@ -10,17 +10,20 @@ const securityHeaders = {
   "Expires": "0",
 };
 
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const user = await requireAuth(request);
-    const id = parseInt(params.id);
+    const id = Number(params.id);
 
-    if (isNaN(id)) {
+    if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json(
-        { error: "Invalid repository ID" },
+        { error: "Invalid repository ID. Must be a positive integer." },
         { status: 400, headers: securityHeaders }
       );
     }
@@ -59,12 +62,12 @@ export async function GET(
       { repository, latestJob },
       { status: 200, headers: securityHeaders }
     );
-  } catch (error: any) {
-    console.error("Get repository error:", sanitizeError(error));
+  } catch (error: unknown) {
+    console.error("Get repository error:", error);
 
     if (isHttpError(error)) {
       return NextResponse.json(
-        { error: error.message },
+        { error: getErrorMessage(error, "Request failed") },
         { status: error.status, headers: securityHeaders }
       );
     }
@@ -82,11 +85,11 @@ export async function DELETE(
 ) {
   try {
     const user = await requireAuth(request);
-    const id = parseInt(params.id);
+    const id = Number(params.id);
 
-    if (isNaN(id)) {
+    if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json(
-        { error: "Invalid repository ID" },
+        { error: "Invalid repository ID. Must be a positive integer." },
         { status: 400, headers: securityHeaders }
       );
     }
@@ -98,19 +101,21 @@ export async function DELETE(
       { message: "Repository deleted successfully" },
       { status: 200, headers: securityHeaders }
     );
-  } catch (error: any) {
-    console.error("Delete repository error:", sanitizeError(error));
+  } catch (error: unknown) {
+    console.error("Delete repository error:", error);
 
     if (isHttpError(error)) {
       return NextResponse.json(
-        { error: error.message },
+        { error: getErrorMessage(error, "Request failed") },
         { status: error.status, headers: securityHeaders }
       );
     }
 
-    if (error.message === "Repository not found") {
+    const errorMessage = getErrorMessage(error, "");
+
+    if (errorMessage === "Repository not found") {
       return NextResponse.json(
-        { error: error.message }, 
+        { error: errorMessage },
         { status: 404, headers: securityHeaders }
       );
     }

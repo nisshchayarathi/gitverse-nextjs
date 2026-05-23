@@ -1,28 +1,52 @@
-import { sanitizeError } from "@/lib/middleware";
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit } from "@/utils/rateLimit";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { generateToken } from "@/lib/auth";
 
+import { parseJsonBody, validateEmail, validatePassword, validateRequiredString } from "@/lib/validateAuth";
+import { badRequestResponse } from "@/lib/middleware";
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { email, password, name } = body;
+    // 1. EXTRACT IP AND CHECK RATE LIMIT FIRST
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    const ip =
+      forwardedFor?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "unknown-ip";
 
-    // Validation
-    if (!email || !password || !name) {
+    const rateLimitResult = checkRateLimit(ip);
+
+    if (!rateLimitResult.success) {
       return NextResponse.json(
-        { error: "Email, password, and name are required" },
-        { status: 400 }
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": rateLimitResult.retryAfter?.toString() || "900",
+          },
+        }
       );
     }
 
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
-        { status: 400 }
-      );
-    }
+    // 2. PARSE AND VALIDATE BODY
+    const parsed = await parseJsonBody(request);
+    if ("error" in parsed) return badRequestResponse(parsed.error);
+    const { body } = parsed;
+
+    const emailCheck = validateEmail(body.email);
+    if (!emailCheck.valid) return badRequestResponse(emailCheck.error!);
+
+    const passwordCheck = validatePassword(body.password);
+    if (!passwordCheck.valid) return badRequestResponse(passwordCheck.error!);
+
+    const nameCheck = validateRequiredString(body.name, "Name");
+    if (!nameCheck.valid) return badRequestResponse(nameCheck.error!);
+
+    const email = body.email as string;
+    const password = body.password as string;
+    const name = body.name as string;
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -77,9 +101,9 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Signup error:", sanitizeError(error));
+    console.error("Signup error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "An unexpected error occurred" },
       { status: 500 }
     );
   }

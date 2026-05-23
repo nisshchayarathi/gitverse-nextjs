@@ -1,5 +1,6 @@
 import prisma from "../prisma";
 import type { AnalysisJob } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 export type JobProgressUpdate = {
   progressPercent?: number;
@@ -84,6 +85,7 @@ export class AnalysisJobService {
         lockedAt: null,
         lockedBy: null,
         lockExpiresAt: null,
+        progressDetails: Prisma.DbNull,
       },
     });
   }
@@ -94,33 +96,27 @@ export class AnalysisJobService {
     error: string;
     attempts: number;
     maxAttempts: number;
+    retryAfter?: number;
   }): Promise<void> {
-    // Update repository status to failed when retries exhausted
-    try {
-      const job = await prisma.analysisJob.findUnique({
-        where: { id: params.jobId },
-        select: { repositoryId: true },
-      });
-      if (job?.repositoryId && params.attempts >= params.maxAttempts) {
-        await prisma.repository.update({
-          where: { id: job.repositoryId },
-          data: { status: "failed" },
-        });
-      }
-    } catch {
-      // Non-critical: repo status update must not crash job status update
-    }
     const shouldRetry = params.attempts < params.maxAttempts;
 
     if (shouldRetry) {
-      const delay = computeBackoffMs(params.attempts);
+      const delay = params.retryAfter
+        ? params.retryAfter * 1000
+        : computeBackoffMs(params.attempts);
+      const retryLabel = params.retryAfter
+        ? `Rate limited, retrying`
+        : `Retrying`;
       await prisma.analysisJob.update({
         where: { id: params.jobId },
         data: {
           status: "QUEUED",
           nextRunAt: new Date(Date.now() + delay),
-          progressMessage: `Retrying in ${Math.round(delay / 1000)}s`,
+          progressMessage: `${retryLabel} in ${Math.round(delay / 1000)}s`,
           error: params.error,
+          ...(params.retryAfter
+            ? { progressDetails: { retryAfter: params.retryAfter, rateLimited: true } }
+            : {}),
           lockedAt: null,
           lockedBy: null,
           lockExpiresAt: null,
@@ -139,6 +135,7 @@ export class AnalysisJobService {
         lockedAt: null,
         lockedBy: null,
         lockExpiresAt: null,
+        progressDetails: Prisma.DbNull,
       },
     });
   }
@@ -188,25 +185,6 @@ export class AnalysisJobService {
     if (!claimedId) return null;
 
     return prisma.analysisJob.findUnique({ where: { id: claimedId } });
-  }
-
-  async cleanupStaleJobs(): Promise<number> {
-    const stale = await prisma.analysisJob.updateMany({
-      where: {
-        status: "PROCESSING",
-        lockExpiresAt: { lt: new Date() },
-        updatedAt: { lt: new Date(Date.now() - 60 * 60 * 1000) },
-      },
-      data: {
-        status: "FAILED",
-        error: "Job timed out - no heartbeat received",
-        finishedAt: new Date(),
-        lockedAt: null,
-        lockedBy: null,
-        lockExpiresAt: null,
-      },
-    });
-    return stale.count;
   }
 
   async heartbeat(params: {

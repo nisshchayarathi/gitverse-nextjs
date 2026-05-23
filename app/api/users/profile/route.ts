@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth , sanitizeError } from "@/lib/middleware";
+import { requireAuth } from "@/lib/api-auth";
+import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
 import bcrypt from "bcryptjs";
 
 export async function PUT(request: NextRequest) {
@@ -11,7 +12,7 @@ export async function PUT(request: NextRequest) {
 
     if (!name || !email) {
       return NextResponse.json(
-        { error: "Name and email are required" },
+        { message: "Name and email are required" },
         { status: 400 }
       );
     }
@@ -25,7 +26,7 @@ export async function PUT(request: NextRequest) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: "Email is already in use" },
+        { message: "Email is already in use" },
         { status: 400 }
       );
     }
@@ -96,10 +97,7 @@ export async function PUT(request: NextRequest) {
       avatarUrl: (updatedUser as any).image,
     });
   } catch (error: any) {
-    console.error("Error updating profile:", sanitizeError(error));
-    return NextResponse.json(
-      { error: "Failed to update profile" },
-      { status: 500 }
-    );
+    console.error("Error updating profile:", sanitizeErrorMessage(error));
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

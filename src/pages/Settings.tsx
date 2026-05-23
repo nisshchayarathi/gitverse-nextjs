@@ -15,6 +15,7 @@ import {
   Button,
   Input,
   toast,
+  Skeleton,
 } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
@@ -49,24 +50,44 @@ export default function Settings() {
     didInitProfileForm.current = true;
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
-    const fetchLinkStatus = async () => {
-      try {
-        const token = localStorage.getItem("gitverse_token");
-        const res = await axios.get(buildApiUrl("/api/users/me"), {
-          withCredentials: true,
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        setIsGoogleLinked(!!res.data?.isGoogleLinked);
-      } catch {
-        // Non-fatal; hide the indicator if we can't fetch.
-        setIsGoogleLinked(null);
+  const fetchProfileDetails = async () => {
+    setIsProfileLoading(true);
+    setProfileError(null);
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      const res = await axios.get(buildApiUrl("/api/users/me"), {
+        withCredentials: true,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      if (res.data) {
+        setName(res.data.name || "");
+        setEmail(res.data.email || "");
+        setAvatar(res.data.avatarUrl || res.data.image || "");
+        initialEmailRef.current = res.data.email || "";
+        setIsGoogleLinked(!!res.data.isGoogleLinked);
+      } else {
+        throw new Error("No profile data received");
       }
-    };
+    } catch (err: any) {
+      console.error("Error fetching user profile:", err);
+      setProfileError(
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to load profile details"
+      );
+    } finally {
+      setIsProfileLoading(false);
+    }
+  };
 
-    fetchLinkStatus();
+  useEffect(() => {
+    if (user) {
+      fetchProfileDetails();
+    }
   }, [user]);
 
   // Password state
@@ -357,257 +378,368 @@ export default function Settings() {
 
           {/* Content Area */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Profile Tab */}
-            {activeTab === "profile" && (
+            {isProfileLoading ? (
+              <>
+                {/* Profile Tab Skeleton */}
+                {activeTab === "profile" && (
+                  <Card className="glass animate-pulse">
+                    <CardHeader>
+                      <div className="space-y-2">
+                        <Skeleton className="h-6 w-1/3 bg-muted/20" />
+                        <Skeleton className="h-4 w-1/2 bg-muted/20" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-24 bg-muted/20" />
+                        <Skeleton className="h-10 w-full bg-muted/20" />
+                      </div>
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-24 bg-muted/20" />
+                        <Skeleton className="h-10 w-full bg-muted/20" />
+                        <Skeleton className="h-3 w-40 bg-muted/20" />
+                      </div>
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-16 bg-muted/20" />
+                        <div className="flex items-center gap-4">
+                          <Skeleton className="h-16 w-16 rounded-full bg-muted/20" />
+                          <div className="space-y-2 flex-1">
+                            <Skeleton className="h-8 w-28 bg-muted/20" />
+                            <Skeleton className="h-3 w-36 bg-muted/20" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="pt-4">
+                        <Skeleton className="h-10 w-32 bg-muted/20" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Security Tab Skeleton */}
+                {activeTab === "security" && (
+                  <Card className="glass animate-pulse">
+                    <CardHeader>
+                      <div className="space-y-2">
+                        <Skeleton className="h-6 w-1/3 bg-muted/20" />
+                        <Skeleton className="h-4 w-1/2 bg-muted/20" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-32 bg-muted/20" />
+                        <Skeleton className="h-10 w-full bg-muted/20" />
+                      </div>
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-28 bg-muted/20" />
+                        <Skeleton className="h-10 w-full bg-muted/20" />
+                        <Skeleton className="h-3 w-44 bg-muted/20" />
+                      </div>
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-36 bg-muted/20" />
+                        <Skeleton className="h-10 w-full bg-muted/20" />
+                      </div>
+                      <div className="pt-4">
+                        <Skeleton className="h-10 w-36 bg-muted/20" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Danger Zone Tab Skeleton */}
+                {activeTab === "danger" && (
+                  <Card className="glass border-destructive/50 animate-pulse">
+                    <CardHeader>
+                      <div className="space-y-2">
+                        <Skeleton className="h-6 w-1/3 bg-muted/20" />
+                        <Skeleton className="h-4 w-1/2 bg-muted/20" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-4 rounded-lg border border-destructive/50 bg-destructive/5 space-y-3">
+                        <Skeleton className="h-5 w-32 bg-muted/20" />
+                        <Skeleton className="h-4 w-3/4 bg-muted/20" />
+                        <Skeleton className="h-10 w-32 bg-muted/20" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            ) : profileError ? (
+              <Card className="glass border-red-500/30 bg-red-500/5">
+                <CardContent className="pt-6 text-center space-y-4">
+                  <div className="text-red-500 font-medium font-heading">Failed to load profile details</div>
+                  <p className="text-sm text-muted-foreground">{profileError}</p>
+                  <Button onClick={fetchProfileDetails} className="bg-red-500 hover:bg-red-600 text-white transition-colors">
+                    Retry
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (!name && !email) ? (
               <Card className="glass">
-                <CardHeader>
-                  <CardTitle className="font-heading flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Profile Information
-                  </CardTitle>
-                  <CardDescription>
-                    Update your personal information
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSaveProfile} className="space-y-4">
-                    <div className="space-y-2">
-                      <label htmlFor="name" className="text-sm font-medium">
-                        Full Name
-                      </label>
-                      <Input
-                        id="name"
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="John Doe"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label htmlFor="email" className="text-sm font-medium">
-                        Email Address
-                      </label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="john@example.com"
-                        required
-                      />
-                      {isGoogleLinked !== null && (
-                        <p className="text-xs text-muted-foreground">
-                          Google account linked: {isGoogleLinked ? "Yes" : "No"}
-                        </p>
-                      )}
-                    </div>
-
-                    {isGoogleLinked &&
-                      !!initialEmailRef.current &&
-                      email.trim().toLowerCase() !==
-                        initialEmailRef.current.toLowerCase() && (
+                <CardContent className="pt-6 text-center space-y-4">
+                  <div className="text-muted-foreground font-medium font-heading">No profile details found</div>
+                  <p className="text-sm text-muted-foreground">We couldn&apos;t retrieve any details for this account.</p>
+                  <Button onClick={fetchProfileDetails} variant="outline">
+                    Reload
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Profile Tab */}
+                {activeTab === "profile" && (
+                  <Card className="glass">
+                    <CardHeader>
+                      <CardTitle className="font-heading flex items-center gap-2">
+                        <User className="h-5 w-5" />
+                        Profile Information
+                      </CardTitle>
+                      <CardDescription>
+                        Update your personal information
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleSaveProfile} className="space-y-4">
                         <div className="space-y-2">
-                          <label
-                            htmlFor="email-change-password"
-                            className="text-sm font-medium"
-                          >
-                            New Password (required to change email)
+                          <label htmlFor="name" className="text-sm font-medium">
+                            Full Name
                           </label>
                           <Input
-                            id="email-change-password"
-                            type="password"
-                            value={emailChangeNewPassword}
-                            onChange={(e) =>
-                              setEmailChangeNewPassword(e.target.value)
-                            }
-                            placeholder="••••••••"
+                            id="name"
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="John Doe"
                           />
-                          <p className="text-xs text-muted-foreground">
-                            Changing email will unlink Google and require a new
-                            password.
-                          </p>
                         </div>
-                      )}
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Avatar</label>
-                      <div className="flex items-center gap-4">
-                        <div className="h-16 w-16 rounded-full bg-gradient-primary flex items-center justify-center overflow-hidden">
-                          {avatar ? (
-                            <img
-                              src={avatar}
-                              alt={name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : user?.avatar ? (
-                            <img
-                              src={user.avatar}
-                              alt={user.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <User className="h-8 w-8 text-primary-foreground" />
+                        <div className="space-y-2">
+                          <label htmlFor="email" className="text-sm font-medium">
+                            Email Address
+                          </label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="john@example.com"
+                            required
+                          />
+                          {isGoogleLinked !== null && (
+                            <p className="text-xs text-muted-foreground">
+                              Google account linked: {isGoogleLinked ? "Yes" : "No"}
+                            </p>
                           )}
                         </div>
-                        <div className="flex flex-col gap-2">
+
+                        {isGoogleLinked &&
+                          !!initialEmailRef.current &&
+                          email.trim().toLowerCase() !==
+                            initialEmailRef.current.toLowerCase() && (
+                            <div className="space-y-2">
+                              <label
+                                htmlFor="email-change-password"
+                                className="text-sm font-medium"
+                              >
+                                New Password (required to change email)
+                              </label>
+                              <Input
+                                id="email-change-password"
+                                type="password"
+                                value={emailChangeNewPassword}
+                                onChange={(e) =>
+                                  setEmailChangeNewPassword(e.target.value)
+                                }
+                                placeholder="••••••••"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Changing email will unlink Google and require a new
+                                password.
+                              </p>
+                            </div>
+                          )}
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Avatar</label>
+                          <div className="flex items-center gap-4">
+                            <div className="h-16 w-16 rounded-full bg-gradient-primary flex items-center justify-center overflow-hidden">
+                              {avatar ? (
+                                <img
+                                  src={avatar}
+                                  alt={name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : user?.avatar ? (
+                                <img
+                                  src={user.avatar}
+                                  alt={user.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <User className="h-8 w-8 text-primary-foreground" />
+                              )}
+                            </div>
+                              <div className="flex flex-col gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleAvatarClick}
+                                >
+                                  Change Avatar
+                                </Button>
+                                <input
+                                  ref={fileInputRef}
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={handleAvatarChange}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Max 5MB, JPG/PNG/GIF
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                        <div className="pt-4">
                           <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleAvatarClick}
+                            type="submit"
+                            disabled={isLoading}
+                            className="bg-gradient-primary hover:opacity-90 transition-opacity"
                           >
-                            Change Avatar
+                            <Save className="h-4 w-4 mr-2" />
+                            {isLoading ? "Saving..." : "Save Changes"}
                           </Button>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleAvatarChange}
-                          />
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Security Tab */}
+                {activeTab === "security" && (
+                  <Card className="glass">
+                    <CardHeader>
+                      <CardTitle className="font-heading flex items-center gap-2">
+                        <Shield className="h-5 w-5" />
+                        Password & Security
+                      </CardTitle>
+                      <CardDescription>Keep your account secure</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleChangePassword} className="space-y-4">
+                        <div className="space-y-2">
+                          <label
+                            htmlFor="current-password"
+                            className="text-sm font-medium"
+                          >
+                            Current Password
+                          </label>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                            <Input
+                              id="current-password"
+                              type="password"
+                              value={currentPassword}
+                              onChange={(e) => setCurrentPassword(e.target.value)}
+                              className="pl-10"
+                              placeholder="••••••••"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label
+                            htmlFor="new-password"
+                            className="text-sm font-medium"
+                          >
+                            New Password
+                          </label>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                            <Input
+                              id="new-password"
+                              type="password"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              className="pl-10"
+                              placeholder="••••••••"
+                            />
+                          </div>
                           <p className="text-xs text-muted-foreground">
-                            Max 5MB, JPG/PNG/GIF
+                            Must be at least 8 characters
                           </p>
                         </div>
+
+                        <div className="space-y-2">
+                          <label
+                            htmlFor="confirm-password"
+                            className="text-sm font-medium"
+                          >
+                            Confirm New Password
+                          </label>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                            <Input
+                              id="confirm-password"
+                              type="password"
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
+                              className="pl-10"
+                              placeholder="••••••••"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="pt-4">
+                          <Button
+                            type="submit"
+                            disabled={isLoading}
+                            className="bg-gradient-primary hover:opacity-90 transition-opacity"
+                          >
+                            <Lock className="h-4 w-4 mr-2" />
+                            {isLoading ? "Updating..." : "Update Password"}
+                          </Button>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Danger Zone Tab */}
+                {activeTab === "danger" && (
+                  <Card className="glass border-destructive/50">
+                    <CardHeader>
+                      <CardTitle className="font-heading flex items-center gap-2 text-destructive">
+                        <Trash2 className="h-5 w-5" />
+                        Danger Zone
+                      </CardTitle>
+                      <CardDescription>
+                        Irreversible and destructive actions
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-4 rounded-lg border border-destructive/50 bg-destructive/5">
+                        <h3 className="font-medium mb-2">Delete Account</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Once you delete your account, there is no going back.
+                          Please be certain.
+                        </p>
+                        <Button
+                          variant="destructive"
+                          onClick={handleDeleteAccount}
+                          disabled={isDeletingAccount}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                        </Button>
                       </div>
-                    </div>
-
-                    <div className="pt-4">
-                      <Button
-                        type="submit"
-                        disabled={isLoading}
-                        className="bg-gradient-primary hover:opacity-90 transition-opacity"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        {isLoading ? "Saving..." : "Save Changes"}
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Security Tab */}
-            {activeTab === "security" && (
-              <Card className="glass">
-                <CardHeader>
-                  <CardTitle className="font-heading flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
-                    Password & Security
-                  </CardTitle>
-                  <CardDescription>Keep your account secure</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleChangePassword} className="space-y-4">
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="current-password"
-                        className="text-sm font-medium"
-                      >
-                        Current Password
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                        <Input
-                          id="current-password"
-                          type="password"
-                          value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
-                          className="pl-10"
-                          placeholder="••••••••"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="new-password"
-                        className="text-sm font-medium"
-                      >
-                        New Password
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                        <Input
-                          id="new-password"
-                          type="password"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          className="pl-10"
-                          placeholder="••••••••"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Must be at least 8 characters
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="confirm-password"
-                        className="text-sm font-medium"
-                      >
-                        Confirm New Password
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                        <Input
-                          id="confirm-password"
-                          type="password"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="pl-10"
-                          placeholder="••••••••"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="pt-4">
-                      <Button
-                        type="submit"
-                        disabled={isLoading}
-                        className="bg-gradient-primary hover:opacity-90 transition-opacity"
-                      >
-                        <Lock className="h-4 w-4 mr-2" />
-                        {isLoading ? "Updating..." : "Update Password"}
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Danger Zone Tab */}
-            {activeTab === "danger" && (
-              <Card className="glass border-destructive/50">
-                <CardHeader>
-                  <CardTitle className="font-heading flex items-center gap-2 text-destructive">
-                    <Trash2 className="h-5 w-5" />
-                    Danger Zone
-                  </CardTitle>
-                  <CardDescription>
-                    Irreversible and destructive actions
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 rounded-lg border border-destructive/50 bg-destructive/5">
-                    <h3 className="font-medium mb-2">Delete Account</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Once you delete your account, there is no going back.
-                      Please be certain.
-                    </p>
-                    <Button
-                      variant="destructive"
-                      onClick={handleDeleteAccount}
-                      disabled={isDeletingAccount}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      {isDeletingAccount ? "Deleting..." : "Delete Account"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </div>
         </div>

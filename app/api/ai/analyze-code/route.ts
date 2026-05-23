@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth } from "@/lib/api-auth";
 import { getGeminiService } from "@/lib/services/geminiService";
 
 export async function POST(request: NextRequest) {
@@ -31,16 +31,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ analysis, analysisType });
   } catch (error: any) {
-    console.error("Code analysis error:", sanitizeError(error));
+    console.error("Code analysis error:", error);
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
         { status: error.status }
       );
     }
-    return NextResponse.json(
-      { error: "Failed to analyze code" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
