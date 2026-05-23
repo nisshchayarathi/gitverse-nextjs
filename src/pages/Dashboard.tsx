@@ -121,9 +121,11 @@ export default function Dashboard() {
   const formatTimeAgo = (date: string) => {
     const now = new Date();
     const then = new Date(date);
-    const diffInMinutes = Math.floor(
-      (now.getTime() - then.getTime()) / (1000 * 60)
-    );
+    const diffInMs = now.getTime() - then.getTime();
+    
+    if (diffInMs < 0) return "Just now";
+    
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
 
     if (diffInMinutes < 1) return "Just now";
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;

@@ -2,7 +2,16 @@ import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
 
-interface Node {
+export interface RepositoryFile {
+  path: string;
+  lines?: number;
+}
+
+export interface RepositoryData {
+  files?: RepositoryFile[];
+}
+
+interface Node extends d3.SimulationNodeDatum {
   id: string;
   name: string;
   type: "folder" | "file";
@@ -10,9 +19,9 @@ interface Node {
   path: string;
 }
 
-interface Link {
-  source: string;
-  target: string;
+interface Link extends d3.SimulationLinkDatum<Node> {
+  source: string | Node;
+  target: string | Node;
   strength: number;
 }
 
@@ -22,7 +31,7 @@ interface GraphData {
 }
 
 // Generate dependency graph from repository files
-const generateDependencyGraph = (repository: any): GraphData => {
+const generateDependencyGraph = (repository: RepositoryData | undefined): GraphData => {
   const nodes: Node[] = [];
   const links: Link[] = [];
 
@@ -31,7 +40,7 @@ const generateDependencyGraph = (repository: any): GraphData => {
   }
 
   // Extract unique folders and create nodes
-  const files = repository.files as any[];
+  const files = repository?.files || [];
 
   // Create folder nodes
   const folderPaths = new Set<string>();
@@ -67,7 +76,7 @@ const generateDependencyGraph = (repository: any): GraphData => {
       id: `file-${file.path}`,
       name: fileName,
       type: "file",
-      size: Math.min(Math.max(file.lines / 10 || 50, 40), 150),
+      size: Math.min(Math.max((file.lines || 0) / 10 || 50, 40), 150),
       path: file.path,
     });
   });
@@ -104,7 +113,7 @@ const generateDependencyGraph = (repository: any): GraphData => {
 };
 
 interface CodeDependencyGraphProps {
-  repository?: any;
+  repository?: RepositoryData;
 }
 
 export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
@@ -158,20 +167,20 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
 
     // Create force simulation
     const simulation = d3
-      .forceSimulation(nodes as any)
+      .forceSimulation<Node>(nodes)
       .force(
         "link",
         d3
-          .forceLink(links)
-          .id((d: any) => d.id)
+          .forceLink<Node, Link>(links)
+          .id((d: Node) => d.id)
           .distance(100)
-          .strength((d: any) => d.strength * 0.5)
+          .strength((d: Link) => d.strength * 0.5)
       )
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force(
         "collision",
-        d3.forceCollide().radius((d: any) => d.size / 2 + 10)
+        d3.forceCollide<Node>().radius((d: Node) => d.size / 2 + 10)
       );
 
     // Draw links
@@ -181,7 +190,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .data(links)
       .join("line")
       .attr("stroke", "rgba(255,255,255,0.2)")
-      .attr("stroke-width", (d: any) => d.strength * 2)
+      .attr("stroke-width", (d: Link) => d.strength * 2)
       .attr("stroke-opacity", 0.6);
 
     // Draw nodes
@@ -193,17 +202,17 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .style("cursor", "pointer")
       .call(
         d3
-          .drag<any, any>()
-          .on("start", (event: any, d: any) => {
+          .drag<any, Node>()
+          .on("start", (event: d3.D3DragEvent<SVGGElement, Node, Node>, d: Node) => {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
             d.fy = d.y;
           })
-          .on("drag", (event: any, d: any) => {
+          .on("drag", (event: d3.D3DragEvent<SVGGElement, Node, Node>, d: Node) => {
             d.fx = event.x;
             d.fy = event.y;
           })
-          .on("end", (event: any, d: any) => {
+          .on("end", (event: d3.D3DragEvent<SVGGElement, Node, Node>, d: Node) => {
             if (!event.active) simulation.alphaTarget(0);
             d.fx = null;
             d.fy = null;
@@ -213,11 +222,11 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     // Node circles
     node
       .append("circle")
-      .attr("r", (d: any) => d.size / 3)
-      .attr("fill", (d: any) => typeColors[d.type])
+      .attr("r", (d: Node) => d.size / 3)
+      .attr("fill", (d: Node) => typeColors[d.type])
       .attr("stroke", "rgba(255,255,255,0.3)")
       .attr("stroke-width", 2)
-      .on("mouseenter", function (event: any, d: any) {
+      .on("mouseenter", function (event: MouseEvent, d: Node) {
         d3.select(this)
           .transition()
           .duration(200)
@@ -229,13 +238,13 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         link
           .transition()
           .duration(200)
-          .attr("stroke", (l: any) =>
-            l.source.id === d.id || l.target.id === d.id
+          .attr("stroke", (l: Link) =>
+            (l.source as Node).id === d.id || (l.target as Node).id === d.id
               ? typeColors[d.type]
               : "rgba(255,255,255,0.1)"
           )
-          .attr("stroke-opacity", (l: any) =>
-            l.source.id === d.id || l.target.id === d.id ? 1 : 0.2
+          .attr("stroke-opacity", (l: Link) =>
+            (l.source as Node).id === d.id || (l.target as Node).id === d.id ? 1 : 0.2
           );
 
         if (tooltipRef.current) {
@@ -253,7 +262,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             `);
         }
       })
-      .on("mousemove", function (event: any) {
+      .on("mousemove", function (event: MouseEvent) {
         if (tooltipRef.current) {
           d3.select(tooltipRef.current)
             .style("left", `${event.clientX}px`)
@@ -267,7 +276,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             .style("display", "none");
         }
       })
-      .on("mouseleave", function (_event: any, d: any) {
+      .on("mouseleave", function (_event: MouseEvent, d: Node) {
         d3.select(this)
           .transition()
           .duration(200)
@@ -289,12 +298,12 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     // Node labels
     node
       .append("text")
-      .text((d: any) =>
+      .text((d: Node) =>
         d.name.length > 15 ? d.name.slice(0, 12) + "..." : d.name
       )
       .attr("font-size", "10px")
       .attr("dx", 0)
-      .attr("dy", (d: any) => d.size / 3 + 15)
+      .attr("dy", (d: Node) => d.size / 3 + 15)
       .attr("text-anchor", "middle")
       .attr("fill", "currentColor")
       .attr("pointer-events", "none");
@@ -302,12 +311,12 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     // Update positions on simulation tick
     simulation.on("tick", () => {
       link
-        .attr("x1", (d: any) => d.source.x)
-        .attr("y1", (d: any) => d.source.y)
-        .attr("x2", (d: any) => d.target.x)
-        .attr("y2", (d: any) => d.target.y);
+        .attr("x1", (d: Link) => (d.source as Node).x!)
+        .attr("y1", (d: Link) => (d.source as Node).y!)
+        .attr("x2", (d: Link) => (d.target as Node).x!)
+        .attr("y2", (d: Link) => (d.target as Node).y!);
 
-      node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+      node.attr("transform", (d: Node) => `translate(${d.x},${d.y})`);
     });
 
     // Zoom behavior
@@ -322,12 +331,12 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
 
     // Animate nodes on load
     node
-      .selectAll("circle")
+      .selectAll<SVGCircleElement, Node>("circle")
       .attr("r", 0)
       .transition()
       .duration(500)
       .delay((_d: any, i: number) => i * 30)
-      .attr("r", (d: any) => d.size / 3);
+      .attr("r", (d: Node) => d.size / 3);
 
     return () => {
       simulation.stop();

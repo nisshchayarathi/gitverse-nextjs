@@ -21,10 +21,10 @@ import {
   ArrowLeft,
   Trash2,
   Activity,
-  CheckCircle2,
+  CheckCircle,
   AlertCircle,
   Clock,
-  Loader2,
+  Loader,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -73,7 +73,7 @@ const StatusBadge = ({ status, isAnalyzing }: { status: string; isAnalyzing: boo
   if (isAnalyzing || s === "analyzing" || s === "processing") {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-500 border border-blue-500/20">
-        <Loader2 className="h-3 w-3 animate-spin" />
+        <Loader className="h-3 w-3 animate-spin" />
         Analyzing
       </span>
     );
@@ -82,7 +82,7 @@ const StatusBadge = ({ status, isAnalyzing }: { status: string; isAnalyzing: boo
   if (s === "completed" || s === "done" || s === "ready") {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-        <CheckCircle2 className="h-3 w-3" />
+        <CheckCircle className="h-3 w-3" />
         Completed
       </span>
     );
