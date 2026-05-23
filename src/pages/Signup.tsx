@@ -114,6 +114,13 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
+
+  const isMinLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password); // Added here
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
@@ -172,10 +179,19 @@ export default function Signup() {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       toast({
-        title: "Error",
-        description: "Password must be at least 6 characters long",
+        title: "Weak Password",
+        description: "Password must be at least 8 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
+      toast({
+        title: "Password Requirements Failed",
+        description: "Your password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.",
         variant: "destructive",
       });
       return;
@@ -314,9 +330,27 @@ export default function Signup() {
                   required
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Must be at least 8 characters
-              </p>
+              <div className="mt-2 space-y-1 text-xs">
+                <p className="text-muted-foreground font-medium mb-1">Password Requirements:</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  <p className={isMinLength ? "text-emerald-500" : "text-muted-foreground"}>
+                    {isMinLength ? "✓" : "•"} At least 8 characters
+                  </p>
+                  <p className={hasUppercase ? "text-emerald-500" : "text-muted-foreground"}>
+                    {hasUppercase ? "✓" : "•"} One uppercase letter
+                  </p>
+                  {/* Added dynamic Lowercase checklist grid node */}
+                  <p className={hasLowercase ? "text-emerald-500" : "text-muted-foreground"}>
+                    {hasLowercase ? "✓" : "•"} One lowercase letter
+                  </p>
+                  <p className={hasNumber ? "text-emerald-500" : "text-muted-foreground"}>
+                    {hasNumber ? "✓" : "•"} One number
+                  </p>
+                  <p className={hasSpecial ? "text-emerald-500" : "text-muted-foreground"}>
+                    {hasSpecial ? "✓" : "•"} One special character
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div
