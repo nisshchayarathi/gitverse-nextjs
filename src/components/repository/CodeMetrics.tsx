@@ -8,7 +8,7 @@ import {
   CheckCircle,
   Package,
 } from "lucide-react";
-import { Card, EmptyState } from "@/components/ui";
+import { Card } from "@/components/ui";
 
 interface LanguageStat {
   name: string;
@@ -276,16 +276,6 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
     }
   };
 
-  if (!repository || (!repository.files?.length && !repository.languages?.length)) {
-    return (
-      <EmptyState
-        icon={Code}
-        title="No code metrics available"
-        description="We couldn't find any file or language data in this repository to compute metrics."
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -348,11 +338,11 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
             </div>
           </div>
         ) : (
-          <EmptyState
-            icon={Code}
-            title="No language data"
-            description="No programming languages were detected in this repository."
-          />
+          <Card className="glass p-4 sm:p-6">
+            <p className="text-muted-foreground text-center text-sm">
+              No language data available
+            </p>
+          </Card>
         )}
       </div>
 
@@ -361,36 +351,28 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
         <h3 className="text-base sm:text-lg font-semibold mb-4">
           File Type Distribution
         </h3>
-        {fileTypeStats.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {fileTypeStats.map((fileType) => (
-              <Card key={fileType.type} className="glass p-3 sm:p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
-                    <FileCode className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xl sm:text-2xl font-bold">
-                      {fileType.count}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {fileType.percentage.toFixed(2)}%
-                    </p>
-                  </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {fileTypeStats.map((fileType) => (
+            <Card key={fileType.type} className="glass p-3 sm:p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
+                  <FileCode className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 </div>
-                <p className="text-xs sm:text-sm font-medium truncate">
-                  {fileType.type}
-                </p>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            icon={FileCode}
-            title="No file type data"
-            description="We couldn't detect any known file types in this repository."
-          />
-        )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xl sm:text-2xl font-bold">
+                    {fileType.count}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {fileType.percentage.toFixed(2)}%
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs sm:text-sm font-medium truncate">
+                {fileType.type}
+              </p>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {/* Quality metrics */}
@@ -606,11 +588,11 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
                 </div>
               </div>
             ) : (
-              <EmptyState
-                icon={TestTube}
-                title="No tests detected"
-                description="We couldn't find any test suites or test files in this repository."
-              />
+              <div className="text-center py-6">
+                <p className="text-muted-foreground text-xs sm:text-sm">
+                  No test files detected in repository
+                </p>
+              </div>
             )}
           </Card>
         );

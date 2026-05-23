@@ -139,7 +139,8 @@ async function startAnalysisWorkerLoop(opts) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isMain = typeof require !== "undefined" && require.main === module;
 if (isMain) {
-    startAnalysisWorkerLoop().catch((e) => {
+    const once = !!process.env.WORKER_ONCE;
+    startAnalysisWorkerLoop({ once }).catch((e) => {
         console.error("worker fatal:", e);
         process.exit(1);
     });

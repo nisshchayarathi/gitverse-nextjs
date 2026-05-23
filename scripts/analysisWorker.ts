@@ -3,11 +3,6 @@ import os from "os";
 import prisma from "../lib/prisma";
 import { analysisJobService } from "../lib/services/analysisJobService";
 import { repositoryService } from "../lib/services/repositoryService";
-import {
-  isRateLimitError,
-  extractRetryAfter,
-  sanitizeErrorMessage,
-} from "../lib/utils/rateLimit";
 import type { AnalysisJob } from "@prisma/client";
 
 const POLL_INTERVAL_MS = 2000;
@@ -84,7 +79,7 @@ async function runJob(
           workerId: params.workerId,
           lockMs: params.lockMs,
         })
-        .catch((e) => console.error("heartbeat failed", sanitizeErrorMessage(e)));
+        .catch((e) => console.error("heartbeat failed", e));
     }, params.heartbeatIntervalMs);
 
     if (job.type !== "repository_analysis") {
@@ -102,26 +97,15 @@ async function runJob(
       workerId: params.workerId,
     });
   } catch (err: any) {
-    const rateLimited = isRateLimitError(err);
-    const retryAfter = rateLimited ? extractRetryAfter(err) : null;
-    const safeMessage = sanitizeErrorMessage(err);
-
-    if (rateLimited) {
-      console.error(
-        `Job ${job.id} rate limited (attempt ${job.attempts}/${job.maxAttempts})` +
-          (retryAfter ? `, retry after ${retryAfter}s` : "")
-      );
-    } else {
-      console.error(`Job ${job.id} failed: ${safeMessage}`);
-    }
+    const message = err?.message ? String(err.message) : String(err);
+    console.error(`Job ${job.id} failed:`, err);
 
     await analysisJobService.markFailed({
       jobId: job.id,
       workerId: params.workerId,
-      error: safeMessage,
+      error: message,
       attempts: job.attempts,
       maxAttempts: job.maxAttempts,
-      retryAfter: retryAfter ?? undefined,
     });
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
@@ -180,7 +164,7 @@ export async function startAnalysisWorkerLoop(opts?: {
 
       if (opts?.once) return;
     } catch (e) {
-      console.error("worker loop error:", sanitizeErrorMessage(e));
+      console.error("worker loop error:", e);
       if (opts?.once) return;
       await sleep(pollIntervalMs);
     }

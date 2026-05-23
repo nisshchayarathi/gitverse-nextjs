@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware";
+import { requireAuth , sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 
 export async function GET(
@@ -19,9 +19,20 @@ export async function GET(
 
     const stats = await repositoryService.getRepositoryStats(id, user.userId);
 
-    return NextResponse.json({ stats });
+    if (!stats) {
+      return NextResponse.json(
+        { error: "Repository not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ stats }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+      },
+    });
   } catch (error: any) {
-    console.error("Get repository stats error:", error);
+    console.error("Get repository stats error:", sanitizeError(error));
     return NextResponse.json(
       { error: "Failed to get repository statistics" },
       { status: 500 }

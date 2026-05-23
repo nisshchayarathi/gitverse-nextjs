@@ -17,7 +17,6 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  EmptyState,
 } from "@/components/ui";
 
 interface FileNode {
@@ -210,28 +209,20 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
 
   return (
     <div className="space-y-4">
-      {!repository?.files || repository.files.length === 0 ? (
-        <EmptyState
-          icon={Folder}
-          title="No files found"
-          description="We couldn't find any files in this repository."
-        />
-      ) : (
-        <Card className="glass">
-          <CardHeader>
-            <CardTitle className="font-heading">File Structure</CardTitle>
-            <CardDescription>
-              Explore the repository&apos;s file system
-            </CardDescription>
-            <CardDescription>*Click on a file for more info*</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="border border-border/50 rounded-lg p-4 bg-background/50 max-h-[600px] overflow-y-auto">
-              <FileTreeNode node={fileTree} onFileSelect={handleFileSelect} />
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <Card className="glass">
+        <CardHeader>
+          <CardTitle className="font-heading">File Structure</CardTitle>
+          <CardDescription>
+            Explore the repository&apos;s file system
+          </CardDescription>
+          <CardDescription>*Click on a file for more info*</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="border border-border/50 rounded-lg p-4 bg-background/50 max-h-[600px] overflow-y-auto">
+            <FileTreeNode node={fileTree} onFileSelect={handleFileSelect} />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* File Analytics Modal */}
       {selectedFile && (

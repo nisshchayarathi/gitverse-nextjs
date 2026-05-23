@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth, isHttpError } from "@/lib/middleware";
+import { requireAuth, isHttpError, sanitizeError } from "@/lib/middleware";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.error("Error fetching user:", error);
+    console.error("Error fetching user:", sanitizeError(error));
     return NextResponse.json(
       { message: "Failed to fetch user" },
       { status: 500 },
@@ -93,7 +93,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
-    console.error("Error deleting account:", error);
+    console.error("Error deleting account:", sanitizeError(error));
     return NextResponse.json(
       { message: "Failed to delete account" },
       { status: 500 },

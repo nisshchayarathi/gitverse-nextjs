@@ -67,6 +67,27 @@ export async function requireAuth(request: NextRequest): Promise<JWTPayload> {
 }
 
 /**
+ * Route guard that strictly requires the authenticated user to be the owner of the resource.
+ * If authentication and ownership succeed, it returns the verified user context;
+ * otherwise, it throws a 403 HttpError.
+ *
+ * @param request - The incoming Next.js HTTP request context.
+ * @param resourceUserId - The user ID of the resource owner.
+ * @throws {HttpError} If no valid user session is detected (401) or if the user is not the owner (403).
+ * @returns The active user payload.
+ */
+export async function requireOwnership(
+  request: NextRequest,
+  resourceUserId: number
+): Promise<JWTPayload> {
+  const user = await requireAuth(request);
+  if (user.userId !== resourceUserId) {
+    throw new HttpError(403, "Forbidden");
+  }
+  return user;
+}
+
+/**
  * Standard HTTP Error container that carries a status code and detailed error message.
  * Used internally to control status codes thrown during route processing and middleware guards.
  */
@@ -99,6 +120,35 @@ export function isHttpError(error: unknown): error is HttpError {
     "status" in error &&
     typeof (error as any).status === "number"
   );
+}
+
+/**
+ * Sanitizes unknown error objects into safe, human-readable strings.
+ *
+ * @param error - The caught unknown error context.
+ * @returns A clean string representing the error message.
+ */
+export function sanitizeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  try {
+    const str = String(error);
+    return str.length > 200 ? str.substring(0, 200) + "..." : str;
+  } catch {
+    return "Unknown error";
+  }
+}
+
+/**
+ * Standard JSON error response builder.
+ *
+ * @param message - The error message.
+ * @param status - The HTTP status code (defaults to 400).
+ * @returns A Next.js NextResponse containing the error.
+ */
+export function errorResponse(message: string, status: number = 400): NextResponse {
+  return NextResponse.json({ error: message }, { status });
 }
 
 /**

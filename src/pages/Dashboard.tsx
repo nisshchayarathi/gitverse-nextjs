@@ -28,6 +28,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
+import { toast } from "@/hooks/use-toast";
 
 interface Repository {
   id: string;
@@ -145,7 +146,7 @@ export default function Dashboard() {
         }))
     : [];
 
-  const handleAnalyze = async () => {
+    const handleAnalyze = async () => {
     if (!repoUrl.trim()) return;
 
     setAnalyzing(true);
@@ -187,7 +188,12 @@ export default function Dashboard() {
       setRepoUrl("");
     } catch (error: any) {
       console.error("Error creating repository:", error);
-      alert(error.response?.data?.error || "Failed to analyze repository");
+      const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to analyze repository";
+      toast({
+        title: "Analysis Failed",
+        description: errMsg,
+        variant: "destructive",
+      });
     } finally {
       setAnalyzing(false);
     }

@@ -1,6 +1,6 @@
-import { FileText, Plus, Minus, GitMerge, Tag, GitCommit } from "lucide-react";
+import { FileText, Plus, Minus, GitMerge, Tag } from "lucide-react";
+
 import { useState, useMemo } from "react";
-import { EmptyState } from "@/components/ui";
 
 interface FileChange {
   path: string;
@@ -320,14 +320,7 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
       </div>
 
       {/* Graph Timeline */}
-      {commits.length === 0 ? (
-        <EmptyState
-          icon={GitCommit}
-          title="No commits found"
-          description={`We couldn't find any commits on branch ${defaultBranch} in this repository.`}
-        />
-      ) : (
-        <div className="relative overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <div className="space-y-0 min-w-max">
           {graphNodes.map((node, index) => {
             const { commit, column, color, routes } = node;
@@ -608,8 +601,7 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
             );
           })}
         </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 };

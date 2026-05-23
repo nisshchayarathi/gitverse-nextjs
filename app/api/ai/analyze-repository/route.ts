@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { getGeminiService } from "@/lib/services/geminiService";
 import { repositoryService } from "@/lib/services/repositoryService";
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ analysis, type });
   } catch (error: any) {
-    console.error("Repository analysis error:", error);
+    console.error("Repository analysis error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(

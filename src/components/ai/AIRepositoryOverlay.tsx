@@ -5,6 +5,24 @@ import { geminiService, ChatMessage } from "@/services/gemini";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
+export interface RepositoryCommit {
+  message: string;
+  author?: string;
+  authorName?: string;
+  date?: string | Date;
+  committedAt?: string | Date;
+}
+
+export interface RepositoryContributor {
+  name: string;
+  commits: number;
+  percentage?: number;
+}
+
+export interface RepositoryBranch {
+  name: string;
+}
+
 interface AIRepositoryOverlayProps {
   repository: {
     name: string;
@@ -19,9 +37,9 @@ interface AIRepositoryOverlayProps {
       stars?: number;
       forks?: number;
     };
-    recentCommits?: any[];
-    contributors?: any[];
-    branches?: any[];
+    recentCommits?: RepositoryCommit[];
+    contributors?: RepositoryContributor[];
+    branches?: RepositoryBranch[];
   };
 }
 
@@ -115,17 +133,17 @@ export function AIRepositoryOverlay({ repository }: AIRepositoryOverlayProps) {
           },
           recentActivity: repository.recentCommits
             ?.slice(0, 5)
-            .map((c: any) => ({
+            .map((c: RepositoryCommit) => ({
               message: c.message,
               author: c.author || c.authorName,
               date: c.date || c.committedAt,
             })),
-          topContributors: contributorsArray.slice(0, 5).map((c: any) => ({
+          topContributors: contributorsArray.slice(0, 5).map((c: RepositoryContributor) => ({
             name: c.name,
             commits: c.commits,
             percentage: c.percentage,
           })),
-          branches: repository.branches?.map((b: any) => b.name),
+          branches: repository.branches?.map((b: RepositoryBranch) => b.name),
         };
 
         contextualPrompt = `You are analyzing the ${context.name} repository. 
@@ -145,7 +163,7 @@ Forks: ${context.stats.forks}
 ${
   context.topContributors && context.topContributors.length > 0
     ? `===== TOP CONTRIBUTORS (BY COMMIT COUNT) =====
-${context.topContributors.map((c: any, i: number) => `${i + 1}. ${c.name} - ${c.commits} commits (${c.percentage?.toFixed(1)}% of total)`).join("\n")}
+${context.topContributors.map((c: RepositoryContributor, i: number) => `${i + 1}. ${c.name} - ${c.commits} commits (${c.percentage?.toFixed(1)}% of total)`).join("\n")}
 The contributor with the most commits is: ${context.topContributors[0].name} with ${context.topContributors[0].commits} commits.`
     : "===== CONTRIBUTORS =====\nContributor information is not yet available for this repository."
 }
@@ -153,7 +171,7 @@ The contributor with the most commits is: ${context.topContributors[0].name} wit
 ${
   context.recentActivity && context.recentActivity.length > 0
     ? `===== RECENT COMMITS =====
-${context.recentActivity.map((c: any, idx: number) => `${idx + 1}. "${c.message}" by ${c.author}`).join("\n")}`
+${context.recentActivity.map((c: { message: string; author?: string }, idx: number) => `${idx + 1}. "${c.message}" by ${c.author || "Unknown"}`).join("\n")}`
     : ""
 }
 
