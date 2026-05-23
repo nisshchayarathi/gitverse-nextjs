@@ -97,7 +97,10 @@ function safeParseReviewJson(text: string): PRReviewResponse | null {
     .filter(Boolean)
     .slice(0, 50) as PRReviewIssue[];
 
-  if (!summary) return null;
+  if (!summary) {
+    console.warn("Parsed review JSON is missing mandatory summary property.");
+    return null;
+  }
   return { summary, overallScore, issues, praise };
 }
 
