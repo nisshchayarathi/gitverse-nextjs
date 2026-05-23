@@ -53,6 +53,7 @@ Paste a repo → GitVerse builds a visual map + AI onboarding so contributors ca
 
 - Visualize repository structure and key paths
 - Explore commits/branches and contributor activity
+- **Git Time Machine & Repo Evolution Player**: Sequential chronological playback of commit logs with active file-tree animations showing additions, modifications, and deletions in real-time.
 - Ask AI questions about files, folders, and architecture
 - Generate analysis jobs and track progress
 
@@ -161,6 +162,7 @@ gitverse-nextjs/
 ## 🧩 Available Scripts
 
 - `npm run dev` - Start development server
+- `npm run worker:dev` - Start the repository analysis background queue worker
 - `npm run build` - Build for production
 - `npm start` - Start production server
 - `npm run lint` - Run Next.js linter

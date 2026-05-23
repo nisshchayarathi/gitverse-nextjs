@@ -16,7 +16,7 @@ import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
 import { AIRepositoryOverlay } from "@/components/ai/AIRepositoryOverlay";
 import { SyncStatusCard } from "@/components/repository/SyncStatusCard";
-
+import { GitTimeMachine } from "@/components/visualizations/GitTimeMachine";
 import {
   Home,
   FolderTree,
@@ -44,7 +44,8 @@ type TabType =
   | "commits"
   | "contributors"
   | "mentor"
-  | "insights";
+  | "insights"
+  | "timemachine";
 
 interface Tab {
   id: TabType;
@@ -75,6 +76,11 @@ const tabs: Tab[] = [
     id: "dead-code",
     label: "Dead Code",
     icon: <FileX2 className="h-4 w-4" />,
+  },
+  {
+    id: "timemachine",
+    label: "Time Machine",
+    icon: <Activity className="h-4 w-4" />,
   },
 ];
 
@@ -405,6 +411,8 @@ export default function RepositoryAnalysis() {
         return <RepositoryMentorTab repositoryData={repository} />;
       case "insights":
         return <RepositoryInsights repository={repository} />;
+      case "timemachine":
+        return <GitTimeMachine repository={repository} />;
       default:
         return <RepositoryOverview />;
     }
