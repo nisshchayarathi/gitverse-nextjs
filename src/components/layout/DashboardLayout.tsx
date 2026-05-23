@@ -13,11 +13,10 @@ import {
   User,
   ChevronLeft,
   Menu,
-  Sun,
-  Moon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -177,18 +176,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             <div className="flex-1" />
 
             {/* Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              aria-pressed={theme === "dark"}
-              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-300 mr-2"
-            >
-              {theme === "light" ? (
-                <Moon className="h-5 w-5" />
-              ) : (
-                <Sun className="h-5 w-5" />
-              )}
-            </button>
+            <ThemeToggle className="mr-2" />
 
             {/* User Profile Dropdown */}
             <DropdownMenu>
