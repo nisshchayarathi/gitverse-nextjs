@@ -7,6 +7,11 @@ const requiredEnvVars = [
 ] as const;
 
 function validateEnv() {
+  if (process.env.SKIP_ENV_VALIDATION === "true" || process.env.NODE_ENV === "test") {
+    console.log("⚠️ Environment validation skipped");
+    return;
+  }
+
   const missingVars = requiredEnvVars.filter((envVar) => {
     const value = process.env[envVar];
 
