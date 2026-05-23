@@ -3,9 +3,10 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useRef } from "react";
-import { User, Lock, Shield, Trash2 } from "lucide-react";
+import { User, Lock, Shield, Trash2, Palette, Sun, Moon } from "lucide-react";
 import { Save } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useTheme } from "@/context/ThemeContext";
 import {
   Card,
   CardHeader,
@@ -22,6 +23,7 @@ import axios from "axios";
 
 export default function Settings() {
   const { user, logout } = useAuth();
+  const { theme: currentTheme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -315,6 +317,7 @@ export default function Settings() {
 
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
+    { id: "appearance", label: "Appearance", icon: Palette },
     { id: "security", label: "Security", icon: Shield },
     { id: "danger", label: "Danger Zone", icon: Trash2 },
   ];
@@ -484,6 +487,83 @@ export default function Settings() {
                       </Button>
                     </div>
                   </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Appearance Tab */}
+            {activeTab === "appearance" && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle className="font-heading flex items-center gap-2">
+                    <Palette className="h-5 w-5" />
+                    Appearance Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Customise the look and feel of the application
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div>
+                    <h3 className="text-sm font-medium mb-3">Theme Mode</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Light Theme Card */}
+                      <button
+                        type="button"
+                        onClick={() => setTheme("light")}
+                        className={`flex flex-col items-center justify-center p-6 rounded-xl border text-left transition-all ${
+                          currentTheme === "light"
+                            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                            : "border-border hover:border-foreground/30 bg-background/50"
+                        }`}
+                      >
+                        <div className="w-full flex items-center justify-between mb-4">
+                          <div className="p-2 rounded-lg bg-yellow-500/10 text-yellow-500">
+                            <Sun className="h-6 w-6" />
+                          </div>
+                          {currentTheme === "light" && (
+                            <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold font-mono">
+                              ✓
+                            </div>
+                          )}
+                        </div>
+                        <div className="w-full">
+                          <p className="font-semibold text-foreground">Light Mode</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Clean, high-contrast display for well-lit rooms
+                          </p>
+                        </div>
+                      </button>
+
+                      {/* Dark Theme Card */}
+                      <button
+                        type="button"
+                        onClick={() => setTheme("dark")}
+                        className={`flex flex-col items-center justify-center p-6 rounded-xl border text-left transition-all ${
+                          currentTheme === "dark"
+                            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                            : "border-border hover:border-foreground/30 bg-background/50"
+                        }`}
+                      >
+                        <div className="w-full flex items-center justify-between mb-4">
+                          <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+                            <Moon className="h-6 w-6" />
+                          </div>
+                          {currentTheme === "dark" && (
+                            <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold font-mono">
+                              ✓
+                            </div>
+                          )}
+                        </div>
+                        <div className="w-full">
+                          <p className="font-semibold text-foreground">Dark Mode</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Modern, low-light theme to reduce eye strain
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}

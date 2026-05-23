@@ -116,7 +116,7 @@ export function Contributors({ repository }: ContributorsProps) {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortOption)}
-          className="glass px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-300 cursor-pointer"
+          className="glass px-4 py-2 rounded-lg hover:bg-accent/50 dark:hover:bg-white/10 transition-all duration-300 cursor-pointer"
         >
           <option value="commits">Most commits</option>
           <option value="additions">Most additions</option>
@@ -195,7 +195,7 @@ export function Contributors({ repository }: ContributorsProps) {
           return (
             <Card
               key={contributor.id}
-              className="glass hover:bg-white/10 transition-all duration-300 cursor-pointer p-6"
+              className="glass hover:bg-accent/50 dark:hover:bg-white/10 transition-all duration-300 cursor-pointer p-6"
               onClick={() => setSelectedContributor(contributor)}
             >
               {/* Contributor header */}
@@ -296,7 +296,7 @@ export function Contributors({ repository }: ContributorsProps) {
               </div>
 
               {/* Timeline */}
-              <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-muted-foreground">
+              <div className="mt-4 pt-4 border-t border-border/50 dark:border-white/10 flex items-center justify-between text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
                   <span>First: {formatDate(contributor.firstCommit)}</span>
@@ -337,7 +337,7 @@ export function Contributors({ repository }: ContributorsProps) {
               {/* Close button */}
               <button
                 onClick={() => setSelectedContributor(null)}
-                className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-lg transition-all z-10"
+                className="absolute top-4 right-4 p-2 hover:bg-accent/50 dark:hover:bg-white/10 rounded-lg transition-all z-10"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -383,7 +383,7 @@ export function Contributors({ repository }: ContributorsProps) {
 
               {/* Main stats grid */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 px-8">
-                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                   <div className="flex items-center gap-2 mb-2 text-blue-400">
                     <GitCommit className="h-4 w-4" />
                     <span className="text-xs font-semibold uppercase tracking-wide">
@@ -402,7 +402,7 @@ export function Contributors({ repository }: ContributorsProps) {
                   </p>
                 </div>
 
-                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                   <div className="flex items-center gap-2 mb-2 text-green-400">
                     <Plus className="h-4 w-4" />
                     <span className="text-xs font-semibold uppercase tracking-wide">
@@ -422,7 +422,7 @@ export function Contributors({ repository }: ContributorsProps) {
                   </p>
                 </div>
 
-                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                   <div className="flex items-center gap-2 mb-2 text-red-400">
                     <Minus className="h-4 w-4" />
                     <span className="text-xs font-semibold uppercase tracking-wide">
@@ -442,7 +442,7 @@ export function Contributors({ repository }: ContributorsProps) {
                   </p>
                 </div>
 
-                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                   <div className="flex items-center gap-2 mb-2 text-yellow-400">
                     <BarChart3 className="h-4 w-4" />
                     <span className="text-xs font-semibold uppercase tracking-wide">
@@ -471,7 +471,7 @@ export function Contributors({ repository }: ContributorsProps) {
                   </h3>
 
                   <div className="space-y-4">
-                    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                    <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
                         First Commit
                       </p>
@@ -490,7 +490,7 @@ export function Contributors({ repository }: ContributorsProps) {
                       </p>
                     </div>
 
-                    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                    <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
                         Last Commit
                       </p>
@@ -509,7 +509,7 @@ export function Contributors({ repository }: ContributorsProps) {
                       </p>
                     </div>
 
-                    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                    <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
                         Active for
                       </p>
@@ -546,7 +546,7 @@ export function Contributors({ repository }: ContributorsProps) {
                   </h3>
 
                   <div className="space-y-3 sm:space-y-4">
-                    <div className="bg-white/5 rounded-lg p-3 sm:p-4 border border-white/10">
+                    <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-3 sm:p-4 border border-border/50 dark:border-white/10">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
                         Commits per Week
                       </p>
@@ -572,7 +572,7 @@ export function Contributors({ repository }: ContributorsProps) {
                       </p>
                     </div>
 
-                    <div className="bg-white/5 rounded-lg p-3 sm:p-4 border border-white/10">
+                    <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-3 sm:p-4 border border-border/50 dark:border-white/10">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
                         Changes per Commit
                       </p>
@@ -589,7 +589,7 @@ export function Contributors({ repository }: ContributorsProps) {
                       </p>
                     </div>
 
-                    <div className="bg-white/5 rounded-lg p-3 sm:p-4 border border-white/10">
+                    <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-3 sm:p-4 border border-border/50 dark:border-white/10">
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
                         Commit Ratio
                       </p>
@@ -624,7 +624,7 @@ export function Contributors({ repository }: ContributorsProps) {
               </div>
 
               {/* Comparison to others */}
-              <div className="bg-gradient-to-r from-primary/10 to-transparent rounded-lg p-4 sm:p-6 border border-white/10 mx-8">
+              <div className="bg-gradient-to-r from-primary/10 to-transparent rounded-lg p-4 sm:p-6 border border-border/50 dark:border-white/10 mx-8">
                 <h3 className="text-base sm:text-lg font-semibold mb-4 flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-primary flex-shrink-0" />
                   Contribution Comparison

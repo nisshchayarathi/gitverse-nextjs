@@ -25,11 +25,12 @@ function kickLocalRunner(request: NextRequest, jobId: string) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await context.params;
     const user = await requireAuth(request);
-    const jobId = params.id;
+    const jobId = id;
 
     const job = await analysisJobService.getJob({
       jobId,

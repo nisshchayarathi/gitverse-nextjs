@@ -252,7 +252,7 @@ export function CodeAnalysisPanel() {
                     className={`p-3 rounded-lg border-2 transition-all duration-300 text-left ${
                       analysisType === option.type
                         ? `${option.bgColor} border-current ${option.color}`
-                        : "glass border-white/10 hover:border-white/20"
+                        : "glass border-border/50 dark:border-white/10 hover:border-border dark:hover:border-white/20"
                     }`}
                   >
                     <option.icon className={`h-5 w-5 mb-2 ${option.color}`} />
@@ -314,7 +314,7 @@ export function CodeAnalysisPanel() {
                   (opt) => opt.type === result.type
                 )!;
                 return (
-                  <Card key={index} className="glass p-4 bg-white/5">
+                  <Card key={index} className="glass p-4 bg-muted/50 dark:bg-white/5">
                     <div className="flex items-center gap-2 mb-3">
                       <option.icon className={`h-4 w-4 ${option.color}`} />
                       <span className="font-semibold text-sm">

@@ -202,7 +202,9 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
             )}
             <Card
               className={`glass max-w-[80%] p-4 ${
-                message.role === "user" ? "bg-primary/10" : "bg-white/5"
+                message.role === "user"
+                  ? "bg-primary/10 border-primary/20"
+                  : "bg-muted/50 dark:bg-white/5 border-border/50 dark:border-white/10"
               }`}
             >
               <div className="flex items-start justify-between gap-2 mb-2">
@@ -245,7 +247,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
               <Bot className="h-4 w-4 text-primary" />
             </div>
-            <Card className="glass max-w-[80%] p-4 bg-white/5">
+            <Card className="glass max-w-[80%] p-4 bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10">
               <div className="text-xs font-semibold opacity-70 mb-2">
                 AI Assistant
               </div>
@@ -266,7 +268,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
               <Bot className="h-4 w-4 text-primary" />
             </div>
-            <Card className="glass max-w-[80%] p-4 bg-white/5">
+            <Card className="glass max-w-[80%] p-4 bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10">
               <div className="flex items-center gap-2 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span>Thinking...</span>
@@ -279,7 +281,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
       </div>
 
       {/* Input area */}
-      <div className="border-t border-white/10 p-4">
+      <div className="border-t border-border/50 dark:border-white/10 p-4">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="text"

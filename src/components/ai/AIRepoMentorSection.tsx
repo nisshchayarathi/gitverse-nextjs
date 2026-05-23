@@ -83,7 +83,7 @@ function MentorMarkdown({ content }: { content: string }) {
           }
 
           return (
-            <pre className="my-2 overflow-x-auto rounded-lg bg-black/40 p-3 border border-white/10">
+            <pre className="my-2 overflow-x-auto rounded-lg bg-muted/20 dark:bg-black/40 p-3 border border-border/50 dark:border-white/10">
               <code className={className} {...props}>
                 {children}
               </code>
@@ -328,7 +328,7 @@ export function AIRepoMentorSection(props: {
                 <div
                   className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${m.role === "user"
                     ? "bg-primary/15"
-                    : "bg-white/5 border border-white/10"
+                    : "bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10"
                     }`}
                 >
                   {m.role === "assistant" ? (
@@ -345,10 +345,10 @@ export function AIRepoMentorSection(props: {
                 <div className="h-7 w-7 rounded-full bg-primary/15" />
 
                 {/* Message bubble skeleton */}
-                <div className="max-w-[85%] rounded-lg px-3 py-3 bg-white/5 border border-white/10 space-y-2">
-                  <div className="h-3 w-3/4 bg-white/10 rounded" />
-                  <div className="h-3 w-full bg-white/10 rounded"/>
-                  <div className="h-3 w-1/2 bg-white/10 rounded" />
+                <div className="max-w-[85%] rounded-lg px-3 py-3 bg-muted/50 dark:bg-white/5 border border-border/50 dark:border-white/10 space-y-2">
+                  <div className="h-3 w-3/4 bg-muted/70 dark:bg-white/10 rounded" />
+                  <div className="h-3 w-full bg-muted/70 dark:bg-white/10 rounded"/>
+                  <div className="h-3 w-1/2 bg-muted/70 dark:bg-white/10 rounded" />
                 </div>
               </div>
             )}

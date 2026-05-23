@@ -469,7 +469,7 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
                 {/* Commit content */}
                 <div className="flex-1 min-w-0 mb-3">
                   <div
-                    className="hover:bg-white/5 transition-all duration-200 rounded-lg cursor-pointer p-3 -ml-2"
+                    className="hover:bg-accent/50 dark:hover:bg-white/5 transition-all duration-200 rounded-lg cursor-pointer p-3 -ml-2"
                     onClick={() => toggleCommit(commit.hash)}
                   >
                     {/* Commit header */}
@@ -540,7 +540,7 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
 
                     {/* Expanded details */}
                     {isExpanded && (
-                      <div className="mt-3 pt-3 border-t border-white/10 space-y-3 animate-fade-in-up">
+                      <div className="mt-3 pt-3 border-t border-border/50 dark:border-white/10 space-y-3 animate-fade-in-up">
                         {commit.description && (
                           <p className="text-sm text-muted-foreground">
                             {commit.description}
@@ -558,7 +558,7 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
                               {commit.fileChanges.map((file, fileIndex) => (
                                 <div
                                   key={fileIndex}
-                                  className="flex items-center justify-between p-2 glass rounded hover:bg-white/10 transition-colors"
+                                  className="flex items-center justify-between p-2 glass rounded hover:bg-accent/50 dark:hover:bg-white/10 transition-colors"
                                 >
                                   <div className="flex items-center gap-2 flex-1 min-w-0">
                                     {getFileIcon(file.type)}

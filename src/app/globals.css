@@ -53,43 +53,45 @@
   }
 
   .dark {
-    /* GitVerse Dark Theme */
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    /* GitVerse Dark Theme — Premium deep blue-slate */
+    --background: 224 47% 7%;
+    --foreground: 213 31% 95%;
 
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
+    /* Cards slightly lighter than background so they pop */
+    --card: 222 44% 11%;
+    --card-foreground: 213 31% 95%;
 
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 222 44% 12%;
+    --popover-foreground: 213 31% 95%;
 
-    /* Deep Blue Primary (lighter in dark mode) */
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
+    /* Deep Blue Primary (brighter for dark mode) */
+    --primary: 217 91% 62%;
+    --primary-foreground: 224 47% 7%;
 
     /* Slate Gray Secondary */
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 217 33% 18%;
+    --secondary-foreground: 213 31% 95%;
 
-    /* Electric Green Accent */
-    --accent: 160 84% 39%;
-    --accent-foreground: 222 47% 11%;
+    /* Electric Green Accent (slightly brighter) */
+    --accent: 160 70% 45%;
+    --accent-foreground: 224 47% 7%;
 
-    --success: 160 84% 39%;
-    --success-foreground: 222 47% 11%;
+    --success: 160 70% 45%;
+    --success-foreground: 224 47% 7%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 48 96% 89%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 213 31% 95%;
 
-    --muted: 217 33% 17%;
+    --muted: 217 33% 15%;
     --muted-foreground: 215 20% 65%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 217 91% 60%;
+    /* Borders slightly lighter for better separation */
+    --border: 217 30% 20%;
+    --input: 217 33% 16%;
+    --ring: 217 91% 62%;
   }
 }
 
@@ -99,6 +101,7 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+    transition: background-color 0.3s ease, color 0.2s ease;
   }
 
   h1,
@@ -108,6 +111,40 @@
   h5,
   h6 {
     @apply font-heading;
+  }
+
+  /* Custom scrollbar — light mode */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.6);
+  }
+
+  /* Dark mode scrollbar */
+  .dark ::-webkit-scrollbar-track {
+    background: hsl(224 47% 9%);
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.7);
+  }
+
+  /* Text selection */
+  ::selection {
+    background: hsl(var(--primary) / 0.25);
+    color: hsl(var(--foreground));
   }
 }
 
@@ -121,8 +158,19 @@
     @apply bg-background/80 backdrop-blur-xl border border-border/50;
   }
 
+  .dark .glass {
+    background: hsl(var(--card) / 0.85);
+    border-color: hsl(var(--border) / 0.6);
+    box-shadow: 0 1px 0 0 hsl(var(--primary) / 0.04) inset, 0 4px 24px 0 hsl(224 47% 4% / 0.4);
+  }
+
   .glass-hover {
     @apply hover:bg-background/90 hover:border-border transition-all duration-300;
+  }
+
+  .dark .glass-hover:hover {
+    background: hsl(var(--card) / 0.95);
+    border-color: hsl(var(--border));
   }
 
   /* Gradient Utilities */

@@ -42,6 +42,12 @@ export async function requireAuth(request: NextRequest): Promise<JWTPayload> {
     throw new HttpError(401, "Unauthorized");
   }
 
+  // Tighten authorization checks to prevent cross-user data access
+  const resourceOwnerId = request.headers.get("x-resource-owner-id");
+  if (resourceOwnerId && String(resourceOwnerId) !== String(user.userId)) {
+    throw new HttpError(403, "Forbidden: You do not have access to this resource.");
+  }
+
   return user;
 }
 

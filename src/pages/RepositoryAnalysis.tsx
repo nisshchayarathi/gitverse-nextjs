@@ -305,7 +305,7 @@ export default function RepositoryAnalysis() {
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
               <Link
                 href="/dashboard"
-                className="glass p-2 rounded-lg hover:bg-white/10 transition-all duration-300 self-start"
+                className="glass p-2 rounded-lg hover:bg-muted/80 dark:hover:bg-white/10 transition-all duration-300 self-start"
               >
                 <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
               </Link>
@@ -376,7 +376,7 @@ export default function RepositoryAnalysis() {
                           ${
                             activeTab === tab.id
                               ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                              : "hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                              : "hover:bg-muted/80 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
                           }
                         `}
                       >
@@ -426,7 +426,7 @@ export default function RepositoryAnalysis() {
                 <button
                   onClick={() => setShowDeleteDialog(false)}
                   disabled={isDeleting}
-                  className="px-3 sm:px-4 py-2 rounded-lg glass hover:bg-white/10 transition-all duration-300 disabled:opacity-50 text-sm"
+                  className="px-3 sm:px-4 py-2 rounded-lg glass hover:bg-muted/80 dark:hover:bg-white/10 transition-all duration-300 disabled:opacity-50 text-sm"
                 >
                   Cancel
                 </button>

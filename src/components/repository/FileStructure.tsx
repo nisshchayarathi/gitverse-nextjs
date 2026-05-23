@@ -237,7 +237,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
             {/* Close button */}
             <button
               onClick={() => setSelectedFile(null)}
-              className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-lg transition-all"
+              className="absolute top-4 right-4 p-2 hover:bg-accent/50 dark:hover:bg-white/10 rounded-lg transition-all"
             >
               <X className="h-5 w-5" />
             </button>
@@ -275,7 +275,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
 
             {/* Main Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                 <div className="flex items-center gap-2 mb-2 text-blue-400">
                   <Code className="h-4 w-4" />
                   <span className="text-xs font-semibold uppercase">
@@ -287,7 +287,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                 </p>
               </div>
 
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                 <div className="flex items-center gap-2 mb-2 text-green-400">
                   <GitCommit className="h-4 w-4" />
                   <span className="text-xs font-semibold uppercase">
@@ -299,7 +299,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                 </p>
               </div>
 
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                 <div className="flex items-center gap-2 mb-2 text-yellow-400">
                   <BarChart3 className="h-4 w-4" />
                   <span className="text-xs font-semibold uppercase">
@@ -322,7 +322,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                 </h3>
 
                 <div className="space-y-3">
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm text-muted-foreground uppercase tracking-wide">
                         Lines Added
@@ -339,7 +339,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     </p>
                   </div>
 
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm text-muted-foreground uppercase tracking-wide">
                         Lines Deleted
@@ -356,7 +356,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     </p>
                   </div>
 
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm text-muted-foreground uppercase tracking-wide">
                         Net Change
@@ -390,7 +390,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                 </h3>
 
                 <div className="space-y-3">
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                     <p className="text-sm text-muted-foreground uppercase tracking-wide mb-2">
                       Changes per Commit
                     </p>
@@ -408,7 +408,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     </p>
                   </div>
 
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                     <p className="text-sm text-muted-foreground uppercase tracking-wide mb-2">
                       Churn Ratio
                     </p>
@@ -431,7 +431,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     </p>
                   </div>
 
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <div className="bg-muted/50 dark:bg-white/5 rounded-lg p-4 border border-border/50 dark:border-white/10">
                     <p className="text-sm text-muted-foreground uppercase tracking-wide mb-2">
                       Created Date
                     </p>
@@ -456,7 +456,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
             </div>
 
             {/* Change Summary */}
-            <div className="bg-gradient-to-r from-primary/10 to-transparent rounded-lg p-6 border border-white/10">
+            <div className="bg-gradient-to-r from-primary/10 to-transparent rounded-lg p-6 border border-border/50 dark:border-white/10">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Clock className="h-5 w-5 text-primary" />
                 Summary

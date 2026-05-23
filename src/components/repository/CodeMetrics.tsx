@@ -308,7 +308,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                      <div className="flex-1 h-2 bg-muted/50 dark:bg-white/5 rounded-full overflow-hidden">
                         <div
                           className={`h-full ${lang.color} transition-all duration-500`}
                           style={{ width: `${lang.percentage}%` }}
@@ -405,7 +405,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
               <p className="text-xs sm:text-sm text-muted-foreground">
                 {metric.description}
               </p>
-              <div className="mt-4 h-2 bg-white/5 rounded-full overflow-hidden">
+              <div className="mt-4 h-2 bg-muted/50 dark:bg-white/5 rounded-full overflow-hidden">
                 <div
                   className={`h-full ${
                     metric.status === "good"
@@ -437,7 +437,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
                   {complexityData.low}%
                 </span>
               </div>
-              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+              <div className="h-2 bg-muted/50 dark:bg-white/5 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-green-500 transition-all duration-500"
                   style={{ width: `${complexityData.low}%` }}
@@ -451,7 +451,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
                   {complexityData.medium}%
                 </span>
               </div>
-              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+              <div className="h-2 bg-muted/50 dark:bg-white/5 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-yellow-500 transition-all duration-500"
                   style={{ width: `${complexityData.medium}%` }}
@@ -465,7 +465,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
                   {complexityData.high}%
                 </span>
               </div>
-              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+              <div className="h-2 bg-muted/50 dark:bg-white/5 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-red-500 transition-all duration-500"
                   style={{ width: `${complexityData.high}%` }}

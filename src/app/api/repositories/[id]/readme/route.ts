@@ -5,11 +5,12 @@ import { GitHubRateLimitError } from "@/lib/services/githubService";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id: paramId } = await context.params;
     const user = await requireAuth(request);
-    const id = Number(params.id);
+    const id = Number(paramId);
 
     if (!Number.isFinite(id)) {
       return NextResponse.json(

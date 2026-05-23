@@ -127,7 +127,7 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as FilterType)}
-            className="glass px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-300 cursor-pointer"
+            className="glass px-4 py-2 rounded-lg hover:bg-accent/50 dark:hover:bg-white/10 transition-all duration-300 cursor-pointer"
           >
             <option value="all">All branches</option>
             <option value="active">Active</option>
@@ -217,7 +217,7 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
               filteredBranches.map((branch) => (
                 <Card
                   key={branch.id}
-                  className="glass hover:bg-white/10 transition-all duration-300 cursor-pointer p-4"
+                  className="glass hover:bg-accent/50 dark:hover:bg-white/10 transition-all duration-300 cursor-pointer p-4"
                   onClick={() => setSelectedBranch(branch)}
                 >
                   <div className="space-y-3">
@@ -384,13 +384,13 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
                 </div>
                 <button
                   onClick={() => setSelectedBranch(null)}
-                  className="glass p-2 rounded-lg hover:bg-white/10 transition-colors"
+                  className="glass p-2 rounded-lg hover:bg-accent/50 dark:hover:bg-white/10 transition-colors"
                 >
                   ×
                 </button>
               </div>
 
-              <div className="space-y-3 pt-4 border-t border-white/10">
+              <div className="space-y-3 pt-4 border-t border-border/50 dark:border-white/10">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="glass p-4 rounded-lg">
                     <p className="text-xs text-muted-foreground mb-1">Ahead</p>

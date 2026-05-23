@@ -13,8 +13,11 @@ import {
   User,
   ChevronLeft,
   Menu,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +37,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   children,
 }) => {
   const { user, logout } = useAuth();
+  const { toggleTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -172,9 +176,22 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
             <div className="flex-1" />
 
-            {/* User Profile Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            <div className="flex items-center gap-4">
+              {/* Theme Toggle Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                className="relative h-9 w-9 p-0 rounded-lg hover:bg-accent/10 transition-colors"
+                aria-label="Toggle theme"
+              >
+                <Sun className="h-5 w-5 rotate-0 scale-100 transition-all duration-300 dark:-rotate-90 dark:scale-0 text-foreground" />
+                <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all duration-300 dark:rotate-0 dark:scale-100 text-foreground" />
+              </Button>
+
+              {/* User Profile Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
                   <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center">
                     {user?.avatar ? (
@@ -220,7 +237,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </header>
+        </div>
+      </header>
 
         {/* Page Content */}
         <main className="p-6">{children}</main>

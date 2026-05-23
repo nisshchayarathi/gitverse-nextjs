@@ -4,11 +4,11 @@ import { analysisJobService } from "@/lib/services/analysisJobService";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  context: { params: Promise<{ jobId: string }> }
 ) {
   try {
+    const { jobId } = await context.params;
     const user = await requireAuth(request);
-    const jobId = params.jobId;
 
     if (!jobId) {
       return NextResponse.json({ error: "Missing jobId" }, { status: 400 });

@@ -51,11 +51,12 @@ function kickProductionWorker() {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: paramId } = await context.params;
     const user = await requireAuth(request);
-    const id = parseInt(params.id);
+    const id = parseInt(paramId, 10);
 
     if (isNaN(id)) {
       return NextResponse.json(
