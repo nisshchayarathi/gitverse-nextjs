@@ -89,7 +89,7 @@ gitverse-nextjs/
 │   │       └── page.tsx
 │   ├── analyze/
 │   │   └── route.ts
-│   ├── api/                       # API routes
+│   ├── api/                       # Next.js App Router
 │   │   ├── ai/                    # AI-powered features
 │   │   │   ├── analyze-code/
 │   │   │   │   └── route.ts
