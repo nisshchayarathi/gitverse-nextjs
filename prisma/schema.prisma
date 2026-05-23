@@ -242,6 +242,7 @@ model Branch {
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
   @@unique([repositoryId, name])
+  @@index([repositoryId])
   @@map("branches")
 }
 
@@ -346,5 +347,5 @@ model Language {
   @@index([repositoryId])
   
   @@map("languages")
-  @@index([repositoryId])
+ 
 }
