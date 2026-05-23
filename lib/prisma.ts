@@ -43,6 +43,10 @@ function createPrismaClient(): PrismaClient {
   const adapterChoice = getAdapterChoice(connectionString);
 
   if (adapterChoice === "neon-http") {
+    // Add connection pool size limits for serverless endpoints
+    const adapter = new PrismaNeonHttp(connectionString, {} as any);
+    return new PrismaClient({ adapter, log: ["error", "warn"] });
+  }
     // Your environment is rejecting Neon WebSocket connections (expects HTTP 101).
     // Use Neon HTTP mode to avoid WS handshakes entirely.
     const adapter = new PrismaNeonHttp(connectionString, {} as any);
