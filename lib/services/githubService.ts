@@ -1,13 +1,12 @@
 import axios, { AxiosError, AxiosInstance, isAxiosError } from "axios";
-<<<<<<< HEAD
 import { getRetryDelayMs, withRetry } from "@/lib/utils/rateLimit";
-=======
->>>>>>> upstream/main
 
 export class GitHubRateLimitError extends Error {
   retryAfterSeconds: number;
   constructor(retryAfterSeconds: number) {
-    super(`GitHub API rate limit reached. Please retry after ${retryAfterSeconds} seconds.`);
+    super(
+      `GitHub API rate limit reached. Please retry after ${retryAfterSeconds} seconds.`,
+    );
     this.name = "GitHubRateLimitError";
     this.retryAfterSeconds = retryAfterSeconds;
   }
@@ -171,7 +170,6 @@ export class GitHubService {
         const status = error.response?.status;
         const config = error.config as any;
 
-<<<<<<< HEAD
         config.retryCount = config.retryCount || 0;
 
         const isRateLimit = status === 429 || status === 403;
@@ -195,22 +193,11 @@ export class GitHubService {
                 );
               }
               throw new GitHubRateLimitError(retrySeconds);
-=======
-        if (status === 429 || status === 403) {
-          const rateLimitRemaining = error.response?.headers?.["x-ratelimit-remaining"];
-          if (status === 429 || rateLimitRemaining === "0") {
-            const retryAfterHeader = error.response?.headers?.["retry-after"];
-            const resetHeader = error.response?.headers?.["x-ratelimit-reset"];
-            let retrySeconds = 60;
-
-            if (retryAfterHeader) {
-              retrySeconds = parseInt(retryAfterHeader, 10);
-            } else if (resetHeader) {
-              const resetTime = parseInt(resetHeader, 10) * 1000;
-              retrySeconds = Math.max(1, Math.ceil((resetTime - Date.now()) / 1000));
->>>>>>> upstream/main
             }
-            throw new GitHubRateLimitError(retrySeconds);
+            config.retryCount += 1;
+            const delayMs = getRetryDelayMs(error, config.retryCount) ?? 1000;
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            return this.client(config);
           }
         }
 
@@ -223,15 +210,11 @@ export class GitHubService {
           config.retryCount = config.retryCount || 0;
           if (config.retryCount < 3) {
             config.retryCount += 1;
-<<<<<<< HEAD
             const backoff =
               Math.pow(2, config.retryCount) * 1000 + Math.random() * 1000;
             console.log(
               `Retrying GitHub API request ${config.url} (attempt ${config.retryCount}) due to ${status || error.code}...`,
             );
-=======
-            const backoff = Math.pow(2, config.retryCount) * 1000 + Math.random() * 1000;
->>>>>>> upstream/main
             await new Promise((resolve) => setTimeout(resolve, backoff));
             return this.client(config);
           }
@@ -245,7 +228,6 @@ export class GitHubService {
   /**
    * Get repository information
    */
-<<<<<<< HEAD
   async getRepository(
     owner: string,
     repo: string,
@@ -272,11 +254,6 @@ export class GitHubService {
       }
       throw sanitizeGitHubError(error);
     }
-=======
-  async getRepository(owner: string, repo: string): Promise<GitHubRepository> {
-    const response = await this.client.get(`/repos/${owner}/${repo}`);
-    return response.data;
->>>>>>> upstream/main
   }
 
   /**
@@ -284,7 +261,9 @@ export class GitHubService {
    */
   async getCurrentUser(): Promise<GitHubUser | null> {
     try {
-      const response = await this.client.get("/user");
+      const response = await withRetry(() => this.client.get("/user"), {
+        maxRetries: 3,
+      });
       return response.data as GitHubUser;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {
@@ -292,6 +271,19 @@ export class GitHubService {
       }
       throw sanitizeGitHubError(error);
     }
+  }
+
+  async getAuthenticatedUser(): Promise<GitHubUser> {
+    if (!this.token) {
+      throw new Error("GitHub token is required");
+    }
+
+    const user = await this.getCurrentUser();
+    if (!user) {
+      throw new Error("GitHub authenticated user not found");
+    }
+
+    return user;
   }
 
   /**
@@ -412,7 +404,6 @@ export class GitHubService {
    * Get repository branches
    */
   async getBranches(owner: string, repo: string): Promise<GitHubBranch[]> {
-<<<<<<< HEAD
     try {
       const response = await this.client.get(
         `/repos/${owner}/${repo}/branches`,
@@ -424,10 +415,6 @@ export class GitHubService {
       }
       throw sanitizeGitHubError(error);
     }
-=======
-    const response = await this.client.get(`/repos/${owner}/${repo}/branches`);
-    return response.data;
->>>>>>> upstream/main
   }
 
   /**
@@ -443,7 +430,6 @@ export class GitHubService {
       page?: number;
     },
   ): Promise<GitHubCommit[]> {
-<<<<<<< HEAD
     try {
       const response = await this.client.get(
         `/repos/${owner}/${repo}/commits`,
@@ -466,18 +452,6 @@ export class GitHubService {
       }
       throw sanitizeGitHubError(error);
     }
-=======
-    const response = await this.client.get(`/repos/${owner}/${repo}/commits`, {
-      params: {
-        sha: params?.sha,
-        path: params?.path,
-        per_page: params?.per_page || 100,
-        page: params?.page || 1,
-      },
-    });
-
-    return response.data;
->>>>>>> upstream/main
   }
 
   /**
@@ -604,7 +578,6 @@ export class GitHubService {
     owner: string,
     repo: string,
   ): Promise<Record<string, number>> {
-<<<<<<< HEAD
     try {
       const response = await this.client.get(
         `/repos/${owner}/${repo}/languages`,
@@ -616,10 +589,6 @@ export class GitHubService {
       }
       throw sanitizeGitHubError(error);
     }
-=======
-    const response = await this.client.get(`/repos/${owner}/${repo}/languages`);
-    return response.data;
->>>>>>> upstream/main
   }
 
   /**

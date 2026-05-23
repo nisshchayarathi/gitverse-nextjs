@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth , sanitizeError } from "@/lib/middleware";
-import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
+import { requireAuth, sanitizeError } from "@/lib/middleware";
+import {
+  GitHubService,
+  GitHubRateLimitError,
+} from "@/lib/services/githubService";
 import { repositoryService } from "@/lib/services/repositoryService";
 
 export async function POST(request: NextRequest) {
@@ -12,14 +15,14 @@ export async function POST(request: NextRequest) {
     if (!url) {
       return NextResponse.json(
         { error: "Repository URL is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!token) {
       return NextResponse.json(
         { error: "GitHub token is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -27,12 +30,18 @@ export async function POST(request: NextRequest) {
     if (!parsed) {
       return NextResponse.json(
         { error: "Invalid GitHub URL" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const github = new GitHubService(token);
     const repoData = await github.getRepository(parsed.owner, parsed.repo);
+    if (!repoData) {
+      return NextResponse.json(
+        { error: "GitHub repository not found" },
+        { status: 404 },
+      );
+    }
 
     const repository = await repositoryService.createRepository({
       name: repoData.name,
@@ -48,13 +57,13 @@ export async function POST(request: NextRequest) {
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(
         { error: error.message, retryAfter: error.retryAfterSeconds },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to import from GitHub" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

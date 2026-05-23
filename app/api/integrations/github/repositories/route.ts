@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-<<<<<<< HEAD
 import { isHttpError, requireAuth } from "@/lib/middleware";
 import {
   GitHubService,
   GitHubRateLimitError,
 } from "@/lib/services/githubService";
 import { sanitizeErrorMessage } from "@/lib/utils/rateLimit";
-=======
-import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
-import { GitHubService } from "@/lib/services/githubService";
->>>>>>> upstream/main
 import prisma from "@/lib/prisma";
 
 function clampInt(
@@ -100,7 +95,6 @@ export async function POST(request: NextRequest) {
       nextPage,
     });
   } catch (error: any) {
-<<<<<<< HEAD
     console.error("GitHub repositories error:", sanitizeErrorMessage(error));
 
     if (error instanceof GitHubRateLimitError) {
@@ -114,9 +108,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-=======
-    console.error("GitHub repositories error:", sanitizeError(error));
->>>>>>> upstream/main
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
