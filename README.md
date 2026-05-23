@@ -75,43 +75,45 @@ That’s the MVP: turn repo complexity into a contributor roadmap.
 
 ## 🏗️ Project Structure
 
-```
+## 🏗️ Project Structure
+
+```bash
 gitverse-nextjs/
-├── app/
-│   ├── api/                 # API routes
-│   │   ├── auth/            # Authentication endpoints
-│   │   ├── repositories/    # Repository management
-│   │   ├── ai/              # AI-powered features
-│   │   ├── users/           # User management
-│   │   └── integrations/    # Git platform integrations
-│   ├── (pages)/             # Page routes
-│   ├── layout.tsx           # Root layout
-│   └── page.tsx             # Home page
-├── src/
-│   ├── components/          # React components
-│   │   ├── ai/              # AI components
-│   │   ├── auth/            # Authentication components
-│   │   ├── layout/          # Layout components
-│   │   ├── repository/      # Repository components
-│   │   ├── ui/              # Reusable UI components
-│   │   └── visualizations/  # Data visualization components
-│   ├── contexts/            # React contexts
-│   ├── hooks/               # Custom React hooks
-│   ├── pages/               # Page components
-│   ├── services/            # API service functions
-│   └── utils/               # Utility functions
-├── lib/
-│   ├── services/            # Backend services
-│   │   ├── gitService.ts    # Git operations
-│   │   ├── geminiService.ts # AI integration
-│   │   └── repositoryService.ts # Repository logic
-│   ├── prisma.ts            # Prisma client
-│   ├── auth.ts              # Authentication utilities
-│   └── middleware.ts        # Auth middleware
-├── prisma/
-│   └── schema.prisma        # Database schema
-├── public/                  # Static assets
-└── package.json             # Dependencies
+├── app/                        # Next.js app router
+├── prisma/                     # Prisma schema and migrations
+├── public/                     # Static assets
+├── types/                      # Shared TypeScript types
+├── .dockerignore
+├── .env.example
+├── .eslintrc.json
+├── .firebaserc
+├── .gitignore
+├── apphosting.yaml             # Firebase App Hosting config
+├── batch_create.ts
+├── CONTRIBUTING.md
+├── Dockerfile
+├── firebase.json
+├── GETTING_STARTED.md
+├── GIT_GRAPH_SETUP.md
+├── GOOGLE_OAUTH_INTEGRATION.md
+├── GOOGLE_OAUTH_SETUP.md
+├── MIGRATION_COMPLETE.md
+├── MIGRATION_SUMMARY.md
+├── migrations_oauth.sql
+├── next-env.d.ts
+├── next.config.js
+├── package-lock.json
+├── package.json
+├── postcss.config.js
+├── prisma.config.ts
+├── QUICKSTART_OAUTH.md
+├── README.md
+├── START_HERE.md
+├── tailwind.config.js
+├── test.txt
+├── tsconfig.json
+├── tsconfig.worker.json
+└── vercel.json
 ```
 
 ## 🎨 Design System
