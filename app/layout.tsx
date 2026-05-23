@@ -7,8 +7,8 @@ import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "GitVerse - AI-Powered Repository Analysis",
-  description: "Contribution made easy with repo visualization and PR Mentor",
+  title: "GitVerse — AI-Powered Repository Analysis & PR Code Review",
+  description: "Accelerate open-source contributions with real-time Git visualization, interactive mapping, and automatic PR mentoring.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
