@@ -29,6 +29,10 @@ export async function GET(request: NextRequest) {
         name: userDetails.name,
         avatarUrl: (userDetails as any).image,
       },
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+      },
     });
   } catch (error) {
     console.error("Get user error:", sanitizeError(error));

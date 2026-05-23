@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       items: toJsonSafe(sessions),
       nextCursor,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+      },
     });
   } catch (error: any) {
     console.error("Fetch sessions error:", sanitizeError(error));
