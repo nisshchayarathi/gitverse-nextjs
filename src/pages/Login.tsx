@@ -299,12 +299,16 @@ if (!email.includes("@")) {
                   )}
                 </button>
               </div>
-              {error && (
-               <p className="text-sm font-medium
-              text-red-500 mt-2 mb-4">
-                {error}
-               </p>
-              )}
+                  {error && (
+                   <p 
+                    id="login-error"
+                    aria-live="assertive" 
+                    className="text-sm font-medium text-red-500 mt-2 mb-4"
+                   >
+                    {error}
+                   </p>
+                  )}
+
 
             </div>
 
