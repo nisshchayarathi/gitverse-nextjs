@@ -2,7 +2,7 @@
 
 Drop images/GIFs in this folder and reference them from the root README.
 
-Suggested files:
+Suggested files(not yet added-please contribute!):
 
 - hero.png (wide banner)
 - map.gif (repo-to-map demo)
