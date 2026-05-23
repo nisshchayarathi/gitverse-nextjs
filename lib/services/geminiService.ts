@@ -114,6 +114,14 @@ export class GeminiService {
   /**
    * Chat using a pre-built prompt (free-form)
    */
+  static cleanJsonMarkdown(text: string): string {
+    let clean = text.trim();
+    if (clean.startsWith("```")) {
+      clean = clean.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "");
+    }
+    return clean.trim();
+  }
+
   async chatRaw(prompt: string): Promise<string> {
     if (!prompt?.trim()) {
       throw new Error("Prompt is required");
