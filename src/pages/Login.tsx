@@ -26,6 +26,8 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [error, setError] = useState("");
+
 
   const RepoGraph = ({
     className,
@@ -177,24 +179,18 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    setError("");
     if (!email || !password) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
-      return;
-    }
+    setError("Please fill in all fields");
+    return;
+}
 
-    if (!email.includes("@")) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      });
-      return;
-    }
+if (!email.includes("@")) {
+    setError("Please enter a valid email address");
+    return;
+}
+
+
 
     setIsLoading(true);
 
@@ -206,12 +202,9 @@ export default function Login() {
       });
       router.push(from);
     } catch (error: any) {
-      toast({
-        title: "Login Failed",
-        description: error.message || "Invalid email or password",
-        variant: "destructive",
-      });
+      setError(error.message || "Invalid email or password");  
     } finally {
+
       setIsLoading(false);
     }
   };
@@ -306,6 +299,13 @@ export default function Login() {
                   )}
                 </button>
               </div>
+              {error && (
+               <p className="text-sm font-medium
+              text-red-500 mt-2 mb-4">
+                {error}
+               </p>
+              )}
+
             </div>
 
             <div
