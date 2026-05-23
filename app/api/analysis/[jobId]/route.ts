@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware";
+import { requireAuth , sanitizeError } from "@/lib/middleware";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 
 export async function GET(
@@ -20,11 +20,7 @@ export async function GET(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ job }, {
-      headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, private",
-      },
-    });
+    return NextResponse.json({ job });
   } catch (error: any) {
     console.error("GET /analysis/:jobId error:", sanitizeError(error));
     return NextResponse.json({ error: "Failed to fetch job" }, { status: 500 });

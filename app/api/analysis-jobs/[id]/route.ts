@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireAuth, isHttpError } from "@/lib/middleware";
+import { requireAuth, isHttpError , sanitizeError } from "@/lib/middleware";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 
 const lastKickAtByJobId = new Map<string, number>();
@@ -61,10 +61,6 @@ export async function GET(
         error: job.error,
         updatedAt: job.updatedAt,
         createdAt: job.createdAt,
-      },
-    }, {
-      headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, private",
       },
     });
   } catch (error: any) {

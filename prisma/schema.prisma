@@ -130,6 +130,7 @@ model Account {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@unique([provider, providerAccountId])
   @@map("accounts")
 }
@@ -142,13 +143,14 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
+  @@index([userId])
 }
 
 model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
-
+  @@index([expires])
   @@unique([identifier, token])
   @@map("verification_tokens")
 }
@@ -178,8 +180,9 @@ model Repository {
   contributors   Contributor[]
   languages      Language[]
   analysisJobs   AnalysisJob[]
-
+  @@index([url])
   @@map("repositories")
+  @@index([userId])
 }
 
 model AnalysisJob {
@@ -217,13 +220,12 @@ model AnalysisJob {
   @@index([status, nextRunAt])
   // Worker lock cleanup: find and release expired locks
   @@index([lockExpiresAt])
-  // List all jobs for a repository (used in repository detail view)
+  // List all jobs for a repository sorted by newest first
   @@index([repositoryId, createdAt(sort: Desc)])
-  // List all jobs for a user (used in dashboard)
+  // List all jobs for a user sorted by newest first
   @@index([userId, createdAt(sort: Desc)])
-  // Composite: filter by repo + status (e.g. find active jobs for a repo)
+  // Filter active jobs per repository
   @@index([repositoryId, status])
-  @@map("analysis_jobs")
 }
 
 model Branch {
@@ -264,8 +266,10 @@ model Commit {
   createdAt    DateTime   @default(now()) @map("created_at")
   fileChanges  FileChange[]
 
+  // Unique constraint prevents duplicate commits per repository
   @@unique([repositoryId, hash])
-  @@index([repositoryId, committedAt])
+  // Index for fast commit listing by repository and date (most common query pattern)
+  @@index([repositoryId, committedAt(sort: Desc)])
   @@map("commits")
 }
 
@@ -300,8 +304,9 @@ model FileChange {
   fileId    Int?     @map("file_id")
   file      File?    @relation(fields: [fileId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now()) @map("created_at")
-
+  @@index([fileId])
   @@map("file_changes")
+  @@index([commitId])
 }
 
 model Contributor {
@@ -336,5 +341,9 @@ model Language {
   createdAt    DateTime   @default(now()) @map("created_at")
 
   @@unique([repositoryId, name])
+  // Index for fast language lookup per repository
+  @@index([repositoryId])
+  
   @@map("languages")
+  @@index([repositoryId])
 }

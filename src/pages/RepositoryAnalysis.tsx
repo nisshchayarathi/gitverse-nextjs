@@ -22,9 +22,9 @@ import {
   Trash2,
   Activity,
   CheckCircle2,
-  AlertCircle,
   Clock,
   Loader2,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -72,7 +72,7 @@ const StatusBadge = ({ status, isAnalyzing }: { status: string; isAnalyzing: boo
 
   if (isAnalyzing || s === "analyzing" || s === "processing") {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-500 border border-blue-500/20">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
         <Loader2 className="h-3 w-3 animate-spin" />
         Analyzing
       </span>
@@ -91,7 +91,7 @@ const StatusBadge = ({ status, isAnalyzing }: { status: string; isAnalyzing: boo
   if (s === "failed" || s === "error") {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">
-        <AlertCircle className="h-3 w-3" />
+        <XCircle className="h-3 w-3" />
         Failed
       </span>
     );
@@ -117,6 +117,7 @@ export default function RepositoryAnalysis() {
   const [job, setJob] = useState<any>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRepository();
@@ -160,6 +161,7 @@ export default function RepositoryAnalysis() {
 
   const fetchRepository = async () => {
     if (!id) return;
+    setError(null);
 
     try {
       const token = localStorage.getItem("gitverse_token");
@@ -169,15 +171,29 @@ export default function RepositoryAnalysis() {
       const repo = response.data.repository || response.data;
       setRepository(repo);
 
+      const repoStatus = repo?.status?.toLowerCase();
+      if (repoStatus === "failed" || repoStatus === "error") {
+        setError(repo?.error || "Analysis failed. Please try again later.");
+      }
+
       if (response.data.latestJob) {
         setJob(response.data.latestJob);
+        if (response.data.latestJob.status === "FAILED") {
+          setError(response.data.latestJob.error || "Analysis failed. Please try again later.");
+        }
       }
       console.log("Repository data:", response.data);
-    } catch (error: any) {
-      console.error("Error fetching repository:", error);
+    } catch (err: any) {
+      console.error("Error fetching repository:", err);
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          err.message ||
+          "Analysis failed. Please try again later."
+      );
       toast({
         title: "Error fetching repository",
-        description: error.response?.data?.error || error.response?.data?.message || error.message || "Failed to load repository data.",
+        description: err.response?.data?.error || err.response?.data?.message || err.message || "Failed to load repository data.",
         variant: "destructive",
       });
     } finally {
@@ -206,17 +222,24 @@ export default function RepositoryAnalysis() {
       }
 
       if (nextJob?.status === "FAILED") {
+        setError(nextJob?.error || "Analysis failed. Please try again later.");
         toast({
           title: "Analysis failed",
           description: nextJob?.error || nextJob?.progressMessage || "The repository analysis encountered an unexpected error.",
           variant: "destructive",
         });
       }
-    } catch (error: any) {
-      console.error("Error fetching analysis job:", error);
+    } catch (err: any) {
+      console.error("Error fetching analysis job:", err);
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to connect to the analysis service."
+      );
       toast({
         title: "Error checking analysis status",
-        description: error.response?.data?.error || error.response?.data?.message || error.message || "Failed to connect to the analysis service.",
+        description: err.response?.data?.error || err.response?.data?.message || err.message || "Failed to connect to the analysis service.",
         variant: "destructive",
       });
     }
@@ -286,23 +309,26 @@ export default function RepositoryAnalysis() {
               </p>
             </div>
           </div>
-        ) : !job ? (
-  <div className="text-center py-12 flex flex-col items-center gap-4">
-    <Activity className="h-12 w-12 text-muted-foreground/50" />
-    <div>
-      <h3 className="font-semibold text-lg">No analysis jobs found</h3>
-      <p className="text-sm text-muted-foreground mt-1">
-        Run your first analysis to get started
-      </p>
-    </div>
-    <button onClick={() => router.push('/dashboard')}>
-      Go to Dashboard
-    </button>
-  </div>
+        ) : !job && !error ? (
+          <div className="text-center py-12 flex flex-col items-center gap-4 animate-fade-in-up">
+            <Activity className="h-12 w-12 text-muted-foreground/50" />
+            <div>
+              <h3 className="font-semibold text-lg">No analysis jobs found</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Run your first analysis to get started
+              </p>
+            </div>
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-300 text-sm font-medium"
+            >
+              Go to Dashboard
+            </button>
+          </div>
         ) : (
           <>
             {/* Header with back button */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 animate-fade-in-up">
               <Link
                 href="/dashboard"
                 className="glass p-2 rounded-lg hover:bg-white/10 transition-all duration-300 self-start"
@@ -311,23 +337,39 @@ export default function RepositoryAnalysis() {
               </Link>
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl sm:text-3xl font-bold truncate">
-                  {repository.name}
+                  {repository?.name || "Repository Analysis"}
                 </h1>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
-                  {repository.url}
+                  {repository?.url || ""}
                 </p>
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <StatusBadge status={repository.status} isAnalyzing={isAnalyzing} />
+                <div className="flex flex-col gap-1 mt-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <StatusBadge
+                      status={
+                        error
+                          ? "failed"
+                          : repository?.status || job?.status || "pending"
+                      }
+                      isAnalyzing={isAnalyzing}
+                    />
+                  </div>
+                  {error && (
+                    <p className="text-xs sm:text-sm text-red-500 font-medium mt-1">
+                      {error}
+                    </p>
+                  )}
                 </div>
               </div>
-              {/* Delete button */}
-              <button
-                onClick={() => setShowDeleteDialog(true)}
-                className="glass p-2 rounded-lg hover:bg-red-500/20 transition-all duration-300 text-red-500 hover:text-red-400 flex-shrink-0"
-                title="Delete repository"
-              >
-                <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
-              </button>
+              {/* Delete button only if repository exists */}
+              {repository && (
+                <button
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="glass p-2 rounded-lg hover:bg-red-500/20 transition-all duration-300 text-red-500 hover:text-red-400 flex-shrink-0"
+                  title="Delete repository"
+                >
+                  <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                </button>
+              )}
             </div>
 
             {isAnalyzing ? (
@@ -362,10 +404,28 @@ export default function RepositoryAnalysis() {
                   </div>
                 </div>
               </div>
+            ) : error && !repository ? (
+              <div className="glass rounded-lg p-12 text-center space-y-4 animate-fade-in-up">
+                <div className="flex justify-center">
+                  <XCircle className="h-12 w-12 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg text-red-500">Failed to Load Repository</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {error}
+                  </p>
+                </div>
+                <button
+                  onClick={() => fetchRepository()}
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-300 text-sm font-medium shadow-lg shadow-primary/25"
+                >
+                  Retry Loading
+                </button>
+              </div>
             ) : (
               <>
                 {/* Tab navigation */}
-                <div className="glass rounded-lg p-2">
+                <div className="glass rounded-lg p-2 animate-fade-in-up">
                   <div className="flex gap-2 overflow-x-auto">
                     {tabs.map((tab) => (
                       <button

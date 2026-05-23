@@ -227,8 +227,9 @@ export default function Contribute() {
   const onDeleteGitHubApp = async () => {
     setReposError(null);
 
-    const ok = true /* TODO: Replace with Modal component for consistent UX */
-      // Currently using inline confirmation - will be migrated to Modal;
+    const ok = window.confirm(
+      "Delete GitHub App data from GitVerse? This will remove all connected repos and stored PR reviews from the database.",
+    );
     if (!ok) return;
 
     setBusyAction("delete");

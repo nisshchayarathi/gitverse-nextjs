@@ -28,6 +28,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
+import { toast } from "@/hooks/use-toast";
 
 interface Repository {
   id: string;
@@ -145,23 +146,7 @@ export default function Dashboard() {
         }))
     : [];
 
-    const [retrying, setRetrying] = useState<number | null>(null);
-  const handleRetry = async (repoId: number) => {
-    if (retrying) return;
-    setRetrying(repoId);
-    try {
-      const res = await fetch(\`/api/repositories/\${repoId}/analyze\`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed");
-      toast({ title: "Analysis queued", description: "Repository queued for re-analysis." });
-      fetchRepositories();
-    } catch {
-      toast({ title: "Error", description: "Failed to retry analysis", variant: "destructive" });
-    } finally {
-      setRetrying(null);
-    }
-  };
-
-const handleAnalyze = async () => {
+    const handleAnalyze = async () => {
     if (!repoUrl.trim()) return;
 
     setAnalyzing(true);
