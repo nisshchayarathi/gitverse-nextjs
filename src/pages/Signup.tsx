@@ -110,6 +110,12 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  const hasMinLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[@$!%*?&#^()_+=\[\]{}|\\:;'"<>,.?/~`\-]/.test(password);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -172,10 +178,19 @@ export default function Signup() {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       toast({
         title: "Error",
-        description: "Password must be at least 6 characters long",
+        description: "Password must be at least 8 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
+      toast({
+        title: "Weak Password",
+        description: "Please satisfy all password complexity requirements.",
         variant: "destructive",
       });
       return;
@@ -314,9 +329,68 @@ export default function Signup() {
                   required
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Must be at least 8 characters
-              </p>
+              {password && (
+                <div className="space-y-1.5 mt-2 animate-fade-in">
+                  <p className="text-xs font-semibold text-muted-foreground">Password strength requirements:</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 p-3 rounded-lg bg-accent/10 border border-border/40">
+                    <div className="flex items-center space-x-2 text-xs">
+                      {hasMinLength ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      ) : (
+                        <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/30 shrink-0" />
+                      )}
+                      <span className={hasMinLength ? "text-emerald-500 font-medium transition-colors" : "text-muted-foreground transition-colors"}>
+                        At least 8 characters
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-xs">
+                      {hasUppercase ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      ) : (
+                        <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/30 shrink-0" />
+                      )}
+                      <span className={hasUppercase ? "text-emerald-500 font-medium transition-colors" : "text-muted-foreground transition-colors"}>
+                        One uppercase letter
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-xs">
+                      {hasLowercase ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      ) : (
+                        <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/30 shrink-0" />
+                      )}
+                      <span className={hasLowercase ? "text-emerald-500 font-medium transition-colors" : "text-muted-foreground transition-colors"}>
+                        One lowercase letter
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-xs">
+                      {hasNumber ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      ) : (
+                        <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/30 shrink-0" />
+                      )}
+                      <span className={hasNumber ? "text-emerald-500 font-medium transition-colors" : "text-muted-foreground transition-colors"}>
+                        One number
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-xs sm:col-span-2">
+                      {hasSpecial ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      ) : (
+                        <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/30 shrink-0" />
+                      )}
+                      <span className={hasSpecial ? "text-emerald-500 font-medium transition-colors" : "text-muted-foreground transition-colors"}>
+                        One special character (e.g., @$!%*?&)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!password && (
+                <p className="text-xs text-muted-foreground">
+                  Must be at least 8 characters with mixed complexity
+                </p>
+              )}
             </div>
 
             <div

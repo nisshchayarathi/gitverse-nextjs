@@ -17,11 +17,26 @@ export async function POST(request: NextRequest) {
     }
 
     if (newPassword.length < 8) {
-      return NextResponse.json(
-        { message: "Password must be at least 8 characters" },
-        { status: 400 }
-      );
-    }
+       return NextResponse.json(
+         { message: "Password must be at least 8 characters" },
+         { status: 400 }
+       );
+     }
+ 
+     const hasUppercase = /[A-Z]/.test(newPassword);
+     const hasLowercase = /[a-z]/.test(newPassword);
+     const hasNumber = /[0-9]/.test(newPassword);
+     const hasSpecial = /[@$!%*?&#^()_+=\[\]{}|\\:;'"<>,.?/~`\-]/.test(newPassword);
+ 
+     if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
+       return NextResponse.json(
+         {
+           message:
+             "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.",
+         },
+         { status: 400 }
+       );
+     }
 
     const userDetails = await prisma.user.findUnique({
       where: { id: user.userId },

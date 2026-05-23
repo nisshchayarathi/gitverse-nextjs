@@ -345,5 +345,4 @@ model Language {
   @@index([repositoryId])
   
   @@map("languages")
-  @@index([repositoryId])
 }
