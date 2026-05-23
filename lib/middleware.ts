@@ -76,7 +76,7 @@ export function isHttpError(error: unknown): error is HttpError {
 
 export function sanitizeError(error: unknown): string {
   if (error instanceof Error) {
-    return error.message;
+    return error.message || "An unexpected error occurred";
   }
   try {
     const str = String(error);
