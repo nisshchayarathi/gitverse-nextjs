@@ -41,7 +41,6 @@ export default function SyncButton({ repositoryId, initialSyncedAt }: SyncButton
 
       // If we get here, the response is definitely a 200 OK
       const data = await res.json();
-      setLastSyncedAt(data.lastSyncedAt);
       
     } catch (err: any) {
       setError(err.message);

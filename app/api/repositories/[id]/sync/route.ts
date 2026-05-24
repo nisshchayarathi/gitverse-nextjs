@@ -55,18 +55,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     userState.count += 1;
     syncRateLimit.set(rateLimitKey, userState);
 
-  // 3. ACTUAL SYNC LOGIC: Enforce DB transaction boundary to prevent race conditions
-    // We wrap the check and update in a single transaction. By updating the repo FIRST,
-    // we trigger a PostgreSQL row lock. Concurrent requests will queue up rather than race.
-    const updatedRepo = await prisma.$transaction(async (tx) => {
+    // 3. ACTUAL SYNC LOGIC: Enforce DB transaction to prevent race conditions
+    const jobResult = await prisma.$transaction(async (tx) => {
       
-      // Step A: Update the timestamp. This locks the repository row for this transaction.
-      const repo = await tx.repository.update({
-        where: { id: repositoryId },
-        data: { lastSyncedAt: new Date() }
-      });
+      // Step A: Lock the repository row at the database level. 
+      // This forces any exact-millisecond concurrent requests to wait in line.
+      await tx.$executeRaw`SELECT id FROM "repositories" WHERE id = ${repositoryId} FOR UPDATE`;
 
-      // Step B: Now safely check for existing jobs (concurrent requests are waiting in line)
+      // Step B: Safely check for existing jobs
       const existingJob = await tx.analysisJob.findFirst({
         where: {
           repositoryId: existingRepo.id,
@@ -74,28 +70,28 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         }
       });
 
-      // Step C: Safely create the job ONLY if it doesn't exist
-      if (!existingJob) {
-        await tx.analysisJob.create({
-          data: {
-            repositoryId: existingRepo.id,
-            userId: existingRepo.userId,
-            status: "QUEUED",
-          }
-        });
+      if (existingJob) {
+        return { status: "ALREADY_QUEUED" };
       }
 
-      return repo;
+      // Step C: Create the job ONLY if one isn't already running
+      await tx.analysisJob.create({
+        data: {
+          repositoryId: existingRepo.id,
+          userId: existingRepo.userId,
+          status: "QUEUED",
+        }
+      });
+
+      return { status: "NEWLY_QUEUED" };
     });
 
+    // Step 4: Return success WITHOUT stamping the timestamp.
+    // The background worker is now responsible for updating lastSyncedAt when it finishes!
     return NextResponse.json({ 
       success: true, 
-      lastSyncedAt: updatedRepo.lastSyncedAt 
-    });
-
-    return NextResponse.json({ 
-      success: true, 
-      lastSyncedAt: updatedRepo.lastSyncedAt 
+      message: jobResult.status === "ALREADY_QUEUED" ? "Sync already in progress" : "Sync queued",
+      status: jobResult.status
     });
 
   } catch (error) {
