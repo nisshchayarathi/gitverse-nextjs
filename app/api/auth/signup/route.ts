@@ -4,12 +4,51 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { generateToken } from "@/lib/auth";
 
+const signupAttempts = new Map<string, { count: number; resetTime: number }>();
+
+const MAX_SIGNUPS = 3;
+const WINDOW_MS = 60 * 60 * 1000;
+
+function getClientIp(request: NextRequest) {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
+function isRateLimited(ip: string) {
+  const now = Date.now();
+  const record = signupAttempts.get(ip);
+
+  if (!record || now > record.resetTime) {
+    signupAttempts.set(ip, { count: 1, resetTime: now + WINDOW_MS });
+    return false;
+  }
+
+  if (record.count >= MAX_SIGNUPS) {
+    return true;
+  }
+
+  record.count += 1;
+  signupAttempts.set(ip, record);
+  return false;
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+
+    if (isRateLimited(ip)) {
+      return NextResponse.json(
+        { error: "Too many signup attempts. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { email, password, name } = body;
 
-    // Validation
     if (!email || !password || !name) {
       return NextResponse.json(
         { error: "Email, password, and name are required" },
@@ -24,7 +63,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -49,10 +87,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
     const user = await prisma.user.create({
       data: {
         email,
@@ -61,7 +97,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Generate JWT token
     const token = generateToken({ userId: user.id, email: user.email });
 
     return NextResponse.json(

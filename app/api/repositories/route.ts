@@ -1,33 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { normalizeKnownRepoHttpUrl } from "@/lib/utils/repositoryUtils";import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
-
-function normalizeKnownRepoHttpUrl(input: string): string | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(input);
-  } catch {
-    return null;
-  }
-
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-
-  const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
-  const supportedHosts = new Set(["github.com", "gitlab.com", "bitbucket.org"]);
-  if (!supportedHosts.has(host)) return input;
-
-  const parts = parsed.pathname.split("/").filter(Boolean);
-  if (parts.length < 2) return null;
-
-  const owner = parts[0];
-  const repo = parts[1].replace(/\.git$/, "");
-  if (!owner || !repo) return null;
-
-  return `${parsed.protocol}//${parsed.host}/${owner}/${repo}`;
-}
-
 function kickLocalRunner(request: NextRequest) {
   if (process.env.NODE_ENV === "production") return;
   const origin = new URL(request.url).origin;
@@ -54,12 +29,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, url, description } = body;
 
-    console.log("Create repository request:", {
-      name,
-      url,
-      userId: user.userId,
-    });
-
     if (!name || !url) {
       return NextResponse.json(
         { error: "Name and URL are required" },
@@ -84,8 +53,6 @@ export async function POST(request: NextRequest) {
       description,
       userId: user.userId,
     });
-
-    console.log("Repository created:", repository.id);
 
     const job = await analysisJobService.createRepositoryAnalysisJob({
       repositoryId: repository.id,

@@ -218,79 +218,90 @@ export async function POST(request: NextRequest) {
       throw e;
     }
 
-    const { review, prUrl } = await reviewPullRequest({
-      owner,
-      repo,
-      number,
-      githubToken: installationToken,
-    });
-
-    const comment = formatPRReviewMarkdown({ review, prUrl });
-    let postedUrl: string | null = null;
-    let postError: {
-      status?: number;
-      message?: string;
-      documentation_url?: string;
-      url?: string;
-    } | null = null;
-
     try {
-      const posted = await github.postPullRequestComment(
+      const { review, prUrl } = await reviewPullRequest({
         owner,
         repo,
         number,
-        comment,
-      );
-      postedUrl = posted?.html_url || null;
-    } catch (err: unknown) {
-      if (isAxiosError(err)) {
-        const status = err.response?.status;
-        const data = err.response?.data as any;
-        // For GitHub Apps, 403 "Resource not accessible by integration" is common when the app
-        // lacks access to write comments/reviews in a particular repo/PR. Don't fail the webhook.
-        if (status === 403) {
-          postError = {
-            status,
-            message: String(data?.message || err.message || "Forbidden"),
-            documentation_url: data?.documentation_url,
-            url: err.config?.url,
-          };
+        githubToken: installationToken,
+      });
+
+      const comment = formatPRReviewMarkdown({ review, prUrl });
+      let postedUrl: string | null = null;
+      let postError: {
+        status?: number;
+        message?: string;
+        documentation_url?: string;
+        url?: string;
+      } | null = null;
+
+      try {
+        const posted = await github.postPullRequestComment(
+          owner,
+          repo,
+          number,
+          comment,
+        );
+        postedUrl = posted?.html_url || null;
+      } catch (err: unknown) {
+        if (isAxiosError(err)) {
+          const status = err.response?.status;
+          const data = err.response?.data as any;
+          // For GitHub Apps, 403 "Resource not accessible by integration" is common when the app
+          // lacks access to write comments/reviews in a particular repo/PR. Don't fail the webhook.
+          if (status === 403) {
+            postError = {
+              status,
+              message: String(data?.message || err.message || "Forbidden"),
+              documentation_url: data?.documentation_url,
+              url: err.config?.url,
+            };
+          } else {
+            throw err;
+          }
         } else {
           throw err;
         }
-      } else {
-        throw err;
       }
-    }
 
-    await prisma.pRReview.update({
-      where: { id: reviewRow.id },
-      data: {
-        reviewText: comment,
-        rawJson: {
-          ...(review as any),
-          _githubPost: {
-            ok: Boolean(postedUrl),
-            postedUrl,
-            error: postError,
-          },
-        } as any,
-      },
-    });
-
-    return NextResponse.json(
-      {
-        ok: true,
-        posted: postedUrl,
-        postError,
-        stored: {
-          pullRequestId: prRecord.id,
-          prReviewId: reviewRow.id,
-          headSha,
+      await prisma.pRReview.update({
+        where: { id: reviewRow.id },
+        data: {
+          reviewText: comment,
+          rawJson: {
+            ...(review as any),
+            _githubPost: {
+              ok: Boolean(postedUrl),
+              postedUrl,
+              error: postError,
+            },
+          } as any,
         },
-      },
-      { status: 200 },
-    );
+      });
+
+      return NextResponse.json(
+        {
+          ok: true,
+          posted: postedUrl,
+          postError,
+          stored: {
+            pullRequestId: prRecord.id,
+            prReviewId: reviewRow.id,
+            headSha,
+          },
+        },
+        { status: 200 },
+      );
+    } catch (innerError: any) {
+      if (reviewRow) {
+        await prisma.pRReview
+          .delete({
+            where: { id: reviewRow.id },
+          })
+          .catch(() => null); // best-effort cleanup
+      }
+      throw innerError;
+    }
   } catch (error: any) {
     console.error("GitHub webhook PR review error:", sanitizeError(error));
     return NextResponse.json(

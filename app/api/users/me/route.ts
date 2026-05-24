@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       })) > 0;
 
     if (!userDetails) {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error("Error fetching user:", sanitizeError(error));
     return NextResponse.json(
-      { message: "Failed to fetch user" },
+      { error: "Failed to fetch user" },
       { status: 500 }
     );
   }
@@ -51,18 +51,32 @@ export async function DELETE(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    await prisma.user.delete({
-      where: { id: user.userId },
-    });
+    // Delete related GitHub repositories
+await prisma.gitHubRepo.deleteMany({
+  where: {
+    userId: user.userId,
+  },
+});
 
+// Delete related GitHub accounts
+await prisma.gitHubAccount.deleteMany({
+  where: {
+    userId: user.userId,
+  },
+});
+
+// Delete the user
+await prisma.user.delete({
+  where: { id: user.userId },
+});
     return NextResponse.json({ message: "Account deleted" });
   } catch (error: any) {
     console.error("Error deleting account:", sanitizeError(error));
     if (error?.code === "P2025") {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
     return NextResponse.json(
-      { message: "Failed to delete account" },
+      { error: "Failed to delete account" },
       { status: 500 }
     );
   }

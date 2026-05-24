@@ -211,6 +211,63 @@ const loadMore = async () => {
 
 ### Vercel (Recommended)
 
+#### Environment Variables Checklist
+
+Before deploying, add these in **Vercel Dashboard → Project → Settings → 
+Environment Variables:**
+
+| Variable | Required | Description | Example |
+|---|---|---|---|
+| `DATABASE_URL` |  Yes | PostgreSQL connection string (Neon recommended) | `postgresql://user:pass@host/db` |
+| `JWT_SECRET` | No (if `NEXTAUTH_SECRET` is set) | Secret key for JWT signing (fallback for `NEXTAUTH_SECRET`) | `openssl rand -base64 32` |
+| `GEMINI_API_KEY` |  Yes | Google Gemini API key | Get from [Google AI Studio](https://aistudio.google.com) |
+| `NEXTAUTH_URL` |  Yes | Your deployed Vercel URL | `https://your-app.vercel.app` |
+| `NEXTAUTH_SECRET` |  Yes | NextAuth session signing secret | `openssl rand -base64 32` |
+| `GOOGLE_CLIENT_ID` |  No (required for OAuth) | Google OAuth client ID | From Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` |  No (required for OAuth) | Google OAuth client secret | From Google Cloud Console |
+| `NEXT_PUBLIC_API_URL` |  Optional | API URL for client-side calls | Defaults to current domain |
+
+#### 🚀 Deployment Steps:
+
+1. Push your code to GitHub.
+2. Import the project in the [Vercel dashboard](https://vercel.com/new).
+3. Under **Settings → Environment Variables**, add every variable listed in the [Environment Variables](#-environment-variables) section below. Vercel automatically makes them available at build time and runtime.
+   - For `NEXTAUTH_URL`, set the value to your Vercel deployment URL (e.g. `https://gitverse.vercel.app`). In local development, set it to `http://localhost:3000` in your `.env.local` to avoid missing-URL warnings.
+   - Mark sensitive secrets (e.g. `JWT_SECRET`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_SECRET`, `GEMINI_API_KEY`) as **Sensitive** in Vercel so they are never exposed in logs.
+4. Click **Deploy**.
+
+> **Tip:** Vercel re-deploys automatically on every push to `main`. If you update an environment variable in the dashboard, trigger a redeploy from **Deployments → Redeploy** for the new value to take effect.
+1. Push your code to GitHub
+2. Go to [vercel.com](https://vercel.com) then **Import Project**
+3. Select your GitHub repository
+4. Add all required environment variables from the checklist above
+5. Click **Deploy**
+6. In Google Cloud Console, add your Vercel URL as an OAuth redirect URI
+
+#### 🔧 Troubleshooting
+
+**Build failing on Vercel?**
+- Ensure all required environment variables are set
+- Check build logs under **Vercel Dashboard → Deployments → Build Logs**
+
+**Database connection errors?**
+- Verify `DATABASE_URL` is a valid PostgreSQL connection string
+- If using Neon, make sure the database is not paused
+- Neon free tier pauses after inactivity — wake it up from the Neon dashboard
+
+**Google OAuth not working?**
+- Ensure `NEXTAUTH_URL` exactly matches your Vercel deployment URL
+- Add `https://your-app.vercel.app/api/auth/callback/google` 
+  to **Authorized Redirect URIs** in Google Cloud Console
+- Check `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are correctly copied
+
+**AI analysis not working?**
+- Verify `GEMINI_API_KEY` is valid and has not exceeded quota
+- Check [Google AI Studio](https://aistudio.google.com) for API usage limits
+
+**Environment variables not updating?**
+- After changing env vars in Vercel dashboard, trigger a **Redeploy** manually
+- Vercel does not auto-redeploy when env vars change
 1. Push your code to GitHub
 2. Import project in Vercel
 3. Add environment variables in Vercel dashboard
@@ -282,26 +339,25 @@ firebase deploy
 
 ## 📝 Environment Variables
 
-> 💡 For a full Vercel deployment checklist, see the [Vercel Deployment section](#-deployment) above.
+Required:
 
-| Variable | Required | Description |
-|---|---|---|
-| `DATABASE_URL` | ✅ Always | PostgreSQL connection string (use NeonDB pooler URL for Vercel) |
-| `JWT_SECRET` | ✅ Always | JWT signing secret key |
-| `GEMINI_API_KEY` | ✅ Always | Google Gemini API key for AI features |
-| `NEXTAUTH_URL` | ✅ Always | Deployed base URL e.g. `https://<your-domain>` |
-| `NEXTAUTH_SECRET` | ✅ Always | Session/JWT signing secret (generate with `openssl rand -base64 32`) |
-| `GOOGLE_CLIENT_ID` | ⚡ OAuth | Google OAuth client id |
-| `GOOGLE_CLIENT_SECRET` | ⚡ OAuth | Google OAuth client secret |
-| `GITHUB_APP_ID` | ⚡ PR Reviews | GitHub App ID |
-| `GITHUB_APP_PRIVATE_KEY` | ⚡ PR Reviews | GitHub App private key (PEM format) |
-| `GITHUB_WEBHOOK_SECRET` | ⚡ PR Reviews | GitHub webhook secret |
-| `ANALYSIS_RUNNER_SECRET` | ⚡ Cron | Required for scheduled analysis jobs on Vercel |
-| `GITVERSE_ANALYSIS_BACKEND` | ⚡ Cron | URL of your analysis worker backend |
-| `SMTP_HOST` | ⚡ Email | SMTP server for password reset emails |
-| `SMTP_USER` | ⚡ Email | SMTP username |
-| `SMTP_PASS` | ⚡ Email | SMTP password / app password |
-| `NEXT_PUBLIC_API_URL` | Optional | API URL for client-side (defaults to current domain) |
+- `DATABASE_URL` - PostgreSQL connection string
+- `JWT_SECRET` - JWT secret key
+- `GEMINI_API_KEY` - Google Gemini API key
+
+OAuth (Google / NextAuth):
+
+- `NEXTAUTH_URL` - Deployed base URL (e.g. `https://<your-domain>`)
+- `NEXTAUTH_SECRET` - Session/JWT signing secret (generate with `openssl rand -base64 32`)
+- `GOOGLE_CLIENT_ID` - Google OAuth client id (required only if Google sign-in is enabled)
+- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret (required only if Google sign-in is enabled)
+
+
+Optional:
+
+- `JWT_SECRET` - JWT signing secret (fallback/alternate secret configuration)
+- `NEXT_PUBLIC_API_URL` - API URL for client-side (defaults to current domain)
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -309,6 +365,11 @@ firebase deploy
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+## 💖 Contributors & Thanks
+
+A huge thank you to all contributors who have helped improve GitVerse ❤️
+Your efforts make this project stronger, more reliable, and more impactful for the community.
 
 ## 📄 License
 

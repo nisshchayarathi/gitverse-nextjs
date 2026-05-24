@@ -2,9 +2,34 @@ import { CommitActivityHeatmap } from '@/components/visualizations/CommitActivit
 import { CodeDependencyGraph } from '@/components/visualizations/CodeDependencyGraph'
 import { LanguageDistributionChart } from '@/components/visualizations/LanguageDistributionChart'
 import { CodeMetrics } from './CodeMetrics'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+
+interface LanguageStat {
+  name: string;
+  percentage: number;
+  files: number;
+  lines: number;
+  color: string;
+}
+
+interface FileTypeStat {
+  type: string;
+  count: number;
+  percentage: number;
+  icon: string;
+}
+
+interface RepositoryData {
+  languages: LanguageStat[];
+  files: FileTypeStat[];
+  commits: any[];
+  contributors: any[];
+  branches?: any[]
+  size: number;
+}
 
 interface RepositoryInsightsProps {
-  repository?: any
+  repository?: RepositoryData;
 }
 
 export function RepositoryInsights({ repository }: RepositoryInsightsProps) {
@@ -19,13 +44,19 @@ export function RepositoryInsights({ repository }: RepositoryInsightsProps) {
       </div>
 
       {/* Commit Activity Heatmap */}
-      <CommitActivityHeatmap repository={repository} />
+      <ErrorBoundary>
+        <CommitActivityHeatmap repository={repository} />
+      </ErrorBoundary>
 
       {/* Language Distribution */}
-      <LanguageDistributionChart repository={repository} />
+      <ErrorBoundary>
+        <LanguageDistributionChart repository={repository} />
+      </ErrorBoundary>
 
       {/* Code Dependency Graph */}
-      <CodeDependencyGraph repository={repository} />
+      <ErrorBoundary>
+        <CodeDependencyGraph repository={repository} />
+      </ErrorBoundary>
 
       {/* Code Metrics Section */}
       <CodeMetrics repository={repository} />

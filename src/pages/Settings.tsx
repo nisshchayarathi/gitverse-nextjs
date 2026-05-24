@@ -15,16 +15,18 @@ import {
   Button,
   Input,
   toast,
+  Modal,
 } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 
 export default function Settings() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const didInitProfileForm = useRef(false);
@@ -68,6 +70,14 @@ export default function Settings() {
 
     fetchLinkStatus();
   }, [user]);
+
+  useEffect(() => {
+  return () => {
+    if (avatar?.startsWith("blob:")) {
+      URL.revokeObjectURL(avatar);
+    }
+  };
+}, [avatar]);
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -157,6 +167,7 @@ export default function Settings() {
       if (response.status === 200) {
         initialEmailRef.current = trimmedEmail;
         setEmailChangeNewPassword("");
+        updateUser({ name: trimmedName, email: trimmedEmail, avatar: avatar || user?.avatar });
         toast({
           title: "Profile Updated",
           description: "Your profile has been successfully updated",
@@ -167,7 +178,6 @@ export default function Settings() {
       toast({
         title: "Error",
         description:
-          error?.response?.data?.message ||
           error?.response?.data?.error ||
           "Failed to update profile",
         variant: "destructive",
@@ -227,7 +237,7 @@ export default function Settings() {
       toast({
         title: "Error",
         description:
-          error.response?.data?.message || "Failed to change password",
+          error.response?.data?.error || "Failed to change password",
         variant: "destructive",
       });
     } finally {
@@ -264,25 +274,22 @@ export default function Settings() {
     }
 
     // Convert to base64
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      setAvatar(base64);
-      toast({
-        title: "Avatar Updated",
-        description: 'Click "Save Changes" to confirm the update',
-      });
-    };
-    reader.readAsDataURL(file);
+    const previewUrl = URL.createObjectURL(file);
+
+     setAvatar(previewUrl);
+
+     toast ({
+     title: "Avatar Updated",
+    description: 'Click "Save Changes" to confirm the update',
+});
   };
 
-  const handleDeleteAccount = async () => {
-    if (isDeletingAccount) return;
+  const handleDeleteAccount = () => {
+    setShowDeleteModal(true);
+  };
 
-    const confirmed = window.confirm(
-      "Delete your account? This permanently deletes your data and cannot be undone."
-    );
-    if (!confirmed) return;
+  const confirmDeleteAccount = async () => {
+    if (isDeletingAccount) return;
 
     setIsDeletingAccount(true);
     try {
@@ -305,7 +312,7 @@ export default function Settings() {
       toast({
         title: "Error",
         description:
-          error.response?.data?.message || "Failed to delete account",
+          error.response?.data?.error || "Failed to delete account",
         variant: "destructive",
       });
     } finally {
@@ -612,6 +619,37 @@ export default function Settings() {
           </div>
         </div>
       </div>
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete Account"
+        size="sm"
+      >
+        <p className="text-muted-foreground mb-6">
+          This permanently deletes your account and all data. This cannot be undone.
+        </p>
+
+        <div className="flex gap-3 justify-end">
+          <Button
+            variant="outline"
+            onClick={() => setShowDeleteModal(false)}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            variant="destructive"
+            onClick={() => {
+              setShowDeleteModal(false);
+              confirmDeleteAccount();
+            }}
+            disabled={isDeletingAccount}
+          >
+            {isDeletingAccount ? "Deleting..." : "Delete Account"}
+          </Button>
+        </div>
+      </Modal>
+
     </DashboardLayout>
   );
 }

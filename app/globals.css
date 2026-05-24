@@ -94,6 +94,11 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 4rem; /* account for fixed navbar height */
+  }
+
   * {
     @apply border-border;
   }
@@ -485,6 +490,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   .marquee__track {
     animation: none;
     transform: none;
