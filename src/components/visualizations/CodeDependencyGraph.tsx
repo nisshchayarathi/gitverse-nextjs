@@ -25,7 +25,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   useEffect(() => {
     if (!svgRef.current) return;
 
-    const graphData = generateDependencyGraph(repository);
+    const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
     // If no data, show empty state
     if (graphData.nodes.length === 0) {
@@ -318,7 +318,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     sm:translate-x-[-250px] sm:translate-y-[-250px]
   "
   style={{
-    opacity: 1, // control with state later
+    opacity: 0,
+    display: "none",
     backgroundColor: "rgba(0, 0, 0, 0.9)",
     color: "white",
     zIndex: 9999,

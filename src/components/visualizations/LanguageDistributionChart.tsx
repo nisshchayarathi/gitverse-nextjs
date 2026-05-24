@@ -270,7 +270,8 @@ export function LanguageDistributionChart({
     sm:translate-x-[-300px] sm:translate-y-[-300px]
   "
   style={{
-    opacity: 1, // control later with state
+    opacity: 0,
+    display: "none",
     backgroundColor: "rgba(0, 0, 0, 0.9)",
     color: "white",
     zIndex: 9999,
