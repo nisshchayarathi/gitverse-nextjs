@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.analysisJobService = exports.AnalysisJobService = void 0;
 const prisma_1 = __importDefault(require("../prisma"));
+const client_1 = require("@prisma/client");
 const DEFAULT_LOCK_MS = 10 * 60 * 1000;
 function computeBackoffMs(attempt) {
     // Exponential backoff with cap (10s, 20s, 40s, ... up to 5m)
@@ -14,17 +15,45 @@ function computeBackoffMs(attempt) {
 }
 class AnalysisJobService {
     async createRepositoryAnalysisJob(params) {
-        return prisma_1.default.analysisJob.create({
-            data: {
-                repositoryId: params.repositoryId,
-                userId: params.userId,
-                type: "repository_analysis",
-                status: "QUEUED",
-                progressPercent: 0,
-                progressMessage: "Queued",
-                maxAttempts: params.maxAttempts ?? 3,
-            },
-        });
+        try {
+            return await prisma_1.default.analysisJob.create({
+                data: {
+                    repositoryId: params.repositoryId,
+                    userId: params.userId,
+                    type: "repository_analysis",
+                    status: "QUEUED",
+                    progressPercent: 0,
+                    progressMessage: "Queued",
+                    maxAttempts: params.maxAttempts ?? 3,
+                },
+            });
+        }
+        catch (error) {
+            if (error instanceof client_1.Prisma.PrismaClientKnownRequestError &&
+                error.code === "P2002") {
+                const existingJob = await prisma_1.default.analysisJob.findFirst({
+                    where: {
+                        repositoryId: params.repositoryId,
+                        status: { in: ["QUEUED", "PROCESSING"] },
+                    },
+                });
+                if (existingJob)
+                    return existingJob;
+                // The active job may have completed between the P2002 and the lookup. Retry exactly once.
+                return await prisma_1.default.analysisJob.create({
+                    data: {
+                        repositoryId: params.repositoryId,
+                        userId: params.userId,
+                        type: "repository_analysis",
+                        status: "QUEUED",
+                        progressPercent: 0,
+                        progressMessage: "Queued",
+                        maxAttempts: params.maxAttempts ?? 3,
+                    },
+                });
+            }
+            throw error;
+        }
     }
     async getJob(params) {
         return prisma_1.default.analysisJob.findFirst({
@@ -68,6 +97,22 @@ class AnalysisJobService {
         });
     }
     async markFailed(params) {
+        // Update repository status to failed when retries exhausted
+        try {
+            const job = await prisma_1.default.analysisJob.findUnique({
+                where: { id: params.jobId },
+                select: { repositoryId: true },
+            });
+            if (job?.repositoryId && params.attempts >= params.maxAttempts) {
+                await prisma_1.default.repository.update({
+                    where: { id: job.repositoryId },
+                    data: { status: "failed" },
+                });
+            }
+        }
+        catch {
+            // Non-critical: repo status update must not crash job status update
+        }
         const shouldRetry = params.attempts < params.maxAttempts;
         if (shouldRetry) {
             const delay = computeBackoffMs(params.attempts);
@@ -138,6 +183,24 @@ class AnalysisJobService {
         if (!claimedId)
             return null;
         return prisma_1.default.analysisJob.findUnique({ where: { id: claimedId } });
+    }
+    async cleanupStaleJobs() {
+        const stale = await prisma_1.default.analysisJob.updateMany({
+            where: {
+                status: "PROCESSING",
+                lockExpiresAt: { lt: new Date() },
+                updatedAt: { lt: new Date(Date.now() - 60 * 60 * 1000) },
+            },
+            data: {
+                status: "FAILED",
+                error: "Job timed out - no heartbeat received",
+                finishedAt: new Date(),
+                lockedAt: null,
+                lockedBy: null,
+                lockExpiresAt: null,
+            },
+        });
+        return stale.count;
     }
     async heartbeat(params) {
         const lockMs = params.lockMs ?? DEFAULT_LOCK_MS;

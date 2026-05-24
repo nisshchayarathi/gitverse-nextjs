@@ -32,17 +32,20 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GitService = void 0;
 const child_process_1 = require("child_process");
 const util_1 = require("util");
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs/promises"));
-const readline = require("readline");
+const readline_1 = __importDefault(require("readline"));
 const execPromiseRaw = (0, util_1.promisify)(child_process_1.exec);
 const DEFAULT_EXEC_OPTIONS = {
     encoding: "utf8",
-    maxBuffer: 100 * 1024 * 1024,
+    maxBuffer: 100 * 1024 * 1024, // 100 MB for very large repos
 };
 const DEFAULT_GIT_TIMEOUT_MS = 2 * 60 * 1000;
 const GIT_CLONE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -210,8 +213,7 @@ class GitService {
                 refEntries.push({ name, fullName, date });
             }
             // Fire all rev-list --count in parallel so one bad ref doesn't block the rest.
-            const countResults = await Promise.allSettled(refEntries.map((entry) => execPromise(`cd "${this.repoPath}" && git rev-list --count "${entry.fullName}"`, { timeout: DEFAULT_GIT_TIMEOUT_MS })
-                .then(({ stdout }) => parseInt(stdout.trim()))));
+            const countResults = await Promise.allSettled(refEntries.map((entry) => execPromise(`cd "${this.repoPath}" && git rev-list --count "${entry.fullName}"`, { timeout: DEFAULT_GIT_TIMEOUT_MS }).then(({ stdout }) => parseInt(stdout.trim()))));
             const branches = refEntries.map((entry, i) => {
                 const result = countResults[i];
                 const commitCount = result.status === "fulfilled"
@@ -247,18 +249,19 @@ class GitService {
             "-n", String(effectiveLimit),
             branch,
         ];
+        const spawnOpts = {
+            stdio: ["ignore", "pipe", "pipe"],
+            env: {
+                ...process.env,
+                GIT_TERMINAL_PROMPT: "0",
+                GCM_INTERACTIVE: "Never",
+                GIT_LFS_SKIP_SMUDGE: "1",
+            },
+            timeout: GIT_LOG_TIMEOUT_MS,
+        };
         return new Promise((resolve, reject) => {
-            const child = (0, child_process_1.spawn)("git", args, {
-                stdio: ["ignore", "pipe", "pipe"],
-                env: {
-                    ...process.env,
-                    GIT_TERMINAL_PROMPT: "0",
-                    GCM_INTERACTIVE: "Never",
-                    GIT_LFS_SKIP_SMUDGE: "1",
-                },
-                timeout: GIT_LOG_TIMEOUT_MS,
-            });
-            const rl = readline.createInterface({ input: child.stdout });
+            const child = (0, child_process_1.spawn)("git", args, spawnOpts);
+            const rl = readline_1.default.createInterface({ input: child.stdout });
             const commits = [];
             let currentHeader = null;
             let currentFileChanges = [];
@@ -330,9 +333,8 @@ class GitService {
                     currentFilesChanged = 0;
                     return;
                 }
-                if (!currentHeader) {
+                if (!currentHeader)
                     return;
-                }
                 if (line.includes("changed") || line.includes("file")) {
                     const match = line.match(/(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/);
                     if (match) {
@@ -576,12 +578,10 @@ class GitService {
                             lineCount = await countLinesReadStream(fullPath);
                         }
                         else {
-                            // Avoid reading very large files into memory.
                             lineCount = Math.ceil(stats.size / 80);
                         }
                     }
                     catch {
-                        // If can't read as text, estimate from bytes (avg 80 chars per line)
                         lineCount = Math.ceil(stats.size / 80);
                     }
                     // Detect language from extension

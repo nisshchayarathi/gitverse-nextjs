@@ -5,7 +5,7 @@ import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
 
-function (input: string): string | null {
+function normalizeKnownRepoHttpUrl(input: string): string | null {
   let parsed: URL;
   try {
     parsed = new URL(input);
