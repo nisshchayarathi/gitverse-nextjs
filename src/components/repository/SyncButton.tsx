@@ -43,7 +43,7 @@ export default function SyncButton({ repositoryId, initialSyncedAt }: SyncButton
 
   // Format the timestamp cleanly (e.g., "Oct 24, 2:30 PM")
   const formattedDate = lastSyncedAt
-    ? new Intl.DateTimeFormat('en-US', {
+    ? new Intl.DateTimeFormat(undefined, {
         month: 'short',
         day: 'numeric',
         hour: 'numeric',
