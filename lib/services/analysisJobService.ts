@@ -1,5 +1,6 @@
 import prisma from "../prisma";
 import type { AnalysisJob } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 export type JobProgressUpdate = {
   progressPercent?: number;
@@ -7,7 +8,7 @@ export type JobProgressUpdate = {
   progressDetails?: unknown;
 };
 
-const DEFAULT_LOCK_MS = 5 * 60 * 1000;
+const DEFAULT_LOCK_MS = 10 * 60 * 1000;
 
 function computeBackoffMs(attempt: number): number {
   // Exponential backoff with cap (10s, 20s, 40s, ... up to 5m)
@@ -22,17 +23,46 @@ export class AnalysisJobService {
     userId: number;
     maxAttempts?: number;
   }): Promise<AnalysisJob> {
-    return prisma.analysisJob.create({
-      data: {
-        repositoryId: params.repositoryId,
-        userId: params.userId,
-        type: "repository_analysis",
-        status: "QUEUED",
-        progressPercent: 0,
-        progressMessage: "Queued",
-        maxAttempts: params.maxAttempts ?? 3,
-      },
-    });
+    try {
+      return await prisma.analysisJob.create({
+        data: {
+          repositoryId: params.repositoryId,
+          userId: params.userId,
+          type: "repository_analysis",
+          status: "QUEUED",
+          progressPercent: 0,
+          progressMessage: "Queued",
+          maxAttempts: params.maxAttempts ?? 3,
+        },
+      });
+    } catch (error: any) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        const existingJob = await prisma.analysisJob.findFirst({
+          where: {
+            repositoryId: params.repositoryId,
+            status: { in: ["QUEUED", "PROCESSING"] },
+          },
+        });
+        if (existingJob) return existingJob;
+
+        // The active job may have completed between the P2002 and the lookup. Retry exactly once.
+        return await prisma.analysisJob.create({
+          data: {
+            repositoryId: params.repositoryId,
+            userId: params.userId,
+            type: "repository_analysis",
+            status: "QUEUED",
+            progressPercent: 0,
+            progressMessage: "Queued",
+            maxAttempts: params.maxAttempts ?? 3,
+          },
+        });
+      }
+      throw error;
+    }
   }
 
   async getJob(params: {

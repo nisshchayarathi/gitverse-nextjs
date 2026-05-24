@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.analysisJobService = exports.AnalysisJobService = void 0;
 const prisma_1 = __importDefault(require("../prisma"));
-const DEFAULT_LOCK_MS = 5 * 60 * 1000;
+const DEFAULT_LOCK_MS = 10 * 60 * 1000;
 function computeBackoffMs(attempt) {
     // Exponential backoff with cap (10s, 20s, 40s, ... up to 5m)
     const base = 10_000;

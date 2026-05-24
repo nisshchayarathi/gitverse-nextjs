@@ -9,6 +9,11 @@ const os_1 = __importDefault(require("os"));
 const prisma_1 = __importDefault(require("../lib/prisma"));
 const analysisJobService_1 = require("../lib/services/analysisJobService");
 const repositoryService_1 = require("../lib/services/repositoryService");
+// Catch rejections that slip past the promise-gap fixes in repositoryService.
+process.on("unhandledRejection", (reason) => {
+    console.error("FATAL unhandled rejection — worker will exit:", reason);
+    process.exit(1);
+});
 const POLL_INTERVAL_MS = 2000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const LOCK_MS = 5 * 60_000;
