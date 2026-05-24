@@ -26,6 +26,9 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const graphAnalyzer = new GraphAnalyzer();
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
+  const graphAnalyzer = new GraphAnalyzer();
+  const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
+
   useEffect(() => {
     if (!svgRef.current) return;
 
@@ -280,22 +283,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
               <span>Files</span>
             </div>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={isExporting} className="gap-2">
-                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleExportPNG}>
-                Export as PNG (High Res)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportPDF}>
-                Export as PDF (Vector Quality)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
       <div className="glass rounded-lg p-4 sm:p-6">
@@ -333,7 +320,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     backdropFilter: "blur(8px)",
     left: "0px",
     top: "0px",
-    whiteSpace: "nowrap",
+  whiteSpace: "nowrap",
   }}
 />
 
@@ -346,7 +333,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         nodeType={selectedNode.type}
         repositoryFiles={repository?.files || []}
         onClose={() => setSelectedNode(null)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+  onOpenSettings={() => setIsSettingsOpen(true)}  
       />
     )}
 

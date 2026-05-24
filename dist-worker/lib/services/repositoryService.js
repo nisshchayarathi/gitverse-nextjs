@@ -43,6 +43,13 @@ const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const crypto = __importStar(require("crypto"));
 const fs = __importStar(require("fs/promises"));
+function yieldIfHighMemory(threshold = 0.7) {
+    const usage = process.memoryUsage();
+    if (usage.heapUsed / usage.heapTotal > threshold) {
+        return new Promise((resolve) => setImmediate(resolve));
+    }
+    return Promise.resolve();
+}
 class RepositoryService {
     async tryReadmeFromRepoPath(repoPath) {
         const candidates = [
@@ -180,13 +187,15 @@ class RepositoryService {
                 progressPercent: 5,
                 progressMessage: "Cloning repository",
             });
-            gitService = await gitService_1.GitService.cloneRepository(repository.url, tempDir);
-            // Capture README / size / branches in parallel; these are independent once cloned.
+            gitService = await gitService_1.GitService.cloneRepository(repository.url, tempDir, {
+                onProgress: (pct, msg) => {
+                    const analysisPct = 5 + Math.round((pct / 100) * 3);
+                    report({ progressPercent: Math.min(8, analysisPct), progressMessage: msg });
+                },
+            });
+            // Capture README first, then size + branches in parallel.
             await report({ progressPercent: 8, progressMessage: "Reading README" });
-            const readmePromise = this.tryReadmeFromRepoPath(tempDir);
-            const sizePromise = gitService.getRepositorySize();
-            const branchesPromise = gitService.getBranches();
-            const readme = await readmePromise;
+            const readme = await this.tryReadmeFromRepoPath(tempDir);
             await prisma_1.default.repository.update({
                 where: { id: repositoryId },
                 data: {
@@ -201,8 +210,8 @@ class RepositoryService {
                 progressMessage: "Calculating size",
             });
             const [size, branches] = await Promise.all([
-                sizePromise,
-                branchesPromise,
+                gitService.getRepositorySize(),
+                gitService.getBranches(),
             ]);
             // Analyze branches
             console.log(`Analyzing branches for repository ${repositoryId}`);
@@ -319,6 +328,7 @@ class RepositoryService {
                     failedCount += chunk.length;
                     console.error(`Failed to insert commit chunk starting at ${i}:`, error.message);
                 }
+                await yieldIfHighMemory();
             }
             console.log(`Commit insertion complete: ${insertedCount} inserted, ${failedCount} failed`);
             // Analyze files
@@ -360,16 +370,13 @@ class RepositoryService {
                 progressPercent: 80,
                 progressMessage: "Analyzing contributors",
             });
-            const contributorsPromise = gitService.getContributors();
-            console.log(`Detecting languages for repository ${repositoryId}`);
             await report({
                 progressPercent: 90,
                 progressMessage: "Detecting languages",
             });
-            const languagesPromise = gitService.detectLanguages();
             const [contributors, languages] = await Promise.all([
-                contributorsPromise,
-                languagesPromise,
+                gitService.getContributors(),
+                gitService.detectLanguages(),
             ]);
             const totalContributions = contributors.reduce((sum, c) => sum + c.commits, 0);
             if (contributors.length > 0) {

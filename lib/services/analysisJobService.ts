@@ -8,7 +8,7 @@ export type JobProgressUpdate = {
   progressDetails?: unknown;
 };
 
-const DEFAULT_LOCK_MS = 5 * 60 * 1000;
+const DEFAULT_LOCK_MS = 10 * 60 * 1000;
 
 function computeBackoffMs(attempt: number): number {
   // Exponential backoff with cap (10s, 20s, 40s, ... up to 5m)
