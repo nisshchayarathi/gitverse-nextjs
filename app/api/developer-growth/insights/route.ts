@@ -8,12 +8,29 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {
     await requireAuth(request);
-    const body = await request.json();
+    
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonErr) {
+      return NextResponse.json(
+        { error: "Malformed request payload" },
+        { status: 400 }
+      );
+    }
+
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { error: "Invalid request payload structure" },
+        { status: 400 }
+      );
+    }
+
     const { username, metrics, repos } = body;
 
-    if (!username) {
+    if (!username || typeof username !== "string") {
       return NextResponse.json(
-        { error: "GitHub username is required" },
+        { error: "GitHub username is required and must be a string" },
         { status: 400 }
       );
     }
@@ -71,8 +88,11 @@ JSON Schema:
         .trim();
       
       insights = JSON.parse(cleanJsonText);
+      if (!isValidAIInsights(insights)) {
+        throw new Error("AI response does not match the expected JSON schema structure");
+      }
     } catch (aiError) {
-      console.warn("AI generation failed or parse error, using fallbacks:", aiError);
+      console.warn("AI generation failed, parse error, or schema validation failed, using fallbacks:", aiError);
       
       // Dynamic fallback mock data based on actual input metrics
       const topLang = languagesList[0]?.name || "JavaScript";
@@ -115,4 +135,23 @@ JSON Schema:
       { status: 500 }
     );
   }
+}
+
+function isValidAIInsights(data: any): boolean {
+  if (!data || typeof data !== "object") return false;
+  if (typeof data.techStackOverview !== "string") return false;
+  
+  if (!Array.isArray(data.emergingTrends) || !data.emergingTrends.every((t: any) => typeof t === "string")) return false;
+  if (!Array.isArray(data.inactiveSkills) || !data.inactiveSkills.every((s: any) => typeof s === "string")) return false;
+  if (!Array.isArray(data.consistencyAlerts) || !data.consistencyAlerts.every((a: any) => typeof a === "string")) return false;
+  
+  if (!Array.isArray(data.growthRecommendations) || !data.growthRecommendations.every((r: any) => typeof r === "string")) return false;
+  
+  if (!Array.isArray(data.underutilizedRepos)) return false;
+  for (const repo of data.underutilizedRepos) {
+    if (!repo || typeof repo !== "object") return false;
+    if (typeof repo.name !== "string" || typeof repo.reason !== "string") return false;
+  }
+  
+  return true;
 }

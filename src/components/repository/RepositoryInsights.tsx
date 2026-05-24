@@ -11,16 +11,11 @@ interface LanguageStat {
   color: string;
 }
 
-interface FileTypeStat {
-  type: string;
-  count: number;
-  percentage: number;
-  icon: string;
-}
+
 
 interface RepositoryData {
   languages: LanguageStat[];
-  files: FileTypeStat[];
+  files: any[];
   commits: any[];
   contributors: any[];
   branches?: any[]

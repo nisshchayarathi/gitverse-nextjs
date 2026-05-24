@@ -32,9 +32,18 @@ interface QualityMetric {
   description: string;
 }
 
+interface RepositoryFile {
+  path: string;
+  language?: string;
+  lines?: number;
+  dependencies?: any[];
+  devDependencies?: any[];
+  [key: string]: any;
+}
+
 interface RepositoryData {
   languages: LanguageStat[];
-  files: any[];
+  files: RepositoryFile[];
   commits: any[];
   contributors: any[];
   branches?: any[];
@@ -63,11 +72,11 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
 
   // Use real repository data
   const languageStats: LanguageStat[] = (repository?.languages || []).map(
-    (lang: any) => {
+    (lang: { name: string; percentage: number; lines?: number }) => {
       // Count files for this language - match by language name
       const languageName = lang.name?.toLowerCase().trim();
       const filesForLanguage =
-        repository?.files?.filter((f: any) => {
+        repository?.files?.filter((f: RepositoryFile) => {
           const fileLanguage = f.language?.toLowerCase().trim();
           return fileLanguage === languageName;
         }).length || 0;
@@ -84,26 +93,26 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
 
   const totalFiles = repository?.files?.length || 0;
   const sourceFiles =
-    repository?.files?.filter((f: any) =>
+    repository?.files?.filter((f: RepositoryFile) =>
       f.path?.match(/\.(ts|tsx|js|jsx|py|java|go|rs)$/i)
     )?.length || 0;
   const testFiles =
-    repository?.files?.filter((f: any) =>
+    repository?.files?.filter((f: RepositoryFile) =>
       f.path?.match(/\.(test|spec)\.(ts|tsx|js|jsx)$/i)
     )?.length || 0;
   const configFiles =
-    repository?.files?.filter((f: any) =>
+    repository?.files?.filter((f: RepositoryFile) =>
       f.path?.match(/\.(json|yaml|yml|toml|ini|env)$/i)
     )?.length || 0;
   const docFiles =
-    repository?.files?.filter((f: any) => f.path?.match(/\.(md|txt|doc)$/i))
+    repository?.files?.filter((f: RepositoryFile) => f.path?.match(/\.(md|txt|doc)$/i))
       ?.length || 0;
   const otherFiles =
     totalFiles - sourceFiles - testFiles - configFiles - docFiles;
 
   // Calculate total lines of code from all files
   const totalLinesOfCode = (repository?.files || []).reduce(
-    (sum: number, file: any) => {
+    (sum: number, file: RepositoryFile) => {
       return sum + (file.lines || 0);
     },
     0
@@ -211,18 +220,18 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
 
   // Calculate code complexity based on file sizes
   const complexityFiles =
-    repository?.files?.filter((f: any) =>
+    repository?.files?.filter((f: RepositoryFile) =>
       f.path?.match(/\.(ts|tsx|js|jsx|py|java|go|rs)$/i)
     ) || [];
 
   const lowComplexity = complexityFiles.filter(
-    (f: any) => (f.lines || 0) < 200
+    (f: RepositoryFile) => (f.lines || 0) < 200
   ).length;
   const mediumComplexity = complexityFiles.filter(
-    (f: any) => (f.lines || 0) >= 200 && (f.lines || 0) < 500
+    (f: RepositoryFile) => (f.lines || 0) >= 200 && (f.lines || 0) < 500
   ).length;
   const highComplexity = complexityFiles.filter(
-    (f: any) => (f.lines || 0) >= 500
+    (f: RepositoryFile) => (f.lines || 0) >= 500
   ).length;
 
   const totalComplexityFiles =
@@ -244,7 +253,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
 
   // Calculate real dependencies from repository
   const packageJsonFile = repository?.files?.find(
-    (f: any) => f.path?.toLowerCase() === "package.json"
+    (f: RepositoryFile) => f.path?.toLowerCase() === "package.json"
   );
   const totalDependencies =
     (packageJsonFile?.dependencies?.length || 0) +

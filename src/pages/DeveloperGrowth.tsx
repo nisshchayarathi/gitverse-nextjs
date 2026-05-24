@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import {
   GitBranch,
@@ -109,6 +109,8 @@ export default function DeveloperGrowth() {
   // Check connected account username
   const [connectedUsername, setConnectedUsername] = useState<string | null>(null);
 
+  const analysisRequestIdRef = useRef(0);
+
   // 1. Initial Load: Check if user has connected their GitHub account
   useEffect(() => {
     const checkConnection = async () => {
@@ -139,6 +141,8 @@ export default function DeveloperGrowth() {
     const cleanUsername = searchUsername.trim().replace(/^@/, "");
     if (!cleanUsername) return;
 
+    const currentRequestId = ++analysisRequestIdRef.current;
+
     setLoading(true);
     setError(null);
     setProfile(null);
@@ -151,8 +155,9 @@ export default function DeveloperGrowth() {
       // Step A: Fetch profile from GitHub public API
       let userRes;
       try {
-        userRes = await axios.get(`https://api.github.com/users/${cleanUsername}`);
+        userRes = await axios.get(`https://api.github.com/users/${encodeURIComponent(cleanUsername)}`);
       } catch (err: any) {
+        if (currentRequestId !== analysisRequestIdRef.current) return;
         if (err.response?.status === 404) {
           throw new Error(`GitHub user "${cleanUsername}" not found. Please double check the spelling.`);
         } else if (err.response?.status === 403) {
@@ -161,13 +166,15 @@ export default function DeveloperGrowth() {
         throw err;
       }
 
+      if (currentRequestId !== analysisRequestIdRef.current) return;
       const profileData: GitHubProfile = userRes.data;
       setProfile(profileData);
 
       // Step B: Fetch repos (up to 100)
       const reposRes = await axios.get(
-        `https://api.github.com/users/${cleanUsername}/repos?per_page=100&sort=updated`
+        `https://api.github.com/users/${encodeURIComponent(cleanUsername)}/repos?per_page=100&sort=updated`
       );
+      if (currentRequestId !== analysisRequestIdRef.current) return;
       const reposList: GitHubRepo[] = Array.isArray(reposRes.data) ? reposRes.data : [];
       setRepos(reposList);
 
@@ -175,23 +182,27 @@ export default function DeveloperGrowth() {
       let eventsList: GitHubEvent[] = [];
       try {
         const eventsRes = await axios.get(
-          `https://api.github.com/users/${cleanUsername}/events?per_page=100`
+          `https://api.github.com/users/${encodeURIComponent(cleanUsername)}/events?per_page=100`
         );
+        if (currentRequestId !== analysisRequestIdRef.current) return;
         eventsList = Array.isArray(eventsRes.data) ? eventsRes.data : [];
       } catch (eventErr) {
+        if (currentRequestId !== analysisRequestIdRef.current) return;
         console.warn("Could not load GitHub events:", eventErr);
       }
+      if (currentRequestId !== analysisRequestIdRef.current) return;
       setEvents(eventsList);
 
       // Step D: Calculate metrics and trigger AI generation
       const calcMetrics = calculateMetrics(profileData, reposList, eventsList);
-      fetchAIInsights(cleanUsername, calcMetrics, reposList, eventsList);
+      fetchAIInsights(cleanUsername, calcMetrics, reposList, eventsList, currentRequestId);
 
       toast({
         title: "Analysis Complete",
         description: `Successfully analyzed GitHub profile for ${cleanUsername}`,
       });
     } catch (err: any) {
+      if (currentRequestId !== analysisRequestIdRef.current) return;
       console.error("Analysis error:", err);
       setError(err.message || "Failed to analyze GitHub profile. Please check your internet connection.");
       toast({
@@ -200,7 +211,9 @@ export default function DeveloperGrowth() {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (currentRequestId === analysisRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -299,7 +312,8 @@ export default function DeveloperGrowth() {
     targetUser: string,
     computedMetrics: any,
     repositories: GitHubRepo[],
-    activityEvents: GitHubEvent[]
+    activityEvents: GitHubEvent[],
+    requestId?: number
   ) => {
     setLoadingInsights(true);
     try {
@@ -331,14 +345,17 @@ export default function DeveloperGrowth() {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         }
       );
+      if (requestId && requestId !== analysisRequestIdRef.current) return;
       setInsights(res.data?.insights || null);
     } catch (err) {
+      if (requestId && requestId !== analysisRequestIdRef.current) return;
       console.error("Failed to load AI insights:", err);
       toast({
         title: "AI Analysis Warning",
         description: "Could not retrieve customized AI recommendations. Displaying metrics engine analytics instead.",
       });
     } finally {
+      if (requestId && requestId !== analysisRequestIdRef.current) return;
       setLoadingInsights(false);
     }
   };

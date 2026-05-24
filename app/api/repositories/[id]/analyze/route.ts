@@ -21,7 +21,7 @@ function kickProductionWorker() {
   if (process.env.NODE_ENV !== "production") return;
 
   void triggerAnalysisWorkerWorkflow().catch((error) => {
-    console.error("Failed to dispatch analysis worker workflow:", error);
+    console.error("Failed to dispatch analysis worker workflow:", sanitizeError(error));
   });
 }
 
