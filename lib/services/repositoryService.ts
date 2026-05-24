@@ -1,4 +1,5 @@
 import prisma from "../prisma";
+import { FileChangeType } from "@prisma/client";
 import { GitService } from "./gitService";
 import * as path from "path";
 import * as os from "os";
@@ -137,7 +138,6 @@ export class RepositoryService {
     });
 
     if (existingRepository) {
-
       return existingRepository;
     }
 
@@ -204,7 +204,10 @@ export class RepositoryService {
       gitService = await GitService.cloneRepository(repository.url, tempDir, {
         onProgress: (pct, msg) => {
           const analysisPct = 5 + Math.round((pct / 100) * 3);
-          report({ progressPercent: Math.min(8, analysisPct), progressMessage: msg });
+          report({
+            progressPercent: Math.min(8, analysisPct),
+            progressMessage: msg,
+          });
         },
       });
 
@@ -237,17 +240,56 @@ export class RepositoryService {
       });
       const defaultBranch = branches.find((b) => b.isDefault)?.name || "main";
 
-      await prisma.branch.createMany({
-        data: branches.map((branch) => ({
-          name: branch.name,
-          isDefault: branch.isDefault,
-          isProtected: branch.isProtected,
-          commitCount: branch.commitCount,
-          lastCommitAt: branch.lastCommitAt,
-          repositoryId,
-        })),
-        skipDuplicates: true,
-      });
+      try {
+        // Upsert each branch: insert new ones and update metadata on existing ones.
+        // Using individual upserts because createMany does not support ON CONFLICT DO UPDATE.
+        for (const branch of branches) {
+          await prisma.branch.upsert({
+            where: {
+              repositoryId_name: {
+                repositoryId,
+                name: branch.name,
+              },
+            },
+            create: {
+              name: branch.name,
+              isDefault: branch.isDefault,
+              isProtected: branch.isProtected,
+              commitCount: branch.commitCount,
+              lastCommitAt: branch.lastCommitAt ?? null,
+              repositoryId,
+            },
+            update: {
+              isDefault: branch.isDefault,
+              isProtected: branch.isProtected,
+              commitCount: branch.commitCount,
+              lastCommitAt: branch.lastCommitAt ?? null,
+            },
+          });
+        }
+
+        // Cleanup: delete stale branches that exist in DB but are no longer
+        // present in the repository (renamed or deleted branches).
+        const freshBranchNames = branches.map((b) => b.name);
+        await prisma.branch.deleteMany({
+          where: {
+            repositoryId,
+            name: { notIn: freshBranchNames },
+          },
+        });
+      } catch (error: any) {
+        // P2002 = unique constraint violation from a race condition between two
+        // concurrent analysis jobs. Safe to log and continue — the DB already
+        // has the correct branch row from whichever job won the race.
+        if (error?.code === "P2002") {
+          console.warn(
+            `Branch upsert race condition for repository ${repositoryId} — skipping:`,
+            error.message,
+          );
+        } else {
+          throw error;
+        }
+      }
 
       // Analyze commits from all branches
       await report({
@@ -277,7 +319,6 @@ export class RepositoryService {
       const newCommits = commits.filter(
         (commit: { hash: string }) => !existingHashes.has(commit.hash),
       );
-
 
       let insertedCount = 0;
       let failedCount = 0;
@@ -341,16 +382,16 @@ export class RepositoryService {
                 changeType: "added" | "modified" | "deleted";
               }>;
             }) => {
-            const commitId = commitIdByHash.get(commit.hash);
-            if (!commitId || commit.fileChanges.length === 0) return [];
+              const commitId = commitIdByHash.get(commit.hash);
+              if (!commitId || commit.fileChanges.length === 0) return [];
 
-            return commit.fileChanges.map((change) => ({
-              path: change.path,
-              additions: change.additions,
-              deletions: change.deletions,
-              changeType: change.changeType,
-              commitId,
-            }));
+              return commit.fileChanges.map((change) => ({
+                path: change.path,
+                additions: change.additions,
+                deletions: change.deletions,
+                changeType: change.changeType.toUpperCase() as FileChangeType,
+                commitId,
+              }));
             },
           );
 
@@ -361,19 +402,27 @@ export class RepositoryService {
             });
           }
 
-          const pct = 25 + Math.round((Math.min(i + chunk.length, newCommits.length) / totalNewCommits) * 35);
+          const pct =
+            25 +
+            Math.round(
+              (Math.min(i + chunk.length, newCommits.length) /
+                totalNewCommits) *
+                35,
+            );
           await report({
             progressPercent: Math.min(60, pct),
             progressMessage: `Storing commits (${Math.min(i + chunk.length, newCommits.length)}/${newCommits.length})`,
           });
         } catch (error: any) {
           failedCount += chunk.length;
-          console.error(`Failed to insert commit chunk starting at ${i}:`, error.message);
+          console.error(
+            `Failed to insert commit chunk starting at ${i}:`,
+            error.message,
+          );
         }
 
         await yieldIfHighMemory();
       }
-
 
       // Analyze files
       await report({ progressPercent: 65, progressMessage: "Scanning files" });
@@ -405,7 +454,6 @@ export class RepositoryService {
             progressMessage: `Storing files (${insertedSoFar}/${files.length})`,
           });
         }
-       
       } else {
       }
 
@@ -518,7 +566,6 @@ export class RepositoryService {
       });
 
       await report({ progressPercent: 100, progressMessage: "Completed" });
-
     } catch (error: any) {
       console.error(`Error analyzing repository ${repositoryId}:`, error);
       await prisma.repository.update({
