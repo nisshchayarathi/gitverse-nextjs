@@ -3,6 +3,10 @@ import * as d3 from "d3";
 import { Card, EmptyState } from "@/components/ui";
 import { Network } from "lucide-react";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
+import { ModuleSummaryPanel } from "./ModuleSummaryPanel";
+import { AISettingsModal } from "@/components/settings/AISettingsModal";
+import { useTheme } from "next-themes";
+import { Loader2, Download } from "lucide-react";
 
 
 
@@ -16,6 +20,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const { theme } = useTheme();
 
   const graphAnalyzer = new GraphAnalyzer();
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
@@ -26,7 +32,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   useEffect(() => {
     if (!svgRef.current) return;
 
-    const graphData = generateDependencyGraph(repository);
+    const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
     // If no data, show empty state
     if (graphData.nodes.length === 0) {
@@ -38,7 +44,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         .attr("y", "50%")
         .attr("text-anchor", "middle")
         .attr("dominant-baseline", "middle")
-        .attr("fill", "rgba(255,255,255,0.4)")
+        .attr("fill", theme === "dark" ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)")
         .text("No files found in repository");
       return;
     }
@@ -92,7 +98,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .selectAll("line")
       .data(links)
       .join("line")
-      .attr("stroke", (d: any) => d.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)")
+      .attr("stroke", (d: any) => d.isCyclic ? "#ef4444" : (theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"))
       .attr("stroke-width", (d: any) => d.strength * 2)
       .attr("stroke-dasharray", (d: any) => d.isCyclic ? "5,5" : "none")
       .attr("stroke-opacity", 0.6);
@@ -132,14 +138,14 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .append("circle")
       .attr("r", (d: any) => d.size / 3)
       .attr("fill", (d: any) => typeColors[d.type])
-      .attr("stroke", "rgba(255,255,255,0.3)")
+      .attr("stroke", theme === "dark" ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)")
       .attr("stroke-width", 2)
       .on("mouseenter", function (event: any, d: any) {
         d3.select(this)
           .transition()
           .duration(200)
           .attr("r", d.size / 2.5)
-          .attr("stroke", "rgba(255,255,255,0.8)")
+          .attr("stroke", theme === "dark" ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.8)")
           .attr("stroke-width", 3);
 
         // Highlight connected nodes
@@ -149,7 +155,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           .attr("stroke", (l: any) =>
             l.source.id === d.id || l.target.id === d.id
               ? typeColors[d.type]
-              : "rgba(255,255,255,0.1)"
+              : (theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)")
           )
           .attr("stroke-opacity", (l: any) =>
             l.source.id === d.id || l.target.id === d.id ? 1 : 0.2
@@ -189,13 +195,13 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           .transition()
           .duration(200)
           .attr("r", d.size / 3)
-          .attr("stroke", "rgba(255,255,255,0.3)")
+          .attr("stroke", theme === "dark" ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)")
           .attr("stroke-width", 2);
 
         link
           .transition()
           .duration(200)
-          .attr("stroke", (l: any) => l.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)")
+          .attr("stroke", (l: any) => l.isCyclic ? "#ef4444" : (theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"))
           .attr("stroke-opacity", 0.6);
 
         if (tooltipRef.current) {
@@ -249,7 +255,10 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     return () => {
       simulation.stop();
     };
-  }, [repository]);
+  }, [repository, theme]);
+
+  const handleExportPNG = async () => {};
+  const handleExportPDF = async () => {};
 
   return (
     <div className="relative">
@@ -286,7 +295,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             width="100%"
             height="auto"
             className="text-foreground min-h-96 sm:min-h-96"
-            style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
+            style={{ background: theme === "dark" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)", minHeight: "300px" }}
             viewBox="0 0 900 600"
             preserveAspectRatio="xMidYMid meet"
           />
@@ -302,15 +311,16 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     translate-x-[-120px] translate-y-[-120px]
     sm:translate-x-[-250px] sm:translate-y-[-250px]
   "
-  style={{
-    opacity: 1, // control with state later
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
-    color: "white",
+    style={{
+    opacity: 0,
+    display: "none",
+    backgroundColor: theme === "dark" ? "rgba(0, 0, 0, 0.9)" : "rgba(255, 255, 255, 0.9)",
+    color: theme === "dark" ? "white" : "black",
     zIndex: 9999,
     backdropFilter: "blur(8px)",
     left: "0px",
     top: "0px",
-    whiteSpace: "nowrap",
+  whiteSpace: "nowrap",
   }}
 />
 
@@ -323,7 +333,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         nodeType={selectedNode.type}
         repositoryFiles={repository?.files || []}
         onClose={() => setSelectedNode(null)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+  onOpenSettings={() => setIsSettingsOpen(true)}  
       />
     )}
 

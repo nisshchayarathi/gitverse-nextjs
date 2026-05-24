@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui";
+import { ThemeToggle } from "./ThemeToggle";
 import { toast } from "@/hooks/use-toast";
 
 interface DashboardLayoutProps {
@@ -172,8 +173,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
             <div className="flex-1" />
 
-            {/* User Profile Dropdown */}
-            <DropdownMenu>
+            <div className="flex items-center gap-2">
+              {/* Theme Toggle */}
+              <ThemeToggle />
+
+              {/* User Profile Dropdown */}
+              <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
                   <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center">
@@ -219,6 +224,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           </div>
         </header>
 

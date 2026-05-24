@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
+import { useTheme } from "next-themes";
 
 interface LanguageData {
   name: string;
@@ -42,6 +43,7 @@ export function LanguageDistributionChart({
 }: LanguageDistributionChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
 
   const languageData: LanguageData[] = (repository?.languages || []).map(
     (lang: RepositoryLanguage) => ({
@@ -108,14 +110,14 @@ export function LanguageDistributionChart({
       .append("path")
       .attr("d", arc)
       .attr("fill", (d) => d.data.color)
-      .attr("stroke", "rgba(0,0,0,0.5)")
+      .attr("stroke", theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)")
       .attr("stroke-width", 2)
       .on("mouseenter", function (event, d) {
         d3.select(this)
           .transition()
           .duration(200)
           .attr("d", (datum: any) => arcHover(datum) || "")
-          .attr("stroke", "rgba(255,255,255,0.8)")
+          .attr("stroke", theme === "dark" ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.8)")
           .attr("stroke-width", 3);
 
         if (tooltipRef.current && svgRef.current) {
@@ -157,7 +159,7 @@ export function LanguageDistributionChart({
           .transition()
           .duration(200)
           .attr("d", (datum: any) => arc(datum) || "")
-          .attr("stroke", "rgba(0,0,0,0.5)")
+          .attr("stroke", theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)")
           .attr("stroke-width", 2);
 
         if (tooltipRef.current) {
@@ -211,7 +213,7 @@ export function LanguageDistributionChart({
       .attr("fill", "currentColor")
       .attr("opacity", 0.7)
       .text("Total Lines");
-  }, [repository]);
+  }, [repository, theme]);
 
   return (
     <Card className="glass p-4 sm:p-6">
@@ -279,9 +281,10 @@ export function LanguageDistributionChart({
     sm:translate-x-[-300px] sm:translate-y-[-300px]
   "
   style={{
-    opacity: 1, // control later with state
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
-    color: "white",
+    opacity: 0,
+    display: "none",
+    backgroundColor: theme === "dark" ? "rgba(0, 0, 0, 0.9)" : "rgba(255, 255, 255, 0.9)",
+    color: theme === "dark" ? "white" : "black",
     zIndex: 9999,
     backdropFilter: "blur(8px)",
     left: "0px",
