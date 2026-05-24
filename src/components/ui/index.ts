@@ -24,3 +24,4 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuRadioGroup,
 } from './dropdown-menu'
+export { ErrorBoundary } from './ErrorBoundary'

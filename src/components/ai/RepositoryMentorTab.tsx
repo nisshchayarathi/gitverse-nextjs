@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { AIRepoMentorSection } from "@/components/ai/AIRepoMentorSection";
+import { ErrorBoundary } from "@/components/ui";
 
 export function RepositoryMentorTab(props: { repositoryData?: any }) {
   const repositoryData = props.repositoryData;
@@ -42,14 +43,17 @@ export function RepositoryMentorTab(props: { repositoryData?: any }) {
 
   return (
     <div className="space-y-6">
-      <AIRepoMentorSection
-        repositoryId={Number(repositoryData?.id || 0)}
-        repoName={repoName}
-        description={description}
-        languages={languageNames}
-        readmeText={readmeText}
-        contributors={contributors}
-      />
+      <ErrorBoundary name="AI Repo Mentor Section">
+        <AIRepoMentorSection
+          repositoryId={Number(repositoryData?.id || 0)}
+          repoName={repoName}
+          description={description}
+          languages={languageNames}
+          readmeText={readmeText}
+          contributors={contributors}
+        />
+      </ErrorBoundary>
     </div>
   );
 }
+

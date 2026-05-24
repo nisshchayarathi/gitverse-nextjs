@@ -88,7 +88,7 @@ User Question: ${message}
       return text;
     } catch (error) {
       console.error("Gemini API error:", error);
-      throw new Error("Failed to get response from AI assistant");
+      throw error;
     }
   }
 
@@ -102,7 +102,7 @@ User Question: ${message}
       yield text;
     } catch (error) {
       console.error("Gemini API streaming error:", error);
-      throw new Error("Failed to stream response from AI assistant");
+      throw error;
     }
   }
 
@@ -133,7 +133,7 @@ User Question: ${message}
       return text;
     } catch (error) {
       console.error("Code analysis error:", error);
-      throw new Error("Failed to analyze code");
+      throw error;
     }
   }
 

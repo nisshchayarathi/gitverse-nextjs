@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Loader2, X, Minimize2, Maximize2, Sparkles } from "lucide-react";
-import { Card } from "@/components/ui";
+import { Card, ErrorBoundary } from "@/components/ui";
 import { geminiService, ChatMessage } from "@/services/gemini";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { getFriendlyErrorMessage } from "@/utils/error";
 
 interface AIRepositoryOverlayProps {
   repository: {
@@ -103,7 +104,7 @@ export function AIRepositoryOverlay({ repository }: AIRepositoryOverlayProps) {
         const context = {
           name: repository.name,
           description: repository.description,
-          languages: repository.languages.map((l) => l.name),
+          languages: Array.isArray(repository.languages) ? repository.languages.map((l) => l.name) : [],
           stats: {
             commits: repository.stats?.commits || 0,
             contributors: contributorsCount,
@@ -113,19 +114,21 @@ export function AIRepositoryOverlay({ repository }: AIRepositoryOverlayProps) {
             stars: repository.stats?.stars || 0,
             forks: repository.stats?.forks || 0,
           },
-          recentActivity: repository.recentCommits
-            ?.slice(0, 5)
-            .map((c: any) => ({
-              message: c.message,
-              author: c.author || c.authorName,
-              date: c.date || c.committedAt,
-            })),
+          recentActivity: Array.isArray(repository.recentCommits)
+            ? repository.recentCommits
+                ?.slice(0, 5)
+                .map((c: any) => ({
+                  message: c.message,
+                  author: c.author || c.authorName,
+                  date: c.date || c.committedAt,
+                }))
+            : [],
           topContributors: contributorsArray.slice(0, 5).map((c: any) => ({
             name: c.name,
             commits: c.commits,
             percentage: c.percentage,
           })),
-          branches: repository.branches?.map((b: any) => b.name),
+          branches: Array.isArray(repository.branches) ? repository.branches?.map((b: any) => b.name) : [],
         };
 
         contextualPrompt = `You are analyzing the ${context.name} repository. 
@@ -202,8 +205,7 @@ User Question: ${input}`;
       console.error("Chat error:", error);
       toast({
         title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to get AI response",
+        description: getFriendlyErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -212,6 +214,7 @@ User Question: ${input}`;
   };
 
   const formatMessage = (content: string) => {
+    if (typeof content !== "string") return null;
     return content.split("\n").map((line, i) => {
       // Bold text
       line = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
@@ -255,7 +258,8 @@ User Question: ${input}`;
         isMinimized ? "w-80" : "w-96"
       }`}
     >
-      <Card className="glass shadow-2xl border border-white/10 overflow-hidden flex flex-col">
+      <ErrorBoundary name="AI Repository Overlay">
+        <Card className="glass shadow-2xl border border-white/10 overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-primary to-accent p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -369,6 +373,7 @@ User Question: ${input}`;
           </>
         )}
       </Card>
-    </div>
+    </ErrorBoundary>
+  </div>
   );
 }

@@ -7,10 +7,11 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { Card, EmptyState } from "@/components/ui";
+import { Card, EmptyState, ErrorBoundary } from "@/components/ui";
 import { geminiService, CodeAnalysisRequest } from "@/services/gemini";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { getFriendlyErrorMessage } from "@/utils/error";
 
 type AnalysisType = "explain" | "bugs" | "improve" | "document";
 
@@ -111,8 +112,7 @@ export function CodeAnalysisPanel() {
       console.error("Analysis error:", error);
       toast({
         title: "Analysis Failed",
-        description:
-          error instanceof Error ? error.message : "Failed to analyze code",
+        description: getFriendlyErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -121,6 +121,7 @@ export function CodeAnalysisPanel() {
   };
 
   const formatResult = (content: string) => {
+    if (typeof content !== "string") return null;
     return content.split("\n").map((line, i) => {
       // Code blocks
       if (line.startsWith("```")) {
@@ -195,7 +196,8 @@ export function CodeAnalysisPanel() {
   )!;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <ErrorBoundary name="Code Analysis Panel">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Input Panel */}
       <div className="space-y-4">
         <Card className="glass p-6">
@@ -333,5 +335,6 @@ export function CodeAnalysisPanel() {
         </Card>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

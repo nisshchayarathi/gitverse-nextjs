@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Loader2, Sparkles, User, Bot, Copy, Check } from "lucide-react";
-import { Card } from "@/components/ui";
+import { Card, ErrorBoundary } from "@/components/ui";
 import { geminiService, ChatMessage } from "@/services/gemini";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { getFriendlyErrorMessage } from "@/utils/error";
 
 interface AIChatInterfaceProps {
   repositoryContext?: {
@@ -98,8 +99,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
       console.error("Chat error:", error);
       toast({
         title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to get AI response",
+        description: getFriendlyErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -187,7 +187,8 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <ErrorBoundary name="AI Chat Interface">
+      <div className="flex flex-col h-full">
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message, index) => (
@@ -310,5 +311,6 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

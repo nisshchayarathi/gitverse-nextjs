@@ -26,7 +26,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, ErrorBoundary } from "@/components/ui";
 import { buildApiUrl } from "@/services/apiConfig";
 
 type TabType =
@@ -212,9 +212,17 @@ export default function RepositoryAnalysis() {
       case "contributors":
         return <Contributors repository={repository} />;
       case "mentor":
-        return <RepositoryMentorTab repositoryData={repository} />;
+        return (
+          <ErrorBoundary name="AI Mentor">
+            <RepositoryMentorTab repositoryData={repository} />
+          </ErrorBoundary>
+        );
       case "insights":
-        return <RepositoryInsights repository={repository} />;
+        return (
+          <ErrorBoundary name="Insights Dashboards">
+            <RepositoryInsights repository={repository} />
+          </ErrorBoundary>
+        );
       default:
         return <RepositoryOverview />;
     }

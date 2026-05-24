@@ -13,6 +13,7 @@ import {
   Button,
 } from "@/components/ui";
 import { buildApiUrl } from "@/services/apiConfig";
+import { getFriendlyErrorMessage } from "@/utils/error";
 
 type Role = "user" | "assistant";
 
@@ -258,7 +259,7 @@ export function AIRepoMentorSection(props: {
         ...prev,
         {
           role: "assistant",
-          content: e?.message || "Something went wrong. Please try again.",
+          content: getFriendlyErrorMessage(e),
         },
       ]);
       pinnedToBottomRef.current = true;
