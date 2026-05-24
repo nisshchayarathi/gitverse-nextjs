@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
+import { useTheme } from "next-themes";
 
 interface CommitData {
   date: string;
@@ -54,6 +55,7 @@ export function CommitActivityHeatmap({
     date: string;
     count: number;
   } | null>(null);
+  const { theme } = useTheme();
 
   useEffect(() => {
     // Advance the window automatically as time passes (refresh at next local midnight).
@@ -205,9 +207,9 @@ export function CommitActivityHeatmap({
           .attr("rx", 2)
           .attr(
             "fill",
-            d.count === 0 ? "rgba(255,255,255,0.1)" : colorScale(d.count)
+            d.count === 0 ? (theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)") : colorScale(d.count)
           )
-          .attr("stroke", "rgba(0,0,0,0.5)")
+          .attr("stroke", theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)")
           .attr("stroke-width", 1)
           .style("cursor", "pointer")
           .on("click", function (event) {
@@ -218,7 +220,7 @@ export function CommitActivityHeatmap({
             d3.select(this)
               .transition()
               .duration(200)
-              .attr("stroke", "rgba(255,255,255,0.5)")
+              .attr("stroke", theme === "dark" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)")
               .attr("stroke-width", 2);
 
             if (tooltipRef.current) {
@@ -256,7 +258,7 @@ export function CommitActivityHeatmap({
             d3.select(this)
               .transition()
               .duration(200)
-              .attr("stroke", "rgba(0,0,0,0.5)")
+              .attr("stroke", theme === "dark" ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)")
               .attr("stroke-width", 1);
 
             if (tooltipRef.current) {
@@ -342,7 +344,7 @@ export function CommitActivityHeatmap({
       .attr("fill", "currentColor")
       .attr("font-size", "10px")
       .text("More");
-  }, [repository, now]);
+  }, [repository, now, theme]);
 
   // Get commits for selected date
   const getCommitsForDate = (date: string) => {
@@ -462,8 +464,8 @@ export function CommitActivityHeatmap({
   style={{
     opacity: 0,
     display: "none",
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
-    color: "white",
+    backgroundColor: theme === "dark" ? "rgba(0, 0, 0, 0.9)" : "rgba(255, 255, 255, 0.9)",
+    color: theme === "dark" ? "white" : "black",
     zIndex: 9999,
     backdropFilter: "blur(8px)",
     left: "0px",
