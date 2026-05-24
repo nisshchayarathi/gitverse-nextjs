@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
-import prisma from "@/lib/prisma";
-import { repositoryService } from "@/lib/services/repositoryService";
+import {
+  isHttpError,
+  requireAuth,
+  sanitizeError,
+} from "../../../../lib/middleware";
+import prisma from "../../../../lib/prisma";
+import { repositoryService } from "../../../../lib/services/repositoryService";
 
 // Helper object containing secure caching headers to prevent data leakage
 const securityHeaders = {

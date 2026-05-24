@@ -1,8 +1,9 @@
-import { normalizeKnownRepoHttpUrl } from "@/lib/utils/repositoryUtils";import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
-import { repositoryService } from "@/lib/services/repositoryService";
-import { analysisJobService } from "@/lib/services/analysisJobService";
-import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
+import { normalizeKnownRepoHttpUrl } from "../../../lib/utils/repositoryUtils";
+import { NextRequest, NextResponse } from "next/server";
+import { isHttpError, requireAuth, sanitizeError } from "../../../lib/middleware";
+import { repositoryService } from "../../../lib/services/repositoryService";
+import { analysisJobService } from "../../../lib/services/analysisJobService";
+import { triggerAnalysisWorkerWorkflow } from "../../../lib/services/analysisWorkerTriggerService";
 function kickLocalRunner(request: NextRequest) {
   if (process.env.NODE_ENV === "production") return;
   const origin = new URL(request.url).origin;
