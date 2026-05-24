@@ -677,7 +677,7 @@ export default function LandingPage() {
             {pricingPlans.map((plan) => (
               <Card
                 key={plan.name}
-                className={`relative glass ${plan.popular ? "border-primary glow-primary" : "glass-hover"}`}
+                className={`relative glass transition-all duration-300 ${plan.popular ? "border-primary glow-primary" : "border-border/50 hover:border-primary hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1"}`}
               >
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-primary rounded-full text-sm font-medium text-primary-foreground">

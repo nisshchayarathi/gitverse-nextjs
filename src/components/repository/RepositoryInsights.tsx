@@ -3,8 +3,32 @@ import { CodeDependencyGraph } from '@/components/visualizations/CodeDependencyG
 import { LanguageDistributionChart } from '@/components/visualizations/LanguageDistributionChart'
 import { CodeMetrics } from './CodeMetrics'
 
+interface LanguageStat {
+  name: string;
+  percentage: number;
+  files: number;
+  lines: number;
+  color: string;
+}
+
+interface FileTypeStat {
+  type: string;
+  count: number;
+  percentage: number;
+  icon: string;
+}
+
+interface RepositoryData {
+  languages: LanguageStat[];
+  files: FileTypeStat[];
+  commits: any[];
+  contributors: any[];
+  branches?: any[]
+  size: number;
+}
+
 interface RepositoryInsightsProps {
-  repository?: any
+  repository?: RepositoryData;
 }
 
 export function RepositoryInsights({ repository }: RepositoryInsightsProps) {

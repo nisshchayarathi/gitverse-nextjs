@@ -44,12 +44,14 @@ export default function SearchPage() {
   const [sortBy, setSortBy] = useState<"recent" | "stars" | "name">("recent");
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetchRepositories();
   }, []);
 
   const fetchRepositories = async () => {
+     setError("");
     try {
       const token = localStorage.getItem("gitverse_token");
       const response = await axios.get(buildApiUrl("/api/repositories"), {
@@ -58,10 +60,17 @@ export default function SearchPage() {
       // API returns { repositories: [...] }
       const repos = response.data.repositories || [];
       setRepositories(Array.isArray(repos) ? repos : []);
-    } catch (error) {
-      console.error("Error fetching repositories:", error);
-      setRepositories([]);
-    } finally {
+    }  
+    catch (error) {
+  console.error("Error fetching repositories:", error);
+
+  setRepositories([]);
+
+  setError(
+    "Failed to load repositories. Please check your connection and try again."
+  );
+}
+finally {
       setLoading(false);
     }
   };
@@ -149,16 +158,24 @@ export default function SearchPage() {
         </div>
 
         {/* Repository Grid/List */}
-        {loading ? (
-          <div className="text-center py-12 text-muted-foreground">
-            Loading repositories...
-          </div>
-        ) : sortedRepositories.length === 0 ? (
+       {loading ? (
+  <div className="text-center py-12 text-muted-foreground">
+    Loading repositories...
+  </div>
+) : error ? (
+  <div className="text-center py-12 text-red-500">
+    {error}
+  </div>
+) : sortedRepositories.length === 0 ? (
           searchQuery ? (
             <EmptyState
               icon={Search}
-              title="No Results Found"
-              description="We couldn't find any repositories matching your search query. Try a different term."
+              title="No repositories found"
+              description="We couldn't find any repositories matching your search query. Try adjusting your search term."
+              suggestions={[
+                "Try another repository",
+                "Check the GitHub username",
+              ]}
               actionLabel="Clear Search"
               onAction={() => setSearchQuery("")}
             />

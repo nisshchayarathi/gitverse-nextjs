@@ -19,8 +19,48 @@ const signupSchema = z.object({
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
 });
 
+const signupAttempts = new Map<string, { count: number; resetTime: number }>();
+
+const MAX_SIGNUPS = 3;
+const WINDOW_MS = 60 * 60 * 1000;
+
+function getClientIp(request: NextRequest) {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
+function isRateLimited(ip: string) {
+  const now = Date.now();
+  const record = signupAttempts.get(ip);
+
+  if (!record || now > record.resetTime) {
+    signupAttempts.set(ip, { count: 1, resetTime: now + WINDOW_MS });
+    return false;
+  }
+
+  if (record.count >= MAX_SIGNUPS) {
+    return true;
+  }
+
+  record.count += 1;
+  signupAttempts.set(ip, record);
+  return false;
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+
+    if (isRateLimited(ip)) {
+      return NextResponse.json(
+        { error: "Too many signup attempts. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
 
     // 2. Validate input against the Zod schema

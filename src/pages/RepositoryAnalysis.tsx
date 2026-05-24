@@ -31,6 +31,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
 import { buildApiUrl } from "@/services/apiConfig";
+import { Modal } from "@/components/ui/Modal";
 
 type TabType =
   | "overview"
@@ -455,63 +456,57 @@ export default function RepositoryAnalysis() {
         )}
 
         {/* Delete Confirmation Dialog */}
-        {showDeleteDialog && (
-          <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
-            onClick={() => !isDeleting && setShowDeleteDialog(false)}
-          >
-            <div
-              className="glass max-w-md w-full p-4 sm:p-6 rounded-lg animate-fade-in-up"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 mb-4">
-                <div className="p-2 sm:p-3 rounded-lg bg-red-500/10 flex-shrink-0">
-                  <Trash2 className="h-5 w-5 sm:h-6 sm:w-6 text-red-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg sm:text-xl font-bold mb-2">
-                    Delete Repository
-                  </h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    Are you sure you want to delete{" "}
-                    <strong className="break-words">{repository?.name}</strong>?
-                    This action cannot be undone and will permanently remove all
-                    repository data, including commits, contributors, and
-                    analysis results.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 justify-end">
-                <button
-                  onClick={() => setShowDeleteDialog(false)}
-                  disabled={isDeleting}
-                  className="px-3 sm:px-4 py-2 rounded-lg glass hover:bg-white/10 transition-all duration-300 disabled:opacity-50 text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteRepository}
-                  disabled={isDeleting}
-                  className="px-3 sm:px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
-                >
-                  {isDeleting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
-                      <span className="hidden sm:inline">Deleting...</span>
-                      <span className="sm:hidden">Deleting...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>Delete Repository</span>
-                    </>
-                  )}
-                </button>
-              </div>
+        <Modal
+          isOpen={showDeleteDialog}
+          onClose={() => !isDeleting && setShowDeleteDialog(false)}
+          size="sm"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 mb-4">
+            <div className="p-2 sm:p-3 rounded-lg bg-red-500/10 flex-shrink-0">
+              <Trash2 className="h-5 w-5 sm:h-6 sm:w-6 text-red-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg sm:text-xl font-bold mb-2">
+                Delete Repository
+              </h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Are you sure you want to delete{" "}
+                <strong className="break-words">{repository?.name}</strong>?
+                This action cannot be undone and will permanently remove all
+                repository data, including commits, contributors, and
+                analysis results.
+              </p>
             </div>
           </div>
-        )}
+
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 justify-end">
+            <button
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={isDeleting}
+              className="px-3 sm:px-4 py-2 rounded-lg border border-secondary-200 dark:border-secondary-700 hover:bg-secondary-100 dark:hover:bg-secondary-800 transition-all duration-300 disabled:opacity-50 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteRepository}
+              disabled={isDeleting}
+              className="px-3 sm:px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 text-sm text-white"
+            >
+              {isDeleting ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+                  <span className="hidden sm:inline">Deleting...</span>
+                  <span className="sm:hidden">Deleting...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span>Delete Repository</span>
+                </>
+              )}
+            </button>
+          </div>
+        </Modal>
       </div>
     </DashboardLayout>
   );

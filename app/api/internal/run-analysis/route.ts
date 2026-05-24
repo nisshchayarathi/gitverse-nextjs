@@ -5,6 +5,14 @@ import { repositoryService } from "@/lib/services/repositoryService";
 
 export const runtime = "nodejs";
 
+// Global catch — prevents Node 15+ from crashing the request on an
+// unhandled rejection that made it past the promise-gap fixes above.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection in run-analysis route:", reason);
+});
+
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
 function isAuthorized(request: NextRequest): boolean {
   const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
 
@@ -53,6 +61,8 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
     return new NextResponse(null, { status: 204 });
   }
 
+  let heartbeatTimer: NodeJS.Timeout | null = null;
+
   try {
     await analysisJobService.updateProgress({
       jobId: job.id,
@@ -62,6 +72,12 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
         progressMessage: job.progressMessage ?? "Processing",
       },
     });
+
+    heartbeatTimer = setInterval(() => {
+      analysisJobService
+        .heartbeat({ jobId: job.id, workerId })
+        .catch((e) => console.error("serverless heartbeat failed", e));
+    }, HEARTBEAT_INTERVAL_MS);
 
     await repositoryService.analyzeRepository(job.repositoryId, {
       onProgress: async (update) => {
@@ -73,10 +89,16 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       },
     });
 
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+
     await analysisJobService.markDone({ jobId: job.id, workerId });
 
     return NextResponse.json({ ok: true, jobId: job.id, status: "DONE" });
   } catch (error: any) {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+
     const message = String(error?.message || error || "Unknown error");
 
     await analysisJobService.markFailed({

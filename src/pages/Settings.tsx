@@ -21,7 +21,7 @@ import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 
 export default function Settings() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -68,6 +68,14 @@ export default function Settings() {
 
     fetchLinkStatus();
   }, [user]);
+
+  useEffect(() => {
+  return () => {
+    if (avatar?.startsWith("blob:")) {
+      URL.revokeObjectURL(avatar);
+    }
+  };
+}, [avatar]);
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -157,6 +165,7 @@ export default function Settings() {
       if (response.status === 200) {
         initialEmailRef.current = trimmedEmail;
         setEmailChangeNewPassword("");
+        updateUser({ name: trimmedName, email: trimmedEmail, avatar: avatar || user?.avatar });
         toast({
           title: "Profile Updated",
           description: "Your profile has been successfully updated",
@@ -167,7 +176,6 @@ export default function Settings() {
       toast({
         title: "Error",
         description:
-          error?.response?.data?.message ||
           error?.response?.data?.error ||
           "Failed to update profile",
         variant: "destructive",
@@ -227,7 +235,7 @@ export default function Settings() {
       toast({
         title: "Error",
         description:
-          error.response?.data?.message || "Failed to change password",
+          error.response?.data?.error || "Failed to change password",
         variant: "destructive",
       });
     } finally {
@@ -264,16 +272,14 @@ export default function Settings() {
     }
 
     // Convert to base64
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      setAvatar(base64);
-      toast({
-        title: "Avatar Updated",
-        description: 'Click "Save Changes" to confirm the update',
-      });
-    };
-    reader.readAsDataURL(file);
+    const previewUrl = URL.createObjectURL(file);
+
+     setAvatar(previewUrl);
+
+     toast ({
+     title: "Avatar Updated",
+    description: 'Click "Save Changes" to confirm the update',
+});
   };
 
   const handleDeleteAccount = async () => {
@@ -305,7 +311,7 @@ export default function Settings() {
       toast({
         title: "Error",
         description:
-          error.response?.data?.message || "Failed to delete account",
+          error.response?.data?.error || "Failed to delete account",
         variant: "destructive",
       });
     } finally {
