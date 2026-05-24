@@ -55,29 +55,42 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     userState.count += 1;
     syncRateLimit.set(rateLimitKey, userState);
 
-    // 3. ACTUAL SYNC LOGIC: Queue a new background job
-    const existingJob = await prisma.analysisJob.findFirst({
-      where: {
-        repositoryId: existingRepo.id,
-        status: { in: ["QUEUED", "PROCESSING"] }
-      }
-    });
+  // 3. ACTUAL SYNC LOGIC: Enforce DB transaction boundary to prevent race conditions
+    // We wrap the check and update in a single transaction. By updating the repo FIRST,
+    // we trigger a PostgreSQL row lock. Concurrent requests will queue up rather than race.
+    const updatedRepo = await prisma.$transaction(async (tx) => {
+      
+      // Step A: Update the timestamp. This locks the repository row for this transaction.
+      const repo = await tx.repository.update({
+        where: { id: repositoryId },
+        data: { lastSyncedAt: new Date() }
+      });
 
-    if (!existingJob) {
-      await prisma.analysisJob.create({
-        data: {
+      // Step B: Now safely check for existing jobs (concurrent requests are waiting in line)
+      const existingJob = await tx.analysisJob.findFirst({
+        where: {
           repositoryId: existingRepo.id,
-          userId: existingRepo.userId, 
-          status: "QUEUED",
+          status: { in: ["QUEUED", "PROCESSING"] }
         }
       });
-    }
-    
-    // 4. Record the time the sync was REQUESTED 
-    // FIX: Updated comment to accurately reflect that the job is now queued
-    const updatedRepo = await prisma.repository.update({
-      where: { id: repositoryId },
-      data: { lastSyncedAt: new Date() }
+
+      // Step C: Safely create the job ONLY if it doesn't exist
+      if (!existingJob) {
+        await tx.analysisJob.create({
+          data: {
+            repositoryId: existingRepo.id,
+            userId: existingRepo.userId,
+            status: "QUEUED",
+          }
+        });
+      }
+
+      return repo;
+    });
+
+    return NextResponse.json({ 
+      success: true, 
+      lastSyncedAt: updatedRepo.lastSyncedAt 
     });
 
     return NextResponse.json({ 
