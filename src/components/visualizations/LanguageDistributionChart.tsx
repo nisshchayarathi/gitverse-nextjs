@@ -9,9 +9,18 @@ interface LanguageData {
   lines: number;
   color: string;
 }
+interface RepositoryLanguage{
+  name:string;
+  percentage: number;
+  lines?:number
+}
+
+interface RepositoryData{
+  languages?: RepositoryLanguage[];
+}
 
 interface LanguageDistributionChartProps {
-  repository?: any;
+  repository?: RepositoryData;
 }
 
 // Generate a vibrant random color
@@ -37,7 +46,7 @@ export function LanguageDistributionChart({
   const { theme } = useTheme();
 
   const languageData: LanguageData[] = (repository?.languages || []).map(
-    (lang: any) => ({
+    (lang: RepositoryLanguage) => ({
       name: lang.name,
       percentage: lang.percentage,
       lines: lang.lines || 0,
@@ -49,7 +58,7 @@ export function LanguageDistributionChart({
     if (!svgRef.current) return;
 
     const languageData: LanguageData[] = (repository?.languages || []).map(
-      (lang: any) => ({
+      (lang: RepositoryLanguage) => ({
         name: lang.name,
         percentage: lang.percentage,
         lines: lang.lines || 0,

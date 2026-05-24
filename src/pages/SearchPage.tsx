@@ -168,17 +168,92 @@ finally {
   </div>
 ) : sortedRepositories.length === 0 ? (
           searchQuery ? (
-            <EmptyState
-              icon={Search}
-              title="No repositories found"
-              description="We couldn't find any repositories matching your search query. Try adjusting your search term."
-              suggestions={[
-                "Try another repository",
-                "Check the GitHub username",
-              ]}
-              actionLabel="Clear Search"
-              onAction={() => setSearchQuery("")}
-            />
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <EmptyState
+                icon={Search}
+                title="No repositories found"
+                description={`We couldn't find any repositories matching "${searchQuery}". Try adjusting your search term.`}
+                suggestions={[
+                  "Try another repository",
+                  "Check the GitHub username",
+                ]}
+                actionLabel="Clear Search"
+                onAction={() => setSearchQuery("")}
+              />
+              
+              {repositories.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between px-2 sm:px-0">
+                    <h2 className="text-xl font-heading font-semibold flex items-center gap-2">
+                      <GitBranch className="h-5 w-5 text-primary" />
+                      Explore Available Repositories
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                    {repositories.slice(0, 3).map((repo, index) => (
+                      <Card
+                        key={repo.id}
+                        className="glass glass-hover cursor-pointer transition-transform hover:scale-[1.02] focus-within:scale-[1.02]"
+                        onClick={() => router.push(`/repo/${repo.id}`)}
+                        style={{ animationDelay: `${index * 0.05}s` }}
+                      >
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-primary/10">
+                                <GitBranch className="h-5 w-5 text-primary" />
+                              </div>
+                              <div>
+                                <CardTitle className="font-heading text-base sm:text-lg break-all">
+                                  {repo.name}
+                                </CardTitle>
+                                <CardDescription className="text-xs font-mono break-all max-w-[180px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[400px]">
+                                  {repo.url}
+                                </CardDescription>
+                              </div>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-xs sm:text-sm text-muted-foreground mb-4 line-clamp-2 min-h-[32px]">
+                            {repo.description || "No description available"}
+                          </p>
+                          <div className="flex flex-wrap items-center justify-between text-xs sm:text-sm">
+                            <div className="flex items-center gap-4 text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Activity className="h-4 w-4" />
+                                {(repo as any)._count?.commits || 0}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <GitBranch className="h-4 w-4" />
+                                {(repo as any)._count?.branches || 0}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {new Date(
+                                (repo as any).lastAnalyzedAt || (repo as any).createdAt
+                              ).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-border/50">
+                            {(repo as any).languages?.[0]?.name ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-accent/10 text-accent">
+                                {(repo as any).languages[0].name}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-muted/50 text-muted-foreground">
+                                No language
+                              </span>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <EmptyState
               icon={GitBranch}

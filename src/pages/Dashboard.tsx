@@ -250,13 +250,23 @@ export default function Dashboard() {
                     <p className="text-xs text-muted-foreground mb-1 truncate">
                       {stat.label}
                     </p>
-                    <p className="text-2xl sm:text-3xl font-heading font-bold break-words">
-                      {stat.value}
-                    </p>
-                    <p className="text-xs text-accent mt-1 flex items-center gap-1 flex-wrap">
-                      <TrendingUp className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate">{stat.change}</span>
-                    </p>
+                    {loading ? (
+                      <div className="space-y-2">
+                        <div className="h-8 w-20 rounded-md bg-muted animate-pulse" />
+                        <div className="h-4 w-28 rounded-md bg-muted animate-pulse" />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-2xl sm:text-3xl font-heading font-bold break-words">
+                        {stat.value}
+                        </p>
+
+                        <p className="text-xs text-accent mt-1 flex items-center gap-1 flex-wrap">
+                        <TrendingUp className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{stat.change}</span>
+                        </p>
+                      </>
+                    )}
                   </div>
                   <div className="p-2 sm:p-3 rounded-lg bg-primary/10 flex-shrink-0">
                     <stat.icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
