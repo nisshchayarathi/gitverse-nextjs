@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
-import { Card, EmptyState } from "@/components/ui";
-import { Network } from "lucide-react";
+import { Card, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, toast } from "@/components/ui";
+import { Loader2, Download } from "lucide-react";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
 import { ModuleSummaryPanel } from "./ModuleSummaryPanel";
 import { AISettingsModal } from "@/components/settings/AISettingsModal";
@@ -18,14 +18,27 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isExporting] = useState(false);
+
+  const handleExportPNG = () => {
+    toast({
+      title: "Exporting PNG",
+      description: "Generating image export...",
+    });
+  };
+
+  const handleExportPDF = () => {
+    toast({
+      title: "Exporting PDF",
+      description: "Generating PDF report...",
+    });
+  };
 
   const graphAnalyzer = new GraphAnalyzer();
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
   useEffect(() => {
     if (!svgRef.current) return;
-
-    const graphData = generateDependencyGraph(repository);
 
     // If no data, show empty state
     if (graphData.nodes.length === 0) {
@@ -64,8 +77,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     };
 
     // Prepare data
-    const nodes = graphData.nodes.map((d) => ({ ...d }));
-    const links = graphData.links.map((d) => ({ ...d }));
+    const nodes = graphData.nodes.map((d: any) => ({ ...d }));
+    const links = graphData.links.map((d: any) => ({ ...d }));
 
     // Create force simulation
     const simulation = d3

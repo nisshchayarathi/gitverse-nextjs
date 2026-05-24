@@ -2,7 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
+import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
 import prisma from "@/lib/prisma";
+
+function kickLocalRunner(request: NextRequest) {
+  if (process.env.NODE_ENV === "production") return;
+  const origin = new URL(request.url).origin;
+  const secret = process.env.ANALYSIS_RUNNER_SECRET;
+  void fetch(`${origin}/api/internal/run-analysis`, {
+    method: "POST",
+    headers: secret ? { "x-analysis-runner-secret": secret } : undefined,
+  }).catch(() => {
+    // Best-effort only.
+  });
+}
+
+function kickProductionWorker() {
+  if (process.env.NODE_ENV !== "production") return;
+
+  void triggerAnalysisWorkerWorkflow().catch((error) => {
+    console.error("Failed to dispatch analysis worker workflow:", error);
+  });
+}
 
 export async function POST(
   request: NextRequest,

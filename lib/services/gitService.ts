@@ -1,7 +1,8 @@
 import { exec, spawn, type ExecOptions, type SpawnOptions } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
-import * as fs from "fs/promises";
+import * as fsPromises from "fs/promises";
+import { createReadStream } from "fs";
 import readline from "readline";
 
 const execPromiseRaw = promisify(exec);
@@ -20,7 +21,7 @@ const MAX_FILE_BYTES_TO_READ_FOR_LINECOUNT = 256 * 1024; // 256KB
 
 function countLinesReadStream(filePath: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    const stream = fs.createReadStream(filePath, { encoding: "utf-8" });
+    const stream = createReadStream(filePath, { encoding: "utf-8" });
     let lines = 0;
     let remaining = "";
 
@@ -187,7 +188,7 @@ export class GitService {
       onProgress?: (percent: number, message: string) => void;
     },
   ): Promise<GitService> {
-    await fs.mkdir(destination, { recursive: true });
+    await fsPromises.mkdir(destination, { recursive: true });
     const depth = Math.max(1, Math.min(opts?.depth ?? 1000, 1000));
     const noSingleBranch = opts?.noSingleBranch ?? true;
 
@@ -356,7 +357,10 @@ export class GitService {
 
     return new Promise((resolve, reject) => {
       const child = spawn("git", args, spawnOpts);
-
+      if (!child.stdout) {
+        reject(new Error("Failed to spawn git log: stdout stream is null"));
+        return;
+      }
       const rl = readline.createInterface({ input: child.stdout });
 
       const commits: CommitData[] = [];
@@ -716,7 +720,7 @@ export class GitService {
 
         try {
           const fullPath = path.join(this.repoPath, filePath);
-          const stats = await fs.stat(fullPath);
+          const stats = await fsPromises.stat(fullPath);
           const name = path.basename(filePath);
           const extension = path.extname(filePath) || null;
 
@@ -811,7 +815,7 @@ export class GitService {
    */
   async cleanup(): Promise<void> {
     try {
-      await fs.rm(this.repoPath, { recursive: true, force: true });
+      await fsPromises.rm(this.repoPath, { recursive: true, force: true });
     } catch (error: any) {
       console.error(`Failed to cleanup repository: ${error.message}`);
     }

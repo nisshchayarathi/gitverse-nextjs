@@ -34,7 +34,7 @@ interface QualityMetric {
 
 interface RepositoryData {
   languages: LanguageStat[];
-  files: FileTypeStat[];
+  files: any[];
   commits: any[];
   contributors: any[];
   branches?: any[];
