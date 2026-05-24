@@ -88,10 +88,6 @@
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.21.0",
     "typescript": "^5.2.2",
-<<<<<<< HEAD
-    "vitest": "^4.1.7"
-=======
     "vitest": "^3.2.4"
->>>>>>> upstream/main
   }
 }
