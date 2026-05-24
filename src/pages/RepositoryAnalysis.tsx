@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RepositoryOverview } from "@/components/repository/RepositoryOverview";
@@ -11,6 +11,7 @@ import { CommitHistory } from "@/components/repository/CommitHistory";
 import { Contributors } from "@/components/repository/Contributors";
 import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import {
   Home,
   FolderTree,
@@ -119,13 +120,24 @@ export default function RepositoryAnalysis() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollingJobRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetchRepository();
   }, [id]);
 
   useEffect(() => {
-    // Poll job status (lightweight) while analyzing.
+    // Guard against dual-polling when the dependency array changes mid-cycle.
+    const jobId = job?.id || repository?.latestJob?.id;
+    if (!jobId) return;
+
+    if (pollingJobRef.current !== jobId) {
+      pollingJobRef.current = jobId;
+    } else {
+      // Same jobId triggered a re-run; bail to avoid stacking loops.
+      return;
+    }
+
     const repoStatus = repository?.status as string | undefined;
     const jobStatus = job?.status as string | undefined;
 
@@ -137,16 +149,22 @@ export default function RepositoryAnalysis() {
 
     setIsAnalyzing(Boolean(shouldShowAnalyzing));
 
-    const jobId = job?.id || repository?.latestJob?.id;
-    if (!jobId) return;
-
     if (jobStatus === "DONE" || jobStatus === "FAILED") return;
 
     let stopped = false;
     let intervalMs = 2000;
+    let retries = 0;
+    const MAX_RETRIES = 60;
 
     const poll = async () => {
       if (stopped) return;
+      if (retries >= MAX_RETRIES) {
+        setError(
+          "Analysis is taking longer than expected. The job may still be processing — check back later."
+        );
+        return;
+      }
+      retries++;
       await fetchJob(jobId);
       if (stopped) return;
       setTimeout(poll, intervalMs);

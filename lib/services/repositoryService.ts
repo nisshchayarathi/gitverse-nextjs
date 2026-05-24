@@ -5,6 +5,14 @@ import * as os from "os";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
 
+function yieldIfHighMemory(threshold = 0.7): Promise<void> {
+  const usage = process.memoryUsage();
+  if (usage.heapUsed / usage.heapTotal > threshold) {
+    return new Promise((resolve) => setImmediate(resolve));
+  }
+  return Promise.resolve();
+}
+
 export interface AnalyzeRepositoryInput {
   name: string;
   url: string;
@@ -193,15 +201,16 @@ export class RepositoryService {
         progressPercent: 5,
         progressMessage: "Cloning repository",
       });
-      gitService = await GitService.cloneRepository(repository.url, tempDir);
+      gitService = await GitService.cloneRepository(repository.url, tempDir, {
+        onProgress: (pct, msg) => {
+          const analysisPct = 5 + Math.round((pct / 100) * 3);
+          report({ progressPercent: Math.min(8, analysisPct), progressMessage: msg });
+        },
+      });
 
-      // Capture README / size / branches in parallel; these are independent once cloned.
+      // Capture README first, then size + branches in parallel.
       await report({ progressPercent: 8, progressMessage: "Reading README" });
-      const readmePromise = this.tryReadmeFromRepoPath(tempDir);
-      const sizePromise = gitService.getRepositorySize();
-      const branchesPromise = gitService.getBranches();
-
-      const readme = await readmePromise;
+      const readme = await this.tryReadmeFromRepoPath(tempDir);
       await prisma.repository.update({
         where: { id: repositoryId },
         data: {
@@ -217,8 +226,8 @@ export class RepositoryService {
         progressMessage: "Calculating size",
       });
       const [size, branches] = await Promise.all([
-        sizePromise,
-        branchesPromise,
+        gitService.getRepositorySize(),
+        gitService.getBranches(),
       ]);
 
       // Analyze branches
@@ -361,6 +370,8 @@ export class RepositoryService {
           failedCount += chunk.length;
           console.error(`Failed to insert commit chunk starting at ${i}:`, error.message);
         }
+
+        await yieldIfHighMemory();
       }
 
 
@@ -403,17 +414,14 @@ export class RepositoryService {
         progressPercent: 80,
         progressMessage: "Analyzing contributors",
       });
-      const contributorsPromise = gitService.getContributors();
-
       await report({
         progressPercent: 90,
         progressMessage: "Detecting languages",
       });
-      const languagesPromise = gitService.detectLanguages();
 
       const [contributors, languages] = await Promise.all([
-        contributorsPromise,
-        languagesPromise,
+        gitService.getContributors(),
+        gitService.detectLanguages(),
       ]);
 
       const totalContributions = contributors.reduce(

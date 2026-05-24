@@ -294,12 +294,18 @@ model File {
   @@map("files")
 }
 
+enum FileChangeType {
+  ADDED
+  MODIFIED
+  DELETED
+}
+
 model FileChange {
   id        Int      @id @default(autoincrement())
   path      String
   additions Int      @default(0)
   deletions Int      @default(0)
-  changeType String  @map("change_type") // added, modified, deleted
+  changeType FileChangeType  @map("change_type") // added, modified, deleted
   commitId  Int      @map("commit_id")
   commit    Commit   @relation(fields: [commitId], references: [id], onDelete: Cascade)
   fileId    Int?     @map("file_id")
@@ -346,5 +352,4 @@ model Language {
   @@index([repositoryId])
   
   @@map("languages")
-  @@index([repositoryId])
 }
