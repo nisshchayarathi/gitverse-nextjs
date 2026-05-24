@@ -222,7 +222,7 @@ export default function Dashboard() {
                 value={repoUrl}
                 onChange={(e) => setRepoUrl(e.target.value)}
                 className="flex-1 bg-background/50"
-                onKeyPress={(e) => e.key === "Enter" && handleAnalyze()}
+                onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
               />
               <Button
                 onClick={handleAnalyze}

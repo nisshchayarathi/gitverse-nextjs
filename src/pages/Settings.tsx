@@ -21,7 +21,7 @@ import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 
 export default function Settings() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -165,6 +165,7 @@ export default function Settings() {
       if (response.status === 200) {
         initialEmailRef.current = trimmedEmail;
         setEmailChangeNewPassword("");
+        updateUser({ name: trimmedName, email: trimmedEmail, avatar: avatar || user?.avatar });
         toast({
           title: "Profile Updated",
           description: "Your profile has been successfully updated",
