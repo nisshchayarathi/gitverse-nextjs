@@ -21,6 +21,7 @@
     "worker:gha": "NODE_OPTIONS=\"--dns-result-order=ipv4first --no-network-family-autoselection\" sh -c 'export WORKER_ONCE=1; node dist-worker/scripts/analysisWorker.js'",
     "worker:dev": "tsx scripts/analysisWorker.ts",
     "lint": "next lint",
+    "test": "vitest run",
     "format": "prettier --write \"**/*.{ts,tsx,css}\"",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
