@@ -55,7 +55,6 @@ export default function SearchPage() {
       const response = await axios.get(buildApiUrl("/api/repositories"), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // API returns { repositories: [...] }
       const repos = response.data.repositories || [];
       setRepositories(Array.isArray(repos) ? repos : []);
     } catch (error) {
@@ -79,13 +78,12 @@ export default function SearchPage() {
   const sortedRepositories = [...filteredRepositories].sort((a, b) => {
     if (sortBy === "stars") return (b.stars || 0) - (a.stars || 0);
     if (sortBy === "name") return a.name.localeCompare(b.name);
-    return 0; // 'recent' is already sorted
+    return 0;
   });
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="px-2 sm:px-0">
           <h1 className="text-2xl sm:text-3xl font-heading font-bold mb-2">
             Browse Repositories
@@ -95,7 +93,6 @@ export default function SearchPage() {
           </p>
         </div>
 
-        {/* Search and Filters */}
         <Card className="glass">
           <CardContent className="pt-4 sm:pt-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
@@ -109,45 +106,53 @@ export default function SearchPage() {
                   className="pl-10 bg-background/50"
                 />
               </div>
-             <div className="flex gap-2 flex-row flex-wrap justify-end">
-  <div className="flex gap-2">
-    <Button
-      variant={viewMode === "grid" ? "default" : "outline"}
-      size="sm"
-      onClick={() => setViewMode("grid")}
-      aria-label="Grid view"
-      className={viewMode === "grid" ? "bg-primary/10" : ""}
-    >
-      <Grid className="h-4 w-4" />
-    </Button>
 
-    <Button
-      variant={viewMode === "list" ? "default" : "outline"}
-      size="sm"
-      onClick={() => setViewMode("list")}
-      aria-label="List view"
-      className={viewMode === "list" ? "bg-primary/10" : ""}
-    >
-      <List className="h-4 w-4" />
-    </Button>
-  </div>
+              <div className="flex gap-2 flex-row flex-wrap justify-end">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewMode("grid")}
+                    aria-label="Grid view"
+                    className={
+                      viewMode === "grid"
+                        ? "bg-primary/10 text-primary border-primary"
+                        : ""
+                    }
+                  >
+                    <Grid className="h-4 w-4" />
+                  </Button>
 
-  <select
-    value={sortBy}
-    onChange={(e) => setSortBy(e.target.value as any)}
-    className="px-3 py-2 rounded-md border border-input bg-background text-sm min-w-[110px]"
-    aria-label="Sort repositories"
-  >
-    <option value="recent">Recent</option>
-    <option value="stars">Most Stars</option>
-    <option value="name">Name</option>
-  </select>
-</div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewMode("list")}
+                    aria-label="List view"
+                    className={
+                      viewMode === "list"
+                        ? "bg-primary/10 text-primary border-primary"
+                        : ""
+                    }
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-3 py-2 rounded-md border border-input bg-background text-sm min-w-[110px]"
+                  aria-label="Sort repositories"
+                >
+                  <option value="recent">Recent</option>
+                  <option value="stars">Most Stars</option>
+                  <option value="name">Name</option>
+                </select>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Results Count */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             {sortedRepositories.length}{" "}
@@ -156,7 +161,6 @@ export default function SearchPage() {
           </p>
         </div>
 
-        {/* Repository Grid/List */}
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">
             Loading repositories...
@@ -205,10 +209,12 @@ export default function SearchPage() {
                     </div>
                   </div>
                 </CardHeader>
+
                 <CardContent>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-4 line-clamp-2 min-h-[32px]">
                     {repo.description || "No description available"}
                   </p>
+
                   <div className="flex flex-wrap items-center justify-between text-xs sm:text-sm">
                     <div className="flex items-center gap-4 text-muted-foreground">
                       <div className="flex items-center gap-1">
@@ -220,6 +226,7 @@ export default function SearchPage() {
                         {(repo as any)._count?.branches || 0}
                       </div>
                     </div>
+
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
                       {new Date(
@@ -227,6 +234,7 @@ export default function SearchPage() {
                       ).toLocaleDateString()}
                     </div>
                   </div>
+
                   <div className="mt-3 pt-3 border-t border-border/50">
                     {(repo as any).languages?.[0]?.name ? (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-accent/10 text-accent">
@@ -256,29 +264,35 @@ export default function SearchPage() {
                     <div className="p-3 rounded-lg bg-primary/10 self-center">
                       <GitBranch className="h-6 w-6 text-primary" />
                     </div>
+
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1">
                         <h3 className="font-heading font-semibold text-base sm:text-lg break-all">
                           {repo.name}
                         </h3>
+
                         {(repo as any).languages?.[0]?.name && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-accent/10 text-accent">
                             {(repo as any).languages[0].name}
                           </span>
                         )}
                       </div>
+
                       <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 min-h-[24px]">
                         {repo.description || "No description available"}
                       </p>
+
                       <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Activity className="h-4 w-4" />
                           {(repo as any)._count?.commits || 0} commits
                         </div>
+
                         <div className="flex items-center gap-1">
                           <GitBranch className="h-4 w-4" />
                           {(repo as any)._count?.branches || 0} branches
                         </div>
+
                         <div className="flex items-center gap-1">
                           <Clock className="h-4 w-4" />
                           {new Date(
