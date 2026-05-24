@@ -6,7 +6,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "NODE_OPTIONS=\"--dns-result-order=ipv4first --no-network-family-autoselection\" next dev",
+    "dev": "cross-env NODE_OPTIONS=\"--dns-result-order=ipv4first --no-network-family-autoselection\" next dev",
     "build": "prisma generate && next build",
     "vercel-build": "node scripts/vercel-build.js",
     "typecheck": "prisma generate && rm -f tsconfig.tsbuildinfo && tsc -p tsconfig.json --noEmit",
@@ -27,7 +27,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "test:validation": "tsx scripts/test-validation.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"    
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
@@ -48,6 +48,7 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "cross-env": "^10.1.0",
     "d3": "^7.9.0",
     "dotenv": "^16.4.5",
     "google-auth-library": "^10.3.0",
@@ -60,6 +61,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.1",
     "recharts": "^3.6.0",
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
@@ -74,6 +76,7 @@
     "@types/node": "^25.0.3",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
+    "@types/react-syntax-highlighter": "^15.5.13",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
     "autoprefixer": "^10.4.16",
