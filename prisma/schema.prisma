@@ -170,6 +170,7 @@ model Repository {
   forks          Int           @default(0)
   size           Int           @default(0) // Size in bytes
   lastAnalyzedAt DateTime?     @map("last_analyzed_at")
+  lastSyncedAt   DateTime?     @map("last_synced_at")
   status         String        @default("pending") // pending, analyzing, completed, failed
   userId         Int           @map("user_id")
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)

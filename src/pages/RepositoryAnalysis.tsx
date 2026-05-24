@@ -11,6 +11,7 @@ import { CommitHistory } from "@/components/repository/CommitHistory";
 import { Contributors } from "@/components/repository/Contributors";
 import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
+import SyncButton from '@/components/repository/SyncButton'
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import {
   Home,
@@ -379,15 +380,22 @@ export default function RepositoryAnalysis() {
                   )}
                 </div>
               </div>
-              {/* Delete button only if repository exists */}
+              {/* Action Buttons Container */}
               {repository && (
-                <button
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="glass p-2 rounded-lg hover:bg-red-500/20 transition-all duration-300 text-red-500 hover:text-red-400 flex-shrink-0"
-                  title="Delete repository"
-                >
-                  <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
-                </button>
+                <div className="flex items-center gap-3">
+                  <SyncButton 
+                    repositoryId={repository.id} 
+                    initialSyncedAt={repository.lastSyncedAt} 
+                  />
+                  
+                  <button
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="glass p-2 rounded-lg hover:bg-red-500/20 transition-all duration-300 text-red-500 hover:text-red-400 flex-shrink-0"
+                    title="Delete repository"
+                  >
+                    <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </button>
+                </div>
               )}
             </div>
 
