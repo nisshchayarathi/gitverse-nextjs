@@ -353,7 +353,7 @@ export default function Login() {
           <Button
             type="button"
             variant="outline"
-            className="w-full"
+            className="w-full flex items-center justify-center transition-transform active:scale-[0.99]"
             onClick={handleGoogleSignIn}
             disabled={isGoogleLoading || isLoading}
           >

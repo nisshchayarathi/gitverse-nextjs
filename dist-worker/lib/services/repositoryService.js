@@ -43,6 +43,13 @@ const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const crypto = __importStar(require("crypto"));
 const fs = __importStar(require("fs/promises"));
+function yieldIfHighMemory(threshold = 0.7) {
+    const usage = process.memoryUsage();
+    if (usage.heapUsed / usage.heapTotal > threshold) {
+        return new Promise((resolve) => setImmediate(resolve));
+    }
+    return Promise.resolve();
+}
 class RepositoryService {
     async tryReadmeFromRepoPath(repoPath) {
         const candidates = [
@@ -130,7 +137,6 @@ class RepositoryService {
             },
         });
         if (existingRepository) {
-            console.log(`Repository already exists: ${existingRepository.id}`);
             return existingRepository;
         }
         const repository = await prisma_1.default.repository.create({
@@ -175,18 +181,19 @@ class RepositoryService {
         let gitService = null;
         try {
             // Clone repository
-            console.log(`Cloning repository ${repository.url} to ${tempDir}`);
             await report({
                 progressPercent: 5,
                 progressMessage: "Cloning repository",
             });
-            gitService = await gitService_1.GitService.cloneRepository(repository.url, tempDir);
-            // Capture README / size / branches in parallel; these are independent once cloned.
+            gitService = await gitService_1.GitService.cloneRepository(repository.url, tempDir, {
+                onProgress: (pct, msg) => {
+                    const analysisPct = 5 + Math.round((pct / 100) * 3);
+                    report({ progressPercent: Math.min(8, analysisPct), progressMessage: msg });
+                },
+            });
+            // Capture README first, then size + branches in parallel.
             await report({ progressPercent: 8, progressMessage: "Reading README" });
-            const readmePromise = this.tryReadmeFromRepoPath(tempDir);
-            const sizePromise = gitService.getRepositorySize();
-            const branchesPromise = gitService.getBranches();
-            const readme = await readmePromise;
+            const readme = await this.tryReadmeFromRepoPath(tempDir);
             await prisma_1.default.repository.update({
                 where: { id: repositoryId },
                 data: {
@@ -201,11 +208,10 @@ class RepositoryService {
                 progressMessage: "Calculating size",
             });
             const [size, branches] = await Promise.all([
-                sizePromise,
-                branchesPromise,
+                gitService.getRepositorySize(),
+                gitService.getBranches(),
             ]);
             // Analyze branches
-            console.log(`Analyzing branches for repository ${repositoryId}`);
             await report({
                 progressPercent: 15,
                 progressMessage: "Analyzing branches",
@@ -223,13 +229,11 @@ class RepositoryService {
                 skipDuplicates: true,
             });
             // Analyze commits from all branches
-            console.log(`Analyzing commits for repository ${repositoryId}`);
             await report({
                 progressPercent: 25,
                 progressMessage: "Reading commit history",
             });
             const commits = await gitService.getCommits("--all", 1000);
-            console.log(`Total commits fetched from git: ${commits.length}`);
             // IMPORTANT: Do not load *all* existing commits for the repo.
             // On large repos this can be huge and cause OOM/timeouts. We only need to
             // know which of the commits we just fetched already exist.
@@ -247,7 +251,6 @@ class RepositoryService {
             const existingHashes = new Set(existingCommits.map((c) => c.hash));
             // Filter out commits that already exist
             const newCommits = commits.filter((commit) => !existingHashes.has(commit.hash));
-            console.log(`Found ${commits.length} commits, ${newCommits.length} are new, ${existingCommits.length} already exist`);
             let insertedCount = 0;
             let failedCount = 0;
             const totalNewCommits = Math.max(1, newCommits.length);
@@ -299,7 +302,7 @@ class RepositoryService {
                             path: change.path,
                             additions: change.additions,
                             deletions: change.deletions,
-                            changeType: change.changeType,
+                            changeType: change.changeType.toUpperCase(),
                             commitId,
                         }));
                     });
@@ -319,10 +322,9 @@ class RepositoryService {
                     failedCount += chunk.length;
                     console.error(`Failed to insert commit chunk starting at ${i}:`, error.message);
                 }
+                await yieldIfHighMemory();
             }
-            console.log(`Commit insertion complete: ${insertedCount} inserted, ${failedCount} failed`);
             // Analyze files
-            console.log(`Analyzing file tree for repository ${repositoryId}`);
             await report({ progressPercent: 65, progressMessage: "Scanning files" });
             const files = await gitService.getFileTree();
             // Avoid querying existing file paths (can be huge). Just rely on
@@ -349,27 +351,21 @@ class RepositoryService {
                         progressMessage: `Storing files (${insertedSoFar}/${files.length})`,
                     });
                 }
-                console.log(`File scan complete: processed ${files.length} paths for repository ${repositoryId}`);
             }
             else {
-                console.log(`No files found for repository ${repositoryId}`);
             }
             // Analyze contributors and languages in parallel; both are independent after file scan.
-            console.log(`Analyzing contributors for repository ${repositoryId}`);
             await report({
                 progressPercent: 80,
                 progressMessage: "Analyzing contributors",
             });
-            const contributorsPromise = gitService.getContributors();
-            console.log(`Detecting languages for repository ${repositoryId}`);
             await report({
                 progressPercent: 90,
                 progressMessage: "Detecting languages",
             });
-            const languagesPromise = gitService.detectLanguages();
             const [contributors, languages] = await Promise.all([
-                contributorsPromise,
-                languagesPromise,
+                gitService.getContributors(),
+                gitService.detectLanguages(),
             ]);
             const totalContributions = contributors.reduce((sum, c) => sum + c.commits, 0);
             if (contributors.length > 0) {
@@ -438,7 +434,6 @@ class RepositoryService {
                 },
             });
             await report({ progressPercent: 100, progressMessage: "Completed" });
-            console.log(`Repository ${repositoryId} analysis completed`);
         }
         catch (error) {
             console.error(`Error analyzing repository ${repositoryId}:`, error);
@@ -453,6 +448,9 @@ class RepositoryService {
             // Cleanup cloned repository
             if (gitService) {
                 await gitService.cleanup();
+            }
+            else {
+                await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null);
             }
         }
     }

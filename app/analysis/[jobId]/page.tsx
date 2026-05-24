@@ -19,7 +19,7 @@ export default function AnalysisJobPage() {
         No Analysis Jobs Found
       </h2>
       <p style={{ color: "#888", marginBottom: "1.5rem" }}>
-        You haven't created any analysis jobs yet.
+        You haven&apos;t created any analysis jobs yet.
       </p>
       <button
         onClick={() => router.push("/analyze")}

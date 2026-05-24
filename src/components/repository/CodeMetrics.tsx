@@ -32,8 +32,17 @@ interface QualityMetric {
   description: string;
 }
 
+interface RepositoryData {
+  languages: LanguageStat[];
+  files: FileTypeStat[];
+  commits: any[];
+  contributors: any[];
+  branches?: any[];
+  size: number;
+}
+
 interface CodeMetricsProps {
-  repository?: any;
+  repository?: RepositoryData;
 }
 
 export function CodeMetrics({ repository }: CodeMetricsProps) {

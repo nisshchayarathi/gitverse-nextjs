@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth , sanitizeError } from "@/lib/middleware";
+import { Prisma } from "@prisma/client";
+import { requireAuth } from "@/lib/middleware";
 import bcrypt from "bcryptjs";
 
 export async function PUT(request: NextRequest) {
@@ -49,7 +50,7 @@ export async function PUT(request: NextRequest) {
       if (!newPassword || typeof newPassword !== "string") {
         return NextResponse.json(
           {
-            message:
+            error:
               "Changing email will unlink your Google account. Please provide newPassword to set a new password.",
           },
           { status: 400 }
@@ -58,7 +59,7 @@ export async function PUT(request: NextRequest) {
 
       if (newPassword.length < 8) {
         return NextResponse.json(
-          { message: "Password must be at least 8 characters" },
+          { error: "Password must be at least 8 characters" },
           { status: 400 }
         );
       }
@@ -69,7 +70,7 @@ export async function PUT(request: NextRequest) {
       });
     }
 
-    const updateData: any = { name, email };
+    const updateData: Prisma.UserUpdateInput ={ name, email };
 
     if (isEmailChanging && hasLinkedGoogle) {
       updateData.passwordHash = await bcrypt.hash(newPassword, 10);
