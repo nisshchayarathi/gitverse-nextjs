@@ -6,6 +6,12 @@ import prisma from "../lib/prisma";
 async function main() {
   console.log("Seeding database...");
 
+  if (process.env.NODE_ENV === "production") {
+    console.error("⚠️  Safety Guard: Cannot run seed script in production environment.");
+    console.error("Aborting to prevent accidental data loss.");
+    process.exit(1);
+  }
+
   console.log("Cleaning up existing data...");
   // Clear all users, which will cascade and delete repositories, commits, branches, etc.
   await prisma.user.deleteMany();
@@ -24,13 +30,13 @@ async function main() {
     },
   });
   users.push(testUser);
-  console.log("Created test user: test@example.com / password123");
+  console.log("Created test user: test@example.com");
 
   // Create 9 random users
   for (let i = 0; i < 9; i++) {
     const user = await prisma.user.create({
       data: {
-        email: faker.internet.email(),
+        email: `user${i}_${faker.internet.email()}`,
         name: faker.person.fullName(),
         image: faker.image.avatar(),
         passwordHash: hashedPassword,
@@ -66,7 +72,7 @@ async function main() {
     const branches = [];
     for (let j = 0; j < faker.number.int({ min: 1, max: 5 }); j++) {
       const isMain = j === 0;
-      const branchName = isMain ? "main" : faker.git.branch();
+      const branchName = isMain ? "main" : `branch-${j}-${faker.git.branch()}`;
       const branch = await prisma.branch.create({
         data: {
           name: branchName,
@@ -102,10 +108,10 @@ async function main() {
     const extensions = [".ts", ".tsx", ".js", ".md", ".css"];
     for (let l = 0; l < faker.number.int({ min: 5, max: 20 }); l++) {
       const ext = faker.helpers.arrayElement(extensions);
-      const name = `${faker.word.noun()}${ext}`;
+      const name = `file${l}_${faker.word.noun()}${ext}`;
       await prisma.file.create({
         data: {
-          path: `src/${faker.word.noun()}/${name}`,
+          path: `src/dir${l}/${name}`,
           name: name,
           extension: ext,
           size: faker.number.int({ min: 100, max: 50000 }),
@@ -134,7 +140,7 @@ async function main() {
       await prisma.contributor.create({
         data: {
           name: faker.person.fullName(),
-          email: faker.internet.email(),
+          email: `contrib${c}_${faker.internet.email()}`,
           avatar: faker.image.avatar(),
           commits: faker.number.int({ min: 1, max: 100 }),
           additions: faker.number.int({ min: 10, max: 5000 }),
