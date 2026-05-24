@@ -23,17 +23,26 @@ export default function SyncButton({ repositoryId, initialSyncedAt }: SyncButton
         method: 'POST',
       });
 
-      const data = await res.json();
-
+      // FIX: Check for errors BEFORE trying to parse JSON
       if (!res.ok) {
-        // Specifically catch the 429 status from our new rate limiter
         if (res.status === 429) {
           throw new Error('Rate limit reached. Please wait a minute.');
         }
-        throw new Error(data.error || 'Failed to sync');
+        
+        // Safely check if the error response is JSON before parsing
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        if (isJson) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to sync');
+        }
+        
+        throw new Error(`Failed to sync: ${res.statusText}`);
       }
 
+      // If we get here, the response is definitely a 200 OK
+      const data = await res.json();
       setLastSyncedAt(data.lastSyncedAt);
+      
     } catch (err: any) {
       setError(err.message);
     } finally {

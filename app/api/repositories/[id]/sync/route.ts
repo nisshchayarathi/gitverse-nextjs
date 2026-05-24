@@ -8,7 +8,6 @@ const syncRateLimit = new Map();
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
-
     // 1. Security Authorization Check
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -24,7 +23,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const existingRepo = await prisma.repository.findFirst({
       where: { 
         id: repositoryId,
-        user: { email: session.user.email } // Scoped to the authenticated user
+        user: { email: session.user.email } 
       }
     });
 
@@ -32,13 +31,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: "Repository not found or unauthorized" }, { status: 404 });
     }
 
-    // 2. Rate Limiting Logic (Max 2 syncs per minute per IP)
-    const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
+    // 2. Rate Limiting Logic (Max 2 syncs per minute per USER)
+    // FIX: Using user email instead of IP prevents spoofing
+    const rateLimitKey = session.user.email; 
     const now = Date.now();
-    const windowMs = 60 * 1000; // 1 minute window
+    const windowMs = 60 * 1000; 
     const maxRequests = 2;
 
-    const userState = syncRateLimit.get(ip) || { count: 0, lastReset: now };
+    const userState = syncRateLimit.get(rateLimitKey) || { count: 0, lastReset: now };
 
     if (now - userState.lastReset > windowMs) {
       userState.count = 0;
@@ -53,10 +53,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
 
     userState.count += 1;
-    syncRateLimit.set(ip, userState);
+    syncRateLimit.set(rateLimitKey, userState);
 
     // 3. ACTUAL SYNC LOGIC: Queue a new background job
-    // First, check if there is already a job running so we don't duplicate work
     const existingJob = await prisma.analysisJob.findFirst({
       where: {
         repositoryId: existingRepo.id,
@@ -64,18 +63,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       }
     });
 
-    // If no job is currently running, create a new one for the worker
     if (!existingJob) {
       await prisma.analysisJob.create({
         data: {
           repositoryId: existingRepo.id,
-          userId: existingRepo.userId, // Or whatever the user relation field is named
+          userId: existingRepo.userId, 
           status: "QUEUED",
         }
       });
     }
-
-    // 4. Update the timestamp ONLY after successful sync
+    
+    // 4. Record the time the sync was REQUESTED 
+    // FIX: Updated comment to accurately reflect that the job is now queued
     const updatedRepo = await prisma.repository.update({
       where: { id: repositoryId },
       data: { lastSyncedAt: new Date() }
