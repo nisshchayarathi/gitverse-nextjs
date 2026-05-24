@@ -20,9 +20,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const graphAnalyzer = new GraphAnalyzer();
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
-  const graphAnalyzer = new GraphAnalyzer();
-  const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
-
   useEffect(() => {
     if (!svgRef.current) return;
 
