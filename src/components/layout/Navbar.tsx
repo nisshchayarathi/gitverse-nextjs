@@ -1,11 +1,13 @@
+'use client'
+
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { GitBranch, Menu, X } from 'lucide-react'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { Button } from '@/components/ui'
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
-
   const navLinks = [
     { name: 'Features', href: '#features' },
     { name: 'How it Works', href: '#how-it-works' },
@@ -40,24 +42,28 @@ export const Navbar: React.FC = () => {
             ))}
           </div>
 
-          {/* CTA Buttons */}
+          {/* CTA Buttons + Theme Toggle */}
           <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
             <Button className="bg-gradient-primary hover:opacity-90 transition-opacity" asChild>
               <Link href="/login">Sign In</Link>
             </Button>
             <Button className="bg-gradient-primary hover:opacity-90 transition-opacity" asChild>
               <Link href="/signup">Get Started</Link>
             </Button>
-          </div> 
+          </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Toggle menu"
-          >
-            {isOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+          {/* Mobile: Theme Toggle + Menu Button */}
+          <div className="md:hidden flex items-center gap-2">
+            <ThemeToggle />
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Toggle menu"
+            >
+              {isOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}

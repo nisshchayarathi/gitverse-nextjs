@@ -15,6 +15,8 @@ import {
   Menu,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +36,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   children,
 }) => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -171,6 +174,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             </button>
 
             <div className="flex-1" />
+
+            {/* Theme Toggle */}
+            <ThemeToggle className="mr-2" />
 
             {/* User Profile Dropdown */}
             <DropdownMenu>
