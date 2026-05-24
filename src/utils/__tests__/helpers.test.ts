@@ -59,16 +59,20 @@ describe("extractRepoInfo", () => {
 
 describe("formatDate", () => {
   it("formats a date correctly", () => {
-    const date = new Date("2024-01-15");
+    // Use explicit local date constructor to avoid timezone issues
+    const date = new Date(2024, 0, 15); // Jan 15, 2024 in local time
     const result = formatDate(date);
     expect(result).toMatch(/Jan/);
     expect(result).toMatch(/2024/);
+    expect(result).toMatch(/15/);
   });
   it("formats another date correctly", () => {
-    const date = new Date("2023-12-25");
+    // Use explicit local date constructor to avoid timezone issues
+    const date = new Date(2023, 11, 25); // Dec 25, 2023 in local time
     const result = formatDate(date);
     expect(result).toMatch(/Dec/);
     expect(result).toMatch(/2023/);
+    expect(result).toMatch(/25/);
   });
 });
 
