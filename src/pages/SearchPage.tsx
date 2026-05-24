@@ -55,7 +55,8 @@ export default function SearchPage() {
       const response = await axios.get(buildApiUrl("/api/repositories"), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const repos = response.data.repositories || [];
+      // API returns { repositories: [...] }
+const repos = response.data.repositories || [];
       setRepositories(Array.isArray(repos) ? repos : []);
     } catch (error) {
       console.error("Error fetching repositories:", error);
@@ -78,7 +79,7 @@ export default function SearchPage() {
   const sortedRepositories = [...filteredRepositories].sort((a, b) => {
     if (sortBy === "stars") return (b.stars || 0) - (a.stars || 0);
     if (sortBy === "name") return a.name.localeCompare(b.name);
-    return 0;
+   return 0; // 'recent' is already sorted
   });
 
   return (
