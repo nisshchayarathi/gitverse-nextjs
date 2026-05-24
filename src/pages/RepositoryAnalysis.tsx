@@ -28,6 +28,7 @@ import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
 import { EmptyState, ErrorBoundary } from "@/components/ui";
 import { buildApiUrl } from "@/services/apiConfig";
+import { AnalysisProgress } from "@/components/repository/AnalysisProgress";
 
 type TabType =
   | "overview"
@@ -72,10 +73,21 @@ export default function RepositoryAnalysis() {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [repository, setRepository] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [job, setJob] = useState<any>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const repoStatus = repository?.status as string | undefined;
+  const jobStatus = job?.status as string | undefined;
+
+  const isRunning =
+    repoStatus === "pending" ||
+    repoStatus === "analyzing" ||
+    jobStatus === "QUEUED" ||
+    jobStatus === "PROCESSING";
+
+  const isFailed = repoStatus === "failed" || jobStatus === "FAILED";
+  const showProgressScreen = isRunning || isFailed;
 
   useEffect(() => {
     fetchRepository();
@@ -83,16 +95,7 @@ export default function RepositoryAnalysis() {
 
   useEffect(() => {
     // Poll job status (lightweight) while analyzing.
-    const repoStatus = repository?.status as string | undefined;
     const jobStatus = job?.status as string | undefined;
-
-    const shouldShowAnalyzing =
-      repoStatus === "pending" ||
-      repoStatus === "analyzing" ||
-      jobStatus === "QUEUED" ||
-      jobStatus === "PROCESSING";
-
-    setIsAnalyzing(Boolean(shouldShowAnalyzing));
 
     const jobId = job?.id || repository?.latestJob?.id;
     if (!jobId) return;
@@ -169,6 +172,54 @@ export default function RepositoryAnalysis() {
     } catch (error) {
       console.error("Error fetching analysis job:", error);
     }
+  };
+
+  const handleRetryAnalysis = async () => {
+    if (!id) return;
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      
+      // Immediately set UI to visual pending/queued state for feedback
+      setRepository((prev: any) => prev ? { ...prev, status: "pending" } : null);
+      setJob({ status: "QUEUED", progressPercent: 0, progressMessage: "Restarting analysis..." });
+      
+      const response = await axios.post(
+        buildApiUrl(`/api/repositories/${id}/analyze`),
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      
+      const data = response.data;
+      const jobId = data.jobId || data.job?.id;
+      
+      if (jobId) {
+        setJob({
+          id: jobId,
+          status: data.status || data.jobStatus || "QUEUED",
+          progressPercent: 0,
+          progressMessage: "Analysis queued",
+        });
+      }
+      
+      toast({
+        title: "Analysis restarted",
+        description: "A new repository analysis job has been successfully queued.",
+      });
+    } catch (error: any) {
+      console.error("Error restarting analysis:", error);
+      toast({
+        title: "Restart failed",
+        description: error.response?.data?.error || "Failed to restart repository analysis.",
+        variant: "destructive",
+      });
+      fetchRepository();
+    }
+  };
+
+  const handleGoToDashboard = () => {
+    router.push("/dashboard");
   };
 
   const handleDeleteRepository = async () => {
@@ -265,7 +316,7 @@ export default function RepositoryAnalysis() {
                     Status:{" "}
                     <span className="capitalize">{repository.status}</span>
                   </p>
-                  {isAnalyzing && (
+                  {isRunning && (
                     <span className="flex items-center gap-1 text-xs text-primary">
                       <span className="animate-pulse">●</span>
                       Analyzing...
@@ -283,36 +334,15 @@ export default function RepositoryAnalysis() {
               </button>
             </div>
 
-            {isAnalyzing ? (
-              <div className="glass rounded-lg p-12 text-center space-y-4">
-                <div className="flex justify-center">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold mb-2">
-                    Analyzing Repository
-                  </h2>
-                  <p className="text-muted-foreground">
-                    We&apos;re analyzing the repository structure, commits,
-                    contributors, and more.
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {job?.progressPercent != null || job?.progressMessage
-                      ? `${job?.progressPercent ?? 0}% — ${job?.progressMessage || "Working"}`
-                      : "This may take a few moments depending on the repository size..."}
-                  </p>
-                </div>
-                <div className="flex justify-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <GitCommit className="h-4 w-4" />
-                    Processing commits
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Finding contributors
-                  </div>
-                </div>
-              </div>
+            {showProgressScreen ? (
+              <AnalysisProgress
+                progressPercent={job?.progressPercent ?? 0}
+                progressMessage={job?.progressMessage || "Analyzing..."}
+                status={job?.status || repository?.status || "pending"}
+                error={job?.error}
+                onRetry={handleRetryAnalysis}
+                onCancel={handleGoToDashboard}
+              />
             ) : (
               <>
                 {/* Tab navigation */}
