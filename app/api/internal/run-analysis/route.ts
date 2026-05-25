@@ -61,6 +61,7 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
     return new NextResponse(null, { status: 204 });
   }
 
+  let isHeartbeatRunning = true;
   let heartbeatTimer: NodeJS.Timeout | null = null;
 
   try {
@@ -73,11 +74,19 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    heartbeatTimer = setInterval(() => {
-      analysisJobService
-        .heartbeat({ jobId: job.id, workerId })
-        .catch((e) => console.error("serverless heartbeat failed", e));
-    }, HEARTBEAT_INTERVAL_MS);
+    const runHeartbeat = async () => {
+      if (!isHeartbeatRunning) return;
+      try {
+        await analysisJobService.heartbeat({ jobId: job.id, workerId });
+      } catch (e) {
+        console.error("serverless heartbeat failed", e);
+      } finally {
+        if (isHeartbeatRunning) {
+          heartbeatTimer = setTimeout(runHeartbeat, HEARTBEAT_INTERVAL_MS);
+        }
+      }
+    };
+    heartbeatTimer = setTimeout(runHeartbeat, HEARTBEAT_INTERVAL_MS);
 
     await repositoryService.analyzeRepository(job.repositoryId, {
       onProgress: async (update) => {
@@ -89,14 +98,16 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    isHeartbeatRunning = false;
+    if (heartbeatTimer) clearTimeout(heartbeatTimer);
     heartbeatTimer = null;
 
     await analysisJobService.markDone({ jobId: job.id, workerId });
 
     return NextResponse.json({ ok: true, jobId: job.id, status: "DONE" });
   } catch (error: any) {
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    isHeartbeatRunning = false;
+    if (heartbeatTimer) clearTimeout(heartbeatTimer);
     heartbeatTimer = null;
 
     const message = String(error?.message || error || "Unknown error");
