@@ -137,6 +137,22 @@ Make sure your TypeScript changes compile successfully:
 npm run typecheck
 ```
 
+### 4. Testing
+GitVerse uses Jest and React Testing Library for automated testing. Before submitting a PR, make sure your tests pass:
+- Run all tests once:
+  ```bash
+  npm test
+  ```
+- Run tests in watch mode during development:
+  ```bash
+  npm run test:watch
+  ```
+- Generate a test coverage report:
+  ```bash
+  npm run test:coverage
+  ```
+If you are adding new features, please include relevant tests in `__tests__` folders.
+
 ---
 
 ## Submitting a Pull Request (PR)
