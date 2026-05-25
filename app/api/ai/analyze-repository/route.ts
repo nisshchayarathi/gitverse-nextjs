@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const context = {
+    const context: any = {
       targetDirectory: (repository as any).targetDirectory ?? undefined,
       languages: repository.languages.map((l: any) => ({
         name: l.name,
@@ -50,6 +50,13 @@ export async function POST(request: NextRequest) {
         date: c.committedAt.toISOString(),
       })),
     };
+
+    if (type === "contribution-difficulty" && repository.files) {
+      context.files = repository.files.map((f: any) => ({
+        path: f.path,
+        content: "",
+      }));
+    }
 
     const defaultBranch = repository.defaultBranch || "main";
     const headCommit =

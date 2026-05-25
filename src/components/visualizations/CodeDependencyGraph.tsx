@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
+import { ModuleSummaryPanel } from "./ModuleSummaryPanel";
+import { AISettingsModal } from "@/components/settings/AISettingsModal";
 
 
 
@@ -18,6 +20,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
 
   useEffect(() => {
     if (!svgRef.current) return;
+
 
     // If no data, show empty state
     if (graphData.nodes.length === 0) {

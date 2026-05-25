@@ -378,6 +378,7 @@ export class GitService {
       });
 
       if (!child.stdout) {
+        child.kill();
         reject(new Error("Failed to spawn git process: stdout is null"));
         return;
       }

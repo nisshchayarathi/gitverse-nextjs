@@ -243,7 +243,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
   };
 
   // Calculate real dependencies from repository
-  const packageJsonFile = repository?.files?.find(
+  const packageJsonFile: any = repository?.files?.find(
     (f: any) => f.path?.toLowerCase() === "package.json"
   ) as any;
   const totalDependencies =
