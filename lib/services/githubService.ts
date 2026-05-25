@@ -424,6 +424,31 @@ export class GitHubService {
   }
 
   /**
+   * Get open issues for a repository
+   */
+  async getIssues(
+    owner: string,
+    repo: string,
+    params?: {
+      labels?: string;
+      state?: "open" | "closed" | "all";
+      per_page?: number;
+      page?: number;
+    }
+  ): Promise<any[]> {
+    const response = await this.client.get(`/repos/${owner}/${repo}/issues`, {
+      params: {
+        labels: params?.labels || "good first issue,help wanted",
+        state: params?.state || "open",
+        per_page: params?.per_page || 20,
+        page: params?.page || 1,
+      },
+    });
+    // Filter out pull requests
+    return response.data.filter((issue: any) => !issue.pull_request);
+  }
+
+  /**
    * Get repository languages
    */
   async getLanguages(

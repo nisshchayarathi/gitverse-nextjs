@@ -11,6 +11,7 @@ import { CommitHistory } from "@/components/repository/CommitHistory";
 import { Contributors } from "@/components/repository/Contributors";
 import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
+import { RepositoryIssues } from "@/components/repository/RepositoryIssues";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import {
   Home,
@@ -40,7 +41,8 @@ type TabType =
   | "commits"
   | "contributors"
   | "mentor"
-  | "insights";
+  | "insights"
+  | "issues";
 
 interface Tab {
   id: TabType;
@@ -66,6 +68,11 @@ const tabs: Tab[] = [
     id: "insights",
     label: "Insights",
     icon: <BarChart3 className="h-4 w-4" />,
+  },
+  {
+    id: "issues",
+    label: "Good First Issues",
+    icon: <Sparkles className="h-4 w-4 text-purple-400 animate-pulse" />,
   },
 ];
 
@@ -308,6 +315,8 @@ export default function RepositoryAnalysis() {
         return <RepositoryMentorTab repositoryData={repository} />;
       case "insights":
         return <RepositoryInsights repository={repository} />;
+      case "issues":
+        return <RepositoryIssues repository={repository} />;
       default:
         return <RepositoryOverview />;
     }
