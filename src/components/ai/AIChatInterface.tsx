@@ -51,6 +51,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
         },
       ]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -278,13 +279,13 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input area */}
       <div className="border-t border-white/10 p-4">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            maxLength={5000}
             placeholder="Ask me anything about your repository..."
             className="flex-1 glass px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
             disabled={isLoading}
@@ -304,9 +305,14 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
             )}
           </button>
         </form>
-        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-          <Sparkles className="h-3 w-3" />
-          <span>Powered by Google Gemini AI</span>
+        <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-3 w-3" />
+            <span>Powered by Google Gemini AI</span>
+          </div>
+          <div className={`transition-colors ${input.length >= 4500 ? (input.length >= 5000 ? "text-red-500 font-bold" : "text-yellow-500") : ""}`}>
+            {input.length} / 5000
+          </div>
         </div>
       </div>
     </div>

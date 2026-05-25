@@ -72,6 +72,7 @@ export function AIRepositoryOverlay({ repository }: AIRepositoryOverlayProps) {
       };
       setMessages([greeting]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, repository.name]);
 
   const handleSubmit = async (e: React.FormEvent) => {
