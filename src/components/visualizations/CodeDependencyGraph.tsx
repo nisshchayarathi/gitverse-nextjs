@@ -164,13 +164,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             .style("top", `${event.clientY}px`);
         }
       })
-      .on("mouseleave", function () {
-        if (tooltipRef.current) {
-          d3.select(tooltipRef.current)
-            .style("opacity", "0")
-            .style("display", "none");
-        }
-      })
       .on("mouseleave", function (_event: any, d: any) {
         d3.select(this)
           .transition()
@@ -186,7 +179,9 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           .attr("stroke-opacity", 0.6);
 
         if (tooltipRef.current) {
-          d3.select(tooltipRef.current).style("opacity", 0);
+          d3.select(tooltipRef.current)
+            .style("opacity", "0")
+            .style("display", "none");
         }
       });
 
