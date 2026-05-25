@@ -163,6 +163,7 @@ model Repository {
   name           String
   url            String
   description    String?
+  targetDirectory String?      @map("target_directory")
   readmePath     String?       @map("readme_path")
   readmeText     String?       @map("readme_text") @db.Text
   readmeFetchedAt DateTime?    @map("readme_fetched_at")
@@ -186,6 +187,7 @@ model Repository {
   @@index([url])
   @@map("repositories")
   @@index([userId])
+  @@index([userId, url, targetDirectory])
 }
 
 model AnalysisJob {
@@ -354,4 +356,24 @@ model Language {
   @@index([repositoryId])
   
   @@map("languages")
+}
+
+model GeminiAnalysisCache {
+  id             Int        @id @default(autoincrement())
+  repositoryId   Int        @map("repository_id")
+  commitHash     String     @map("commit_hash")
+  analysisType   String     @map("analysis_type")
+  promptHash     String     @map("prompt_hash")
+  model          String?
+  cachedResult   String     @map("cached_result") @db.Text
+  createdAt      DateTime   @default(now()) @map("created_at")
+  lastAccessedAt DateTime?  @map("last_accessed_at")
+  expiresAt      DateTime?  @map("expires_at")
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, commitHash, analysisType, promptHash])
+  @@index([expiresAt])
+  @@index([repositoryId])
+  @@map("gemini_analysis_cache")
 }

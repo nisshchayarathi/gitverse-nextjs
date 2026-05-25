@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Free-form mode: client provides a prebuilt prompt.
     if (typeof prompt === "string" && prompt.trim()) {
-      const response = await getGeminiService().chatRaw(prompt);
+      const response = await getGeminiService().chatRaw(prompt, messages);
       return NextResponse.json({ response });
     }
 

@@ -316,12 +316,12 @@ export default function Login() {
                 <input type="checkbox" className="mr-2 rounded border-input" />
                 <span className="text-muted-foreground">Remember me</span>
               </label>
-              <Link
-                href="/forgot-password"
-                className="text-primary hover:text-primary/80 transition-colors"
+              <span
+                className="text-muted-foreground cursor-not-allowed"
+                title="Forgot password feature coming soon"
               >
                 Forgot password?
-              </Link>
+              </span>
             </div>
 
             <Button

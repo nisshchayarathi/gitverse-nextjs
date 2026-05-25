@@ -478,6 +478,35 @@
   .progress-ring--animate .progress-ring__value {
     stroke-dashoffset: calc(289 * (1 - var(--progress, 0.85)));
   }
+
+  /* Navbar Animated Underline */
+  .nav-link {
+    position: relative;
+  }
+
+  .nav-link::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -4px;
+    width: 72%;
+    height: 2px;
+    background-color: currentcolor;
+    transform: translateX(-50%) scaleX(0);
+    transform-origin: center;
+    transition: transform 0.3s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nav-link::after {
+      transition: none;
+    }
+  }
+
+  .nav-link:hover::after,
+  .nav-link:focus-visible::after {
+    transform: translateX(-50%) scaleX(1);
+  }
 }
 
 @keyframes marquee-x {
