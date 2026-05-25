@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import { Card, EmptyState } from "@/components/ui";
-import { Network } from "lucide-react";
+import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
 import { ModuleSummaryPanel } from "./ModuleSummaryPanel";
 import { AISettingsModal } from "../settings/AISettingsModal";
@@ -19,6 +18,8 @@ export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeD
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const graphAnalyzer = new GraphAnalyzer();
+  const graphAnalyzer = new GraphAnalyzer();
+  const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -319,22 +320,6 @@ export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeD
 />
 
     </Card>
-
-    {selectedNode && (
-      <ModuleSummaryPanel
-        nodeId={selectedNode.id}
-        nodeName={selectedNode.name}
-        nodeType={selectedNode.type}
-        repositoryFiles={repository?.files || []}
-        onClose={() => setSelectedNode(null)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
-    )}
-
-    <AISettingsModal 
-      isOpen={isSettingsOpen} 
-      onClose={() => setIsSettingsOpen(false)} 
-    />
     </div>
   );
 }

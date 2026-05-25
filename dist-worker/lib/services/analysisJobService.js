@@ -15,6 +15,14 @@ function computeBackoffMs(attempt) {
 }
 class AnalysisJobService {
     async createRepositoryAnalysisJob(params) {
+        const existing = await prisma_1.default.analysisJob.findFirst({
+            where: {
+                repositoryId: params.repositoryId,
+                status: { in: ["QUEUED", "PROCESSING"] },
+            },
+        });
+        if (existing)
+            return existing;
         try {
             return await prisma_1.default.analysisJob.create({
                 data: {
@@ -31,26 +39,14 @@ class AnalysisJobService {
         catch (error) {
             if (error instanceof client_1.Prisma.PrismaClientKnownRequestError &&
                 error.code === "P2002") {
-                const existingJob = await prisma_1.default.analysisJob.findFirst({
+                const activeJob = await prisma_1.default.analysisJob.findFirst({
                     where: {
                         repositoryId: params.repositoryId,
                         status: { in: ["QUEUED", "PROCESSING"] },
                     },
                 });
-                if (existingJob)
-                    return existingJob;
-                // The active job may have completed between the P2002 and the lookup. Retry exactly once.
-                return await prisma_1.default.analysisJob.create({
-                    data: {
-                        repositoryId: params.repositoryId,
-                        userId: params.userId,
-                        type: "repository_analysis",
-                        status: "QUEUED",
-                        progressPercent: 0,
-                        progressMessage: "Queued",
-                        maxAttempts: params.maxAttempts ?? 3,
-                    },
-                });
+                if (activeJob)
+                    return activeJob;
             }
             throw error;
         }
@@ -155,12 +151,19 @@ class AnalysisJobService {
         // 2) re-fetch via Prisma Client (typed + camelCase fields)
         const rows = await prisma_1.default.$queryRaw `
       WITH candidate AS (
-        SELECT id
-        FROM analysis_jobs
-        WHERE next_run_at <= NOW()
-          AND status IN ('QUEUED', 'PROCESSING')
-          AND (lock_expires_at IS NULL OR lock_expires_at < NOW())
-        ORDER BY created_at ASC
+        SELECT a1.id
+        FROM analysis_jobs a1
+        WHERE a1.next_run_at <= NOW()
+          AND a1.status IN ('QUEUED', 'PROCESSING')
+          AND (a1.lock_expires_at IS NULL OR a1.lock_expires_at < NOW())
+          AND NOT EXISTS (
+            SELECT 1 FROM analysis_jobs a2
+            WHERE a2.repository_id = a1.repository_id
+              AND a2.status = 'PROCESSING'
+              AND a2.id != a1.id
+              AND (a2.lock_expires_at IS NULL OR a2.lock_expires_at > NOW())
+          )
+        ORDER BY a1.created_at ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )

@@ -119,33 +119,48 @@ finally {
                   className="pl-10 bg-background/50"
                 />
               </div>
-              <div className="flex gap-2 flex-row flex-wrap justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setViewMode(viewMode === "grid" ? "list" : "grid")
-                  }
-                  aria-label="Toggle view mode"
-                >
-                  {viewMode === "grid" ? (
-                    <List className="h-4 w-4" />
-                  ) : (
-                    <Grid className="h-4 w-4" />
-                  )}
-                </Button>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="px-3 py-2 rounded-md border border-input bg-background text-sm min-w-[110px]"
-                  aria-label="Sort repositories"
-                >
-                  <option value="recent">Recent</option>
-                  <option value="stars">Most Stars</option>
-                  <option value="name">Name</option>
-                </select>
-              </div>
-            </div>
+            <div className="flex gap-2 flex-row flex-wrap justify-end">
+  <div className="flex gap-2">
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => setViewMode("grid")}
+      aria-label="Grid view"
+      className={
+        viewMode === "grid"
+          ? "bg-primary/10 text-primary border-primary"
+          : ""
+      }
+    >
+      <Grid className="h-4 w-4" />
+    </Button>
+
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => setViewMode("list")}
+      aria-label="List view"
+      className={
+        viewMode === "list"
+          ? "bg-primary/10 text-primary border-primary"
+          : ""
+      }
+    >
+      <List className="h-4 w-4" />
+    </Button>
+  </div>
+
+  <select
+    value={sortBy}
+    onChange={(e) => setSortBy(e.target.value as any)}
+    className="px-3 py-2 rounded-md border border-input bg-background text-sm min-w-[110px]"
+    aria-label="Sort repositories"
+  >
+    <option value="recent">Recent</option>
+    <option value="stars">Most Stars</option>
+    <option value="name">Name</option>
+  </select>
+</div>
           </CardContent>
         </Card>
 

@@ -16,35 +16,48 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
     const saved = localStorage.getItem('theme')
     if (saved) {
       setTheme(saved as Theme)
+    } else {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      setTheme(prefersDark ? 'dark' : 'light')
     }
+    setMounted(true)
   }, [])
 
   useEffect(() => {
+    if (!mounted) return
+    
     const root = document.documentElement
     if (theme === 'dark') {
       root.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
     } else {
       root.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
     }
-    localStorage.setItem('theme', theme)
-  }, [theme])
+  }, [theme, mounted])
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
   }
 
+  // CodeRabbit Fix: Returns null during server-side rendering / initial hydration
+  // to avoid the unstyled light-theme flash (FOUC).
   if (!mounted) {
     return null
   }
 
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>
+  // CodeRabbit Fix: Cleaned up and consolidated duplicated return statements
+  return (
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  )
 }
 
-export const useTheme = () => {
+export const useTheme = (): ThemeContextType => {
   const context = useContext(ThemeContext)
   if (context === undefined) {
     throw new Error('useTheme must be used within a ThemeProvider')

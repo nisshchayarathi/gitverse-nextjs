@@ -1,7 +1,7 @@
 "use client";
 
 export const dynamic = "force-dynamic";
-
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -50,12 +50,47 @@ export default function Dashboard() {
   const { user } = useAuth();
   const router = useRouter();
   const [repoUrl, setRepoUrl] = useState("");
+  const [repoScope, setRepoScope] = useState("");
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     fetchRepositories();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const active = document.activeElement;
+
+      const isTyping =
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        active instanceof HTMLSelectElement ||
+        (active instanceof HTMLElement && active.isContentEditable);
+
+      if (e.key === "/" && !isTyping) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+
+      if (
+        e.key === "/" &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !e.shiftKey &&
+        !isTyping
+      ) {
+        setRepoUrl("");
+        setRepoScope("");
+        searchRef.current?.blur();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   const fetchRepositories = async () => {
@@ -69,6 +104,11 @@ export default function Dashboard() {
       setRepositories(Array.isArray(repos) ? repos : []);
     } catch (error) {
       console.error("Error fetching repositories:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch repositories.",
+        variant: "destructive",
+      });
       setRepositories([]);
     } finally {
       setLoading(false);
@@ -80,9 +120,9 @@ export default function Dashboard() {
     : 0;
   const totalContributors = Array.isArray(repositories)
     ? repositories.reduce(
-        (sum, r: any) => sum + (r._count?.contributors || 0),
-        0
-      )
+      (sum, r: any) => sum + (r._count?.contributors || 0),
+      0
+    )
     : 0;
   const totalFiles = Array.isArray(repositories)
     ? repositories.reduce((sum, r: any) => sum + (r._count?.files || 0), 0)
@@ -137,17 +177,17 @@ export default function Dashboard() {
 
   const recentActivity = Array.isArray(repositories)
     ? repositories
-        .filter((r: any) => r.status === "completed")
-        .slice(0, 5)
-        .map((repo: any) => ({
-          action: "Analyzed",
-          repo: repo.name,
-          time: formatTimeAgo(repo.lastAnalyzedAt || repo.createdAt),
-          status: repo.status,
-        }))
+      .filter((r: any) => r.status === "completed")
+      .slice(0, 5)
+      .map((repo: any) => ({
+        action: "Analyzed",
+        repo: repo.name,
+        time: formatTimeAgo(repo.lastAnalyzedAt || repo.createdAt),
+        status: repo.status,
+      }))
     : [];
 
-    const handleAnalyze = async () => {
+  const handleAnalyze = async () => {
     if (!repoUrl.trim()) return;
 
     setAnalyzing(true);
@@ -164,6 +204,7 @@ export default function Dashboard() {
           name: repoName,
           url: repoUrl.trim(),
           description: `Repository from ${repoUrl}`,
+          scope: repoScope.trim() || undefined,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -187,6 +228,7 @@ export default function Dashboard() {
       }
 
       setRepoUrl("");
+      setRepoScope("");
     } catch (error: any) {
       console.error("Error creating repository:", error);
       const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to analyze repository";
@@ -199,9 +241,61 @@ export default function Dashboard() {
       setAnalyzing(false);
     }
   };
-
+if (loading) {
   return (
     <DashboardLayout>
+      <div className="space-y-6">
+        
+        {/* Welcome skeleton */}
+        <div className="space-y-2">
+          <Skeleton width="250px" height="28px" />
+          <Skeleton width="400px" height="18"/>
+        </div>
+
+        {/* Input skeleton */}
+        <div className="p-6 border rounded-lg space-y-3">
+          <Skeleton width="100%" height="40" />
+          <Skeleton width="180" height="40" />
+        </div>
+
+        {/* Stats skeleton */}
+        <div className="grid grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="p-4 border rounded-lg space-y-3">
+              <Skeleton width="60%" height="16" />
+              <Skeleton width="40%" height="28" />
+              <Skeleton width="80%" height="12" />
+            </div>
+          ))}
+        </div>
+
+        {/* Cards skeleton */}
+        <div className="grid grid-cols-3 gap-6">
+          <div className="col-span-2 space-y-3">
+            <Skeleton width="40%" height="20" />
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="p-4 border rounded-lg space-y-2">
+                <Skeleton width="30%" height="18" />
+                <Skeleton width="70%" height="14" />
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-3">
+            <Skeleton width="50%" height="20" />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} width="100%" height="40" />
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </DashboardLayout>
+  );
+}
+  return (
+    <DashboardLayout>
+    <div className="min-h-screen bg-background"></div>
       <div className="space-y-6">
         {/* Welcome Section */}
         <div>
@@ -233,6 +327,19 @@ export default function Dashboard() {
                 <Plus className="h-4 w-4 mr-2" />
                 {analyzing ? "Analyzing..." : "Analyze Repository"}
               </Button>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 mt-3">
+              <Input
+                type="text"
+                placeholder="Scope (e.g., packages/, src/) - Optional"
+                value={repoScope}
+                onChange={(e) => setRepoScope(e.target.value)}
+                className="flex-1 bg-background/50 max-w-sm"
+                onKeyPress={(e) => e.key === "Enter" && handleAnalyze()}
+              />
+            </div>
+            <div className="mt-3">
+              <ShortcutHint />
             </div>
           </CardContent>
         </Card>
@@ -378,7 +485,7 @@ export default function Dashboard() {
                           <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
                           {formatTimeAgo(
                             (repo as any).lastAnalyzedAt ||
-                              (repo as any).createdAt
+                            (repo as any).createdAt
                           )}
                         </div>
                       </div>

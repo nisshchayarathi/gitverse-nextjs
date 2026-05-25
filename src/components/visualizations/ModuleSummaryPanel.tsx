@@ -1,16 +1,31 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Settings, Sparkles, X } from "lucide-react";
-import { useAISettings } from "@/hooks/useAISettings";
-import { ClientAIProvider, AIContext } from "@/lib/ai/clientProvider";
+import { Sparkles, X } from "lucide-react";
+import type { AIContext } from "@/lib/ai/clientProvider";
 
 interface Props {
   nodeId: string;
   nodeName: string;
   nodeType: "folder" | "file";
-  repositoryFiles: any[]; // The raw file array from the repository
+  repositoryFiles: any[];
   onClose: () => void;
-  onOpenSettings: () => void;
+}
+
+function buildModuleSummaryPrompt(context: AIContext): string {
+  const fileList = context.files.slice(0, 50).map((f) => `- ${f.path} (${f.size} bytes)`).join("\n");
+  const truncationNotice = context.files.length > 50 ? `\n...and ${context.files.length - 50} more files omitted for brevity.` : "";
+
+  return `Explain the architectural purpose and responsibility of the following module/folder in this repository. 
+Module Name: ${context.moduleName}
+
+Contained Files:
+${fileList}${truncationNotice}
+
+Provide a concise 2-3 paragraph plain-English summary. Focus on:
+1. Architecture overview
+2. Module responsibilities
+3. Key behaviors based on the file names provided
+Be beginner-friendly but technically accurate.`;
 }
 
 export const ModuleSummaryPanel: React.FC<Props> = ({
@@ -19,46 +34,55 @@ export const ModuleSummaryPanel: React.FC<Props> = ({
   nodeType,
   repositoryFiles,
   onClose,
-  onOpenSettings,
 }) => {
-  const { settings, isLoaded } = useAISettings();
   const [summary, setSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
-    if (!isLoaded) return;
-    
-    const activeKey = settings.provider === "gemini" ? settings.geminiKey : settings.openaiKey;
-    if (!activeKey) {
-      setError("Please configure your API key first.");
-      onOpenSettings();
-      return;
-    }
-
     setLoading(true);
     setError(null);
-    
+
     try {
-      // Build context
       let filesToInclude = [];
       if (nodeType === "file") {
         const file = repositoryFiles.find(f => f.path.endsWith(nodeName));
         if (file) filesToInclude.push(file);
       } else {
-        // It's a folder, include files inside this folder
-        // The nodeId for a folder looks like "folder-src/components"
         const folderPath = nodeId.replace("folder-", "");
         filesToInclude = repositoryFiles.filter(f => f.path.startsWith(folderPath + "/"));
       }
 
       const context: AIContext = {
         moduleName: nodeName,
-        files: filesToInclude.map(f => ({ path: f.path, size: f.size || 0 }))
+        files: filesToInclude.map(f => ({ path: f.path, size: f.size || 0 })),
       };
 
-      const result = await ClientAIProvider.generateModuleSummary(settings.provider, activeKey, context);
-      setSummary(result);
+      const prompt = buildModuleSummaryPrompt(context);
+
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("gitverse_token")
+          : null;
+
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          prompt,
+          messages: [],
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || data?.details || "Failed to generate summary");
+      }
+
+      setSummary(data.response);
     } catch (err: any) {
       setError(err.message || "Failed to generate summary");
     } finally {
@@ -74,9 +98,6 @@ export const ModuleSummaryPanel: React.FC<Props> = ({
           <p className="text-xs text-muted-foreground capitalize">{nodeType}</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={onOpenSettings} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary">
-            <Settings size={18} />
-          </button>
           <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary">
             <X size={18} />
           </button>

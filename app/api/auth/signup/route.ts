@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { generateToken } from "@/lib/auth";
+import { logger } from "@/lib/logger";
+import crypto from "crypto";
 
 const signupAttempts = new Map<string, { count: number; resetTime: number }>();
 
@@ -55,6 +57,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    // Normalize email to lowercase
+    const normalizedEmail = email.toLowerCase();
 
     if (password.length < 6) {
       return NextResponse.json(
@@ -64,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
@@ -91,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         passwordHash: hashedPassword,
         name,
       },
@@ -111,8 +115,14 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("Signup error:", sanitizeError(error));
+  } catch (error: any) {
+    const rawIp = getClientIp(request);
+    let ipFingerprint = "unknown";
+    if (rawIp !== "unknown") {
+      const secret = process.env.NEXTAUTH_SECRET || "fallback_secret";
+      ipFingerprint = crypto.createHmac("sha256", secret).update(rawIp).digest("hex").substring(0, 16);
+    }
+    logger.error({ err: sanitizeError(error), ipFingerprint }, "Signup error");
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

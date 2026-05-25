@@ -2,8 +2,8 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState, useRef } from "react";
-import { User, Lock, Shield, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { User, Lock, Shield, Trash2, AlertCircle } from "lucide-react";
 import { Save } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
@@ -15,14 +15,15 @@ import {
   Button,
   Input,
   toast,
-  Modal,
+  EmptyState,
 } from "@/components/ui";
+import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 
 export default function Settings() {
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -51,25 +52,39 @@ export default function Settings() {
     didInitProfileForm.current = true;
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
+  const [userFetchStatus, setUserFetchStatus] = useState<
+    "loading" | "success" | "error" | "empty"
+  >("loading");
 
-    const fetchLinkStatus = async () => {
-      try {
-        const token = localStorage.getItem("gitverse_token");
-        const res = await axios.get(buildApiUrl("/api/users/me"), {
-          withCredentials: true,
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        setIsGoogleLinked(!!res.data?.isGoogleLinked);
-      } catch {
-        // Non-fatal; hide the indicator if we can't fetch.
+  const fetchUserInfo = useCallback(async () => {
+    setUserFetchStatus("loading");
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      const res = await axios.get(buildApiUrl("/api/users/me"), {
+        withCredentials: true,
+        timeout: 5000,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      if (!res.data) {
+        setUserFetchStatus("empty");
         setIsGoogleLinked(null);
+        return;
       }
-    };
 
-    fetchLinkStatus();
-  }, [user]);
+      setIsGoogleLinked(!!res.data?.isGoogleLinked);
+      setUserFetchStatus("success");
+    } catch (err) {
+      console.error("Error fetching user info:", err);
+      setIsGoogleLinked(null);
+      setUserFetchStatus("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    fetchUserInfo();
+  }, [authLoading, fetchUserInfo]);
 
   useEffect(() => {
   return () => {
@@ -325,6 +340,61 @@ export default function Settings() {
     { id: "security", label: "Security", icon: Shield },
     { id: "danger", label: "Danger Zone", icon: Trash2 },
   ];
+
+  // Early returns for loading / error / empty states to prevent layout shift
+  if (userFetchStatus === "loading" || authLoading) {
+    return (
+      <DashboardLayout>
+        <SettingsSkeleton />
+      </DashboardLayout>
+    );
+  }
+
+  if (userFetchStatus === "error") {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-heading font-bold mb-2">Settings</h1>
+            <p className="text-muted-foreground">
+              Manage your account settings and preferences
+            </p>
+          </div>
+
+          <EmptyState
+            icon={AlertCircle}
+            title="Unable to load account"
+            description="There was an error loading your account information. Check your connection and try again."
+            actionLabel="Retry"
+            onAction={fetchUserInfo}
+          />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (userFetchStatus === "empty") {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-heading font-bold mb-2">Settings</h1>
+            <p className="text-muted-foreground">
+              Manage your account settings and preferences
+            </p>
+          </div>
+
+          <EmptyState
+            icon={User}
+            title="No account found"
+            description="We couldn't find user data for this account. Try signing in again or contact support."
+            actionLabel="Reload"
+            onAction={fetchUserInfo}
+          />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

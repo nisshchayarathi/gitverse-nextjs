@@ -1,3 +1,4 @@
+// @ts-ignore
 import { jsPDF } from 'jspdf';
 
 /**
