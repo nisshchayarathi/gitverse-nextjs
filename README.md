@@ -353,7 +353,6 @@ firebase deploy
 Required:
 
 - `DATABASE_URL` - PostgreSQL connection string
-- `JWT_SECRET` - JWT secret key
 - `GEMINI_API_KEY` - Google Gemini API key
 
 OAuth (Google / NextAuth):
@@ -363,10 +362,9 @@ OAuth (Google / NextAuth):
 - `GOOGLE_CLIENT_ID` - Google OAuth client id (required only if Google sign-in is enabled)
 - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret (required only if Google sign-in is enabled)
 
-
 Optional:
 
-- `JWT_SECRET` - JWT signing secret (fallback/alternate secret configuration)
+- `JWT_SECRET` - JWT signing secret (fallback/alternate secret configuration used only if `NEXTAUTH_SECRET` is not set)
 - `NEXT_PUBLIC_API_URL` - API URL for client-side (defaults to current domain)
 
 ## 🤝 Contributing
