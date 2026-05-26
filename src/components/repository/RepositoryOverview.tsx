@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   GitBranch,
@@ -51,6 +51,23 @@ interface RepositoryOverviewProps {
 export const RepositoryOverview = ({
   repositoryData,
 }: RepositoryOverviewProps) => {
+  const [isFavorited, setIsFavorited] = useState(false);
+
+  const handleToggleFavorite = async (id: string, nextState: boolean) => {
+    // Simulate server API latency of 1.5 seconds
+    await new Promise((resolve, reject) => {
+      setTimeout(() => {
+        // Simulate a 30% chance of failure to showcase the try/catch rollback
+        if (Math.random() > 0.7) {
+          reject(new Error("Database connection lost. Please try again."));
+        } else {
+          setIsFavorited(nextState);
+          resolve(null);
+        }
+      }, 1500);
+    });
+  };
+
   // IMPORTANT: derive README directly from props so it always matches the
   // currently-selected repository (avoids showing stale README when navigating).
   const readmeText: string | null = repositoryData?.readmeText ?? null;
@@ -276,6 +293,14 @@ export const RepositoryOverview = ({
                 Updated {repository.updatedAt}
               </span>
             </div>
+          </div>
+          {/* Favorite Action Button */}
+          <div className="flex-shrink-0 self-start sm:self-center">
+            <FavoriteButton
+              initialIsFavorited={isFavorited}
+              repositoryId={repository.id}
+              onToggle={handleToggleFavorite}
+            />
           </div>
         </div>
 
@@ -606,3 +631,4 @@ export const RepositoryOverview = ({
     </div>
   );
 };
+

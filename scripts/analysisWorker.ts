@@ -5,6 +5,14 @@ import { analysisJobService } from "../lib/services/analysisJobService";
 import { repositoryService } from "../lib/services/repositoryService";
 import type { AnalysisJob } from "@prisma/client";
 
+// Catch any rejections that slip through the promise-gap fixes above.
+// Without this, Node 15+ crashes the entire worker on an unhandled rejection.
+process.on("unhandledRejection", (reason) => {
+  console.error("FATAL unhandled rejection — worker will exit:", reason);
+  // Log and exit so the orchestrator can retry the job.
+  process.exit(1);
+});
+
 const POLL_INTERVAL_MS = 2000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const LOCK_MS = 5 * 60_000;
@@ -86,7 +94,11 @@ async function runJob(
       throw new Error(`Unsupported job type: ${job.type}`);
     }
 
+    const details = job.progressDetails as any;
+    const scope = details?.scope;
+
     await repositoryService.analyzeRepository(job.repositoryId, {
+      scope,
       onProgress: async (update) => {
         await writeProgress(update);
       },

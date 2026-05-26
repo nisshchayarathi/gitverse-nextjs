@@ -2,8 +2,8 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState, useRef } from "react";
-import { User, Lock, Shield, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { User, Lock, Shield, Trash2, AlertCircle } from "lucide-react";
 import { Save } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
@@ -15,16 +15,19 @@ import {
   Button,
   Input,
   toast,
+  EmptyState,
 } from "@/components/ui";
+import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 
 export default function Settings() {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const didInitProfileForm = useRef(false);
@@ -49,25 +52,39 @@ export default function Settings() {
     didInitProfileForm.current = true;
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
+  const [userFetchStatus, setUserFetchStatus] = useState<
+    "loading" | "success" | "error" | "empty"
+  >("loading");
 
-    const fetchLinkStatus = async () => {
-      try {
-        const token = localStorage.getItem("gitverse_token");
-        const res = await axios.get(buildApiUrl("/api/users/me"), {
-          withCredentials: true,
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        setIsGoogleLinked(!!res.data?.isGoogleLinked);
-      } catch {
-        // Non-fatal; hide the indicator if we can't fetch.
+  const fetchUserInfo = useCallback(async () => {
+    setUserFetchStatus("loading");
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      const res = await axios.get(buildApiUrl("/api/users/me"), {
+        withCredentials: true,
+        timeout: 5000,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      if (!res.data) {
+        setUserFetchStatus("empty");
         setIsGoogleLinked(null);
+        return;
       }
-    };
 
-    fetchLinkStatus();
-  }, [user]);
+      setIsGoogleLinked(!!res.data?.isGoogleLinked);
+      setUserFetchStatus("success");
+    } catch (err) {
+      console.error("Error fetching user info:", err);
+      setIsGoogleLinked(null);
+      setUserFetchStatus("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    fetchUserInfo();
+  }, [authLoading, fetchUserInfo]);
 
   useEffect(() => {
   return () => {
@@ -165,6 +182,7 @@ export default function Settings() {
       if (response.status === 200) {
         initialEmailRef.current = trimmedEmail;
         setEmailChangeNewPassword("");
+        updateUser({ name: trimmedName, email: trimmedEmail, avatar: avatar || user?.avatar });
         toast({
           title: "Profile Updated",
           description: "Your profile has been successfully updated",
@@ -281,13 +299,12 @@ export default function Settings() {
 });
   };
 
-  const handleDeleteAccount = async () => {
-    if (isDeletingAccount) return;
+  const handleDeleteAccount = () => {
+    setShowDeleteModal(true);
+  };
 
-    const confirmed = window.confirm(
-      "Delete your account? This permanently deletes your data and cannot be undone."
-    );
-    if (!confirmed) return;
+  const confirmDeleteAccount = async () => {
+    if (isDeletingAccount) return;
 
     setIsDeletingAccount(true);
     try {
@@ -323,6 +340,61 @@ export default function Settings() {
     { id: "security", label: "Security", icon: Shield },
     { id: "danger", label: "Danger Zone", icon: Trash2 },
   ];
+
+  // Early returns for loading / error / empty states to prevent layout shift
+  if (userFetchStatus === "loading" || authLoading) {
+    return (
+      <DashboardLayout>
+        <SettingsSkeleton />
+      </DashboardLayout>
+    );
+  }
+
+  if (userFetchStatus === "error") {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-heading font-bold mb-2">Settings</h1>
+            <p className="text-muted-foreground">
+              Manage your account settings and preferences
+            </p>
+          </div>
+
+          <EmptyState
+            icon={AlertCircle}
+            title="Unable to load account"
+            description="There was an error loading your account information. Check your connection and try again."
+            actionLabel="Retry"
+            onAction={fetchUserInfo}
+          />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (userFetchStatus === "empty") {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-heading font-bold mb-2">Settings</h1>
+            <p className="text-muted-foreground">
+              Manage your account settings and preferences
+            </p>
+          </div>
+
+          <EmptyState
+            icon={User}
+            title="No account found"
+            description="We couldn't find user data for this account. Try signing in again or contact support."
+            actionLabel="Reload"
+            onAction={fetchUserInfo}
+          />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -383,6 +455,7 @@ export default function Settings() {
                       <Input
                         id="name"
                         type="text"
+                        autoComplete="name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="John Doe"
@@ -396,6 +469,7 @@ export default function Settings() {
                       <Input
                         id="email"
                         type="email"
+                        autoComplete="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="john@example.com"
@@ -422,6 +496,7 @@ export default function Settings() {
                           <Input
                             id="email-change-password"
                             type="password"
+                            autoComplete="new-password"
                             value={emailChangeNewPassword}
                             onChange={(e) =>
                               setEmailChangeNewPassword(e.target.value)
@@ -518,6 +593,7 @@ export default function Settings() {
                           id="current-password"
                           type="password"
                           value={currentPassword}
+                          autoComplete="current-password"
                           onChange={(e) => setCurrentPassword(e.target.value)}
                           className="pl-10"
                           placeholder="••••••••"
@@ -537,6 +613,7 @@ export default function Settings() {
                         <Input
                           id="new-password"
                           type="password"
+                          autoComplete="new-password"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           className="pl-10"
@@ -560,6 +637,7 @@ export default function Settings() {
                         <Input
                           id="confirm-password"
                           type="password"
+                          autoComplete="new-password"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           className="pl-10"
@@ -617,6 +695,37 @@ export default function Settings() {
           </div>
         </div>
       </div>
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete Account"
+        size="sm"
+      >
+        <p className="text-muted-foreground mb-6">
+          This permanently deletes your account and all data. This cannot be undone.
+        </p>
+
+        <div className="flex gap-3 justify-end">
+          <Button
+            variant="outline"
+            onClick={() => setShowDeleteModal(false)}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            variant="destructive"
+            onClick={() => {
+              setShowDeleteModal(false);
+              confirmDeleteAccount();
+            }}
+            disabled={isDeletingAccount}
+          >
+            {isDeletingAccount ? "Deleting..." : "Delete Account"}
+          </Button>
+        </div>
+      </Modal>
+
     </DashboardLayout>
   );
 }

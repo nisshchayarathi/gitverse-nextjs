@@ -172,10 +172,10 @@ export default function Signup() {
       return;
     }
 
-    if (password.length < 6) {
-      toast({
-        title: "Error",
-        description: "Password must be at least 6 characters long",
+    if (password.length < 8) {
+  toast({
+    title: "Error",
+    description: "Password must be at least 8 characters long",
         variant: "destructive",
       });
       return;

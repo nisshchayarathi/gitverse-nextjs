@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import RepositoryAnalysisProgress  from "@/components/repository/RepositoryAnalysisProgress";
 import { useParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RepositoryOverview } from "@/components/repository/RepositoryOverview";
@@ -11,6 +12,7 @@ import { CommitHistory } from "@/components/repository/CommitHistory";
 import { Contributors } from "@/components/repository/Contributors";
 import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
+
 import {
   Home,
   FolderTree,
@@ -115,17 +117,61 @@ export default function RepositoryAnalysis() {
   const [repository, setRepository] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [job, setJob] = useState<any>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollingJobRef = useRef<string | null>(null);
+
+  // Timeout / stuck state
+  const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  const pollingStartedAt = useRef<number | null>(null);
+  // Tracks last time progress changed  prevents falsely timing out active jobs
+  const lastProgressAt = useRef<number | null>(null);
+  const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // ── Elapsed seconds ticker ────────────────────────────────────────
+  useEffect(() => {
+    if (isAnalyzing && !analysisTimedOut) {
+      elapsedTimer.current = setInterval(() => {
+        if (pollingStartedAt.current) {
+          setElapsedSeconds(
+            Math.floor((Date.now() - pollingStartedAt.current) / 1000)
+          );
+        }
+      }, 1000);
+    } else {
+      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
+    }
+    return () => {
+      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
+    };
+  }, [isAnalyzing, analysisTimedOut]);
+
+  // ── Initial fetch ─────────────────────────────────────────────────� Initial fetch ─────────────────────────────────────────────────
+  useEffect(() => {
+  fetchRepository();
+  fetchJobHistory();
+}, [id]);
 
   useEffect(() => {
-    fetchRepository();
-  }, [id]);
+    // Guard against dual-polling when the dependency array changes mid-cycle.
+    const jobId = job?.id || repository?.latestJob?.id;
+    if (!jobId) return;
 
-  useEffect(() => {
-    // Poll job status (lightweight) while analyzing.
+    if (pollingJobRef.current !== jobId) {
+      pollingJobRef.current = jobId;
+    } else {
+      // Same jobId triggered a re-run; bail to avoid stacking loops.
+      return;
+    }
+
     const repoStatus = repository?.status as string | undefined;
     const jobStatus = job?.status as string | undefined;
 
@@ -137,16 +183,22 @@ export default function RepositoryAnalysis() {
 
     setIsAnalyzing(Boolean(shouldShowAnalyzing));
 
-    const jobId = job?.id || repository?.latestJob?.id;
-    if (!jobId) return;
-
     if (jobStatus === "DONE" || jobStatus === "FAILED") return;
 
     let stopped = false;
     let intervalMs = 2000;
+    let retries = 0;
+    const MAX_RETRIES = 60;
 
     const poll = async () => {
       if (stopped) return;
+      if (retries >= MAX_RETRIES) {
+        setError(
+          "Analysis is taking longer than expected. The job may still be processing — check back later."
+        );
+        return;
+      }
+      retries++;
       await fetchJob(jobId);
       if (stopped) return;
       setTimeout(poll, intervalMs);
@@ -159,6 +211,24 @@ export default function RepositoryAnalysis() {
       stopped = true;
     };
   }, [repository?.status, repository?.latestJob?.id, job?.id, job?.status]);
+
+  useEffect(() => {
+  if (!isAnalyzing) return;
+
+  setCurrentStep(0);
+
+  const interval = setInterval(() => {
+    setCurrentStep((prev) => {
+      if (prev < 4) {
+        return prev + 1;
+      }
+
+      return prev;
+    });
+  }, 2500);
+
+  return () => clearInterval(interval);
+}, [isAnalyzing]);
 
   const fetchRepository = async () => {
     if (!id) return;
@@ -245,6 +315,29 @@ export default function RepositoryAnalysis() {
       });
     }
   };
+
+  const fetchJobHistory = async () => {
+  if (!id) return;
+
+  try {
+    setLoadingJobs(true);
+
+    const token = localStorage.getItem("gitverse_token");
+
+    const response = await axios.get(
+      buildApiUrl(`/api/repositories/${id}/jobs`),
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+
+    setJobs(response.data.jobs || []);
+  } catch (error) {
+    console.error("Error fetching job history:", error);
+  } finally {
+    setLoadingJobs(false);
+  }
+};
 
   const handleDeleteRepository = async () => {
     if (!id) return;
@@ -373,12 +466,33 @@ export default function RepositoryAnalysis() {
               )}
             </div>
 
-            {isAnalyzing ? (
+            {/* {isAnalyzing ? (
               <div className="glass rounded-lg p-12 text-center space-y-4 animate-pulse">
                 <div className="flex justify-center">
                   <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
                 </div>
-                <div>
+                <div> */}
+
+                {isAnalyzing ? (
+  <div className="animate-fade-in-up">
+    <RepositoryAnalysisProgress currentStep={currentStep} />
+
+    <div className="mt-6 glass rounded-lg p-4 text-center">
+      <p className="text-sm text-muted-foreground">
+        {job?.progressPercent != null && job?.progressPercent >= 0
+          ? `${Math.min(Math.round(job.progressPercent), 100)}% complete`
+          : "Processing repository analysis..."}
+      </p>
+
+      {job?.progressMessage && (
+        <p className="text-sm mt-2 text-primary font-medium">
+          {job.progressMessage}
+        </p>
+      )}
+    </div>
+  </div>
+) : error && !repository ? (
+
                   <h2 className="text-xl font-semibold mb-2">
                     Analyzing Repository
                   </h2>
@@ -449,7 +563,57 @@ export default function RepositoryAnalysis() {
                 </div>
 
                 {/* Content */}
-                <div className="animate-fade-in-up">{renderContent()}</div>
+                {/* Content */}
+<div className="animate-fade-in-up">
+  {renderContent()}
+</div>
+
+{/* Analysis History */}
+<div className="glass rounded-lg p-6 mt-6">
+  <h2 className="text-2xl font-bold mb-4">
+    Analysis History
+  </h2>
+
+  {loadingJobs ? (
+    <p className="text-muted-foreground">
+      Loading analysis history...
+    </p>
+  ) : jobs.length === 0 ? (
+    <p className="text-muted-foreground">
+      No analysis history found.
+    </p>
+  ) : (
+    <div className="space-y-4">
+      {jobs.map((historyJob: any) => (
+        <div
+          key={historyJob.id}
+          onClick={() =>
+            router.push(`/analysis/${historyJob.id}`)
+          }
+          className="border rounded-lg p-4 cursor-pointer hover:bg-white/5 transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold">
+                {historyJob.status}
+              </p>
+
+              <p className="text-sm text-muted-foreground">
+                {historyJob.summary || "No summary available"}
+              </p>
+
+              <p className="text-xs text-muted-foreground mt-1">
+                {new Date(
+                  historyJob.createdAt,
+                ).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
               </>
             )}
           </>
@@ -511,3 +675,5 @@ export default function RepositoryAnalysis() {
     </DashboardLayout>
   );
 }
+
+

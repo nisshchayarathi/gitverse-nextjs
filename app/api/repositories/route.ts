@@ -1,8 +1,9 @@
-import { normalizeKnownRepoHttpUrl } from "@/lib/utils/repositoryUtils";import { NextRequest, NextResponse } from "next/server";
+import { normalizeKnownRepoHttpUrl, normalizeTargetDirectory } from "@/lib/utils/repositoryUtils";import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
+import { logger } from "@/lib/logger";
 function kickLocalRunner(request: NextRequest) {
   if (process.env.NODE_ENV === "production") return;
   const origin = new URL(request.url).origin;
@@ -19,7 +20,7 @@ function kickProductionWorker() {
   if (process.env.NODE_ENV !== "production") return;
 
   void triggerAnalysisWorkerWorkflow().catch((error) => {
-    console.error("Failed to dispatch analysis worker workflow:", sanitizeError(error));
+    logger.error({ err: sanitizeError(error) }, "Failed to dispatch analysis worker workflow");
   });
 }
 
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
     const body = await request.json();
-    const { name, url, description } = body;
+    const { name, url, description, targetDirectory } = body;
 
     if (!name || !url) {
       return NextResponse.json(
@@ -47,16 +48,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedTargetDirectory = normalizeTargetDirectory(targetDirectory);
+    if (targetDirectory && !normalizedTargetDirectory) {
+      return NextResponse.json(
+        { error: "Invalid targetDirectory. Example: packages/ui or apps/web" },
+        { status: 400 }
+      );
+    }
+
     const repository = await repositoryService.createRepository({
       name,
       url: normalizedUrl,
       description,
+      targetDirectory: normalizedTargetDirectory ?? undefined,
       userId: user.userId,
     });
 
+    console.log("Repository created:", repository.id);
+
+    let trimmedScope: string | undefined = undefined;
+    if (body.scope && typeof body.scope === "string") {
+      trimmedScope = body.scope.trim();
+    }
     const job = await analysisJobService.createRepositoryAnalysisJob({
       repositoryId: repository.id,
       userId: user.userId,
+      scope: trimmedScope || undefined,
     });
 
     kickLocalRunner(request);
@@ -67,8 +84,8 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error("Create repository error:", sanitizeError(error));
-    console.error("Error stack:", error.stack);
+    const stack = process.env.NODE_ENV === 'development' ? error.stack : error.stack?.split('\n').slice(0, 3).join('\n');
+    logger.error({ err: sanitizeError(error), stack }, "Create repository error");
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
@@ -89,7 +106,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ repositories });
   } catch (error: any) {
-    console.error("List repositories error:", sanitizeError(error));
+    logger.error({ err: sanitizeError(error) }, "List repositories error");
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },

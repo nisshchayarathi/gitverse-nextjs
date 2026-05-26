@@ -5,35 +5,37 @@ import { repositoryService } from "@/lib/services/repositoryService";
 
 export const runtime = "nodejs";
 
+// Global catch — prevents Node 15+ from crashing the request on an
+// unhandled rejection that made it past the promise-gap fixes above.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection in run-analysis route:", reason);
+});
+
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
 function isAuthorized(request: NextRequest): boolean {
   const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
 
-  // If a secret is configured, require it for non-GET requests.
-  // (Vercel Cron triggers are GET-only and cannot send custom headers.)
-  if (configuredSecret && request.method !== "GET") {
-    const headerSecret = request.headers.get("x-analysis-runner-secret");
-    const url = new URL(request.url);
-    const querySecret = url.searchParams.get("secret");
-
-    return headerSecret === configuredSecret || querySecret === configuredSecret;
-  }
-
-  // Vercel Cron: triggers are plain HTTP GETs to your `path`.
-  // Per Vercel docs, cron-triggered functions contain `vercel-cron/1.0` as the User-Agent.
-  // Note: User-Agent can be spoofed, but this is the strongest option that works with
-  // `vercel.json` crons (which don't support custom headers).
-  const ua = (request.headers.get("user-agent") || "").toLowerCase();
-  const isVercelCron =
-    process.env.VERCEL === "1" &&
-    process.env.VERCEL_ENV === "production" &&
-    ua.includes("vercel-cron/");
-  if (request.method === "GET" && isVercelCron) return true;
-
-  // In dev, allow calling without a secret.
+  // When no secret is configured, allow in dev or via Vercel Cron on Vercel.
   if (!configuredSecret) {
-    return process.env.NODE_ENV !== "production";
+    if (process.env.NODE_ENV !== "production") return true;
+
+    const ua = (request.headers.get("user-agent") || "").toLowerCase();
+    if (
+      request.method === "GET" &&
+      process.env.VERCEL === "1" &&
+      process.env.VERCEL_ENV === "production" &&
+      ua.includes("vercel-cron/")
+    ) {
+      return true;
+    }
+
+    return false;
   }
 
+  // When a secret is configured, always require it, regardless of
+  // HTTP method or User-Agent. Vercel Cron jobs should include the
+  // secret as a query parameter in the cron path.
   const headerSecret = request.headers.get("x-analysis-runner-secret");
   const url = new URL(request.url);
   const querySecret = url.searchParams.get("secret");
@@ -53,6 +55,8 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
     return new NextResponse(null, { status: 204 });
   }
 
+  let heartbeatTimer: NodeJS.Timeout | null = null;
+
   try {
     await analysisJobService.updateProgress({
       jobId: job.id,
@@ -62,6 +66,12 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
         progressMessage: job.progressMessage ?? "Processing",
       },
     });
+
+    heartbeatTimer = setInterval(() => {
+      analysisJobService
+        .heartbeat({ jobId: job.id, workerId })
+        .catch((e) => console.error("serverless heartbeat failed", e));
+    }, HEARTBEAT_INTERVAL_MS);
 
     await repositoryService.analyzeRepository(job.repositoryId, {
       onProgress: async (update) => {
@@ -73,10 +83,16 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       },
     });
 
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+
     await analysisJobService.markDone({ jobId: job.id, workerId });
 
     return NextResponse.json({ ok: true, jobId: job.id, status: "DONE" });
   } catch (error: any) {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+
     const message = String(error?.message || error || "Unknown error");
 
     await analysisJobService.markFailed({

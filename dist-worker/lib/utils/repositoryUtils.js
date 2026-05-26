@@ -16,6 +16,7 @@ exports.isFeatureBranch = isFeatureBranch;
 exports.isBugfixBranch = isBugfixBranch;
 exports.isReleaseBranch = isReleaseBranch;
 exports.calculateCodeChurn = calculateCodeChurn;
+exports.normalizeKnownRepoHttpUrl = normalizeKnownRepoHttpUrl;
 exports.LANGUAGE_COLORS = {
     TypeScript: '#3178c6',
     JavaScript: '#f1e05a',
@@ -185,4 +186,27 @@ function calculateCodeChurn(commits) {
     return Array.from(churnByDate.entries())
         .map(([date, churn]) => ({ date, churn }))
         .sort((a, b) => a.date.localeCompare(b.date));
+}
+function normalizeKnownRepoHttpUrl(input) {
+    let parsed;
+    try {
+        parsed = new URL(input);
+    }
+    catch {
+        return null;
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+        return null;
+    const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    const supportedHosts = new Set(["github.com", "gitlab.com", "bitbucket.org"]);
+    if (!supportedHosts.has(host))
+        return input;
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    if (parts.length < 2)
+        return null;
+    const owner = parts[0];
+    const repo = parts[1].replace(/\.git$/, "");
+    if (!owner || !repo)
+        return null;
+    return `${parsed.protocol}//${parsed.host}/${owner}/${repo}`;
 }
