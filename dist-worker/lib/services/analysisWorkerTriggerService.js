@@ -29,6 +29,7 @@ async function triggerAnalysisWorkerWorkflow(config) {
             Authorization: `Bearer ${token}`,
             "X-GitHub-Api-Version": "2022-11-28",
             "Content-Type": "application/json",
+            "User-Agent": "GitVerse-App",
         },
         body: JSON.stringify({ ref }),
     });

@@ -18,16 +18,27 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
   const pathname = usePathname()
 
   return (
-    <nav className="flex items-center space-x-2 text-sm text-secondary-600 dark:text-secondary-400">
+    <nav className="flex items-center space-x-2 text-sm text-secondary">
+      
+    <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
       {items.map((item, index) => {
         const isLast = index === items.length - 1
         const isActive = pathname === item.path
 
         return (
           <React.Fragment key={item.path}>
-            {index > 0 && <ChevronRight size={16} className="text-secondary-400" />}
+            {index > 0 && <ChevronRight size={16} className="text-secondary" />}
             {isLast || isActive ? (
-              <span className="font-medium text-secondary-900 dark:text-secondary-50">
+              <span className="font-medium text-secondary">
+            {/* CodeRabbit Fix: Changed text-secondary to text-muted-foreground for legible separator contrast */}
+            {index > 0 && <ChevronRight size={16} className="text-muted-foreground" />}
+            
+            {isLast || isActive ? (
+{isLast || isActive ? (
+  <span className="font-medium text-foreground">
+    {item.label}
+  </span>
+) : (
                 {item.label}
               </span>
             ) : (

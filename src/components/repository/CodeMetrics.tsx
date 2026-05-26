@@ -1,3 +1,6 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
 import {
   Code,
   FileCode,
@@ -46,6 +49,12 @@ interface CodeMetricsProps {
 }
 
 export function CodeMetrics({ repository }: CodeMetricsProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const getLanguageColor = (name: string): string => {
     const colors: Record<string, string> = {
       TypeScript: "bg-blue-500",
@@ -83,14 +92,23 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
   );
 
   const totalFiles = repository?.files?.length || 0;
-  const sourceFiles =
-    repository?.files?.filter((f: any) =>
-      f.path?.match(/\.(ts|tsx|js|jsx|py|java|go|rs)$/i)
-    )?.length || 0;
-  const testFiles =
-    repository?.files?.filter((f: any) =>
-      f.path?.match(/\.(test|spec)\.(ts|tsx|js|jsx)$/i)
-    )?.length || 0;
+  
+  const testFilePattern = /\.(test|spec)\.(ts|tsx|js|jsx)$/i;
+  const sourceFilePattern = /\.(ts|tsx|js|jsx|py|java|go|rs)$/i;
+
+  // 1. Filter test files first
+  const testFilesList = repository?.files?.filter((f: any) =>
+    testFilePattern.test(f.path || "")
+  ) || [];
+  const testFiles = testFilesList.length;
+  const hasTests = testFiles > 0;
+
+  // 2. Filter source files but EXCLUDE matches from the test pattern
+  const sourceFilesList = repository?.files?.filter((f: any) =>
+    sourceFilePattern.test(f.path || "") && !testFilePattern.test(f.path || "")
+  ) || [];
+  const sourceFiles = sourceFilesList.length;
+
   const configFiles =
     repository?.files?.filter((f: any) =>
       f.path?.match(/\.(json|yaml|yml|toml|ini|env)$/i)
@@ -108,6 +126,13 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
     },
     0
   );
+
+  // Calculate distinct test lines of code vs source lines of code
+  const testLinesOfCode = testFilesList.reduce((sum: number, file: any) => sum + (file.lines || 0), 0);
+  const sourceLinesOfCode = sourceFilesList.reduce((sum: number, file: any) => sum + (file.lines || 0), 0);
+
+  // Calculate a precise test-to-source file footprint ratio footprint
+  const testToSourceRatio = sourceFiles > 0 ? (testFiles / sourceFiles) * 100 : 0;
 
   // Calculate percentages that sum to exactly 100%
   const totalCategorizedFiles =
@@ -245,7 +270,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
   // Calculate real dependencies from repository
   const packageJsonFile = repository?.files?.find(
     (f: any) => f.path?.toLowerCase() === "package.json"
-  );
+  ) as any;
   const totalDependencies =
     (packageJsonFile?.dependencies?.length || 0) +
     (packageJsonFile?.devDependencies?.length || 0);
@@ -259,6 +284,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
     outdated: outdatedCount,
     vulnerable: vulnerableCount,
   };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "good":
@@ -319,8 +345,8 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
                     <div className="flex items-center gap-3">
                       <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
                         <div
-                          className={`h-full ${lang.color} transition-all duration-500`}
-                          style={{ width: `${lang.percentage}%` }}
+                          className={`h-full ${lang.color} transition-all duration-500 ease-out`}
+                          style={{ width: mounted ? `${lang.percentage}%` : "0%" }}
                         />
                       </div>
                       <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -402,7 +428,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
                 <span
                   className={`text-lg sm:text-2xl font-bold flex-shrink-0 ${getStatusColor(metric.status)}`}
                 >
-                  {metric.value}
+                  {metric.value.toLocaleString()}
                   {metric.name.includes("Score") ||
                   metric.name.includes("Coverage") ||
                   metric.name.includes("Maintainability") ||
@@ -423,7 +449,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
                         ? "bg-yellow-500"
                         : "bg-red-500"
                   } transition-all duration-500`}
-                  style={{ width: `${metric.value}%` }}
+                  style={{ width: `${Math.min(metric.value, 100)}%` }}
                 />
               </div>
             </Card>
@@ -431,7 +457,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
         </div>
       </div>
 
-      {/* Code complexity */}
+      {/* Code complexity & Dependencies */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <Card className="glass p-4 sm:p-6">
           <h3 className="text-base sm:text-lg font-semibold mb-4 flex items-center gap-2">
@@ -491,7 +517,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
         <Card className="glass p-4 sm:p-6">
           <h3 className="text-base sm:text-lg font-semibold mb-4 flex items-center gap-2">
             <Package className="h-5 w-5 text-primary flex-shrink-0" />
-            Dependencies
+            <span>Dependencies</span>
           </h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 glass rounded-lg">
@@ -540,72 +566,59 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
         </Card>
       </div>
 
-      {/* Test coverage */}
-      {(() => {
-        const totalTestFiles = testFiles;
-        const hasTests = totalTestFiles > 0;
-        const estimatedTestCount = hasTests ? totalTestFiles * 12 : 0;
-        const passingRate = hasTests ? 95 : 0;
-        const passingTests = Math.floor(
-          (estimatedTestCount * passingRate) / 100
-        );
-        const failingTests = estimatedTestCount - passingTests;
-        const coveragePercentage =
-          totalTestFiles > 0
-            ? Math.min(100, Math.round((testFiles / sourceFiles) * 100) || 0)
-            : 0;
+      {/* Test footprint analysis */}
+      <Card className="glass p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-semibold mb-4 flex items-center gap-2">
+          <TestTube className="h-5 w-5 text-primary flex-shrink-0" />
+          <span>Test Footprint Analysis</span>
+        </h3>
 
-        return (
-          <Card className="glass p-4 sm:p-6">
-            <h3 className="text-base sm:text-lg font-semibold mb-4 flex items-center gap-2">
-              <TestTube className="h-5 w-5 text-primary flex-shrink-0" />
-              <span>Test Coverage</span>
-            </h3>
-            {hasTests ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-                <div>
-                  <p className="text-3xl sm:text-4xl font-bold text-green-500 mb-2">
-                    {coveragePercentage}%
-                  </p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    Coverage Ratio
-                  </p>
-                </div>
-                <div>
-                  <p className="text-2xl sm:text-3xl font-bold mb-2">
-                    {estimatedTestCount}
-                  </p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    Total Tests
-                  </p>
-                </div>
-                <div>
-                  <p className="text-2xl sm:text-3xl font-bold text-green-500 mb-2">
-                    {passingTests}
-                  </p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    Passing
-                  </p>
-                </div>
-                <div>
-                  <p className="text-2xl sm:text-3xl font-bold text-red-500 mb-2">
-                    {failingTests}
-                  </p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    Failing
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-6">
-                <p className="text-muted-foreground text-xs sm:text-sm">
-                  No test files detected in repository
-                </p>
-              </div>
-            )}
-          </Card>
-        );
-      })()}
+        {hasTests ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            <div>
+              <p className="text-3xl sm:text-4xl font-bold mb-2">
+                {testToSourceRatio.toFixed(1)}%
+              </p>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Test-to-Source File Ratio
+              </p>
+            </div>
+
+            <div>
+              <p className="text-3xl sm:text-4xl font-bold mb-2">
+                {testFiles}
+              </p>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Test Suites Detected
+              </p>
+            </div>
+
+            <div>
+              <p className="text-3xl sm:text-4xl font-bold text-green-500 mb-2">
+                {testLinesOfCode.toLocaleString()}
+              </p>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Test Lines of Code
+              </p>
+            </div>
+
+            <div>
+              <p className="text-3xl sm:text-4xl font-bold text-blue-500 mb-2">
+                {sourceLinesOfCode.toLocaleString()}
+              </p>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Source Lines of Code
+              </p>
+            </div>
+          </div>
+        ) : (
+          <EmptyState
+            icon={TestTube}
+            title="No tests detected"
+            description="We couldn't find any test suites or test files in this repository."
+          />
+        )}
+      </Card>
     </div>
   );
 }

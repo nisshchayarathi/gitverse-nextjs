@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui";
+import { CommandPalette } from "@/components/ui/CommandPalette";
 import { toast } from "@/hooks/use-toast";
 
 interface DashboardLayoutProps {
@@ -38,6 +39,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -101,14 +103,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
           {/* Toggle Sidebar Button */}
           <div className="p-4 border-t border-border/50">
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-accent transition-colors"
+              aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             >
               <ChevronLeft
                 className={`h-5 w-5 transition-transform ${!sidebarOpen ? "rotate-180" : ""}`}
               />
-            </button>
+            </Button>
           </div>
         </div>
       </aside>
@@ -163,14 +168,29 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         <header className="sticky top-0 z-30 glass border-b border-border/50">
           <div className="px-4 py-3 flex items-center justify-between">
             {/* Mobile Menu Button */}
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setMobileMenuOpen(true)}
               className="p-2 rounded-lg hover:bg-accent transition-colors md:hidden"
+              aria-label="Open mobile menu"
             >
               <Menu className="h-5 w-5" />
-            </button>
+            </Button>
 
-            <div className="flex-1" />
+            <div className="flex-1 flex items-center justify-end px-4 sm:px-6">
+              <Button
+                variant="outline"
+                className="hidden sm:flex relative h-9 w-full justify-start rounded-[0.5rem] bg-background/50 text-sm text-muted-foreground sm:pr-12 md:w-56 lg:w-64 border-border/50 hover:bg-accent/50"
+                onClick={() => setCommandPaletteOpen(true)}
+              >
+                <span className="hidden lg:inline-flex">Search or jump to...</span>
+                <span className="inline-flex lg:hidden">Search...</span>
+                <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex text-foreground">
+                  <span className="text-xs">⌘</span>K / Ctrl K
+                </kbd>
+              </Button>
+            </div>
 
             {/* User Profile Dropdown */}
             <DropdownMenu>
@@ -225,6 +245,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {/* Page Content */}
         <main className="p-6">{children}</main>
       </div>
+      
+      {/* Global Command Palette */}
+      <CommandPalette open={commandPaletteOpen} setOpen={setCommandPaletteOpen} />
     </div>
   );
 };
