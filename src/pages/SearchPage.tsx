@@ -119,7 +119,8 @@ finally {
                   className="pl-10 bg-background/50"
                 />
               </div>
-            <div className="flex gap-2 flex-row flex-wrap justify-end">
+              </div>
+              <div className="flex gap-2 flex-row flex-wrap justify-end">
   <div className="flex gap-2">
     <Button
       variant="outline"

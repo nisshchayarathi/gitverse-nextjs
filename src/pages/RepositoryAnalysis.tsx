@@ -777,63 +777,8 @@ const safeProgressMessage =
   </div>
 ) : error && !repository ? (
 
-                  <h2 className="text-xl font-semibold mb-2">
-                    Analyzing Repository
-                  </h2>
-                  <p className="text-muted-foreground">
-                    We&apos;re analyzing the repository structure, commits,
-                    contributors, and more.
-                  </p>
-
-                  {/* Progress bar */}
-                  <div className="mt-4 max-w-sm mx-auto">
-                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                      <span>{safeProgressMessage}</span>
-                      <span>{Math.round(safeProgressPercent)}%</span>
-                    </div>
-                    <div className="w-full bg-white/10 rounded-full h-2">
-                      <div
-                        className="bg-primary h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(2, safeProgressPercent)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Elapsed time */}
-                  <p className="text-xs text-muted-foreground mt-3 flex items-center justify-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {elapsedSeconds > 0
-                      ? `Running for ${formatElapsed(elapsedSeconds)}`
-                      : "Starting up..."}
-                  </p>
-
-                  {/* Warn if queued too long (>60s with no progress) */}
-                  {elapsedSeconds > 60 && safeProgressPercent === 0  && (
-                    <div className="mt-4 max-w-sm mx-auto p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                      <p className="text-xs text-yellow-400 flex items-start gap-2">
-                        <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                        Still queued after {formatElapsed(elapsedSeconds)}. 
-                        The worker runs every 5 minutes via GitHub Actions â€” 
-                        it should pick this up shortly.
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <GitCommit className="h-4 w-4" />
-                    Processing commits
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Finding contributors
-                  </div>
-                </div>
-              </div>
-
-            ) : analysisTimedOut || analysisError ? (
-              /* â”€â”€ Timeout / error state â”€â”€ */
-              <div className="glass rounded-lg p-12 text-center space-y-6">
+              
+              <div className="glass rounded-lg p-12 text-center space-y-4 animate-fade-in-up">
                 <div className="flex justify-center">
                   <div className="p-4 rounded-full bg-red-500/10">
                     <AlertCircle className="h-12 w-12 text-red-400" />

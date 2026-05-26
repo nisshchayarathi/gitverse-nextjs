@@ -53,8 +53,7 @@ export const RepositoryOverview = ({
 }: RepositoryOverviewProps) => {
   const [isFavorited, setIsFavorited] = useState(false);
 
-  const handleToggleFavorite = async (id: string, nextState: boolean) => {
-    // Simulate server API latency of 1.5 seconds
+const handleToggleFavorite = async (_id: string, nextState: boolean) => {    // Simulate server API latency of 1.5 seconds
     await new Promise((resolve, reject) => {
       setTimeout(() => {
         // Simulate a 30% chance of failure to showcase the try/catch rollback

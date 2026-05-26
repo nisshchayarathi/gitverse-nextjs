@@ -9,7 +9,17 @@ export type JobProgressUpdate = {
 };
 
 const DEFAULT_LOCK_MS = 5 * 60 * 1000;
-const PROGRESS_MESSAGE_QUEUED = "Queued — waiting to start...";
+function isRetryableError(error: any): boolean {
+  const message = error?.message?.toLowerCase() || "";
+
+  return (
+    message.includes("timeout") ||
+    message.includes("network") ||
+    message.includes("rate limit") ||
+    message.includes("fetch failed") ||
+    message.includes("temporarily unavailable")
+  );
+}
 
 function computeBackoffMs(attempt: number): number {
   // Exponential backoff with cap (10s, 20s, 40s, ... up to 5m)
@@ -72,21 +82,7 @@ export class AnalysisJobService {
             status: { in: ["QUEUED", "PROCESSING"] },
           },
         });
-        if (existingJob) return existingJob;
-
-        // The active job may have completed between the P2002 and the lookup. Retry exactly once.
-        return await prisma.analysisJob.create({
-          data: {
-            repositoryId: params.repositoryId,
-            userId: params.userId,
-            type: "repository_analysis",
-            status: "QUEUED",
-            progressPercent: 0,
-            progressMessage: "Queued",
-            progressDetails: params.scope ? { scope: params.scope } : undefined,
-            maxAttempts: params.maxAttempts ?? 3,
-          },
-        });
+        if (activeJob) return activeJob;
       }
       throw error;
     }
@@ -156,23 +152,9 @@ export class AnalysisJobService {
     attempts: number;
     maxAttempts: number;
   }): Promise<void> {
-    // Update repository status to failed when retries exhausted
-    try {
-      const job = await prisma.analysisJob.findUnique({
-        where: { id: params.jobId },
-        select: { repositoryId: true },
-      });
-      if (job?.repositoryId && params.attempts >= params.maxAttempts) {
-        await prisma.repository.update({
-          where: { id: job.repositoryId },
-          data: { status: "failed" },
-        });
-      }
-    } catch {
-      // Non-critical: repo status update must not crash job status update
-    }
-    const shouldRetry = params.attempts < params.maxAttempts;
-
+   const shouldRetry =
+  params.attempts < params.maxAttempts &&
+  isRetryableError(params.error);
     if (shouldRetry) {
       const delay = computeBackoffMs(params.attempts);
       await prisma.analysisJob.update({
@@ -220,38 +202,38 @@ export class AnalysisJobService {
     // 2) re-fetch via Prisma Client (typed + camelCase fields)
     const rows = await prisma.$queryRaw<{ id: string }[]>`
       WITH candidate AS (
-        SELECT a1.id
-        FROM analysis_jobs a1
-        WHERE a1.next_run_at <= NOW()
-          AND a1.status IN ('QUEUED', 'PROCESSING')
-          AND (a1.lock_expires_at IS NULL OR a1.lock_expires_at < NOW())
-          AND NOT EXISTS (
-            SELECT 1 FROM analysis_jobs a2
-            WHERE a2.repository_id = a1.repository_id
-              AND a2.status = 'PROCESSING'
-              AND a2.id != a1.id
-              AND (a2.lock_expires_at IS NULL OR a2.lock_expires_at > NOW())
-          )
-        ORDER BY a1.created_at ASC
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED
-      )
-      UPDATE analysis_jobs j
-      SET
-        status = 'PROCESSING',
-        locked_at = NOW(),
-        locked_by = ${params.workerId},
-        lock_expires_at = NOW() + (${lockMs}::int * INTERVAL '1 millisecond'),
-        attempts = j.attempts + 1,
-        started_at = COALESCE(j.started_at, NOW()),
-        updated_at = NOW(),
-        progress_message = COALESCE(j.progress_message, 'Analysis in progress...'),
-        progress_percent = COALESCE(j.progress_percent, 0)
-      FROM candidate
-      WHERE j.id = candidate.id
-      RETURNING j.id
-    `;
-
+WITH candidate AS (
+  SELECT a1.id
+  FROM analysis_jobs a1
+  WHERE a1.next_run_at <= NOW()
+    AND a1.status IN ('QUEUED', 'PROCESSING')
+    AND (a1.lock_expires_at IS NULL OR a1.lock_expires_at < NOW())
+    AND NOT EXISTS (
+      SELECT 1 FROM analysis_jobs a2
+      WHERE a2.repository_id = a1.repository_id
+        AND a2.status = 'PROCESSING'
+        AND a2.id != a1.id
+        AND (a2.lock_expires_at IS NULL OR a2.lock_expires_at > NOW())
+    )
+  ORDER BY a1.created_at ASC
+  LIMIT 1
+  FOR UPDATE SKIP LOCKED
+)
+UPDATE analysis_jobs j
+SET
+  status = 'PROCESSING',
+  locked_at = NOW(),
+  locked_by = ${params.workerId},
+  lock_expires_at = NOW() + (${lockMs}::int * INTERVAL '1 millisecond'),
+  attempts = j.attempts + 1,
+  started_at = COALESCE(j.started_at, NOW()),
+  updated_at = NOW(),
+  progress_message = COALESCE(j.progress_message, 'Processing'),
+  progress_percent = COALESCE(j.progress_percent, 0)
+FROM candidate
+WHERE j.id = candidate.id
+RETURNING j.id
+`;
     const claimedId = rows[0]?.id;
     if (!claimedId) return null;
 

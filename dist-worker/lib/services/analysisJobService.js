@@ -139,6 +139,8 @@ class AnalysisJobService {
             },
         });
     }
+
+    
     async claimNextJob(params) {
         const lockMs = params.lockMs ?? DEFAULT_LOCK_MS;
         // IMPORTANT:

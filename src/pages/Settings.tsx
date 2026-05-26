@@ -16,6 +16,7 @@ import {
   Input,
   toast,
   EmptyState,
+  Modal,
 } from "@/components/ui";
 import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,13 +24,12 @@ import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 
 export default function Settings() {
-  const { user, logout, isLoading: authLoading } = useAuth();
+  const { user, logout, updateUser, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const didInitProfileForm = useRef(false);
 
   // Profile state
@@ -340,6 +340,7 @@ export default function Settings() {
     { id: "security", label: "Security", icon: Shield },
     { id: "danger", label: "Danger Zone", icon: Trash2 },
   ];
+
 
   // Early returns for loading / error / empty states to prevent layout shift
   if (userFetchStatus === "loading" || authLoading) {
