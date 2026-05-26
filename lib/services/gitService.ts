@@ -1,7 +1,7 @@
 import { exec, spawn, type ExecOptions, type SpawnOptions } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
-import * as fs from "fs/promises";
+import * as fsPromises from "fs/promises";
 import { createReadStream } from "fs";
 import readline from "readline";
 
@@ -201,7 +201,7 @@ export class GitService {
       signal?:AbortSignal;
     },
   ): Promise<GitService> {
-    await fs.mkdir(destination, { recursive: true });
+    await fsPromises.mkdir(destination, { recursive: true });
     const depth = Math.max(1, Math.min(opts?.depth ?? 1000, 1000));
     const noSingleBranch = opts?.noSingleBranch ?? true;
 
@@ -372,13 +372,8 @@ export class GitService {
 
     return new Promise((resolve, reject) => {
       const child = spawn("git", args, spawnOpts);
-
-      child.on("error", (err) => {
-        reject(new Error(`Failed to get commits: ${err.message}`));
-      });
-
       if (!child.stdout) {
-        reject(new Error("Failed to spawn git process: stdout is null"));
+        reject(new Error("Failed to spawn git log: stdout stream is null"));
         return;
       }
       const rl = readline.createInterface({ input: child.stdout });
@@ -730,21 +725,26 @@ export class GitService {
         language: string | null;
       }[] = [];
       const filePaths = stdout.trim().split("\n").filter(Boolean);
-      const scopedPrefix =
-        opts?.targetDirectory?.trim()
-          ? `${opts.targetDirectory.trim().replace(/\\/g, "/").replace(/\/+$/, "")}/`
-          : null;
 
-      // Process in chunks to avoid blocking the event loop on huge monorepos
-      const concurrencyLimit = 50;
-      for (let i = 0; i < filePaths.length; i += concurrencyLimit) {
-        const batch = filePaths.slice(i, i + concurrencyLimit);
-        
-        await Promise.all(
-          batch.map(async (filePath) => {
-            // Skip ignored files
-            if (this.shouldIgnoreFile(filePath)) {
-              return;
+      for (const filePath of filePaths) {
+        // Skip ignored files
+        if (this.shouldIgnoreFile(filePath)) {
+          continue;
+        }
+
+        try {
+          const fullPath = path.join(this.repoPath, filePath);
+          const stats = await fsPromises.stat(fullPath);
+          const name = path.basename(filePath);
+          const extension = path.extname(filePath) || null;
+
+          // Count lines in the file
+          let lineCount = 0;
+          try {
+            if (stats.size <= MAX_FILE_BYTES_TO_READ_FOR_LINECOUNT) {
+              lineCount = await countLinesReadStream(fullPath);
+            } else {
+              lineCount = Math.ceil(stats.size / 80);
             }
 
             try {
@@ -849,7 +849,7 @@ export class GitService {
    */
   async cleanup(): Promise<void> {
     try {
-      await fs.rm(this.repoPath, { recursive: true, force: true });
+      await fsPromises.rm(this.repoPath, { recursive: true, force: true });
     } catch (error: any) {
       console.error(`Failed to cleanup repository: ${error.message}`);
     }

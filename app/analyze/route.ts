@@ -4,8 +4,6 @@ import prisma from "@/lib/prisma";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
-import { normalizeTargetDirectory } from "@/lib/utils/repositoryUtils";
-
 function normalizeKnownRepoHttpUrl(input: string): string | null {
   let parsed: URL;
   try {

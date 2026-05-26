@@ -402,7 +402,7 @@ if (existingRepositoryName) {
               path: change.path,
               additions: change.additions,
               deletions: change.deletions,
-              changeType: change.changeType.toUpperCase() as FileChangeType,
+              changeType: change.changeType === "added" ? "ADDED" : change.changeType === "deleted" ? "DELETED" : "MODIFIED" as any,
               commitId,
             }));
             },

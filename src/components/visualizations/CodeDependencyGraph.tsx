@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import { Card } from "@/components/ui";
+import { Card, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, toast } from "@/components/ui";
+import { Loader2, Download } from "lucide-react";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
+import { ModuleSummaryPanel } from "./ModuleSummaryPanel";
+import { AISettingsModal } from "@/components/settings/AISettingsModal";
+import { jsPDF } from "jspdf";
 
 interface RepositoryFile {
   path: string;
@@ -100,6 +104,148 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   
+  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const getGraphPNGDataUrl = (): Promise<{ dataUrl: string; width: number; height: number }> => {
+    return new Promise((resolve, reject) => {
+      const svgElement = svgRef.current;
+      if (!svgElement) {
+        reject(new Error("SVG element not found"));
+        return;
+      }
+
+      try {
+        const svgClone = svgElement.cloneNode(true) as SVGSVGElement;
+        
+        // Ensure white/light-gray color for labels when rendering against a dark background
+        svgClone.querySelectorAll("text").forEach((txt) => {
+          if (txt.getAttribute("fill") === "currentColor") {
+            txt.setAttribute("fill", "#f3f4f6");
+          }
+        });
+
+        // Set explicit styling for the clone
+        svgClone.setAttribute("style", "background-color: #0b0f19; color: #f3f4f6; font-family: sans-serif;");
+        
+        // Find dimensions
+        const svgWidth = svgElement.viewBox.baseVal.width || svgElement.clientWidth || 900;
+        const svgHeight = svgElement.viewBox.baseVal.height || svgElement.clientHeight || 600;
+        
+        // Explicitly set attributes on clone
+        svgClone.setAttribute("width", svgWidth.toString());
+        svgClone.setAttribute("height", svgHeight.toString());
+
+        const serializer = new XMLSerializer();
+        const svgString = serializer.serializeToString(svgClone);
+        const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(svgBlob);
+        
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            const scale = 2; // High-res scaling
+            canvas.width = svgWidth * scale;
+            canvas.height = svgHeight * scale;
+            
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              reject(new Error("Could not get 2D canvas context"));
+              return;
+            }
+            
+            ctx.fillStyle = "#0b0f19";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            const dataUrl = canvas.toDataURL("image/png");
+            URL.revokeObjectURL(url);
+            resolve({ dataUrl, width: svgWidth, height: svgHeight });
+          } catch (err) {
+            reject(err);
+          }
+        };
+        img.onerror = () => {
+          reject(new Error("Failed to load SVG image source"));
+        };
+        img.src = url;
+      } catch (err) {
+        reject(err);
+      }
+    });
+  };
+
+  const handleExportPNG = async () => {
+    setIsExporting(true);
+    toast({
+      title: "Exporting PNG",
+      description: "Generating high-resolution image...",
+    });
+
+    try {
+      const { dataUrl } = await getGraphPNGDataUrl();
+      const downloadLink = document.createElement("a");
+      downloadLink.href = dataUrl;
+      downloadLink.download = `${repository?.name || "repository"}-dependency-graph.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      toast({
+        title: "Export Complete",
+        description: "Successfully downloaded dependency graph as PNG.",
+      });
+    } catch (error) {
+      console.error("Export PNG failed:", error);
+      toast({
+        title: "Export Failed",
+        description: "An error occurred while generating the PNG image.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    toast({
+      title: "Exporting PDF",
+      description: "Generating PDF document...",
+    });
+
+    try {
+      const { dataUrl, width, height } = await getGraphPNGDataUrl();
+      
+      const doc = new jsPDF({
+        orientation: width > height ? "landscape" : "portrait",
+        unit: "px",
+        format: [width, height],
+      });
+      
+      doc.addImage(dataUrl, "PNG", 0, 0, width, height);
+      doc.save(`${repository?.name || "repository"}-dependency-graph.pdf`);
+      
+      toast({
+        title: "Export Complete",
+        description: "Successfully downloaded dependency graph as PDF.",
+      });
+    } catch (error) {
+      console.error("Export PDF failed:", error);
+      toast({
+        title: "Export Failed",
+        description: "An error occurred while generating the PDF document.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const graphAnalyzer = new GraphAnalyzer();
+  const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
+
   const graphAnalyzer = new GraphAnalyzer();
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
@@ -143,8 +289,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     };
 
     // Prepare data
-    const nodes = graphData.nodes.map((d) => ({ ...d }));
-    const links = graphData.links.map((d) => ({ ...d }));
+    const nodes = graphData.nodes.map((d: any) => ({ ...d }));
+    const links = graphData.links.map((d: any) => ({ ...d }));
 
     // Create force simulation
     const simulation = d3
