@@ -12,6 +12,7 @@ import { CommitHistory } from "@/components/repository/CommitHistory";
 import { Contributors } from "@/components/repository/Contributors";
 import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
+import { RepositoryAnalysisSkeleton } from "@/components/skeletons/RepositoryAnalysisSkeleton";
 
 import {
   Home,
@@ -392,17 +393,7 @@ export default function RepositoryAnalysis() {
     <DashboardLayout>
       <div className="space-y-6">
         {loading ? (
-          <div className="glass rounded-lg p-12 text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Loading Repository</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Fetching repository data and analysis results...
-              </p>
-            </div>
-          </div>
+          <RepositoryAnalysisSkeleton />
         ) : !job && !error ? (
           <div className="text-center py-12 flex flex-col items-center gap-4 animate-fade-in-up">
             <Activity className="h-12 w-12 text-muted-foreground/50" />

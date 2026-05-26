@@ -15,8 +15,8 @@ import {
   Button,
   Input,
   EmptyState,
-  Skeleton,
 } from "@/components/ui";
+import { SearchResultsSkeleton } from "@/components/skeletons/SearchResultsSkeleton";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 
@@ -91,6 +91,14 @@ finally {
     if (sortBy === "name") return a.name.localeCompare(b.name);
     return 0; // 'recent' is already sorted
   });
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <SearchResultsSkeleton />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -174,65 +182,7 @@ finally {
         </div>
 
         {/* Repository Grid/List */}
-        {loading ? (
-          viewMode === "grid" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Card key={i} className="glass">
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-10 w-10 rounded-lg flex-shrink-0" />
-                      <div className="space-y-2 flex-1">
-                        <Skeleton className="h-5 w-3/4" />
-                        <Skeleton className="h-4 w-full" />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 mb-4">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-5/6" />
-                    </div>
-                    <div className="flex justify-between items-center mb-4">
-                      <div className="flex gap-4">
-                        <Skeleton className="h-4 w-12" />
-                        <Skeleton className="h-4 w-12" />
-                      </div>
-                      <Skeleton className="h-4 w-20" />
-                    </div>
-                    <div className="pt-3 border-t border-border/50">
-                      <Skeleton className="h-6 w-20 rounded-full" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Card key={i} className="glass">
-                  <CardContent className="pt-4 sm:pt-6">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                      <Skeleton className="h-12 w-12 rounded-lg flex-shrink-0 self-center" />
-                      <div className="flex-1 w-full space-y-3">
-                        <div className="flex gap-2">
-                          <Skeleton className="h-6 w-1/3" />
-                          <Skeleton className="h-5 w-16 rounded-full" />
-                        </div>
-                        <Skeleton className="h-4 w-full max-w-2xl" />
-                        <div className="flex gap-4 mt-2">
-                          <Skeleton className="h-4 w-16" />
-                          <Skeleton className="h-4 w-20" />
-                          <Skeleton className="h-4 w-24" />
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )
-) : error ? (
+        {error ? (
   <div className="text-center py-12 text-red-500">
     {error}
   </div>
