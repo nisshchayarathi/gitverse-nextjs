@@ -315,7 +315,7 @@ Add these in **Vercel Dashboard → Settings → Environment Variables**:
 - **Wrong DATABASE_URL** — Use the **pooler** URL from NeonDB for Vercel (not direct connection)
 - **Missing NEXTAUTH_URL** — Must be set to your exact production domain
 - **GITHUB_APP_PRIVATE_KEY format** — Paste with literal `\n` between lines, wrapped in quotes
-- **ANALYSIS_RUNNER_SECRET not set** — Recommended for security; without it, the cron endpoint runs unauthenticated on Vercel
+- **ANALYSIS_RUNNER_SECRET not set** - Required in production; `/api/internal/run-analysis` rejects requests with 401 until the secret is configured
 
 ### Docker
 

@@ -67,18 +67,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const txResult = await prisma.$transaction(async (tx) => {
+      // Check if user already exists
+      const existingUser = await tx.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+
+      if (existingUser) {
+        const isGoogleOnly =
+          !existingUser.passwordHash &&
+          (await tx.account.count({
+            where: { userId: existingUser.id, provider: "google" },
+          })) > 0;
+
+        return { error: isGoogleOnly ? "GOOGLE_ONLY" : "USER_EXISTS" };
+      }
+
+      // Create user
+      const createdUser = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          passwordHash: hashedPassword,
+          name,
+        },
+      });
+
+      return { user: createdUser };
     });
 
-    if (existingUser) {
-      const isGoogleOnly =
-        !existingUser.passwordHash &&
-        (await prisma.account.count({
-          where: { userId: existingUser.id, provider: "google" },
-        })) > 0;
-
-      if (isGoogleOnly) {
+    if ("error" in txResult) {
+      if (txResult.error === "GOOGLE_ONLY") {
         return NextResponse.json(
           { error: "Email already exists. Please sign in with Google." },
           { status: 409 }
@@ -91,15 +112,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        passwordHash: hashedPassword,
-        name,
-      },
-    });
+    const user = txResult.user;
 
     const token = generateToken({ userId: user.id, email: user.email });
 
@@ -116,6 +129,13 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
+    if (error?.code === "P2002") {
+      return NextResponse.json(
+        { error: "User with this email already exists" },
+        { status: 409 }
+      );
+    }
+
     const rawIp = getClientIp(request);
     let ipFingerprint = "unknown";
     if (rawIp !== "unknown") {

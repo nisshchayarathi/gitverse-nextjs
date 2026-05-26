@@ -4,8 +4,17 @@ import * as d3 from "d3";
 import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
 
+interface RepositoryFile {
+  path: string;
+  lines?: number;
+}
+
+interface Repository {
+  files?: RepositoryFile[];
+}
+
 interface CodeDependencyGraphProps {
-  repository?: any;
+  repository?: Repository;
 }
 
 export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
@@ -151,7 +160,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         if (tooltipRef.current) {
           const tooltip = d3.select(tooltipRef.current);
           tooltip
-            .style("opacity", "0")
+            .style("opacity", "1")
             .style("display", "block")
             .style("left", `${event.clientX}px`)
             .style("top", `${event.clientY}px`).html(`
@@ -297,7 +306,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     return () => {
       simulation.stop();
     };
-  }, [repository , currentParams, router, searchParams, graphData]);
+  }, [ currentParams, router, searchParams, graphData]);
 
   return (
     <div className="relative">
@@ -351,7 +360,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     sm:translate-x-[-250px] sm:translate-y-[-250px]
   "
           style={{
-            opacity: 1, // control with state later
+            opacity: 0, // control with state later
             backgroundColor: "rgba(0, 0, 0, 0.9)",
             color: "white",
             zIndex: 9999,

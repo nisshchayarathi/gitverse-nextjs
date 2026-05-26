@@ -188,17 +188,15 @@ export function AIRepoMentorSection(props: {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const pinnedToBottomRef = useRef(true);
 
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
-    const el = bottomRef.current;
-    if (!el) return;
-    el.scrollIntoView({ behavior, block: "end" });
-  };
-
   useEffect(() => {
     if (!pinnedToBottomRef.current) return;
+    const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+      const el = bottomRef.current;
+      if (!el) return;
+      el.scrollIntoView({ behavior, block: "end" });
+    };
     const id = requestAnimationFrame(() => scrollToBottom("smooth"));
     return () => cancelAnimationFrame(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, isLoading]);
 
   const send = async (question: string) => {

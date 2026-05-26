@@ -207,7 +207,7 @@ if (existingRepositoryName) {
       }
     };
 
-    await report({ progressPercent: 1, progressMessage: "Starting" });
+    await report({ progressPercent: 1, progressMessage: "Starting analysis..." });
 
     const timeoutMs = opts?.timeoutMs ?? 15 * 60 * 1000; // 15 minutes default
     const controller = new AbortController();
@@ -237,7 +237,7 @@ if (existingRepositoryName) {
       // Clone repository
       await report({
         progressPercent: 5,
-        progressMessage: "Cloning repository",
+        progressMessage: "Cloning repository...",
       });
       gitService = await GitService.cloneRepository(repository.url, tempDir, {
         signal,
@@ -272,7 +272,7 @@ if (existingRepositoryName) {
       // Get repository size and branches.
       await report({
         progressPercent: 10,
-        progressMessage: "Calculating size",
+        progressMessage: "Calculating repository size...",
       });
       const [size, branches] = await Promise.all([
         gitService.getRepositorySize(),
@@ -284,7 +284,7 @@ if (existingRepositoryName) {
       // Analyze branches
       await report({
         progressPercent: 15,
-        progressMessage: "Analyzing branches",
+        progressMessage: "Analyzing branches...",
       });
       const defaultBranch = branches.find((b) => b.isDefault)?.name || "main";
 
@@ -305,7 +305,7 @@ if (existingRepositoryName) {
       // Analyze commits from all branches
       await report({
         progressPercent: 25,
-        progressMessage: "Reading commit history",
+        progressMessage: "Fetching commit history...",
       });
       const commits = await gitService.getCommits("--all", 1000);
 
@@ -418,7 +418,7 @@ if (existingRepositoryName) {
           const pct = 25 + Math.round((Math.min(i + chunk.length, newCommits.length) / totalNewCommits) * 35);
           await report({
             progressPercent: Math.min(60, pct),
-            progressMessage: `Storing commits (${Math.min(i + chunk.length, newCommits.length)}/${newCommits.length})`,
+            progressMessage: `Processing commits (${Math.min(i + chunk.length, newCommits.length)}/${newCommits.length})...`,
           });
         } catch (error: any) {
           failedCount += chunk.length;
@@ -459,7 +459,7 @@ if (existingRepositoryName) {
           await report({
             progressPercent:
               65 + Math.round((insertedSoFar / files.length) * 10),
-            progressMessage: `Storing files (${insertedSoFar}/${files.length})`,
+            progressMessage: `Indexing files (${insertedSoFar}/${files.length})...`,
           });
         }
        
@@ -471,11 +471,11 @@ if (existingRepositoryName) {
       // Analyze contributors and languages in parallel; both are independent after file scan.
       await report({
         progressPercent: 80,
-        progressMessage: "Analyzing contributors",
+        progressMessage: "Analyzing contributor activity...",
       });
       await report({
         progressPercent: 90,
-        progressMessage: "Detecting languages",
+        progressMessage: "Detecting programming languages...",
       });
 
       const [contributors, languages] = await Promise.all([
@@ -643,7 +643,7 @@ if (existingRepositoryName) {
         where: { id: repositoryId },
         data: { status: "failed" },
       });
-      await report({ progressMessage: "Failed" });
+      await report({ progressMessage: "Analysis failed. Please try again." });
       throw error;
     } finally {
       clearTimeout(timeoutId);
