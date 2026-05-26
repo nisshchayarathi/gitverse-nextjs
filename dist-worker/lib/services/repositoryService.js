@@ -137,7 +137,6 @@ class RepositoryService {
             },
         });
         if (existingRepository) {
-            console.log(`Repository already exists: ${existingRepository.id}`);
             return existingRepository;
         }
         const repository = await prisma_1.default.repository.create({
@@ -182,7 +181,6 @@ class RepositoryService {
         let gitService = null;
         try {
             // Clone repository
-            console.log(`Cloning repository ${repository.url} to ${tempDir}`);
             await report({
                 progressPercent: 5,
                 progressMessage: "Cloning repository",
@@ -214,7 +212,6 @@ class RepositoryService {
                 gitService.getBranches(),
             ]);
             // Analyze branches
-            console.log(`Analyzing branches for repository ${repositoryId}`);
             await report({
                 progressPercent: 15,
                 progressMessage: "Analyzing branches",
@@ -232,13 +229,11 @@ class RepositoryService {
                 skipDuplicates: true,
             });
             // Analyze commits from all branches
-            console.log(`Analyzing commits for repository ${repositoryId}`);
             await report({
                 progressPercent: 25,
                 progressMessage: "Reading commit history",
             });
             const commits = await gitService.getCommits("--all", 1000);
-            console.log(`Total commits fetched from git: ${commits.length}`);
             // IMPORTANT: Do not load *all* existing commits for the repo.
             // On large repos this can be huge and cause OOM/timeouts. We only need to
             // know which of the commits we just fetched already exist.
@@ -256,7 +251,6 @@ class RepositoryService {
             const existingHashes = new Set(existingCommits.map((c) => c.hash));
             // Filter out commits that already exist
             const newCommits = commits.filter((commit) => !existingHashes.has(commit.hash));
-            console.log(`Found ${commits.length} commits, ${newCommits.length} are new, ${existingCommits.length} already exist`);
             let insertedCount = 0;
             let failedCount = 0;
             const totalNewCommits = Math.max(1, newCommits.length);
@@ -308,7 +302,7 @@ class RepositoryService {
                             path: change.path,
                             additions: change.additions,
                             deletions: change.deletions,
-                            changeType: change.changeType,
+                            changeType: change.changeType.toUpperCase(),
                             commitId,
                         }));
                     });
@@ -330,9 +324,7 @@ class RepositoryService {
                 }
                 await yieldIfHighMemory();
             }
-            console.log(`Commit insertion complete: ${insertedCount} inserted, ${failedCount} failed`);
             // Analyze files
-            console.log(`Analyzing file tree for repository ${repositoryId}`);
             await report({ progressPercent: 65, progressMessage: "Scanning files" });
             const files = await gitService.getFileTree();
             // Avoid querying existing file paths (can be huge). Just rely on
@@ -359,13 +351,10 @@ class RepositoryService {
                         progressMessage: `Storing files (${insertedSoFar}/${files.length})`,
                     });
                 }
-                console.log(`File scan complete: processed ${files.length} paths for repository ${repositoryId}`);
             }
             else {
-                console.log(`No files found for repository ${repositoryId}`);
             }
             // Analyze contributors and languages in parallel; both are independent after file scan.
-            console.log(`Analyzing contributors for repository ${repositoryId}`);
             await report({
                 progressPercent: 80,
                 progressMessage: "Analyzing contributors",
@@ -445,7 +434,6 @@ class RepositoryService {
                 },
             });
             await report({ progressPercent: 100, progressMessage: "Completed" });
-            console.log(`Repository ${repositoryId} analysis completed`);
         }
         catch (error) {
             console.error(`Error analyzing repository ${repositoryId}:`, error);
@@ -460,6 +448,9 @@ class RepositoryService {
             // Cleanup cloned repository
             if (gitService) {
                 await gitService.cleanup();
+            }
+            else {
+                await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null);
             }
         }
     }

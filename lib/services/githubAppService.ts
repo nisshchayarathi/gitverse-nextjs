@@ -50,6 +50,7 @@ export class GitHubAppService {
           Authorization: `Bearer ${appJwt}`,
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": "2022-11-28",
+          "User-Agent": "GitVerse-App",
         },
       },
     );
@@ -74,6 +75,7 @@ export class GitHubAppService {
           Authorization: `Bearer ${appJwt}`,
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": "2022-11-28",
+          "User-Agent": "GitVerse-App",
         },
       },
     );

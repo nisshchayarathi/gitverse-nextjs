@@ -40,11 +40,12 @@ function countLinesReadStream(filePath: string): Promise<number> {
 
 function execPromise(
   command: string,
-  options: ExecOptions = {},
+  options: ExecOptions & {signal?: AbortSignal} = {},
 ): Promise<{ stdout: string; stderr: string }> {
   return execPromiseRaw(command, {
     ...DEFAULT_EXEC_OPTIONS,
     ...options,
+    signal:options.signal,
     timeout: options.timeout ?? DEFAULT_GIT_TIMEOUT_MS,
     env: {
       ...process.env,
@@ -171,9 +172,20 @@ export interface LanguageData {
 
 export class GitService {
   private repoPath: string;
+  private signal?: AbortSignal;
 
-  constructor(repoPath: string) {
+  constructor(repoPath: string, signal?:AbortSignal) {
     this.repoPath = repoPath;
+    this.signal=signal;
+  }
+
+  //helper to wrap execpromise with signal
+
+  private exec(command: string, options: ExecOptions = {}) {
+    return execPromise(command, {
+      signal: this.signal,
+      ...options,
+    });
   }
 
   /**
@@ -186,6 +198,7 @@ export class GitService {
       depth?: number;
       noSingleBranch?: boolean;
       onProgress?: (percent: number, message: string) => void;
+      signal?:AbortSignal;
     },
   ): Promise<GitService> {
     await fsPromises.mkdir(destination, { recursive: true });
@@ -215,6 +228,7 @@ export class GitService {
           GIT_LFS_SKIP_SMUDGE: "1",
         },
         timeout: GIT_CLONE_TIMEOUT_MS,
+        signal: opts?.signal,
       });
 
       let lastReportedPct = 0;
@@ -238,7 +252,7 @@ export class GitService {
 
       child.on("close", (code) => {
         if (code === 0) {
-          resolve(new GitService(destination));
+          resolve(new GitService(destination, opts?.signal));
         } else {
           const msg = stderr.trim().split("\n").pop() || `exit code ${code}`;
           reject(new Error(`Failed to clone repository: ${msg}`));
@@ -254,14 +268,14 @@ export class GitService {
    */
   async getBranches(): Promise<BranchData[]> {
     try {
-      const { stdout: defaultBranch } = await execPromise(
+      const { stdout: defaultBranch } = await this.exec(
         `cd "${this.repoPath}" && git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'`,
         { timeout: DEFAULT_GIT_TIMEOUT_MS },
       );
       const defaultBranchName = defaultBranch.trim();
 
       // Get both local and remote branches
-      const { stdout } = await execPromise(
+      const { stdout } = await this.exec(
         `cd "${this.repoPath}" && git for-each-ref --format='%(refname:short)|%(committerdate:iso)|%(objectname)' refs/heads/ refs/remotes/origin/`,
         { timeout: DEFAULT_GIT_TIMEOUT_MS },
       );
@@ -289,7 +303,7 @@ export class GitService {
       // Fire all rev-list --count in parallel so one bad ref doesn't block the rest.
       const countResults = await Promise.allSettled(
         refEntries.map((entry) =>
-          execPromise(
+          this.exec(
             `cd "${this.repoPath}" && git rev-list --count "${entry.fullName}"`,
             { timeout: DEFAULT_GIT_TIMEOUT_MS },
           ).then(({ stdout }) => parseInt(stdout.trim())),
@@ -353,6 +367,7 @@ export class GitService {
         GIT_LFS_SKIP_SMUDGE: "1",
       },
       timeout: GIT_LOG_TIMEOUT_MS,
+      signal: this.signal,
     };
 
     return new Promise((resolve, reject) => {
@@ -497,9 +512,7 @@ export class GitService {
         stderr += chunk.toString();
       });
 
-      child.on("error", (err) => {
-        reject(new Error(`Failed to get commits: ${err.message}`));
-      });
+
 
       child.on("exit", (code) => {
         if (code !== 0 && commits.length === 0) {
@@ -515,7 +528,7 @@ export class GitService {
   async getContributors(): Promise<ContributorData[]> {
     try {
       // Contributor scans can be expensive; cap by commit count.
-      const { stdout } = await execPromise(
+      const { stdout } = await this.exec(
         `cd "${this.repoPath}" && git log --format="%an|%ae|%aI" --numstat -n ${MAX_CONTRIBUTOR_COMMITS}`,
         { timeout: GIT_LOG_TIMEOUT_MS },
       );
@@ -686,7 +699,7 @@ export class GitService {
     return languageMap[ext] || null;
   }
 
-  async getFileTree(): Promise<
+  async getFileTree(scope?: string): Promise<
     {
       path: string;
       name: string;
@@ -697,8 +710,9 @@ export class GitService {
     }[]
   > {
     try {
+      const scopeArg = scope ? ` "${scope}"` : "";
       const { stdout } = await execPromise(
-        `cd "${this.repoPath}" && git ls-files`,
+        `cd "${this.repoPath}" && git ls-files${scopeArg}`,
         { timeout: DEFAULT_GIT_TIMEOUT_MS },
       );
 
@@ -732,25 +746,45 @@ export class GitService {
             } else {
               lineCount = Math.ceil(stats.size / 80);
             }
-          } catch {
-            lineCount = Math.ceil(stats.size / 80);
-          }
 
-          // Detect language from extension
-          const language = this.detectLanguageFromExtension(extension);
+            try {
+              const fullPath = path.join(this.repoPath, filePath);
+              const stats = await fs.stat(fullPath);
+              const name = path.basename(filePath);
+              const extension = path.extname(filePath) || null;
 
-          files.push({
-            path: filePath,
-            name,
-            size: stats.size,
-            extension,
-            lines: lineCount,
-            language,
-          });
-        } catch {
-          // Skip files that can't be accessed
-          continue;
-        }
+              // Count lines in the file
+              let lineCount = 0;
+              try {
+                if (stats.size <= MAX_FILE_BYTES_TO_READ_FOR_LINECOUNT) {
+                  const content = await fs.readFile(fullPath, "utf-8");
+                  lineCount = content.split("\n").length;
+                } else {
+                  // Avoid reading very large files into memory.
+                  lineCount = Math.ceil(stats.size / 80);
+                }
+              } catch {
+                // If can't read as text, estimate from bytes (avg 80 chars per line)
+                lineCount = Math.ceil(stats.size / 80);
+              }
+
+              // Detect language from extension
+              const language = this.detectLanguageFromExtension(extension);
+
+              files.push({
+                path: filePath,
+                name,
+                size: stats.size,
+                extension,
+                lines: lineCount,
+                language,
+              });
+            } catch {
+              // Skip files that can't be accessed
+              return;
+            }
+          })
+        );
       }
 
       return files;
@@ -762,9 +796,9 @@ export class GitService {
   /**
    * Detect programming languages in the repository
    */
-  async detectLanguages(): Promise<LanguageData[]> {
+  async detectLanguages(scope?: string): Promise<LanguageData[]> {
     try {
-      const files = await this.getFileTree();
+      const files = await this.getFileTree(scope);
 
       const languageStats = new Map<string, { bytes: number; lines: number }>();
       let totalBytes = 0;
@@ -800,7 +834,7 @@ export class GitService {
    */
   async getRepositorySize(): Promise<number> {
     try {
-      const { stdout } = await execPromise(
+      const { stdout } = await this.exec(
         `cd "${this.repoPath}" && du -sb . | cut -f1`,
         { timeout: DEFAULT_GIT_TIMEOUT_MS },
       );

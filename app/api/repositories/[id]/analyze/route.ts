@@ -25,6 +25,8 @@ function kickProductionWorker() {
   });
 }
 
+import { apiError } from "@/lib/api-error";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -34,20 +36,14 @@ export async function POST(
     const id = parseInt(params.id);
 
     if (isNaN(id)) {
-      return NextResponse.json(
-        { error: "Invalid repository ID" },
-        { status: 400 }
-      );
+      return apiError(400, "Invalid repository ID");
     }
 
     // Verify ownership
     const repository = await repositoryService.getRepository(id, user.userId);
 
     if (!repository) {
-      return NextResponse.json(
-        { error: "Repository not found" },
-        { status: 404 }
-      );
+      return apiError(404, "Repository not found");
     }
 
     const existingJob = await prisma.analysisJob.findFirst({
@@ -69,13 +65,24 @@ if (existingJob) {
   );
 }
 
+    const bodyText = await request.text();
+    let scope: string | undefined = undefined;
+    if (bodyText) {
+      try {
+        const json = JSON.parse(bodyText);
+        if (json.scope && typeof json.scope === "string") {
+          scope = json.scope;
+        }
+      } catch (e) {
+        // ignore JSON parse errors
+      }
+    }
+
     const job = await analysisJobService.createRepositoryAnalysisJob({
       repositoryId: id,
       userId: user.userId,
+      scope,
     });
-
-    kickLocalRunner(request);
-    kickProductionWorker();
 
     return NextResponse.json(
       { message: "Job queued", jobId: job.id, status: job.status },
@@ -84,14 +91,8 @@ if (existingJob) {
   } catch (error: any) {
     console.error("Analyze repository error:", sanitizeError(error));
     if (isHttpError(error)) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status }
-      );
+     return apiError(error.status, error.message);
     }
-    return NextResponse.json(
-      { error: "Failed to start analysis" },
-      { status: 500 }
-    );
+    return apiError(500, "Failed to start analysis");
   }
 }

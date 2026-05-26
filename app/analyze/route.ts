@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     const url = body?.url;
     const name = body?.name;
     const description = body?.description;
+    const targetDirectory = body?.targetDirectory;
 
     let repositoryId: number;
 
@@ -99,10 +100,19 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const normalizedTargetDirectory = normalizeTargetDirectory(targetDirectory);
+      if (targetDirectory && !normalizedTargetDirectory) {
+        return NextResponse.json(
+          { error: "Invalid targetDirectory. Example: packages/ui or apps/web" },
+          { status: 400 }
+        );
+      }
+
       const repo = await repositoryService.createRepository({
         name,
         url: normalizedUrl,
         description,
+        targetDirectory: normalizedTargetDirectory ?? undefined,
         userId: user.userId,
       });
 

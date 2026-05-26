@@ -79,7 +79,8 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
 
     try {
       let fullResponse = "";
-      const stream = geminiService.chatStream(input, repositoryContext);
+      // Pass the current messages array as history (excluding the current prompt which is appended by chatRaw)
+      const stream = geminiService.chatStream(input, repositoryContext, messages);
 
       for await (const chunk of stream) {
         fullResponse += chunk;
@@ -105,6 +106,21 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleClearChat = () => {
+    const greeting = repositoryContext
+      ? `Hello! I'm your AI assistant for the **${repositoryContext.name}** repository. I can help you understand the code, find bugs, suggest improvements, and answer questions about this project. How can I assist you today?`
+      : `Hello! I'm your AI assistant. I can help you with code analysis, explanations, bug detection, and more. What would you like to know?`;
+
+    setMessages([
+      {
+        role: "assistant",
+        content: greeting,
+        timestamp: new Date(),
+      },
+    ]);
+    setStreamingMessage("");
   };
 
   const copyToClipboard = async (text: string, index: number) => {
@@ -280,6 +296,20 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
 
       {/* Input area */}
       <div className="border-t border-white/10 p-4">
+        <div className="flex justify-between items-center mb-3 px-1">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Sparkles className="h-3 w-3" />
+            <span>Powered by Google Gemini AI</span>
+          </div>
+          {messages.length > 1 && (
+            <button
+              onClick={handleClearChat}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Clear Chat
+            </button>
+          )}
+        </div>
         <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="text"
@@ -304,10 +334,6 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
             )}
           </button>
         </form>
-        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-          <Sparkles className="h-3 w-3" />
-          <span>Powered by Google Gemini AI</span>
-        </div>
       </div>
     </div>
   );
