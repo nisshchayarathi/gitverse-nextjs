@@ -42,9 +42,7 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/docs" className="hover:text-primary transition-colors">
-                  Documentation
-                </Link>
+                <span title="Coming soon" className="cursor-not-allowed opacity-50 hover:text-current">Documentation</span>
               </li>
             </ul>
           </div>
@@ -54,24 +52,16 @@ export const Footer: React.FC = () => {
             <h3 className="font-semibold text-foreground mb-4">Company</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/about" className="hover:text-primary transition-colors">
-                  About
-                </Link>
+                <span title="Coming soon" className="cursor-not-allowed opacity-50">About</span>
               </li>
               <li>
-                <Link href="/blog" className="hover:text-primary transition-colors">
-                  Blog
-                </Link>
+                <span title="Coming soon" className="cursor-not-allowed opacity-50">Blog</span>
               </li>
               <li>
-                <Link href="/careers" className="hover:text-primary transition-colors">
-                  Careers
-                </Link>
+                <span title="Coming soon" className="cursor-not-allowed opacity-50">Careers</span>
               </li>
               <li>
-                <Link href="/contact" className="hover:text-primary transition-colors">
-                  Contact
-                </Link>
+                <span title="Coming soon" className="cursor-not-allowed opacity-50">Contact</span>
               </li>
             </ul>
           </div>
@@ -81,6 +71,10 @@ export const Footer: React.FC = () => {
             <h3 className="font-semibold text-foreground mb-4">Legal</h3>
             <ul className="space-y-2 text-sm">
               <li>
+                <span title="Coming soon" className="cursor-not-allowed opacity-50 hover:text-current">Privacy Policy</span>
+              </li>
+              <li>
+                <span title="Coming soon" className="cursor-not-allowed opacity-50 hover:text-current">Terms of Service</span>
                 <Link href="/privacy-policy" className="hover:text-primary transition-colors">
                   Privacy Policy
                 </Link>
@@ -91,11 +85,10 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/security" className="hover:text-primary transition-colors">
-                  Security
-                </Link>
+                <span title="Coming soon" className="cursor-not-allowed opacity-50 hover:text-current">Security</span>
               </li>
               <li>
+                <span title="Coming soon" className="cursor-not-allowed opacity-50 hover:text-current">Cookie Policy</span>
                 <Link href="/cookie-policy" className="hover:text-primary transition-colors">
                   Cookie Policy
                 </Link>

@@ -31,27 +31,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const passwordHash =
-      userDetails.passwordHash || (userDetails as any).password;
-    if (passwordHash) {
-      if (!currentPassword) {
-        return NextResponse.json(
-          { error: "Current password is required" },
-          { status: 400 }
-        );
-      }
-
-      const isPasswordValid = await bcrypt.compare(
-        currentPassword,
-        passwordHash
+    const passwordHash = userDetails.passwordHash;
+    if (!passwordHash) {
+      return NextResponse.json(
+        { error: "Cannot set password: account uses OAuth authentication" },
+        { status: 400 }
       );
+    }
 
-      if (!isPasswordValid) {
-        return NextResponse.json(
-          { error: "Current password is incorrect" },
-          { status: 401 }
-        );
-      }
+    if (!currentPassword) {
+      return NextResponse.json(
+        { error: "Current password is required" },
+        { status: 400 }
+      );
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      passwordHash,
+    );
+
+    if (!isPasswordValid) {
+      return NextResponse.json(
+        { error: "Current password is incorrect" },
+        { status: 401 }
+      );
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);

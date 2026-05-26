@@ -9,8 +9,8 @@ export interface AIAnalysisRequest {
     | "architecture"
     | "suggestions";
   context?: {
-    targetDirectory?: string;
     files?: Array<{ path: string; content: string }>;
+    fileTree?: string;
     commits?: Array<{ message: string; author: string; date: string }>;
     languages?: Array<{ name: string; percentage: number }>;
     contributors?: Array<{ name: string; commits: number }>;
@@ -201,14 +201,14 @@ Provide only the commit messages, one per line.
   ): string {
     const baseContext = `
 Repository Context:
-- Target directory: ${context?.targetDirectory || "Full repository"}
 - Languages: ${context?.languages?.map((l) => `${l.name} (${l.percentage}%)`).join(", ") || "Unknown"}
 - Contributors: ${context?.contributors?.length || 0}
 - Recent commits: ${context?.commits?.length || 0}
+${context?.fileTree ? `\nFile Structure:\n${context.fileTree}\n` : ""}
 `;
 
-    const scopeNote = context?.targetDirectory
-      ? `\nImportant: Restrict your analysis to the target directory (${context.targetDirectory}). Only reference files outside this directory if they are immediately required dependencies.\n`
+    const scopeNote = (context as any)?.targetDirectory
+      ? `\nImportant: Restrict your analysis to the target directory (${(context as any).targetDirectory}). Only reference files outside this directory if they are immediately required dependencies.\n`
       : "";
 
     switch (type) {
