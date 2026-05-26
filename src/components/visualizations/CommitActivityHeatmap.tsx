@@ -476,7 +476,8 @@ export function CommitActivityHeatmap({
     sm:translate-x-[-350px] sm:translate-y-[-320px]
   "
   style={{
-    opacity: 1,
+    opacity: 0,
+    display: "none",
     backgroundColor: "rgba(0, 0, 0, 0.9)",
     color: "white",
     zIndex: 9999,
