@@ -42,6 +42,15 @@ export async function POST(request: NextRequest) {
 
   const signature = request.headers.get("x-hub-signature-256");
   const event = request.headers.get("x-github-event");
+
+  const deliveryId = request.headers.get("x-github-delivery");
+
+if (!deliveryId) {
+  return NextResponse.json(
+    { error: "Missing delivery ID" },
+    { status: 400 }
+  );
+}
   const secret = process.env.GITHUB_WEBHOOK_SECRET || "";
 
   if (
@@ -108,6 +117,43 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    await prisma.webhookEvent.deleteMany({
+    where: {
+      expiresAt: {
+        lt: new Date(),
+      },
+    },
+  });
+
+  // Check duplicate delivery ID
+  const existingWebhook = await prisma.webhookEvent.findUnique({
+    where: {
+      deliveryId,
+    },
+  });
+
+  if (existingWebhook) {
+    return NextResponse.json(
+      {
+        ok: true,
+        ignored: true,
+        reason: "duplicate_webhook",
+      },
+      { status: 409 }
+    );
+  }
+
+  // Store webhook delivery ID
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  await prisma.webhookEvent.create({
+    data: {
+      deliveryId,
+      expiresAt,
+    },
+  });
+
     const repoFullName = `${owner}/${repo}`;
 
     // Gate by DB selection: only auto-review repos that users explicitly enabled.
