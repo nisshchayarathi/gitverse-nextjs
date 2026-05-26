@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   GitBranch,
@@ -12,6 +12,7 @@ import {
   Activity,
   TrendingUp,
   ExternalLink,
+  Download,
 } from "lucide-react";
 import {
   Card,
@@ -20,7 +21,10 @@ import {
   CardDescription,
   CardContent,
   Skeleton,
+  Button,
+  toast,
 } from "@/components/ui";
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -52,6 +56,61 @@ export const RepositoryOverview = ({
   repositoryData,
 }: RepositoryOverviewProps) => {
   const [isFavorited, setIsFavorited] = useState(false);
+  const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
+
+  const handleGenerateArchitecture = async () => {
+    if (!repositoryData?.id) return;
+    try {
+      setIsGeneratingDocs(true);
+      const res = await fetch("/api/ai/analyze-repository", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repositoryId: repositoryData.id,
+          type: "generate-architecture-md",
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to generate ARCHITECTURE.md");
+
+      const data = await res.json();
+      
+      let markdownContent = data.analysis;
+      // Strip markdown code block wrapping if Gemini included it despite our prompt
+      if (markdownContent.startsWith("\`\`\`markdown")) {
+        markdownContent = markdownContent.replace(/^\`\`\`markdown\n?/, "");
+        markdownContent = markdownContent.replace(/\n?\`\`\`$/, "");
+      } else if (markdownContent.startsWith("\`\`\`")) {
+        markdownContent = markdownContent.replace(/^\`\`\`\n?/, "");
+        markdownContent = markdownContent.replace(/\n?\`\`\`$/, "");
+      }
+
+      // Create a Blob and trigger download
+      const blob = new Blob([markdownContent], { type: "text/markdown" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "ARCHITECTURE.md";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Success",
+        description: "ARCHITECTURE.md generated successfully.",
+      });
+    } catch (error) {
+      console.error("Error generating ARCHITECTURE.md:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate ARCHITECTURE.md. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingDocs(false);
+    }
+  };
 
   const handleToggleFavorite = async (id: string, nextState: boolean) => {
     // Simulate server API latency of 1.5 seconds
@@ -447,13 +506,25 @@ export const RepositoryOverview = ({
       {/* README */}
       <div className="grid grid-cols-1 gap-4 sm:gap-6">
         <Card className="glass">
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="font-heading text-lg sm:text-xl">
-              README
-            </CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
-              {readmePath ? `Showing ${readmePath}` : "README"}
-            </CardDescription>
+          <CardHeader className="p-4 sm:p-6 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="font-heading text-lg sm:text-xl">
+                README
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                {readmePath ? `Showing ${readmePath}` : "README"}
+              </CardDescription>
+            </div>
+            <Button 
+              onClick={handleGenerateArchitecture} 
+              disabled={isGeneratingDocs}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              {isGeneratingDocs ? "Generating..." : "Generate ARCHITECTURE.md"}
+            </Button>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-3">
             {isAnalyzing && !hasUsableReadme ? (

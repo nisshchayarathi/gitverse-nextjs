@@ -7,7 +7,8 @@ export interface AIAnalysisRequest {
     | "code-quality"
     | "security"
     | "architecture"
-    | "suggestions";
+    | "suggestions"
+    | "generate-architecture-md";
   context?: {
     files?: Array<{ path: string; content: string }>;
     fileTree?: string;
@@ -266,6 +267,20 @@ Provide improvement suggestions:
 5. Technology upgrade recommendations
 
 Prioritize by impact and effort.`;
+
+      case "generate-architecture-md":
+        return `${baseContext}${scopeNote}
+
+Generate a comprehensive ARCHITECTURE.md file for this repository based on the provided context.
+Use standard markdown formatting. Do NOT wrap the response in a markdown code block (\`\`\`markdown). Include:
+1. Project Overview & Primary Purpose
+2. Technology Stack
+3. Core Architecture & Design Patterns
+4. Key Modules & Directory Structure
+5. Data Flow (if applicable)
+6. Contribution Guidelines (inferred from stack and structure)
+
+Make it clean, professional, and ready to be committed directly to the repository.`;
 
       default:
         return `${baseContext}\n\nAnalyze this repository and provide insights.`;
