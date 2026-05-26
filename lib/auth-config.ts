@@ -111,18 +111,13 @@ function prismaIntIdAdapter(): Adapter {
     },
 
     async createSession(session) {
-      const created = await prisma.session.create({
-        data: {
-          sessionToken: session.sessionToken,
-          userId: intUserId(session.userId),
-          expires: session.expires,
-        },
-      });
-
+      // No-op: with `session.strategy = "jwt"`, database sessions are never
+      // read by NextAuth.  Writing them here would produce orphaned rows
+      // that accumulate on every credentials sign-in.
       return {
-        sessionToken: created.sessionToken,
-        userId: String(created.userId),
-        expires: created.expires,
+        sessionToken: session.sessionToken,
+        userId: session.userId,
+        expires: session.expires,
       } satisfies AdapterSession;
     },
 

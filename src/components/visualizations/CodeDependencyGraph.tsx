@@ -3,6 +3,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
+import { MapControls } from "./MapControls";
 
 interface RepositoryFile {
   path: string;
@@ -29,6 +30,37 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     const analyzer = new GraphAnalyzer();
     return analyzer.buildDependencyGraph(repository?.files || []);
   }, [repository]);
+  const zoomRef = useRef<any>(null);
+  const svgSelectionRef = useRef<any>(null);
+  
+
+  const handleZoomIn = () => {
+    if (svgSelectionRef.current && zoomRef.current) {
+      svgSelectionRef.current
+        .transition()
+        .duration(300)
+        .call(zoomRef.current.scaleBy, 1.3);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (svgSelectionRef.current && zoomRef.current) {
+      svgSelectionRef.current
+        .transition()
+        .duration(300)
+        .call(zoomRef.current.scaleBy, 1 / 1.3);
+    }
+  };
+
+  const handleReset = () => {
+    if (svgSelectionRef.current && zoomRef.current) {
+      svgSelectionRef.current
+        .transition()
+        .duration(500)
+        .call(zoomRef.current.transform, d3.zoomIdentity);
+    }
+  };
+
   useEffect(() => {
     if (!svgRef.current) return;
 
@@ -293,6 +325,9 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         }, 500);
       }
     }
+    // Save D3 zoom behavior and SVG selection for programmatic triggers
+    zoomRef.current = zoom;
+    svgSelectionRef.current = svg;
 
     // Animate nodes on load
     node
@@ -308,69 +343,81 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     };
   }, [ currentParams, router, searchParams, graphData]);
 
-  return (
-    <div className="relative">
-      <Card className="glass p-4 sm:p-6 overflow-hidden">
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h3 className="text-base sm:text-lg font-semibold">
-              Code Dependency Graph
-            </h3>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              Interactive visualization of file dependencies and relationships
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
-            <div className="flex gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
-                <span>Folders</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
-                <span>Files</span>
-              </div>
+return (
+  <div className="relative">
+    <Card className="glass p-4 sm:p-6 overflow-hidden">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h3 className="text-base sm:text-lg font-semibold">
+            Code Dependency Graph
+          </h3>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Interactive visualization of file dependencies and relationships
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
+          <div className="flex gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
+              <span>Folders</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+              <span>Files</span>
             </div>
           </div>
         </div>
-        <div className="glass rounded-lg p-4 sm:p-6">
-          <h3 className="text-base sm:text-lg font-semibold mb-4">
-            Code Dependencies
-          </h3>
-          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-            <svg
-              ref={svgRef}
-              width="100%"
-              height="auto"
-              className="text-foreground min-h-96 sm:min-h-96"
-              style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
-              viewBox="0 0 900 600"
-              preserveAspectRatio="xMidYMid meet"
-            />
-          </div>
+      </div>
+
+      <div className="glass rounded-lg p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-semibold mb-4">
+          Code Dependencies
+        </h3>
+
+        <div className="relative overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <svg
+            ref={svgRef}
+            width="100%"
+            height="auto"
+            className="text-foreground min-h-96 sm:min-h-96"
+            style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
+            viewBox="0 0 900 600"
+            preserveAspectRatio="xMidYMid meet"
+          />
+
+          <MapControls
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onReset={handleReset}
+          />
         </div>
-        <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
-          💡 Drag nodes to reposition • Scroll to zoom • Hover for details
-        </p>
-        <div
-          ref={tooltipRef}
-          className="
-    fixed p-3 rounded-lg pointer-events-none shadow-xl border
-    translate-x-[-120px] translate-y-[-120px]
-    sm:translate-x-[-250px] sm:translate-y-[-250px]
-  "
-          style={{
-            opacity: 0, // control with state later
-            backgroundColor: "rgba(0, 0, 0, 0.9)",
-            color: "white",
-            zIndex: 9999,
-            backdropFilter: "blur(8px)",
-            left: "0px",
-            top: "0px",
-            whiteSpace: "nowrap",
-          }}
-        />
-      </Card>
-    </div>
-  );
+      </div>
+
+      <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
+        💡 Drag nodes to reposition • Scroll to zoom • Hover for details
+      </p>
+
+      <div
+        ref={tooltipRef}
+        className="
+          fixed p-3 rounded-lg pointer-events-none shadow-xl border
+          translate-x-[-120px] translate-y-[-120px]
+          sm:translate-x-[-250px] sm:translate-y-[-250px]
+        "
+        style={{
+          opacity: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.9)",
+          color: "white",
+          zIndex: 9999,
+          backdropFilter: "blur(8px)",
+          left: "0px",
+          top: "0px",
+          whiteSpace: "nowrap",
+        }}
+      />
+    </Card>
+  </div>
+);
 }
