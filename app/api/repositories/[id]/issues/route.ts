@@ -59,30 +59,10 @@ export async function GET(
       });
     } catch (apiErr: any) {
       console.warn("GitHub API fetch issues failed:", apiErr.message);
-      // Grudgingly fall back to mock issues if the GitHub API is totally unreachable or rate-limited
-      githubIssues = [
-        {
-          number: 101,
-          title: "Fix responsive design in dashboard layout",
-          html_url: `${repository.url}/issues/101`,
-          body: "The layout sidebar breaks on mobile viewports. We need to hide it and add a toggle button.",
-          labels: [{ name: "good first issue" }],
-        },
-        {
-          number: 102,
-          title: "Optimize prisma queries in repository stats",
-          html_url: `${repository.url}/issues/102`,
-          body: "The endpoint /api/repositories/[id]/stats is taking over 2 seconds. We need to add better selects to query less columns.",
-          labels: [{ name: "help wanted" }],
-        },
-        {
-          number: 103,
-          title: "Add unit tests for gemini service",
-          html_url: `${repository.url}/issues/103`,
-          body: "We need mock-based unit tests for all prompts inside geminiService.ts.",
-          labels: [{ name: "good first issue" }],
-        },
-      ];
+      return NextResponse.json(
+        { error: "Failed to fetch issues from GitHub. Please try again later." },
+        { status: 502, headers: securityHeaders }
+      );
     }
 
     if (githubIssues.length === 0) {
@@ -186,12 +166,21 @@ JSON output structure:
       parsedMatches.map((m: any) => [m.number, m])
     );
 
+    const repoFilesSet = new Set(repositoryFiles);
+
     const enrichedIssues = githubIssues.map((issue: any) => {
-      const match = matchesMap.get(issue.number) || {
-        score: 50,
-        matchedFiles: [],
-        reason: "Matched as a general repository-wide issue.",
-      };
+      const match = matchesMap.get(issue.number) || {};
+
+      const rawScore = Number(match.score ?? 50);
+      const safeScore = isNaN(rawScore) ? 50 : Math.max(0, Math.min(100, Math.round(rawScore)));
+
+      const safeMatchedFiles = Array.isArray(match.matchedFiles)
+        ? match.matchedFiles.filter((f: any) => typeof f === "string" && repoFilesSet.has(f))
+        : [];
+
+      const safeReason = typeof match.reason === "string" && match.reason.trim()
+        ? match.reason.trim()
+        : "Matched as a general repository-wide issue.";
 
       return {
         id: issue.id || issue.number,
@@ -202,9 +191,9 @@ JSON output structure:
         labels: Array.isArray(issue.labels) 
           ? issue.labels.map((l: any) => typeof l === "object" ? l.name : l)
           : [],
-        score: match.score,
-        matchedFiles: match.matchedFiles,
-        reason: match.reason,
+        score: safeScore,
+        matchedFiles: safeMatchedFiles,
+        reason: safeReason,
       };
     });
 

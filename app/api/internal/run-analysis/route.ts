@@ -68,21 +68,32 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       },
     });
 
+    const abortController = new AbortController();
+
+    let heartbeatReject: (reason?: any) => void;
+    const heartbeatPromise = new Promise((_, reject) => {
+      heartbeatReject = reject;
+    });
+
     const runHeartbeat = async () => {
       if (!isHeartbeatRunning) return;
       try {
         await analysisJobService.heartbeat({ jobId: job.id, workerId });
-      } catch (e) {
-        console.error("serverless heartbeat failed", e);
-      } finally {
         if (isHeartbeatRunning) {
           heartbeatTimer = setTimeout(runHeartbeat, HEARTBEAT_INTERVAL_MS);
         }
+      } catch (e) {
+        console.error("serverless heartbeat failed", e);
+        isHeartbeatRunning = false;
+        const err = new Error("Heartbeat failed, losing job lock.");
+        abortController.abort(err);
+        heartbeatReject(err);
       }
     };
     heartbeatTimer = setTimeout(runHeartbeat, HEARTBEAT_INTERVAL_MS);
 
-    await repositoryService.analyzeRepository(job.repositoryId, {
+    const analyzePromise = repositoryService.analyzeRepository(job.repositoryId, {
+      signal: abortController.signal,
       onProgress: async (update) => {
         await analysisJobService.updateProgress({
           jobId: job.id,
@@ -91,6 +102,8 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
         });
       },
     });
+
+    await Promise.race([analyzePromise, heartbeatPromise]);
 
     isHeartbeatRunning = false;
     if (heartbeatTimer) clearTimeout(heartbeatTimer);

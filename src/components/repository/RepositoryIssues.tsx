@@ -134,7 +134,7 @@ export function RepositoryIssues({ repository }: RepositoryIssuesProps) {
             AI-Powered Matcher
           </div>
           <h2 className="text-2xl sm:text-3xl font-heading font-bold text-white tracking-tight">
-            Automated "Good First Issue" Matcher
+            Automated &quot;Good First Issue&quot; Matcher
           </h2>
           <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
             Connect to open issues, supply your core developer skillset, and GitVerse will automatically pinpoint the exact files and modules you should start hacking in.
@@ -253,7 +253,7 @@ export function RepositoryIssues({ repository }: RepositoryIssuesProps) {
               <div>
                 <p className="text-white font-medium text-base">No Open Issues Found</p>
                 <p className="text-slate-400 text-xs sm:text-sm mt-1">
-                  We couldn't fetch open 'good first issue' or 'help wanted' issues for this repo.
+                  We couldn&apos;t fetch open &apos;good first issue&apos; or &apos;help wanted&apos; issues for this repo.
                 </p>
               </div>
             </div>
@@ -262,16 +262,16 @@ export function RepositoryIssues({ repository }: RepositoryIssuesProps) {
               {issues.map((issue) => {
                 const active = selectedIssue?.number === issue.number;
                 return (
-                  <div
+                  <button
                     key={issue.number}
                     onClick={() => setSelectedIssue(issue)}
-                    className={`glass p-4 rounded-xl border text-left cursor-pointer transition-all duration-300 flex flex-col justify-between gap-3 ${
+                    className={`w-full glass p-4 rounded-xl border text-left cursor-pointer transition-all duration-300 flex flex-col justify-between gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 ${
                       active
                         ? "border-purple-500 bg-purple-500/5 shadow-md shadow-purple-500/5"
                         : "border-slate-800/80 hover:border-slate-700/60 hover:bg-slate-900/20"
                     }`}
                   >
-                    <div className="space-y-1">
+                    <div className="space-y-1 w-full">
                       <div className="flex items-start justify-between gap-3">
                         <span className="text-xs text-purple-400 font-semibold font-mono">
                           #{issue.number}
@@ -284,18 +284,18 @@ export function RepositoryIssues({ repository }: RepositoryIssuesProps) {
                           {issue.score}% Fit
                         </span>
                       </div>
-                      <h4 className="font-semibold text-sm sm:text-base text-white line-clamp-1 leading-snug">
+                      <h4 className="font-semibold text-sm sm:text-base text-white line-clamp-1 leading-snug text-left">
                         {issue.title}
                       </h4>
                     </div>
 
-                    <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed text-left w-full">
                       {issue.reason}
                     </p>
 
                     {/* Matched Files tag list */}
                     {issue.matchedFiles.length > 0 && (
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap w-full">
                         <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider flex items-center gap-1">
                           <Code2 className="h-3 w-3" />
                           Target File:
@@ -311,7 +311,7 @@ export function RepositoryIssues({ repository }: RepositoryIssuesProps) {
                         ))}
                       </div>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>

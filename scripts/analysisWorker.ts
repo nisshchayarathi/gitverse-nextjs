@@ -81,6 +81,13 @@ async function runJob(
   try {
     await writeProgress({ progressPercent: 0, progressMessage: "Processing" });
 
+    const abortController = new AbortController();
+
+    let heartbeatReject: (reason?: any) => void;
+    const heartbeatPromise = new Promise((_, reject) => {
+      heartbeatReject = reject;
+    });
+
     const runHeartbeat = async () => {
       if (!isHeartbeatRunning) return;
       try {
@@ -89,12 +96,15 @@ async function runJob(
           workerId: params.workerId,
           lockMs: params.lockMs,
         });
-      } catch (e) {
-        console.error("heartbeat failed", e);
-      } finally {
         if (isHeartbeatRunning) {
           heartbeatTimer = setTimeout(runHeartbeat, params.heartbeatIntervalMs);
         }
+      } catch (e) {
+        console.error("heartbeat failed", e);
+        isHeartbeatRunning = false;
+        const err = new Error("Heartbeat failed, losing job lock.");
+        abortController.abort(err);
+        heartbeatReject(err);
       }
     };
     heartbeatTimer = setTimeout(runHeartbeat, params.heartbeatIntervalMs);
@@ -106,12 +116,15 @@ async function runJob(
     const details = job.progressDetails as any;
     const scope = details?.scope;
 
-    await repositoryService.analyzeRepository(job.repositoryId, {
+    const analyzePromise = repositoryService.analyzeRepository(job.repositoryId, {
       scope,
+      signal: abortController.signal,
       onProgress: async (update) => {
         await writeProgress(update);
       },
     });
+
+    await Promise.race([analyzePromise, heartbeatPromise]);
 
     await analysisJobService.markDone({
       jobId: job.id,

@@ -423,9 +423,6 @@ export class GitHubService {
     }
   }
 
-  /**
-   * Get open issues for a repository
-   */
   async getIssues(
     owner: string,
     repo: string,
@@ -436,16 +433,43 @@ export class GitHubService {
       page?: number;
     }
   ): Promise<any[]> {
-    const response = await this.client.get(`/repos/${owner}/${repo}/issues`, {
-      params: {
-        labels: params?.labels || "good first issue,help wanted",
-        state: params?.state || "open",
-        per_page: params?.per_page || 20,
-        page: params?.page || 1,
-      },
+    const labelsStr = params?.labels !== undefined ? params.labels : "good first issue,help wanted";
+    const labels = labelsStr.split(",").map(l => l.trim()).filter(Boolean);
+
+    if (labels.length === 0) {
+      const response = await this.client.get(`/repos/${owner}/${repo}/issues`, {
+        params: {
+          state: params?.state || "open",
+          per_page: params?.per_page || 20,
+          page: params?.page || 1,
+        },
+      });
+      return response.data.filter((issue: any) => !issue.pull_request);
+    }
+
+    const fetchPromises = labels.map(async (label) => {
+      const response = await this.client.get(`/repos/${owner}/${repo}/issues`, {
+        params: {
+          labels: label,
+          state: params?.state || "open",
+          per_page: params?.per_page || 20,
+          page: params?.page || 1,
+        },
+      });
+      return response.data;
     });
-    // Filter out pull requests
-    return response.data.filter((issue: any) => !issue.pull_request);
+
+    const results = await Promise.all(fetchPromises);
+    const allIssues = results.flat();
+
+    const uniqueIssues = new Map();
+    for (const issue of allIssues) {
+      if (!issue.pull_request && !uniqueIssues.has(issue.number)) {
+        uniqueIssues.set(issue.number, issue);
+      }
+    }
+
+    return Array.from(uniqueIssues.values());
   }
 
   /**

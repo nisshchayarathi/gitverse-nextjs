@@ -171,7 +171,11 @@ export class RepositoryService {
    */
   async analyzeRepository(
     repositoryId: number,
-    opts?: { onProgress?: RepositoryAnalysisProgressReporter; scope?: string },
+    opts?: { 
+      onProgress?: RepositoryAnalysisProgressReporter;
+      signal?: AbortSignal;
+      scope?: string;
+    },
   ) {
     const repository = await prisma.repository.findUnique({
       where: { id: repositoryId },
@@ -188,6 +192,9 @@ export class RepositoryService {
     });
 
     const report = async (update: RepositoryAnalysisProgress) => {
+      if (opts?.signal?.aborted) {
+        throw new Error(opts.signal.reason || "Analysis aborted");
+      }
       if (!opts?.onProgress) return;
       try {
         await opts.onProgress(update);
@@ -208,6 +215,9 @@ export class RepositoryService {
     const checkAborted = () => {
       if (signal.aborted) {
         throw new Error(`Repository analysis timed out after ${timeoutMs / 60000} minutes`);
+      }
+      if (opts?.signal?.aborted) {
+        throw new Error(opts.signal.reason || "Analysis aborted");
       }
     };
 
