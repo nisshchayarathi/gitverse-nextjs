@@ -48,6 +48,7 @@
     "cross-env": "^10.1.0",
     "d3": "^7.9.0",
     "dotenv": "^16.4.5",
+    "firebase": "^10.14.1",
     "google-auth-library": "^10.3.0",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",

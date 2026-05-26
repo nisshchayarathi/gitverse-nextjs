@@ -175,7 +175,9 @@ finally {
 
         {/* Repository Grid/List */}
         {loading ? (
-          viewMode === "grid" ? (
+          <>
+            <div aria-live="polite" className="sr-only">Loading repositories...</div>
+            {viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <Card key={i} className="glass">
@@ -231,7 +233,8 @@ finally {
                 </Card>
               ))}
             </div>
-          )
+          )}
+        </>
 ) : error ? (
   <div className="text-center py-12 text-red-500">
     {error}
