@@ -152,6 +152,17 @@ export class RepositoryService {
       return existingRepository;
     }
 
+    const existingRepositoryName = await prisma.repository.findFirst({
+  where: {
+    name: input.name,
+    userId: input.userId,
+  },
+});
+
+if (existingRepositoryName) {
+  throw new Error("Repository with this name already exists");
+}
+
     const repository = await prisma.repository.create({
       data: {
         name: input.name,
@@ -196,7 +207,7 @@ export class RepositoryService {
       }
     };
 
-    await report({ progressPercent: 1, progressMessage: "Starting" });
+    await report({ progressPercent: 1, progressMessage: "Starting analysis..." });
 
     const timeoutMs = opts?.timeoutMs ?? 15 * 60 * 1000; // 15 minutes default
     const controller = new AbortController();
@@ -226,7 +237,7 @@ export class RepositoryService {
       // Clone repository
       await report({
         progressPercent: 5,
-        progressMessage: "Cloning repository",
+        progressMessage: "Cloning repository...",
       });
       gitService = await GitService.cloneRepository(repository.url, tempDir, {
         signal,
@@ -261,7 +272,7 @@ export class RepositoryService {
       // Get repository size and branches.
       await report({
         progressPercent: 10,
-        progressMessage: "Calculating size",
+        progressMessage: "Calculating repository size...",
       });
       const [size, branches] = await Promise.all([
         gitService.getRepositorySize(),
@@ -273,7 +284,7 @@ export class RepositoryService {
       // Analyze branches
       await report({
         progressPercent: 15,
-        progressMessage: "Analyzing branches",
+        progressMessage: "Analyzing branches...",
       });
       const defaultBranch = branches.find((b) => b.isDefault)?.name || "main";
 
@@ -294,7 +305,7 @@ export class RepositoryService {
       // Analyze commits from all branches
       await report({
         progressPercent: 25,
-        progressMessage: "Reading commit history",
+        progressMessage: "Fetching commit history...",
       });
       const commits = await gitService.getCommits("--all", 1000);
 
@@ -407,7 +418,7 @@ export class RepositoryService {
           const pct = 25 + Math.round((Math.min(i + chunk.length, newCommits.length) / totalNewCommits) * 35);
           await report({
             progressPercent: Math.min(60, pct),
-            progressMessage: `Storing commits (${Math.min(i + chunk.length, newCommits.length)}/${newCommits.length})`,
+            progressMessage: `Processing commits (${Math.min(i + chunk.length, newCommits.length)}/${newCommits.length})...`,
           });
         } catch (error: any) {
           failedCount += chunk.length;
@@ -448,7 +459,7 @@ export class RepositoryService {
           await report({
             progressPercent:
               65 + Math.round((insertedSoFar / files.length) * 10),
-            progressMessage: `Storing files (${insertedSoFar}/${files.length})`,
+            progressMessage: `Indexing files (${insertedSoFar}/${files.length})...`,
           });
         }
        
@@ -460,11 +471,11 @@ export class RepositoryService {
       // Analyze contributors and languages in parallel; both are independent after file scan.
       await report({
         progressPercent: 80,
-        progressMessage: "Analyzing contributors",
+        progressMessage: "Analyzing contributor activity...",
       });
       await report({
         progressPercent: 90,
-        progressMessage: "Detecting languages",
+        progressMessage: "Detecting programming languages...",
       });
 
       const [contributors, languages] = await Promise.all([
@@ -514,6 +525,37 @@ export class RepositoryService {
       // Languages to ignore (config/data formats, not actual code)
       const ignoredLanguages = ["JSON", "YAML", "Markdown", "TOML", "CSV"];
 
+      // Clean up existing languages before inserting fresh data,
+      // otherwise re-analysis would leave stale records and skip
+      // updates on metrics that may have changed.
+      try {
+        await prisma.language.deleteMany({
+          where: { repositoryId },
+        });
+      } catch (e: any) {
+        console.error(
+          `Failed to clean up languages for repository ${repositoryId}:`,
+          e.message,
+        );
+      }
+
+      if (languagesWithAdjustedPercentage.length > 0) {
+        try {
+          await prisma.language.createMany({
+            data: languagesWithAdjustedPercentage.map((language) => ({
+              name: language.name,
+              percentage: language.percentage,
+              bytes: language.bytes,
+              lines: language.lines,
+              repositoryId,
+            })),
+          });
+        } catch (e: any) {
+          console.error(
+            `Failed to insert languages for repository ${repositoryId}:`,
+            e.message,
+          );
+        }
       // Filter out ignored languages
       const filteredLanguages = languages.filter(
         (lang) => !ignoredLanguages.includes(lang.name),
@@ -535,14 +577,16 @@ export class RepositoryService {
 
       // Adjust to ensure sum is exactly 100%
       const sum = roundedPercentages.reduce((acc, val) => acc + val, 0);
-      if (sum > 0 && sum !== 100) {
+      if (sum > 0 && sum !== 100 && roundedPercentages.length > 0) {
         const diff = 100 - sum;
         // Add difference to the largest percentage
         const maxIndex = roundedPercentages.indexOf(
           Math.max(...roundedPercentages),
         );
-        roundedPercentages[maxIndex] =
-          Math.round((roundedPercentages[maxIndex] + diff) * 100) / 100;
+        if (maxIndex !== -1) {
+          roundedPercentages[maxIndex] =
+            Math.round((roundedPercentages[maxIndex] + diff) * 100) / 100;
+        }
       }
 
       const languagesWithAdjustedPercentage = filteredLanguages.map(
@@ -599,7 +643,7 @@ export class RepositoryService {
         where: { id: repositoryId },
         data: { status: "failed" },
       });
-      await report({ progressMessage: "Failed" });
+      await report({ progressMessage: "Analysis failed. Please try again." });
       throw error;
     } finally {
       clearTimeout(timeoutId);

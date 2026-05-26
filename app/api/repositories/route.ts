@@ -24,6 +24,30 @@ function kickProductionWorker() {
   });
 }
 
+function normalizeGitHubRepoUrl(input: string): string | null {
+  const trimmed = input.trim();
+
+  const patterns = [
+    /^https:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+?)(?:\.git)?\/?$/i,
+    /^http:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+?)(?:\.git)?\/?$/i,
+    /^git@github\.com:([^/\s]+)\/([^/\s#?]+?)(?:\.git)?$/i,
+    /^ssh:\/\/git@github\.com\/([^/\s]+)\/([^/\s#?]+?)(?:\.git)?$/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+
+    if (match) {
+      const owner = match[1];
+      const repo = match[2];
+
+      return `https://github.com/${owner}/${repo}`;
+    }
+  }
+
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
@@ -37,11 +61,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedUrl = normalizeGitHubRepoUrl(url);
+
     const normalizedUrl = normalizeKnownRepoHttpUrl(url);
     if (!normalizedUrl) {
       return NextResponse.json(
         {
           error:
+            "Invalid repository URL. Expected a GitHub repository URL like https://github.com/owner/repo, https://github.com/owner/repo.git, git@github.com:owner/repo.git, or ssh://git@github.com/owner/repo.git.",
+        },
             "Invalid repository URL. Use a full repository URL like https://github.com/owner/repo",
         },
         { status: 400 },
@@ -84,6 +112,9 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
+    console.error("Create repository error:", error);
+    console.error("Error stack:", error.stack);
+
     const stack = process.env.NODE_ENV === 'development' ? error.stack : error.stack?.split('\n').slice(0, 3).join('\n');
     logger.error({ err: sanitizeError(error), stack }, "Create repository error");
     if (isHttpError(error)) {
@@ -92,6 +123,7 @@ export async function POST(request: NextRequest) {
         { status: error.status }
       );
     }
+
     return NextResponse.json(
       { error: "Failed to create repository" },
       { status: 500 }
@@ -106,6 +138,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ repositories });
   } catch (error: any) {
+    console.error("List repositories error:", error);
+
     logger.error({ err: sanitizeError(error) }, "List repositories error");
     if (isHttpError(error)) {
       return NextResponse.json(
@@ -113,6 +147,7 @@ export async function GET(request: NextRequest) {
         { status: error.status }
       );
     }
+
     return NextResponse.json(
       { error: "Failed to list repositories" },
       { status: 500 }

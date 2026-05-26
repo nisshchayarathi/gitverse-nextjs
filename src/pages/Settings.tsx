@@ -2,6 +2,8 @@
 
 export const dynamic = "force-dynamic";
 
+import { useEffect, useState, useRef } from "react";
+import { User, Lock, Shield, Trash2, Cpu } from "lucide-react";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { User, Lock, Shield, Trash2, AlertCircle } from "lucide-react";
 import { Save } from "lucide-react";
@@ -21,6 +23,7 @@ import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
+import { useAISettings, AIProviderType } from "@/hooks/useAISettings";
 
 export default function Settings() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -93,6 +96,33 @@ export default function Settings() {
     }
   };
 }, [avatar]);
+
+  // AI Settings State
+  const { settings, updateSettings, isLoaded: isAISettingsLoaded } = useAISettings();
+  const [aiProvider, setAiProvider] = useState<AIProviderType>("gemini");
+  const [aiGeminiKey, setAiGeminiKey] = useState("");
+  const [aiOpenaiKey, setAiOpenaiKey] = useState("");
+
+  useEffect(() => {
+    if (isAISettingsLoaded) {
+      setAiProvider(settings.provider);
+      setAiGeminiKey(settings.geminiKey);
+      setAiOpenaiKey(settings.openaiKey);
+    }
+  }, [settings, isAISettingsLoaded]);
+
+  const handleSaveAISettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSettings({
+      provider: aiProvider,
+      geminiKey: aiGeminiKey,
+      openaiKey: aiOpenaiKey,
+    });
+    toast({
+      title: "AI Settings Saved",
+      description: "Your local AI provider and API keys have been updated.",
+    });
+  };
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -338,6 +368,7 @@ export default function Settings() {
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
     { id: "security", label: "Security", icon: Shield },
+    { id: "ai", label: "AI Settings", icon: Cpu },
     { id: "danger", label: "Danger Zone", icon: Trash2 },
   ];
 
@@ -654,6 +685,85 @@ export default function Settings() {
                       >
                         <Lock className="h-4 w-4 mr-2" />
                         {isLoading ? "Updating..." : "Update Password"}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* AI Settings Tab */}
+            {activeTab === "ai" && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle className="font-heading flex items-center gap-2">
+                    <Cpu className="h-5 w-5" />
+                    AI Summary Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Configure your AI provider to generate module and file summaries. Keys are stored securely in your browser's localStorage.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSaveAISettings} className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="ai-provider" className="text-sm font-medium">
+                        AI Provider
+                      </label>
+                      <select
+                        id="ai-provider"
+                        value={aiProvider}
+                        onChange={(e) => setAiProvider(e.target.value as AIProviderType)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value="gemini">Google Gemini</option>
+                        <option value="openai">OpenAI</option>
+                      </select>
+                    </div>
+
+                    {aiProvider === "gemini" && (
+                      <div className="space-y-2">
+                        <label htmlFor="gemini-key" className="text-sm font-medium">
+                          Gemini API Key
+                        </label>
+                        <Input
+                          id="gemini-key"
+                          type="password"
+                          placeholder="AIzaSy..."
+                          value={aiGeminiKey}
+                          onChange={(e) => setAiGeminiKey(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Enter your Google Gemini API Key. Get one from Google AI Studio.
+                        </p>
+                      </div>
+                    )}
+
+                    {aiProvider === "openai" && (
+                      <div className="space-y-2">
+                        <label htmlFor="openai-key" className="text-sm font-medium">
+                          OpenAI API Key
+                        </label>
+                        <Input
+                          id="openai-key"
+                          type="password"
+                          placeholder="sk-..."
+                          value={aiOpenaiKey}
+                          onChange={(e) => setAiOpenaiKey(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Enter your OpenAI API Key.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="pt-4">
+                      <Button
+                        type="submit"
+                        className="bg-gradient-primary hover:opacity-90 transition-opacity"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        Save AI Settings
                       </Button>
                     </div>
                   </form>

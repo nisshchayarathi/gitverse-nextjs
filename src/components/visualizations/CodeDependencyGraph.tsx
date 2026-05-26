@@ -3,10 +3,97 @@ import * as d3 from "d3";
 import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
 
+interface RepositoryFile {
+  path: string;
+  lines?: number;
+}
+
+interface Repository {
+  files?: RepositoryFile[];
+}
+
+// Generate dependency graph from repository files
+const generateDependencyGraph = (repository?: Repository): GraphData => {
+  const nodes: Node[] = [];
+  const links: Link[] = [];
+
+  if (!repository?.files || repository.files.length === 0) {
+    return { nodes: [], links: [] };
+  }
+
+  // Extract unique folders and create nodes
+  const files = repository.files;
+
+  // Create folder nodes
+  const folderPaths = new Set<string>();
+  files.forEach((file) => {
+    const parts = file.path.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      const folderPath = parts.slice(0, i).join("/");
+      folderPaths.add(folderPath);
+    }
+  });
+
+  // Add folder nodes
+  folderPaths.forEach((folderPath) => {
+    const parts = folderPath.split("/");
+    const folderName = parts[parts.length - 1];
+    nodes.push({
+      id: `folder-${folderPath}`,
+      name: folderName,
+      type: "folder",
+      size: 100,
+      path: folderPath,
+    });
+  });
+
+  // Add file nodes (limit to top files by lines to avoid clutter)
+  const topFiles = files
+    .sort((a, b) => (b.lines || 0) - (a.lines || 0))
+    .slice(0, 30);
+
+  topFiles.forEach((file) => {
+    const fileName = file.path.split("/").pop() || file.path;
+    nodes.push({
+      id: `file-${file.path}`,
+      name: fileName,
+      type: "file",
+      size: Math.min(Math.max((file.lines ?? 0) / 10 || 50, 40), 150),
+      path: file.path,
+    });
+  });
+
+  // Create links: files to their parent folders
+  topFiles.forEach((file) => {
+    const parts = file.path.split("/");
+    if (parts.length > 1) {
+      const parentFolder = parts.slice(0, -1).join("/");
+      links.push({
+        source: `file-${file.path}`,
+        target: `folder-${parentFolder}`,
+        strength: 1,
+      });
+    }
+  });
+
+  // Create links between folders (parent-child relationships)
+  folderPaths.forEach((folderPath) => {
+    const parts = folderPath.split("/");
+    if (parts.length > 1) {
+      const parentFolder = parts.slice(0, -1).join("/");
+      if (folderPaths.has(parentFolder)) {
+        links.push({
+          source: `folder-${folderPath}`,
+          target: `folder-${parentFolder}`,
+          strength: 0.8,
+        });
+      }
+    }
+  });
 
 
 interface CodeDependencyGraphProps {
-  repository?: any;
+  repository?: Repository;
 }
 
 export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {

@@ -184,13 +184,12 @@ Provide only the commit messages, one per line.
         .filter((line) => line.trim())
         .slice(0, 3);
     } catch (error: any) {
-      console.error("Commit message suggestion error:", error);
-      return [
-        "feat: implement new features",
-        "fix: resolve bugs and issues",
-        "chore: update dependencies and configuration",
-      ];
-    }
+  console.error("Commit message suggestion error:", error);
+
+  throw new Error(
+    error?.message || "Failed to generate commit message suggestions"
+  );
+}
   }
 
   /**
