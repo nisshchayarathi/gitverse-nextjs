@@ -94,7 +94,11 @@ async function runJob(
       throw new Error(`Unsupported job type: ${job.type}`);
     }
 
+    const details = job.progressDetails as any;
+    const scope = details?.scope;
+
     await repositoryService.analyzeRepository(job.repositoryId, {
+      scope,
       onProgress: async (update) => {
         await writeProgress(update);
       },

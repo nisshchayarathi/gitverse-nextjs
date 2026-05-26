@@ -48,9 +48,23 @@ if (existingJob) {
   );
 }
 
+    const bodyText = await request.text();
+    let scope: string | undefined = undefined;
+    if (bodyText) {
+      try {
+        const json = JSON.parse(bodyText);
+        if (json.scope && typeof json.scope === "string") {
+          scope = json.scope;
+        }
+      } catch (e) {
+        // ignore JSON parse errors
+      }
+    }
+
     const job = await analysisJobService.createRepositoryAnalysisJob({
       repositoryId: id,
       userId: user.userId,
+      scope,
     });
 
     return NextResponse.json(

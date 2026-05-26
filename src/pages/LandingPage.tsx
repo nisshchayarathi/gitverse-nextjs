@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   GitBranch,
@@ -29,6 +29,9 @@ export default function LandingPage() {
   const [repoUrl, setRepoUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [scoreAnimate, setScoreAnimate] = useState(false);
+  const [activeFeatureIndex, setActiveFeatureIndex] = useState(0);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+  const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
   const isAnalyzeDisabled = !repoUrl.trim() || isLoading;
 
   const mentorMessages = useMemo(
@@ -58,7 +61,6 @@ export default function LandingPage() {
     }
 
     const rafId = window.requestAnimationFrame(() => {
-      // Trigger CSS transitions (e.g., score ring fill) after first paint.
       setScoreAnimate(true);
     });
 
@@ -130,7 +132,6 @@ export default function LandingPage() {
     e.preventDefault();
     if (!repoUrl.trim() || isLoading) return;
 
-    // Demo-only CTA: keep it as UI (no navigation / no analysis).
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
@@ -181,6 +182,30 @@ export default function LandingPage() {
         "Production readiness assessment, architecture pattern recognition, and intelligent recommendations.",
     },
   ];
+
+  const totalFeatures = features.length;
+  const activeFeature = features[activeFeatureIndex];
+
+  useEffect(() => {
+    if (isCarouselPaused) return;
+
+    const intervalId = window.setInterval(() => {
+      setActiveFeatureIndex((index) => (index + 1) % totalFeatures);
+    }, 6500);
+
+    return () => window.clearInterval(intervalId);
+  }, [totalFeatures, isCarouselPaused]);
+
+  useEffect(() => {
+    const activeSlide = slideRefs.current[activeFeatureIndex];
+    if (activeSlide) {
+      activeSlide.scrollIntoView({
+        behavior: "smooth",
+        inline: "center",
+        block: "nearest",
+      });
+    }
+  }, [activeFeatureIndex]);
 
   const howItWorks = [
     {
@@ -563,36 +588,68 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="marquee marquee--pause-on-hover reveal" data-reveal>
-            <div
-              className="marquee__track gap-6 py-2"
-              style={{ ["--marquee-duration"]: "34s" } as React.CSSProperties}
-            >
-              {[...features, ...features].map((feature, index) => (
-                <Card
-                  key={`${feature.title}-${index}`}
-                  className="glass feature-card group shrink-0 w-[320px] md:w-[360px]"
-                >
-                  <CardHeader>
-                    <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <feature.icon className="h-6 w-6 text-primary-foreground" />
-                    </div>
-                    <CardTitle className="font-heading">
-                      {feature.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-muted-foreground text-base">
-                      {feature.description}
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              ))}
+          <div
+            className="feature-carousel"
+            role="region"
+            aria-roledescription="carousel"
+            aria-label="GitVerse features"
+            onMouseEnter={() => setIsCarouselPaused(true)}
+            onMouseLeave={() => setIsCarouselPaused(false)}
+            onFocus={() => setIsCarouselPaused(true)}
+            onBlur={() => setIsCarouselPaused(false)}
+            onTouchStart={() => setIsCarouselPaused(true)}
+            onTouchEnd={() => setIsCarouselPaused(false)}
+            onTouchCancel={() => setIsCarouselPaused(false)}
+          >
+            <div className="feature-carousel__viewport">
+              <div className="feature-carousel__track">
+                {features.map((feature, index) => (
+                  <div
+                    key={feature.title}
+                    ref={(el) => (slideRefs.current[index] = el)}
+                    className={`feature-carousel__slide ${
+                      index === activeFeatureIndex ? "active" : ""
+                    }`}
+                    aria-hidden={index !== activeFeatureIndex}
+                  >
+                    <Card className="glass feature-card group w-full">
+                      <CardHeader>
+                        <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                          <feature.icon className="h-6 w-6 text-primary-foreground" />
+                        </div>
+                        <CardTitle className="font-heading">
+                          {feature.title}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <CardDescription className="text-muted-foreground text-base">
+                          {feature.description}
+                        </CardDescription>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Edge fades */}
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-background to-transparent" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background to-transparent" />
+            <div className="feature-carousel__controls" aria-label="Feature navigation">
+              <div className="flex items-center justify-center gap-2">
+                {features.map((feature, index) => (
+                  <button
+                    key={feature.title}
+                    type="button"
+                    onClick={() => setActiveFeatureIndex(index)}
+                    aria-label={`Show ${feature.title}`}
+                    aria-current={index === activeFeatureIndex ? "true" : "false"}
+                    className={`feature-carousel__dot ${
+                      index === activeFeatureIndex
+                        ? "bg-primary"
+                        : "bg-border/40 hover:opacity-80"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>

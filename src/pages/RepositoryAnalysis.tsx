@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +126,35 @@ export default function RepositoryAnalysis() {
   const [error, setError] = useState<string | null>(null);
   const pollingJobRef = useRef<string | null>(null);
 
+  // Timeout / stuck state
+  const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  const pollingStartedAt = useRef<number | null>(null);
+  // Tracks last time progress changed  prevents falsely timing out active jobs
+  const lastProgressAt = useRef<number | null>(null);
+  const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // ── Elapsed seconds ticker ────────────────────────────────────────
+  useEffect(() => {
+    if (isAnalyzing && !analysisTimedOut) {
+      elapsedTimer.current = setInterval(() => {
+        if (pollingStartedAt.current) {
+          setElapsedSeconds(
+            Math.floor((Date.now() - pollingStartedAt.current) / 1000)
+          );
+        }
+      }, 1000);
+    } else {
+      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
+    }
+    return () => {
+      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
+    };
+  }, [isAnalyzing, analysisTimedOut]);
+
+  // ── Initial fetch ─────────────────────────────────────────────────� Initial fetch ─────────────────────────────────────────────────
   useEffect(() => {
   fetchRepository();
   fetchJobHistory();
@@ -646,3 +675,5 @@ export default function RepositoryAnalysis() {
     </DashboardLayout>
   );
 }
+
+

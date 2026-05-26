@@ -171,10 +171,7 @@ export class RepositoryService {
    */
   async analyzeRepository(
     repositoryId: number,
-    opts?: {
-      onProgress?: RepositoryAnalysisProgressReporter;
-      timeoutMs?: number;
-    },
+    opts?: { onProgress?: RepositoryAnalysisProgressReporter; scope?: string },
   ) {
     const repository = await prisma.repository.findUnique({
       where: { id: repositoryId },
@@ -425,11 +422,7 @@ export class RepositoryService {
 
       // Analyze files
       await report({ progressPercent: 65, progressMessage: "Scanning files" });
-      const files = await gitService.getFileTree({
-        targetDirectory: repository.targetDirectory ?? null,
-      });
-
-      checkAborted();
+      const files = await gitService.getFileTree(opts?.scope);
 
       // Avoid querying existing file paths (can be huge). Just rely on
       // `skipDuplicates` with the unique constraint (repositoryId, path).
@@ -511,6 +504,13 @@ export class RepositoryService {
         });
       }
 
+      // Detect languages
+      console.log(`Detecting languages for repository ${repositoryId}`);
+      await report({
+        progressPercent: 90,
+        progressMessage: "Detecting languages",
+      });
+      const languages = await gitService.detectLanguages(opts?.scope);
       // Languages to ignore (config/data formats, not actual code)
       const ignoredLanguages = ["JSON", "YAML", "Markdown", "TOML", "CSV"];
 

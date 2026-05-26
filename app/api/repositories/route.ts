@@ -64,9 +64,16 @@ export async function POST(request: NextRequest) {
       userId: user.userId,
     });
 
+    console.log("Repository created:", repository.id);
+
+    let trimmedScope: string | undefined = undefined;
+    if (body.scope && typeof body.scope === "string") {
+      trimmedScope = body.scope.trim();
+    }
     const job = await analysisJobService.createRepositoryAnalysisJob({
       repositoryId: repository.id,
       userId: user.userId,
+      scope: trimmedScope || undefined,
     });
 
     kickLocalRunner(request);
