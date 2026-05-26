@@ -193,11 +193,14 @@ model Repository {
   @@index([userId])
   @@index([userId, url, targetDirectory])
 }
-
+enum AnalysisJobType {
+  REPOSITORY_ANALYSIS
+  PR_REVIEW
+}
 model AnalysisJob {
   id             String    @id @default(uuid()) @db.Uuid
   status         JobStatus @default(QUEUED)
-  type           String    @default("repository_analysis")
+  type           AnalysisJobType  @default(REPOSITORY_ANALYSIS)
 
   repositoryId   Int       @map("repository_id")
   repository     Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)

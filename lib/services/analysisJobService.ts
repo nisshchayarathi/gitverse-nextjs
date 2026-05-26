@@ -1,6 +1,6 @@
 import prisma from "../prisma";
 import type { AnalysisJob } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+import { Prisma,AnalysisJobType  } from "@prisma/client";
 
 export type JobProgressUpdate = {
   progressPercent?: number;
@@ -47,59 +47,38 @@ export class AnalysisJobService {
     if (existingJob) {
       throw new HttpError(409, "An active analysis job already exists for this repository");
     }
-
-    return prisma.analysisJob.create({
-      data: {
-    const existing = await prisma.analysisJob.findFirst({
+    try {
+  return await prisma.analysisJob.create({
+    data: {
+      repositoryId: params.repositoryId,
+      userId: params.userId,
+      type: AnalysisJobType.REPOSITORY_ANALYSIS,
+      status: "QUEUED",
+      progressPercent: 0,
+      progressMessage: "Queued",
+      progressDetails: params.scope
+        ? { scope: params.scope }
+        : undefined,
+      maxAttempts: params.maxAttempts ?? 3,
+    },
+  });
+} catch (error: any) {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  ) {
+    const activeJob = await prisma.analysisJob.findFirst({
       where: {
         repositoryId: params.repositoryId,
         status: { in: ["QUEUED", "PROCESSING"] },
       },
     });
-    if (existing) return existing;
 
-    try {
-      return await prisma.analysisJob.create({
-        data: {
-          repositoryId: params.repositoryId,
-          userId: params.userId,
-          type: "repository_analysis",
-          status: "QUEUED",
-          progressPercent: 0,
-          progressMessage: "Queued",
-          progressDetails: params.scope ? { scope: params.scope } : undefined,
-          maxAttempts: params.maxAttempts ?? 3,
-        },
-      });
-    } catch (error: any) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        const activeJob = await prisma.analysisJob.findFirst({
-          where: {
-            repositoryId: params.repositoryId,
-            status: { in: ["QUEUED", "PROCESSING"] },
-          },
-        });
-        if (existingJob) return existingJob;
+    if (activeJob) return activeJob;
+  }
 
-        // The active job may have completed between the P2002 and the lookup. Retry exactly once.
-        return await prisma.analysisJob.create({
-          data: {
-            repositoryId: params.repositoryId,
-            userId: params.userId,
-            type: "repository_analysis",
-            status: "QUEUED",
-            progressPercent: 0,
-            progressMessage: "Queued",
-            progressDetails: params.scope ? { scope: params.scope } : undefined,
-            maxAttempts: params.maxAttempts ?? 3,
-          },
-        });
-      }
-      throw error;
-    }
+  throw error;
+}
   }
 
   async getJob(params: {
