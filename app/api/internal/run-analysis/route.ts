@@ -11,6 +11,29 @@ process.on("unhandledRejection", (reason) => {
   console.error("Unhandled rejection in run-analysis route:", reason);
 });
 
+  // Fail-closed: if no secret is configured in production, deny all requests.
+  // An unset secret must never silently open access in any deployed environment.
+  if (!configuredSecret) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[run-analysis] ANALYSIS_RUNNER_SECRET is not set. " +
+          "All requests are rejected in production until the secret is configured."
+      );
+      return false;
+    }
+    // Allow unauthenticated calls only in local development.
+    return true;
+  }
+
+  // Secret is configured -- verify it on every request, regardless of HTTP method.
+  // Vercel Cron sends plain GET requests; the recommended approach is to set
+  // CRON_SECRET equal to ANALYSIS_RUNNER_SECRET so Vercel automatically
+  // injects "Authorization: Bearer <CRON_SECRET>" on each cron invocation.
+  const authHeader = request.headers.get("authorization");
+  if (authHeader === `Bearer ${configuredSecret}`) return true;
+
+  // Also accept the value in the custom header for non-cron callers
+  // (e.g. a GitHub Actions workflow or an internal service).
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
 function isAuthorized(request: NextRequest): boolean {
@@ -37,10 +60,9 @@ function isAuthorized(request: NextRequest): boolean {
   // HTTP method or User-Agent. Vercel Cron jobs should include the
   // secret as a query parameter in the cron path.
   const headerSecret = request.headers.get("x-analysis-runner-secret");
-  const url = new URL(request.url);
-  const querySecret = url.searchParams.get("secret");
+  if (headerSecret === configuredSecret) return true;
 
-  return headerSecret === configuredSecret || querySecret === configuredSecret;
+  return false;
 }
 
 async function runOnce(request: NextRequest): Promise<NextResponse> {

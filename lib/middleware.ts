@@ -109,6 +109,6 @@ export function sanitizeError(error: unknown): string {
   }
 }
 
-export function errorResponse(message: string, status: number = 400): NextResponse {
+export function badRequestResponse(message: string, status: number = 400): NextResponse {
   return NextResponse.json({ error: message }, { status });
 }

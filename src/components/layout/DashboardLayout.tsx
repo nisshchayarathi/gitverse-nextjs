@@ -103,14 +103,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
           {/* Toggle Sidebar Button */}
           <div className="p-4 border-t border-border/50">
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-accent transition-colors"
+              aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             >
               <ChevronLeft
                 className={`h-5 w-5 transition-transform ${!sidebarOpen ? "rotate-180" : ""}`}
               />
-            </button>
+            </Button>
           </div>
         </div>
       </aside>
@@ -165,12 +168,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         <header className="sticky top-0 z-30 glass border-b border-border/50">
           <div className="px-4 py-3 flex items-center justify-between">
             {/* Mobile Menu Button */}
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setMobileMenuOpen(true)}
               className="p-2 rounded-lg hover:bg-accent transition-colors md:hidden"
+              aria-label="Open mobile menu"
             >
               <Menu className="h-5 w-5" />
-            </button>
+            </Button>
 
             <div className="flex-1 flex items-center justify-end px-4 sm:px-6">
               <Button

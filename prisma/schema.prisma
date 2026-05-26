@@ -7,6 +7,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
 }
 
 enum JobStatus {
@@ -132,6 +134,7 @@ model Account {
 
   @@index([userId])
   @@unique([provider, providerAccountId])
+  @@index([userId])    
   @@map("accounts")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -144,6 +147,7 @@ model Session {
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])  
   @@map("sessions")
   @@index([userId])
 }
