@@ -370,7 +370,6 @@ OAuth (Google / NextAuth):
 
 Optional:
 
-- `JWT_SECRET` - JWT signing secret (fallback/alternate secret configuration)
 - `NEXT_PUBLIC_API_URL` - API URL for client-side (defaults to current domain)
 
 ## 🤝 Contributing
