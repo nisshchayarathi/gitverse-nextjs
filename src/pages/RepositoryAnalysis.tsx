@@ -8,9 +8,8 @@ import axios from "axios";
 import Link from "next/link";
 
 
-import { useState, useEffect, useRef } from "react";
-import RepositoryAnalysisProgress  from "@/components/repository/RepositoryAnalysisProgress";
-import { useParams } from "next/navigation";
+
+import RepositoryAnalysisProgress  from "@/components/repository/RepositoryAnalysisProgress;
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RepositoryOverview } from "@/components/repository/RepositoryOverview";
 import { FileStructure } from "@/components/repository/FileStructure";
@@ -19,6 +18,7 @@ import { Contributors } from "@/components/repository/Contributors";
 import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
 
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import {
   Home,
   FolderTree,
@@ -29,6 +29,7 @@ import {
   ArrowLeft,
   Trash2,
   Activity,
+  AlertCircle,
   Copy,
   CheckCircle2,
   Clock,
@@ -94,44 +95,44 @@ const tabs: Tab[] = [
     icon: <BarChart3 className="h-4 w-4" />,
   },
 ];
-
 const StatusBadge = ({ status, isAnalyzing }: { status: string; isAnalyzing: boolean }) => {
   const s = status?.toLowerCase() || "pending";
 
+  let config = {
+    className: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+    icon: <Clock className="h-3 w-3" />,
+    label: "Pending"
+  };
+
   if (isAnalyzing || s === "analyzing" || s === "processing") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        Analyzing
-      </span>
-    );
-  }
-
-  if (s === "completed" || s === "done" || s === "ready") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-        <CheckCircle2 className="h-3 w-3" />
-        Completed
-      </span>
-    );
-  }
-
-  if (s === "failed" || s === "error") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">
-        <XCircle className="h-3 w-3" />
-        Failed
-      </span>
-    );
+    config = {
+      className: "bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse",
+      icon: <Loader2 className="h-3 w-3 animate-spin" />,
+      label: "Analyzing"
+    };
+  } else if (s === "completed" || s === "done" || s === "ready") {
+    config = {
+      className: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+      icon: <CheckCircle2 className="h-3 w-3" />,
+      label: "Completed"
+    };
+  } else if (s === "failed" || s === "error") {
+    config = {
+      className: "bg-red-500/10 text-red-500 border-red-500/20",
+      icon: <XCircle className="h-3 w-3" />,
+      label: "Failed"
+    };
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">
-      <Clock className="h-3 w-3" />
-      Pending
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${config.className}`}>
+      {config.icon}
+      {config.label}
     </span>
   );
 };
+
+    
 
 export default function RepositoryAnalysis() {
   const params = useParams();
@@ -150,6 +151,9 @@ export default function RepositoryAnalysis() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+
+  // âœ… ERROR STATE (improved usage)
   const [error, setError] = useState<string | null>(null);
   const pollingJobRef = useRef<string | null>(null);
 
@@ -159,41 +163,33 @@ export default function RepositoryAnalysis() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const pollingStartedAt = useRef<number | null>(null);
-  // Tracks last time progress changed  prevents falsely timing out active jobs
-  const lastProgressAt = useRef<number | null>(null);
-  const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
+// Tracks last time progress changed — prevents falsely timing out active jobs
+const lastProgressAt = useRef<number | null>(null);
+const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // ── Elapsed seconds ticker ────────────────────────────────────────
-  useEffect(() => {
-    if (isAnalyzing && !analysisTimedOut) {
-      elapsedTimer.current = setInterval(() => {
-        if (pollingStartedAt.current) {
-          setElapsedSeconds(
-            Math.floor((Date.now() - pollingStartedAt.current) / 1000)
-          );
-        }
-      }, 1000);
-    } else {
-      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
-    }
-    return () => {
-      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
-    };
-  }, [isAnalyzing, analysisTimedOut]);
+const startAnalysisPolling = () => {
+  pollingStartedAt.current = Date.now();
+  setIsAnalyzing(true);
+};
 
-  
+// Elapsed seconds ticker
+useEffect(() => {
+  if (isAnalyzing && !analysisTimedOut) {
+    elapsedTimer.current = setInterval(() => {
+      if (pollingStartedAt.current) {
+        setElapsedSeconds(
+          Math.floor((Date.now() - pollingStartedAt.current) / 1000)
+        );
+      }
+    }, 1000);
+  } else {
+    if (elapsedTimer.current) clearInterval(elapsedTimer.current);
+  }
 
-  // Timeout / stuck state
-  const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  const pollingStartedAt = useRef<number | null>(null);
-  // Tracks last time progress changed — prevents falsely timing out active jobs
-  const lastProgressAt = useRef<number | null>(null);
-  const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // â”€â”€ Elapsed seconds ticker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  return () => {
+    if (elapsedTimer.current) clearInterval(elapsedTimer.current);
+  };
+}, [isAnalyzing, analysisTimedOut]);
   useEffect(() => {
     if (isAnalyzing && !analysisTimedOut) {
       elapsedTimer.current = setInterval(() => {
@@ -322,6 +318,8 @@ export default function RepositoryAnalysis() {
     if (!id) return;
     setError(null);
 
+    setError(null); // âœ… reset error on retry
+
     try {
       const token = localStorage.getItem("gitverse_token");
 
@@ -347,6 +345,8 @@ export default function RepositoryAnalysis() {
         }
       }
     } catch (error: any) {
+      console.error("Error fetching repository:", error);
+
       setError(
         error?.response?.data?.error ||
         "Failed to load repository. Check your connection and try again."
@@ -374,6 +374,9 @@ export default function RepositoryAnalysis() {
     }
   };
 
+  // =========================
+  // FETCH JOB (FIXED)
+  // =========================
   const fetchJob = async (jobId: string) => {
     if (!jobId) return;
 
@@ -425,9 +428,10 @@ export default function RepositoryAnalysis() {
       }
 
       if (nextJob?.status === "FAILED") {
-        const msg = nextJob?.error || "The repository analysis failed.";
+        const msg =
+          nextJob?.error || "The repository analysis failed.";
 
-        setError(msg);
+        setError(msg); // âœ… UI error added
 
         pollingStartedAt.current = null;
         setIsAnalyzing(false);
@@ -439,6 +443,8 @@ export default function RepositoryAnalysis() {
         });
       }
     } catch (error: any) {
+      console.error("Error fetching analysis job:", error);
+
       toast({
         title: "Error",
         description: "Failed to fetch analysis job status",
@@ -563,6 +569,7 @@ export default function RepositoryAnalysis() {
         return <RepositoryOverview repositoryData={repository} />;
     }
   };
+const progressPercent = job?.progressPercent ?? 0;
 
   // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const formatElapsed = (secs: number) => {
@@ -688,16 +695,38 @@ const safeProgressMessage =
           </div>
         ) : (
           <>
+            {/* âœ… IMPROVED ERROR UI */}
+            {error && (
+              <div className="glass border border-red-500/40 p-4 rounded-lg text-red-300 flex items-start gap-2">
+                <span>âš ï¸</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* HEADER */}
             {/* Header with back button */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 animate-fade-in-up">
               <Link
                 href="/dashboard"
-                className="glass p-2 rounded-lg hover:bg-white/10 transition-all duration-300 self-start"
+                className="glass p-2 rounded-lg hover:bg-white/10"
               >
-                <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+                <ArrowLeft className="h-4 w-4" />
               </Link>
 
               <div className="flex-1 min-w-0">
+                <h1 className="text-2xl font-bold truncate">
+                  {repository?.name || "Repository"}
+                </h1>
+
+                <p className="text-sm text-muted-foreground truncate">
+                  {repository?.url || "No URL available"}
+                </p>
+
+                <p className="text-xs text-muted-foreground mt-1">
+                  Status:{" "}
+                  <span className="capitalize">
+                    {repository?.status || "unknown"}
+                  </span>
                 <h1 className="text-2xl sm:text-3xl font-bold truncate">
                   {repository?.name || "Repository Analysis"}
                 </h1>
@@ -806,6 +835,18 @@ const safeProgressMessage =
                       ? `Running for ${formatElapsed(elapsedSeconds)}`
                       : "Starting up..."}
                   </p>
+{/* Warn if queued too long (>60s with no progress) */}
+          {elapsedSeconds > 60 && progressPercent === 0 && (
+            <div className="mt-4 max-w-sm mx-auto p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+              <p className="text-xs text-yellow-400 flex items-start gap-2">
+                <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                <span>
+                  Still queued after {formatElapsed(elapsedSeconds)}. The worker runs every 5 minutes via GitHub Actions — it should pick this up shortly.
+                </span>
+              </p>
+            </div>
+          )}
+                  
 
                   {/* Warn if queued too long (>60s with no progress) */}
                   {elapsedSeconds > 60 && safeProgressPercent === 0  && (
