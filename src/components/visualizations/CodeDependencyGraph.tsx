@@ -1,9 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
-
-
 
 interface CodeDependencyGraphProps {
   repository?: any;
@@ -12,10 +11,15 @@ interface CodeDependencyGraphProps {
 export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  
-  const graphAnalyzer = new GraphAnalyzer();
-  const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentParams = searchParams?.toString() || "";
+  const selectedNodeRef = useRef<any>(null);
 
+ const graphData = useMemo(() => {
+    const analyzer = new GraphAnalyzer();
+    return analyzer.buildDependencyGraph(repository?.files || []);
+  }, [repository]);
   useEffect(() => {
     if (!svgRef.current) return;
 
@@ -68,13 +72,13 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           .forceLink(links)
           .id((d: any) => d.id)
           .distance(100)
-          .strength((d: any) => d.strength * 0.5)
+          .strength((d: any) => d.strength * 0.5),
       )
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force(
         "collision",
-        d3.forceCollide().radius((d: any) => d.size / 2 + 10)
+        d3.forceCollide().radius((d: any) => d.size / 2 + 10),
       );
 
     // Draw links
@@ -83,9 +87,11 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .selectAll("line")
       .data(links)
       .join("line")
-      .attr("stroke", (d: any) => d.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)")
+      .attr("stroke", (d: any) =>
+        d.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)",
+      )
       .attr("stroke-width", (d: any) => d.strength * 2)
-      .attr("stroke-dasharray", (d: any) => d.isCyclic ? "5,5" : "none")
+      .attr("stroke-dasharray", (d: any) => (d.isCyclic ? "5,5" : "none"))
       .attr("stroke-opacity", 0.6);
 
     // Draw nodes
@@ -111,7 +117,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             if (!d.active) simulation.alphaTarget(0);
             d.fx = null;
             d.fy = null;
-          })
+          }),
       );
 
     // Node circles
@@ -136,16 +142,16 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           .attr("stroke", (l: any) =>
             l.source.id === d.id || l.target.id === d.id
               ? typeColors[d.type]
-              : "rgba(255,255,255,0.1)"
+              : "rgba(255,255,255,0.1)",
           )
           .attr("stroke-opacity", (l: any) =>
-            l.source.id === d.id || l.target.id === d.id ? 1 : 0.2
+            l.source.id === d.id || l.target.id === d.id ? 1 : 0.2,
           );
 
         if (tooltipRef.current) {
           const tooltip = d3.select(tooltipRef.current);
           tooltip
-            .style("opacity", "1")
+            .style("opacity", "0")
             .style("display", "block")
             .style("left", `${event.clientX}px`)
             .style("top", `${event.clientY}px`).html(`
@@ -164,13 +170,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             .style("top", `${event.clientY}px`);
         }
       })
-      .on("mouseleave", function () {
-        if (tooltipRef.current) {
-          d3.select(tooltipRef.current)
-            .style("opacity", "0")
-            .style("display", "none");
-        }
-      })
       .on("mouseleave", function (_event: any, d: any) {
         d3.select(this)
           .transition()
@@ -182,19 +181,39 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         link
           .transition()
           .duration(200)
-          .attr("stroke", (l: any) => l.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)")
+          .attr("stroke", (l: any) =>
+            l.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)",
+          )
           .attr("stroke-opacity", 0.6);
 
         if (tooltipRef.current) {
           d3.select(tooltipRef.current).style("opacity", 0);
         }
+      })
+      .on("click", function (_event: any, d: any) {
+        selectedNodeRef.current = d;
+
+        const params = new URLSearchParams(currentParams);
+        params.set("node", d.path);
+
+        router.replace(`?${params.toString()}`, {
+          scroll: false,
+        });
+
+        // highlight selected node
+        node
+          .selectAll("circle")
+          .attr("stroke", "rgba(255,255,255,0.3)")
+          .attr("stroke-width", 2);
+
+        d3.select(this).attr("stroke", "#10b981").attr("stroke-width", 4);
       });
 
     // Node labels
     node
       .append("text")
       .text((d: any) =>
-        d.name.length > 15 ? d.name.slice(0, 12) + "..." : d.name
+        d.name.length > 15 ? d.name.slice(0, 12) + "..." : d.name,
       )
       .attr("font-size", "10px")
       .attr("dx", 0)
@@ -224,6 +243,48 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
 
     svg.call(zoom as any);
 
+    const targetNodePath = searchParams?.get("node");
+
+    if (targetNodePath) {
+      const targetNode = nodes.find(
+        (n: any) => n.path === targetNodePath,
+      ) as d3.SimulationNodeDatum & {
+        id: string;
+        name: string;
+        type: "folder" | "file";
+        size: number;
+        path: string;
+      };
+      if (targetNode) {
+        selectedNodeRef.current = targetNode;
+
+        setTimeout(() => {
+          const transform = d3.zoomIdentity
+            .translate(
+              width / 2 - (targetNode.x ?? width / 2),
+              height / 2 - (targetNode.y ?? height / 2),
+            )
+            .scale(1.5);
+
+          svg
+            .transition()
+            .duration(750)
+            .call(zoom.transform as any, transform);
+
+          node
+            .selectAll("circle")
+            .attr("stroke", "rgba(255,255,255,0.3)")
+            .attr("stroke-width", 2);
+
+          node
+            .filter((n: any) => n.path === targetNodePath)
+            .select("circle")
+            .attr("stroke", "#10b981")
+            .attr("stroke-width", 4);
+        }, 500);
+      }
+    }
+
     // Animate nodes on load
     node
       .selectAll("circle")
@@ -236,72 +297,71 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     return () => {
       simulation.stop();
     };
-  }, [repository]);
+  }, [repository , currentParams, router, searchParams, graphData]);
 
   return (
     <div className="relative">
-    <Card className="glass p-4 sm:p-6 overflow-hidden">
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h3 className="text-base sm:text-lg font-semibold">
-            Code Dependency Graph
-          </h3>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Interactive visualization of file dependencies and relationships
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
-          <div className="flex gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
-              <span>Folders</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
-              <span>Files</span>
+      <Card className="glass p-4 sm:p-6 overflow-hidden">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h3 className="text-base sm:text-lg font-semibold">
+              Code Dependency Graph
+            </h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Interactive visualization of file dependencies and relationships
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
+            <div className="flex gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
+                <span>Folders</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+                <span>Files</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div className="glass rounded-lg p-4 sm:p-6">
-        <h3 className="text-base sm:text-lg font-semibold mb-4">
-          Code Dependencies
-        </h3>
-        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <svg
-            ref={svgRef}
-            width="100%"
-            height="auto"
-            className="text-foreground min-h-96 sm:min-h-96"
-            style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
-            viewBox="0 0 900 600"
-            preserveAspectRatio="xMidYMid meet"
-          />
+        <div className="glass rounded-lg p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold mb-4">
+            Code Dependencies
+          </h3>
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <svg
+              ref={svgRef}
+              width="100%"
+              height="auto"
+              className="text-foreground min-h-96 sm:min-h-96"
+              style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
+              viewBox="0 0 900 600"
+              preserveAspectRatio="xMidYMid meet"
+            />
+          </div>
         </div>
-      </div>
-      <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
-        💡 Drag nodes to reposition • Scroll to zoom • Hover for details
-      </p>
-      <div
-  ref={tooltipRef}
-  className="
+        <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
+          💡 Drag nodes to reposition • Scroll to zoom • Hover for details
+        </p>
+        <div
+          ref={tooltipRef}
+          className="
     fixed p-3 rounded-lg pointer-events-none shadow-xl border
     translate-x-[-120px] translate-y-[-120px]
     sm:translate-x-[-250px] sm:translate-y-[-250px]
   "
-  style={{
-    opacity: 1, // control with state later
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
-    color: "white",
-    zIndex: 9999,
-    backdropFilter: "blur(8px)",
-    left: "0px",
-    top: "0px",
-    whiteSpace: "nowrap",
-  }}
-/>
-
-    </Card>
+          style={{
+            opacity: 1, // control with state later
+            backgroundColor: "rgba(0, 0, 0, 0.9)",
+            color: "white",
+            zIndex: 9999,
+            backdropFilter: "blur(8px)",
+            left: "0px",
+            top: "0px",
+            whiteSpace: "nowrap",
+          }}
+        />
+      </Card>
     </div>
   );
 }
