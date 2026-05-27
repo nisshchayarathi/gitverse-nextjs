@@ -549,23 +549,6 @@ if (existingRepositoryName) {
         );
       }
 
-      if (languagesWithAdjustedPercentage.length > 0) {
-        try {
-          await prisma.language.createMany({
-            data: languagesWithAdjustedPercentage.map((language) => ({
-              name: language.name,
-              percentage: language.percentage,
-              bytes: language.bytes,
-              lines: language.lines,
-              repositoryId,
-            })),
-          });
-        } catch (e: any) {
-          console.error(
-            `Failed to insert languages for repository ${repositoryId}:`,
-            e.message,
-          );
-        }
       // Filter out ignored languages
       const filteredLanguages = languages.filter(
         (lang) => !ignoredLanguages.includes(lang.name),

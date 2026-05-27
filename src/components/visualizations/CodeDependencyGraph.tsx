@@ -5,10 +5,6 @@ import { GraphAnalyzer } from "@/utils/graphAnalyzer";
 import { ModuleSummaryPanel } from "./ModuleSummaryPanel";
 import { AISettingsModal } from "../settings/AISettingsModal";
 
-interface CodeDependencyGraphProps {
-  repository?: any;
-  highlightedPaths?: string[];
-
 interface RepositoryFile {
   path: string;
   lines?: number;
@@ -16,6 +12,11 @@ interface RepositoryFile {
 
 interface Repository {
   files?: RepositoryFile[];
+}
+
+interface CodeDependencyGraphProps {
+  repository?: Repository;
+  highlightedPaths?: string[];
 }
 
 // Generate dependency graph from repository files
@@ -98,9 +99,6 @@ const generateDependencyGraph = (repository?: Repository): GraphData => {
   });
 
 
-interface CodeDependencyGraphProps {
-  repository?: Repository;
-}
 
 export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeDependencyGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -109,7 +107,6 @@ export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeD
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  const graphAnalyzer = new GraphAnalyzer();
   const graphAnalyzer = new GraphAnalyzer();
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
