@@ -11,8 +11,11 @@ process.on("unhandledRejection", (reason) => {
   console.error("Unhandled rejection in run-analysis route:", reason);
 });
 
-  // Fail-closed: if no secret is configured in production, deny all requests.
-  // An unset secret must never silently open access in any deployed environment.
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
+function isAuthorized(request: NextRequest): boolean {
+  const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
+
   if (!configuredSecret) {
     if (process.env.NODE_ENV === "production") {
       console.error(
@@ -21,59 +24,59 @@ process.on("unhandledRejection", (reason) => {
       );
       return false;
     }
-    // Allow unauthenticated calls only in local development.
     return true;
   }
 
-  // Secret is configured -- verify it on every request, regardless of HTTP method.
-  // Vercel Cron sends plain GET requests; the recommended approach is to set
-  // CRON_SECRET equal to ANALYSIS_RUNNER_SECRET so Vercel automatically
-  // injects "Authorization: Bearer <CRON_SECRET>" on each cron invocation.
   const authHeader = request.headers.get("authorization");
   if (authHeader === `Bearer ${configuredSecret}`) return true;
 
-  // Also accept the value in the custom header for non-cron callers
-  // (e.g. a GitHub Actions workflow or an internal service).
-const HEARTBEAT_INTERVAL_MS = 30_000;
-
-function isAuthorized(request: NextRequest): boolean {
-  const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
-
-  // When no secret is configured, allow in dev or via Vercel Cron on Vercel.
-  if (!configuredSecret) {
-    if (process.env.NODE_ENV !== "production") return true;
-
-    const ua = (request.headers.get("user-agent") || "").toLowerCase();
-    if (
-      request.method === "GET" &&
-      process.env.VERCEL === "1" &&
-      process.env.VERCEL_ENV === "production" &&
-      ua.includes("vercel-cron/")
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
-  // When a secret is configured, always require it, regardless of
-  // HTTP method or User-Agent. Vercel Cron jobs should include the
-  // secret as a query parameter in the cron path.
   const headerSecret = request.headers.get("x-analysis-runner-secret");
   if (headerSecret === configuredSecret) return true;
 
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Core handler
+// ---------------------------------------------------------------------------
+
 async function runOnce(request: NextRequest): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
+  const startMs = Date.now();
+
+  // Auth
+  const auth = isAuthorized(request);
+  if (!auth.ok) {
+    log("warn", "Unauthorized request", {
+      reason: auth.reason,
+      method: request.method,
+      // Log the IP for rate-limiting / alerting — never the secret
+      ip: request.headers.get("x-forwarded-for") ?? "unknown",
+    });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const workerId = `serverless:${process.env.VERCEL_REGION || "local"}:${crypto.randomBytes(6).toString("hex")}`;
 
-  const job = await analysisJobService.claimNextJob({ workerId });
+  log("info", "Worker started", { workerId, authReason: auth.reason });
+
+  // Claim job
+  let job: Awaited<ReturnType<typeof analysisJobService.claimNextJob>>;
+  try {
+    job = await analysisJobService.claimNextJob({ workerId });
+  } catch (err: any) {
+    // Treat DB / service errors on claim as 503 so the cron retries
+    log("error", "Failed to claim job", {
+      workerId,
+      error: err?.message ?? String(err),
+    });
+    return NextResponse.json(
+      { error: "Service unavailable" },
+      { status: 503 },
+    );
+  }
+
   if (!job) {
+    log("info", "No pending jobs", { workerId });
     return new NextResponse(null, { status: 204 });
   }
 
@@ -85,7 +88,7 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       workerId,
       update: {
         progressPercent: job.progressPercent ?? 0,
-        progressMessage: job.progressMessage ?? "Processing",
+        progressMessage: job.progressMessage ?? "Starting analysis…",
       },
     });
 
@@ -95,7 +98,7 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
         .catch((e) => console.error("serverless heartbeat failed", e));
     }, HEARTBEAT_INTERVAL_MS);
 
-    await repositoryService.analyzeRepository(job.repositoryId, {
+    await repositoryService.analyzeRepository(job.repositoryId, job.userId, {
       onProgress: async (update) => {
         await analysisJobService.updateProgress({
           jobId: job.id,
@@ -104,6 +107,36 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
         });
       },
     });
+  }
+
+  // Run analysis with a hard timeout so we always respond before Vercel cuts us off
+  try {
+    await withTimeout(
+      repositoryService.analyzeRepository(job.repositoryId, {
+        onProgress: async (update) => {
+          try {
+            await analysisJobService.updateProgress({
+              jobId: job.id,
+              workerId,
+              update,
+            });
+            log("info", "Progress update", {
+              workerId,
+              jobId: job.id,
+              ...update,
+            });
+          } catch (progressErr: any) {
+            // Progress failures are non-fatal — log and keep going
+            log("warn", "Progress update failed", {
+              workerId,
+              jobId: job.id,
+              error: progressErr?.message ?? String(progressErr),
+            });
+          }
+        },
+      }),
+      WORKER_TIMEOUT_MS,
+    );
 
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     heartbeatTimer = null;
@@ -117,20 +150,87 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
 
     const message = String(error?.message || error || "Unknown error");
 
-    await analysisJobService.markFailed({
+    return NextResponse.json({
+      ok: true,
       jobId: job.id,
+      status: "DONE",
+      durationMs,
+    });
+  } catch (error: any) {
+    const isTimeout = error?.code === "WORKER_TIMEOUT";
+    // Never expose internal error details to callers
+    const safeMessage = isTimeout
+      ? "Analysis timed out — will retry"
+      : "Analysis failed";
+
+    const durationMs = Date.now() - startMs;
+
+    log("error", isTimeout ? "Job timed out" : "Job failed", {
       workerId,
-      error: message,
-      attempts: job.attempts,
+      jobId: job.id,
+      durationMs,
+      attempt: job.attempts,
       maxAttempts: job.maxAttempts,
+      // Internal detail stays server-side only
+      internalError: error?.message ?? String(error),
     });
 
+    // Mark job failed
+    try {
+      await analysisJobService.markFailed({
+        jobId: job.id,
+        workerId,
+        error: safeMessage,
+        attempts: job.attempts,
+        maxAttempts: job.maxAttempts,
+      });
+    } catch (markErr: any) {
+      // Best-effort — if this also fails, the job will be reclaimed after its
+      // lock TTL expires (handled by the job service)
+      log("error", "Failed to mark job as failed", {
+        workerId,
+        jobId: job.id,
+        error: markErr?.message ?? String(markErr),
+      });
+    }
+
+    // Issue #330 — ensure repo status is explicitly set to "failed" at the
+    // runner layer, even if repositoryService's own catch block was bypassed
+    // (e.g. Vercel timeout fires before repositoryService catch can run, or
+    // the DB connection drops mid-analysis leaving status stuck on "analyzing").
+    try {
+      await repositoryService.setRepositoryStatus(job.repositoryId, "failed");
+      log("info", "Repository status set to failed", {
+        workerId,
+        jobId: job.id,
+        repositoryId: job.repositoryId,
+      });
+    } catch (repoErr: any) {
+      // Non-fatal at this point — log for alerting but don't mask the original error
+      log("error", "Failed to update repository status to failed", {
+        workerId,
+        jobId: job.id,
+        repositoryId: job.repositoryId,
+        error: repoErr?.message ?? String(repoErr),
+      });
+    }
+
     return NextResponse.json(
-      { ok: false, jobId: job.id, status: "FAILED", error: message },
+      {
+        ok: false,
+        jobId: job.id,
+        status: isTimeout ? "TIMEOUT" : "FAILED",
+        error: safeMessage,
+        durationMs,
+      },
       { status: 500 },
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Route exports
+// ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
   return runOnce(request);

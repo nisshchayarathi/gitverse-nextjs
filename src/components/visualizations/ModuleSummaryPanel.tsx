@@ -98,9 +98,25 @@ export const ModuleSummaryPanel: React.FC<Props> = ({
           <p className="text-xs text-muted-foreground capitalize">{nodeType}</p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenSettings}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            aria-label="Open settings"
+          >
+            <Settings size={18} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            aria-label="Close panel"
+          >
           <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary">
             <X size={18} />
-          </button>
+          </Button>
         </div>
       </div>
 

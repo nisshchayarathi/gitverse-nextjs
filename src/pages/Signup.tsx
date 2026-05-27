@@ -114,6 +114,14 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
+  const [errors, setErrors] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    terms: "",
+  });
+
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
@@ -145,48 +153,57 @@ export default function Signup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name || !email || !password || !confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
-      return;
+    const newErrors = {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      terms: "",
+    };
+
+    if (!name.trim()) {
+      newErrors.name = "Full name is required";
     }
 
-    if (!email.includes("@")) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      });
-      return;
+    if (!email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!email.includes("@")) {
+      newErrors.email = "Please enter a valid email address";
     }
 
-    if (password !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match",
-        variant: "destructive",
-      });
-      return;
+    if (!password) {
+      newErrors.password = "Password is required";
+    } else if (password.length < 8) {
+      newErrors.password =
+        "Password must be at least 8 characters long";
     }
 
-    if (password.length < 8) {
-  toast({
-    title: "Error",
-    description: "Password must be at least 8 characters long",
+    if (!confirmPassword) {
+      newErrors.confirmPassword =
+        "Please confirm your password";
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword =
+        "Passwords do not match";
+    const passwordRegex =
+          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      toast({
+        title: "Error",
+        description:
+        "Password must be at least 8 characters and include uppercase, lowercase and a number",
         variant: "destructive",
       });
       return;
     }
 
     if (!agreedToTerms) {
-      toast({
-        title: "Error",
-        description: "Please agree to the terms of service",
-        variant: "destructive",
-      });
+      newErrors.terms =
+        "Please agree to the terms of service";
+    }
+
+    setErrors(newErrors);
+
+    if (Object.values(newErrors).some(Boolean)) {
       return;
     }
 
@@ -194,16 +211,20 @@ export default function Signup() {
 
     try {
       await signup(name, email, password);
+
       toast({
         title: "Success!",
-        description: "Account created successfully. Welcome to GitVerse!",
+        description:
+          "Account created successfully. Welcome to GitVerse!",
       });
+
       router.push("/dashboard");
     } catch (error: any) {
       toast({
         title: "Signup Failed",
         description:
-          error.message || "Failed to create account. Please try again.",
+          error.message ||
+          "Failed to create account. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -267,11 +288,24 @@ export default function Signup() {
                   type="text"
                   placeholder="John Doe"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+
+                    setErrors((prev) => ({
+                      ...prev,
+                      name: "",
+                    }));
+                  }}
                   className="pl-10"
                   required
                 />
               </div>
+
+              {errors.name && (
+                <p className="text-sm text-red-500">
+                  {errors.name}
+                </p>
+              )}
             </div>
 
             <div
@@ -288,11 +322,25 @@ export default function Signup() {
                   type="email"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+
+                    setErrors((prev) => ({
+                      ...prev,
+                      email: "",
+                    }));
+                  }}
                   className="pl-10"
                   required
                 />
               </div>
+
+              {errors.email && (
+                <p className="text-sm text-red-500">
+                  {errors.email}
+                </p>
+              )}
+
             </div>
 
             <div
@@ -309,7 +357,14 @@ export default function Signup() {
                   type="password"
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+
+                    setErrors((prev) => ({
+                      ...prev,
+                      password: "",
+                    }));
+                  }}
                   className="pl-10"
                   required
                 />
@@ -317,6 +372,11 @@ export default function Signup() {
               <p className="text-xs text-muted-foreground">
                 Must be at least 8 characters
               </p>
+              {errors.password && (
+                <p className="text-sm text-red-500">
+                  {errors.password}
+                </p>
+              )}
             </div>
 
             <div
@@ -333,11 +393,23 @@ export default function Signup() {
                   type="password"
                   placeholder="••••••••"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+
+                    setErrors((prev) => ({
+                      ...prev,
+                      confirmPassword: "",
+                    }));
+                  }}
                   className="pl-10"
                   required
                 />
               </div>
+              {errors.confirmPassword && (
+                <p className="text-sm text-red-500">
+                  {errors.confirmPassword}
+                </p>
+              )}
             </div>
 
             {repoUrl && (
@@ -367,7 +439,14 @@ export default function Signup() {
                 type="checkbox"
                 className="mr-2 mt-0.5 rounded border-input"
                 checked={agreedToTerms}
-                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                onChange={(e) => {
+                  setAgreedToTerms(e.target.checked);
+
+                  setErrors((prev) => ({
+                    ...prev,
+                    terms: "",
+                  }));
+                }}
               />
               <span className="text-muted-foreground">
                 I agree to the{" "}
@@ -386,6 +465,12 @@ export default function Signup() {
                 </Link>
               </span>
             </label>
+
+            {errors.terms && (
+              <p className="text-sm text-red-500">
+                {errors.terms}
+              </p>
+            )}
 
             <Button
               type="submit"

@@ -7,8 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
-  directUrl  = env("DIRECT_URL")
 }
 
 enum JobStatus {
@@ -29,6 +27,7 @@ model User {
   id                    Int          @id @default(autoincrement())
   email                 String       @unique
   passwordHash          String?      @map("password_hash") // Optional for OAuth users
+  tokenVersion          Int          @default(0) @map("token_version")
   name                  String
   emailVerified         DateTime?    @map("email_verified")
   image                 String?      @map("avatar_url")
@@ -134,7 +133,6 @@ model Account {
 
   @@index([userId])
   @@unique([provider, providerAccountId])
-  @@index([userId])    
   @@map("accounts")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -147,9 +145,8 @@ model Session {
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])  
-  @@map("sessions")
   @@index([userId])
+  @@map("sessions")
 }
 
 model VerificationToken {
@@ -187,7 +184,8 @@ model Repository {
   files          File[]
   contributors   Contributor[]
   languages      Language[]
-  analysisJobs   AnalysisJob[]
+  analysisJobs        AnalysisJob[]
+  geminiAnalysisCache GeminiAnalysisCache[]
   @@index([url])
   @@map("repositories")
   @@index([userId])

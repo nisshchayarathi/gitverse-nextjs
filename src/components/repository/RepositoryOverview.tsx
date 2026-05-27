@@ -25,6 +25,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import { EmptyState } from "@/components/ui/EmptyState";
+// FIXED: Injecting pre-built skeleton view component to completely block Cumulative Layout Shifts (CLS) #131
+import { RepositoryAnalysisSkeleton } from "@/components/ui/RepositoryAnalysisSkeleton";
 
 interface RepositoryData {
   id: string;
@@ -51,6 +54,10 @@ interface RepositoryOverviewProps {
 export const RepositoryOverview = ({
   repositoryData,
 }: RepositoryOverviewProps) => {
+  // FIXED: Trigger skeleton loader state if repositoryData payload is missing/fetching to preserve bounding box metrics #131
+  if (!repositoryData) {
+    return <RepositoryAnalysisSkeleton />;
+  }
   const [isFavorited, setIsFavorited] = useState(false);
 
   const handleToggleFavorite = async (id: string, nextState: boolean) => {
@@ -202,12 +209,17 @@ export const RepositoryOverview = ({
     const base = kind === "image" ? githubRawBase : githubBlobBase;
     if (!base) return v;
 
-    // Handle absolute-from-repo-root paths like "/assets/logo.png".
     const pathPart = v.startsWith("/") ? v.slice(1) : v;
     return `${base}${pathPart}`;
   };
 
   const readmeSanitizeSchema = (() => {
+    const schema: any = {
+      ...(defaultSchema as any),
+      protocols: {
+        ...((defaultSchema as any).protocols || {}),
+        href: ["http", "https", "mailto"],
+      },
     // Allow common README HTML (like <img align="right" ...>) while keeping things safe.
     const schema: any = {
       ...(defaultSchema as any),
@@ -226,7 +238,6 @@ export const RepositoryOverview = ({
         img: ["src", "alt", "title", "width", "height", "align", "loading"],
       },
     };
-
     return schema;
   })();
 
@@ -630,5 +641,6 @@ export const RepositoryOverview = ({
       </div>
     </div>
   );
+};
 };
 

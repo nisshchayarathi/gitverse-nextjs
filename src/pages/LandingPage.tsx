@@ -13,6 +13,9 @@ import {
   MessageSquare,
   Loader2,
 } from "lucide-react";
+import { RecentReposList } from "@/components/RecentReposList";
+import { useRecentRepos } from "@/hooks/useRecentRepos";
+import { isValidGithubUrl } from "@/lib/utils/validators";
 import { Navbar, Footer } from "@/components/layout";
 import {
   Button,
@@ -24,15 +27,19 @@ import {
   CardContent,
 } from "@/components/ui";
 
+
 export default function LandingPage() {
   const router = useRouter();
   const [repoUrl, setRepoUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [scoreAnimate, setScoreAnimate] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeFeatureIndex, setActiveFeatureIndex] = useState(0);
   const [isCarouselPaused, setIsCarouselPaused] = useState(false);
   const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
   const isAnalyzeDisabled = !repoUrl.trim() || isLoading;
+  
+  const { addRepo } = useRecentRepos();
 
   const mentorMessages = useMemo(
     () => [
@@ -132,8 +139,32 @@ export default function LandingPage() {
     e.preventDefault();
     if (!repoUrl.trim() || isLoading) return;
 
+    setError(null);
+
+    // Strict GitHub URL validation on submission
+    if (!isValidGithubUrl(repoUrl)) {
+      setError("Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo).");
+      return;
+    }
+
+    // Extract repository owner and name from the URL
+    const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
+    const urlParts = cleanUrl.split("/");
+    const name = urlParts[urlParts.length - 1] || "";
+    const owner = urlParts[urlParts.length - 2] || "";
+
+    if (name && owner) {
+      addRepo({
+        owner,
+        name,
+        url: repoUrl.trim(),
+      });
+    }
+
+    // Demo-only CTA: keep it as UI (no navigation / no analysis).
     setIsLoading(true);
     setTimeout(() => {
+      addRepo({ name, owner, url: cleanUrl });
       setIsLoading(false);
     }, 1500);
   };
@@ -404,9 +435,10 @@ export default function LandingPage() {
                     type="url"
                     placeholder="https://github.com/username/repository"
                     value={repoUrl}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setRepoUrl(e.target.value)
-                    }
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      setRepoUrl(e.target.value);
+                      setError(null);
+                    }}
                     className="flex-1 h-12 bg-background/50 border-0 text-base placeholder:text-muted-foreground/60 focus-visible:ring-primary"
                   />
                   <Button
@@ -430,10 +462,20 @@ export default function LandingPage() {
                 </div>
                 <div className="cta-shell__scan" aria-hidden="true" />
               </div>
+              {error && (
+                <p className="text-sm text-red-500 font-medium mt-2">
+                  ⚠️ {error}
+                </p>
+              )}
               <p className="text-sm text-muted-foreground mt-3">
                 Demo UI only — real analysis happens after install/sign up.
               </p>
+
             </form>
+
+            {/* Recent Repositories */}
+            <RecentReposList />
+
 
             {/* Demos */}
             <div

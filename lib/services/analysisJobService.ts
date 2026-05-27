@@ -28,8 +28,6 @@ function computeBackoffMs(attempt: number): number {
   return Math.min(max, base * Math.pow(2, Math.max(0, attempt - 1)));
 }
 
-import { HttpError } from "../middleware";
-
 export class AnalysisJobService {
   async createRepositoryAnalysisJob(params: {
     repositoryId: number;
@@ -37,55 +35,19 @@ export class AnalysisJobService {
     maxAttempts?: number;
     scope?: string;
   }): Promise<AnalysisJob> {
-    const existingJob = await prisma.analysisJob.findFirst({
-      where: {
-        repositoryId: params.repositoryId,
-        status: { in: ["QUEUED", "PROCESSING"] },
-      },
-    });
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(${params.repositoryId})`;
 
-    if (existingJob) {
-      throw new HttpError(409, "An active analysis job already exists for this repository");
-    }
-
-    return prisma.analysisJob.create({
-      data: {
-    const existing = await prisma.analysisJob.findFirst({
-      where: {
-        repositoryId: params.repositoryId,
-        status: { in: ["QUEUED", "PROCESSING"] },
-      },
-    });
-    if (existing) return existing;
-
-    try {
-      return await prisma.analysisJob.create({
-        data: {
+      const existing = await tx.analysisJob.findFirst({
+        where: {
           repositoryId: params.repositoryId,
-          userId: params.userId,
-          type: "repository_analysis",
-          status: "QUEUED",
-          progressPercent: 0,
-          progressMessage: "Queued",
-          progressDetails: params.scope ? { scope: params.scope } : undefined,
-          maxAttempts: params.maxAttempts ?? 3,
+          status: { in: ["QUEUED", "PROCESSING"] },
         },
       });
-    } catch (error: any) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        const activeJob = await prisma.analysisJob.findFirst({
-          where: {
-            repositoryId: params.repositoryId,
-            status: { in: ["QUEUED", "PROCESSING"] },
-          },
-        });
-        if (existingJob) return existingJob;
+      if (existing) return existing;
 
-        // The active job may have completed between the P2002 and the lookup. Retry exactly once.
-        return await prisma.analysisJob.create({
+      try {
+        return await tx.analysisJob.create({
           data: {
             repositoryId: params.repositoryId,
             userId: params.userId,
@@ -97,9 +59,22 @@ export class AnalysisJobService {
             maxAttempts: params.maxAttempts ?? 3,
           },
         });
+      } catch (error: any) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          const activeJob = await tx.analysisJob.findFirst({
+            where: {
+              repositoryId: params.repositoryId,
+              status: { in: ["QUEUED", "PROCESSING"] },
+            },
+          });
+          if (activeJob) return activeJob;
+        }
+        throw error;
       }
-      throw error;
-    }
+    });
   }
 
   async getJob(params: {
@@ -126,16 +101,19 @@ export class AnalysisJobService {
       ? Math.max(0, Math.min(100, Math.round(params.update.progressPercent)))
       : undefined;
 
+    const where: any = { id: params.jobId };
+    if (params.workerId) {
+      where.lockedBy = params.workerId;
+    }
+
     await prisma.analysisJob.update({
-      where: { id: params.jobId },
+      where,
       data: {
         progressPercent: pct,
         progressMessage: params.update.progressMessage,
         progressDetails: params.update.progressDetails as any,
-        // Heartbeat: extend lock while we’re actively working
         ...(params.workerId
           ? {
-              lockedBy: params.workerId,
               lockExpiresAt: new Date(Date.now() + lockExtension),
             }
           : {}),
@@ -144,8 +122,13 @@ export class AnalysisJobService {
   }
 
   async markDone(params: { jobId: string; workerId?: string }): Promise<void> {
+    const where: any = { id: params.jobId };
+    if (params.workerId) {
+      where.lockedBy = params.workerId;
+    }
+
     await prisma.analysisJob.update({
-      where: { id: params.jobId },
+      where,
       data: {
         status: "DONE",
         progressPercent: 100,
@@ -166,13 +149,18 @@ export class AnalysisJobService {
     attempts: number;
     maxAttempts: number;
   }): Promise<void> {
-   const shouldRetry =
-  params.attempts < params.maxAttempts &&
-  isRetryableError(params.error);
+    const where: any = { id: params.jobId };
+    if (params.workerId) {
+      where.lockedBy = params.workerId;
+    }
+
+    const shouldRetry =
+      params.attempts < params.maxAttempts &&
+      isRetryableError(params.error);
     if (shouldRetry) {
       const delay = computeBackoffMs(params.attempts);
       await prisma.analysisJob.update({
-        where: { id: params.jobId },
+        where,
         data: {
           status: "QUEUED",
           nextRunAt: new Date(Date.now() + delay),
@@ -187,7 +175,7 @@ export class AnalysisJobService {
     }
 
     await prisma.analysisJob.update({
-      where: { id: params.jobId },
+      where,
       data: {
         status: "FAILED",
         finishedAt: new Date(),
