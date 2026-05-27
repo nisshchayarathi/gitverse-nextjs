@@ -1,5 +1,21 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 
+/**
+ * Custom error class to maintain SDK context, original stack traces,
+ * and method source boundaries for superior debugging.
+ */
+export class GeminiServiceError extends Error {
+  public cause?: unknown;
+  public context?: string;
+
+  constructor(message: string, context?: string, cause?: unknown) {
+    super(message);
+    this.name = "GeminiServiceError";
+    this.context = context;
+    this.cause = cause;
+  }
+}
+
 export interface AIAnalysisRequest {
   repositoryId: number;
   type:
@@ -40,9 +56,12 @@ export class GeminiService {
   private model: GenerativeModel;
 
   constructor(apiKey?: string) {
-    const key = apiKey || process.env.GEMINI_API_KEY;
+    const key = (apiKey ?? process.env.GEMINI_API_KEY)?.trim();
     if (!key) {
-      throw new Error("GEMINI_API_KEY is required");
+      throw new GeminiServiceError(
+        "Missing GEMINI_API_KEY environment variable",
+        "constructor"
+      );
     }
 
     this.client = new GoogleGenerativeAI(key);
@@ -50,20 +69,26 @@ export class GeminiService {
   }
 
   /**
+   * Centralized error tracking and context attaching handler
+   */
+  private handleError(context: string, error: unknown): never {
+    console.error(`[GeminiService:${context}]`, error);
+    throw new GeminiServiceError(`${context} failed`, context, error);
+  }
+
+  /**
    * Analyze repository and provide insights
    */
   async analyzeRepository(request: AIAnalysisRequest): Promise<string> {
     const { type, context } = request;
-
     let prompt = this.buildRepositoryAnalysisPrompt(type, context);
 
     try {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       return response.text();
-    } catch (error: any) {
-      console.error("Gemini analysis error:", error);
-      throw new Error(`AI analysis failed: ${error.message}`);
+    } catch (error) {
+      this.handleError("analyzeRepository", error);
     }
   }
 
@@ -72,7 +97,6 @@ export class GeminiService {
    */
   async analyzeCode(request: AICodeAnalysisRequest): Promise<string> {
     const { code, language, analysisType, context } = request;
-
     let prompt = this.buildCodeAnalysisPrompt(
       code,
       language,
@@ -84,9 +108,8 @@ export class GeminiService {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       return response.text();
-    } catch (error: any) {
-      console.error("Gemini code analysis error:", error);
-      throw new Error(`Code analysis failed: ${error.message}`);
+    } catch (error) {
+      this.handleError("analyzeCode", error);
     }
   }
 
@@ -95,7 +118,6 @@ export class GeminiService {
    */
   async chatAboutRepository(request: AIRepositoryChatRequest): Promise<string> {
     const { question, conversationHistory, context } = request;
-
     let prompt = this.buildRepositoryChatPrompt(
       question,
       conversationHistory,
@@ -106,9 +128,8 @@ export class GeminiService {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       return response.text();
-    } catch (error: any) {
-      console.error("Gemini chat error:", error);
-      throw new Error(`AI chat failed: ${error.message}`);
+    } catch (error) {
+      this.handleError("chatAboutRepository", error);
     }
   }
 
@@ -120,10 +141,15 @@ export class GeminiService {
     history?: Array<{ role: "user" | "assistant"; content: string }>
   ): Promise<string> {
     if (!prompt?.trim()) {
-      throw new Error("Prompt is required");
+      throw new GeminiServiceError("Prompt is required", "chatRaw");
     }
 
     try {
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      return response.text();
+    } catch (error) {
+      this.handleError("chatRaw", error);
       if (history && history.length > 0) {
         // Cap history to prevent context limit failures
         const MAX_HISTORY_LENGTH = 10;
@@ -183,13 +209,9 @@ Provide only the commit messages, one per line.
         .split("\n")
         .filter((line) => line.trim())
         .slice(0, 3);
-    } catch (error: any) {
-  console.error("Commit message suggestion error:", error);
-
-  throw new Error(
-    error?.message || "Failed to generate commit message suggestions"
-  );
-}
+    } catch (error) {
+      this.handleError("suggestCommitMessage", error);
+    }
   }
 
   /**
