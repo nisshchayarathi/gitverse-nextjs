@@ -300,14 +300,34 @@ export function CodeAnalysisPanel() {
           </h3>
 
           {results.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Code className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No analysis yet</p>
-              <p className="text-sm mt-2">
-                Enter your code and click analyze to get started
-              </p>
-            </div>
-          ) : (
+  <div className="flex flex-col items-center justify-center text-center py-12 px-4">
+    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-4">
+      <Sparkles className="h-7 w-7 text-primary" />
+    </div>
+
+    <h3 className="text-lg font-semibold mb-2">
+      No AI analysis yet
+    </h3>
+
+    <p className="text-sm text-muted-foreground max-w-sm mb-6">
+      Paste your code and run an AI-powered analysis to get explanations,
+      bug detection, documentation, and improvement suggestions.
+    </p>
+
+    <button
+      onClick={() => {
+        const textarea = document.querySelector("textarea");
+        if (textarea) {
+          (textarea as HTMLTextAreaElement).focus();
+        }
+      }}
+      className="glass px-5 py-2 rounded-lg hover:bg-primary/20 transition-all duration-300"
+      aria-label="Start AI analysis"
+    >
+      Start Analysis
+    </button>
+  </div>
+) : (
             <div className="space-y-4 max-h-[600px] overflow-y-auto">
               {results.map((result, index) => {
                 const option = analysisOptions.find(

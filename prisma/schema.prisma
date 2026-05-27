@@ -27,6 +27,7 @@ model User {
   id                    Int          @id @default(autoincrement())
   email                 String       @unique
   passwordHash          String?      @map("password_hash") // Optional for OAuth users
+  tokenVersion          Int          @default(0) @map("token_version")
   name                  String
   emailVerified         DateTime?    @map("email_verified")
   image                 String?      @map("avatar_url")
@@ -130,8 +131,11 @@ model Account {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@unique([provider, providerAccountId])
   @@map("accounts")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 }
 
 model Session {
@@ -141,6 +145,7 @@ model Session {
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("sessions")
 }
 
@@ -148,6 +153,7 @@ model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([identifier, token])
   @@map("verification_tokens")
@@ -158,6 +164,7 @@ model Repository {
   name           String
   url            String
   description    String?
+  targetDirectory String?      @map("target_directory")
   readmePath     String?       @map("readme_path")
   readmeText     String?       @map("readme_text") @db.Text
   readmeFetchedAt DateTime?    @map("readme_fetched_at")
@@ -177,9 +184,12 @@ model Repository {
   files          File[]
   contributors   Contributor[]
   languages      Language[]
-  analysisJobs   AnalysisJob[]
-
+  analysisJobs        AnalysisJob[]
+  geminiAnalysisCache GeminiAnalysisCache[]
+  @@index([url])
   @@map("repositories")
+  @@index([userId])
+  @@index([userId, url, targetDirectory])
 }
 
 model AnalysisJob {
@@ -213,11 +223,16 @@ model AnalysisJob {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
+  // Worker queue: fetch next jobs to process
   @@index([status, nextRunAt])
+  // Worker lock cleanup: find and release expired locks
   @@index([lockExpiresAt])
-  @@index([repositoryId])
-  @@index([userId])
-  @@map("analysis_jobs")
+  // List all jobs for a repository sorted by newest first
+  @@index([repositoryId, createdAt(sort: Desc)])
+  // List all jobs for a user sorted by newest first
+  @@index([userId, createdAt(sort: Desc)])
+  // Filter active jobs per repository
+  @@index([repositoryId, status])
 }
 
 model Branch {
@@ -258,8 +273,10 @@ model Commit {
   createdAt    DateTime   @default(now()) @map("created_at")
   fileChanges  FileChange[]
 
+  // Unique constraint prevents duplicate commits per repository
   @@unique([repositoryId, hash])
-  @@index([repositoryId, committedAt])
+  // Index for fast commit listing by repository and date (most common query pattern)
+  @@index([repositoryId, committedAt(sort: Desc)])
   @@map("commits")
 }
 
@@ -283,19 +300,26 @@ model File {
   @@map("files")
 }
 
+enum FileChangeType {
+  ADDED
+  MODIFIED
+  DELETED
+}
+
 model FileChange {
   id        Int      @id @default(autoincrement())
   path      String
   additions Int      @default(0)
   deletions Int      @default(0)
-  changeType String  @map("change_type") // added, modified, deleted
+  changeType FileChangeType  @map("change_type") // added, modified, deleted
   commitId  Int      @map("commit_id")
   commit    Commit   @relation(fields: [commitId], references: [id], onDelete: Cascade)
   fileId    Int?     @map("file_id")
   file      File?    @relation(fields: [fileId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now()) @map("created_at")
-
+  @@index([fileId])
   @@map("file_changes")
+  @@index([commitId])
 }
 
 model Contributor {
@@ -330,5 +354,28 @@ model Language {
   createdAt    DateTime   @default(now()) @map("created_at")
 
   @@unique([repositoryId, name])
+  // Index for fast language lookup per repository
+  @@index([repositoryId])
+  
   @@map("languages")
+}
+
+model GeminiAnalysisCache {
+  id             Int        @id @default(autoincrement())
+  repositoryId   Int        @map("repository_id")
+  commitHash     String     @map("commit_hash")
+  analysisType   String     @map("analysis_type")
+  promptHash     String     @map("prompt_hash")
+  model          String?
+  cachedResult   String     @map("cached_result") @db.Text
+  createdAt      DateTime   @default(now()) @map("created_at")
+  lastAccessedAt DateTime?  @map("last_accessed_at")
+  expiresAt      DateTime?  @map("expires_at")
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, commitHash, analysisType, promptHash])
+  @@index([expiresAt])
+  @@index([repositoryId])
+  @@map("gemini_analysis_cache")
 }

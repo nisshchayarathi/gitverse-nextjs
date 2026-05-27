@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken, JWTPayload } from "./auth";
 import { getToken } from "next-auth/jwt";
+import prisma from "./prisma";
 
 export interface AuthenticatedRequest {
   user: JWTPayload;
@@ -10,30 +11,62 @@ export async function getAuthUser(
   request: NextRequest
 ): Promise<JWTPayload | null> {
   const authHeader = request.headers.get("authorization");
+  let userPayload: JWTPayload | null = null;
 
   // 1) Existing JWT auth (Authorization: Bearer ...)
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.substring(7);
     const payload = verifyToken(token);
-    if (payload) return payload;
+    if (payload) {
+      userPayload = payload;
+    }
   }
 
   // 2) NextAuth session cookie (Google OAuth)
+  if (!userPayload) {
+    try {
+      const token = await getToken({
+        req: request,
+        secret: process.env.NEXTAUTH_SECRET,
+      });
+      if (token?.sub && token.email) {
+        const userId = Number(token.sub);
+        if (Number.isFinite(userId)) {
+          userPayload = { userId, email: token.email };
+        }
+      }
+    } catch {
+      // Ignore token retrieval errors
+    }
+  }
+
+  if (!userPayload) return null;
+
+  // 3) Verify user existence and token version to block deleted/revoked users
   try {
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userPayload.userId },
+      select: { id: true, tokenVersion: true },
     });
-    if (!token?.sub || !token.email) return null;
-
-    const userId = Number(token.sub);
-    if (!Number.isFinite(userId)) return null;
-
-    return { userId, email: token.email };
-  } catch {
+    if (!dbUser) return null;
+    // If token carries a tokenVersion, reject if the user's version has been
+    // incremented (e.g. after logout or password change). Tokens issued before
+    // this field was added carry no tokenVersion and are accepted for backward
+    // compatibility — they will naturally expire within 7 days.
+    if (
+      userPayload.tokenVersion != null &&
+      userPayload.tokenVersion < dbUser.tokenVersion
+    ) {
+      return null;
+    }
+  } catch (error) {
+    console.error("Database check failed in auth middleware:", error);
     return null;
   }
+
+  return userPayload;
 }
+
 
 export async function requireAuth(request: NextRequest): Promise<JWTPayload> {
   const user = await getAuthUser(request);
@@ -86,6 +119,6 @@ export function sanitizeError(error: unknown): string {
   }
 }
 
-export function errorResponse(message: string, status: number = 400): NextResponse {
+export function badRequestResponse(message: string, status: number = 400): NextResponse {
   return NextResponse.json({ error: message }, { status });
 }

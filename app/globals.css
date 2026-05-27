@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Source+Sans+3:wght@300;400;500;600;700&display=swap");
+
 
 @tailwind base;
 @tailwind components;
@@ -94,6 +94,11 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 4rem; /* account for fixed navbar height */
+  }
+
   * {
     @apply border-border;
   }
@@ -151,21 +156,131 @@
     box-shadow: 0 0 20px hsl(var(--accent) / 0.3);
   }
 
-  /* Horizontal marquee (for feature cards, logos, etc.) */
-  .marquee {
+  /* ─── Feature carousel ─────────────────────────────────────────────────── */
+  .feature-carousel {
     position: relative;
-    overflow: hidden;
+    width: 100%;
   }
 
-  .marquee__track {
+  .feature-carousel__viewport {
+    position: relative;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    border-radius: 1.5rem;
+    border: 1px solid hsl(var(--border) / 0.2);
+    background: hsl(var(--background) / 0.85);
+    padding: 1.25rem 2rem;
+    box-sizing: border-box;
+  }
+
+  .feature-carousel__viewport::-webkit-scrollbar {
+    display: none;
+  }
+
+  .feature-carousel__viewport::before,
+  .feature-carousel__viewport::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 8rem;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .feature-carousel__viewport::before {
+    left: 0;
+    background: linear-gradient(to right, hsl(var(--background)), transparent);
+  }
+
+  .feature-carousel__viewport::after {
+    right: 0;
+    background: linear-gradient(to left, hsl(var(--background)), transparent);
+  }
+
+  .feature-carousel__track {
     display: flex;
-    width: max-content;
-    will-change: transform;
-    animation: marquee-x var(--marquee-duration, 28s) linear infinite;
+    gap: 1rem;
+    align-items: center;
+    padding: 0 0.25rem;
   }
 
-  .marquee--pause-on-hover:hover .marquee__track {
-    animation-play-state: paused;
+  .feature-carousel__slide {
+    flex: 0 0 300px;
+    min-width: 300px;
+    max-width: 300px;
+    scroll-snap-align: center;
+    display: grid;
+    place-items: center;
+    transition: transform 300ms ease, filter 300ms ease, opacity 300ms ease;
+  }
+
+  .feature-carousel__slide:not(.active) {
+    filter: blur(2px);
+    opacity: 0.85;
+    transform: scale(0.98);
+  }
+
+  @media (max-width: 768px) {
+    .feature-carousel__viewport {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .feature-carousel__slide {
+      flex: 0 0 min(100%, 300px);
+      min-width: min(100%, 300px);
+      max-width: min(100%, 300px);
+    }
+  }
+
+  .feature-carousel__slide.active {
+    filter: none;
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .feature-carousel__controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .feature-carousel__dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 9999px;
+    background: hsl(var(--border) / 0.4);
+    border: 1px solid hsl(var(--border) / 0.1);
+    transition: opacity 200ms ease, transform 200ms ease, background-color 200ms ease;
+  }
+
+  .feature-carousel__dot[aria-current="true"] {
+    background: hsl(var(--primary));
+    opacity: 1;
+    transform: scale(1.15);
+  }
+
+  .feature-card {
+    width: 100%;
+    border-radius: 1.5rem;
+    transition:
+      transform 260ms ease,
+      box-shadow 260ms ease,
+      border-color 260ms ease,
+      background-color 260ms ease;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-6px);
+    box-shadow:
+      0 14px 40px hsl(var(--primary) / 0.16),
+      0 0 0 1px hsl(var(--primary) / 0.18);
   }
 
   /* Heatmap pulse background (activity hotspots) */
@@ -264,6 +379,11 @@
     transform: rotate(18deg);
     animation: cta-scan 4.2s ease-in-out infinite;
     opacity: 0.9;
+  }
+
+  /* Safety: marquee track must never be hidden by .reveal opacity */
+  .marquee .marquee__track {
+    opacity: 1 !important;
   }
 
   /* Scroll reveal */
@@ -385,22 +505,6 @@
     animation: cta-icon-float 3.8s ease-in-out infinite;
   }
 
-  /* Feature cards: lift + glow */
-  .feature-card {
-    transition:
-      transform 220ms ease,
-      box-shadow 220ms ease,
-      border-color 220ms ease,
-      background-color 220ms ease;
-  }
-
-  .feature-card:hover {
-    transform: translateY(-4px);
-    box-shadow:
-      0 12px 35px hsl(var(--primary) / 0.12),
-      0 0 0 1px hsl(var(--primary) / 0.16);
-  }
-
   /* AI typing demo */
   .typing-cursor {
     display: inline-block;
@@ -473,6 +577,35 @@
   .progress-ring--animate .progress-ring__value {
     stroke-dashoffset: calc(289 * (1 - var(--progress, 0.85)));
   }
+
+  /* Navbar Animated Underline */
+  .nav-link {
+    position: relative;
+  }
+
+  .nav-link::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -4px;
+    width: 72%;
+    height: 2px;
+    background-color: currentcolor;
+    transform: translateX(-50%) scaleX(0);
+    transform-origin: center;
+    transition: transform 0.3s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nav-link::after {
+      transition: none;
+    }
+  }
+
+  .nav-link:hover::after,
+  .nav-link:focus-visible::after {
+    transform: translateX(-50%) scaleX(1);
+  }
 }
 
 @keyframes marquee-x {
@@ -485,9 +618,18 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   .marquee__track {
     animation: none;
     transform: none;
+  }
+
+  /* Ensure JS-toggled paused class also has no animation in reduced-motion */
+  .marquee--paused .marquee__track {
+    animation: none;
   }
 
   .reveal {
@@ -690,5 +832,25 @@
   }
   100% {
     transform: translateY(0);
+  }
+}
+
+/* Infinite carousel marquee animation
+   Translates the track by exactly 50% of its width (one complete set of cards).
+   With cloned cards at the end, this creates a seamless infinite loop.
+*/
+@keyframes marquee-x {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* Reduced motion preference respects animation pause state */
+@media (prefers-reduced-motion: reduce) {
+  .marquee__track {
+    animation: none !important;
   }
 }
