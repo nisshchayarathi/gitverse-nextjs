@@ -2,7 +2,7 @@
 
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useTheme } from "../../context/ThemeContext";
+import { useTheme } from "next-themes";
 import { Command } from "cmdk";
 import {
   LayoutDashboard,
@@ -20,7 +20,7 @@ interface CommandPaletteProps {
 
 export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
   const router = useRouter();
-  const { toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   // Toggle the menu when ⌘K is pressed
   useEffect(() => {
@@ -123,7 +123,7 @@ export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
             <Command.Group heading="Quick Actions">
               <Command.Item
                 onSelect={() => runCommand(() => {
-                  toggleTheme();
+                  setTheme(theme === "dark" ? "light" : "dark");
                 })}
                 className="flex items-center gap-2 px-2 py-2 text-sm rounded-md aria-selected:bg-accent aria-selected:text-accent-foreground cursor-pointer text-foreground"
               >

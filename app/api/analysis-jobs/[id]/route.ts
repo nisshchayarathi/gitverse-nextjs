@@ -3,34 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, isHttpError , sanitizeError } from "@/lib/middleware";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 
-const MAX_KICK_ENTRIES = 1000;
-const lastKickAtByJobId = new Map<string, number>();
+import { shouldThrottleJobKick } from "@/lib/utils/analysisRunner";
 
 
 function kickLocalRunner(request: NextRequest, jobId: string) {
   if (process.env.NODE_ENV === "production") return;
 
-  const now = Date.now();
-  const lastKickAt = lastKickAtByJobId.get(jobId) ?? 0;
-
-
-  if (now - lastKickAt < 5000) return;
-
-  
-  if (lastKickAtByJobId.size > MAX_KICK_ENTRIES) {
-    const firstKey = lastKickAtByJobId.keys().next().value;
-    lastKickAtByJobId.delete(firstKey);
-  }
-
-
-  if (now - lastKickAt < 5000) return; // throttle (best-effort)
-  if (lastKickAtByJobId.size >= MAX_KICK_ENTRIES) {
-  const firstKey = lastKickAtByJobId.keys().next().value;
-  lastKickAtByJobId.delete(firstKey);
-}
-
-  lastKickAtByJobId.set(jobId, now);
-
+ if (shouldThrottleJobKick(jobId)) return;  
   const origin = new URL(request.url).origin;
   const secret = process.env.ANALYSIS_RUNNER_SECRET;
 

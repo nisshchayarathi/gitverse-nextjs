@@ -3,6 +3,7 @@ import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
+import { GitService } from "@/lib/services/gitService";
 import { logger } from "@/lib/logger";
 function kickLocalRunner(request: NextRequest) {
   if (process.env.NODE_ENV === "production") return;
@@ -61,18 +62,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const normalizedUrl = normalizeGitHubRepoUrl(url);
-
     const normalizedUrl = normalizeKnownRepoHttpUrl(url);
     if (!normalizedUrl) {
       return NextResponse.json(
         {
           error:
-            "Invalid repository URL. Expected a GitHub repository URL like https://github.com/owner/repo, https://github.com/owner/repo.git, git@github.com:owner/repo.git, or ssh://git@github.com/owner/repo.git.",
-        },
             "Invalid repository URL. Use a full repository URL like https://github.com/owner/repo",
         },
         { status: 400 },
+      );
+    }
+
+    // Backend check to catch non-existent or private GitHub repositories
+    const exists = await GitService.checkGithubRepositoryExists(normalizedUrl);
+    if (!exists) {
+      return NextResponse.json(
+        {
+          error: "NOT_FOUND",
+          message: "Repository not found. Please ensure the URL is correct and the repository is public.",
+        },
+        { status: 404 }
       );
     }
 

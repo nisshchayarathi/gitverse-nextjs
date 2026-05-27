@@ -11,6 +11,7 @@ const JWT_SECRET: string = (() => {
 export interface JWTPayload {
   userId: number
   email: string
+  tokenVersion?: number
 }
 
 export function generateToken(payload: JWTPayload): string {

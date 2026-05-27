@@ -1,0 +1,14 @@
+/**
+ * Validates whether a given string is a strictly malformed or well-formed public GitHub repository URL.
+ * Matches:
+ * - https://github.com/owner/repo
+ * - http://github.com/owner/repo/
+ * - https://www.github.com/owner/repo.git
+ */
+export function isValidGithubUrl(url: string): boolean {
+  if (!url || typeof url !== "string") return false;
+  
+  // Strict regex accounting for subdomains (www.), optional trailing slashes, and optional .git extensions.
+  const githubRegex = /^https?:\/\/(www\.)?github\.com\/[a-zA-Z0-9-._]+\/[a-zA-Z0-9-._]+(\.git)?\/?$/;
+  return githubRegex.test(url.trim());
+}

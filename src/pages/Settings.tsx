@@ -2,11 +2,8 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState, useRef } from "react";
-import { User, Lock, Shield, Trash2, Cpu } from "lucide-react";
-import { useCallback, useEffect, useState, useRef } from "react";
-import { User, Lock, Shield, Trash2, AlertCircle } from "lucide-react";
-import { Save } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { User, Lock, Shield, Trash2, AlertCircle, Save, Cpu } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   Card,
@@ -31,6 +28,7 @@ export default function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const didInitProfileForm = useRef(false);
@@ -42,6 +40,7 @@ export default function Settings() {
 
   const initialEmailRef = useRef<string>(user?.email || "");
   const [isGoogleLinked, setIsGoogleLinked] = useState<boolean | null>(null);
+  const [hasPassword, setHasPassword] = useState(false);
   const [emailChangeNewPassword, setEmailChangeNewPassword] = useState("");
 
   // When using Google login, `user` arrives async from NextAuth session.
@@ -76,6 +75,7 @@ export default function Settings() {
       }
 
       setIsGoogleLinked(!!res.data?.isGoogleLinked);
+      setHasPassword(!!res.data?.hasPassword);
       setUserFetchStatus("success");
     } catch (err) {
       console.error("Error fetching user info:", err);
@@ -212,7 +212,8 @@ export default function Settings() {
       if (response.status === 200) {
         initialEmailRef.current = trimmedEmail;
         setEmailChangeNewPassword("");
-        updateUser({ name: trimmedName, email: trimmedEmail, avatar: avatar || user?.avatar });
+        setName(trimmedName);
+        setEmail(trimmedEmail);
         toast({
           title: "Profile Updated",
           description: "Your profile has been successfully updated",
@@ -330,6 +331,7 @@ export default function Settings() {
   };
 
   const handleDeleteAccount = () => {
+    setDeletePassword("");
     setShowDeleteModal(true);
   };
 
@@ -342,6 +344,7 @@ export default function Settings() {
       await axios.delete(buildApiUrl("/api/users/me"), {
         withCredentials: true,
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        data: { password: deletePassword },
       });
 
       await logout();
@@ -807,18 +810,34 @@ export default function Settings() {
       </div>
       <Modal
         isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
+        onClose={() => { setShowDeleteModal(false); setDeletePassword(""); }}
         title="Delete Account"
         size="sm"
       >
-        <p className="text-muted-foreground mb-6">
+        <p className="text-muted-foreground mb-4">
           This permanently deletes your account and all data. This cannot be undone.
         </p>
+
+        {hasPassword && (
+          <>
+            <p className="text-sm text-muted-foreground mb-4">
+              Enter your password to confirm.
+            </p>
+
+            <Input
+              type="password"
+              placeholder="Password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              className="mb-6"
+            />
+          </>
+        )}
 
         <div className="flex gap-3 justify-end">
           <Button
             variant="outline"
-            onClick={() => setShowDeleteModal(false)}
+            onClick={() => { setShowDeleteModal(false); setDeletePassword(""); }}
           >
             Cancel
           </Button>
@@ -829,7 +848,7 @@ export default function Settings() {
               setShowDeleteModal(false);
               confirmDeleteAccount();
             }}
-            disabled={isDeletingAccount}
+            disabled={isDeletingAccount || (hasPassword && !deletePassword)}
           >
             {isDeletingAccount ? "Deleting..." : "Delete Account"}
           </Button>

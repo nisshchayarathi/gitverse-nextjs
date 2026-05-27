@@ -5,48 +5,18 @@ import prisma from "@/lib/prisma";
 import { generateToken } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import crypto from "crypto";
-
-const signupAttempts = new Map<string, { count: number; resetTime: number }>();
+import {
+  getClientIp,
+  countAttempts,
+  recordAttempt,
+} from "@/lib/services/rateLimitService";
 
 const MAX_SIGNUPS = 3;
 const WINDOW_MS = 60 * 60 * 1000;
 
-function getClientIp(request: NextRequest) {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  );
-}
-
-function isRateLimited(ip: string) {
-  const now = Date.now();
-  const record = signupAttempts.get(ip);
-
-  if (!record || now > record.resetTime) {
-    signupAttempts.set(ip, { count: 1, resetTime: now + WINDOW_MS });
-    return false;
-  }
-
-  if (record.count >= MAX_SIGNUPS) {
-    return true;
-  }
-
-  record.count += 1;
-  signupAttempts.set(ip, record);
-  return false;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
-
-    if (isRateLimited(ip)) {
-      return NextResponse.json(
-        { error: "Too many signup attempts. Please try again later." },
-        { status: 429 }
-      );
-    }
 
     const body = await request.json();
     const { email, password, name } = body;
@@ -57,21 +27,33 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    // Normalize email to lowercase
+
     const normalizedEmail = email.toLowerCase();
 
-    if (password.length < 6) {
+    const attemptCount = await countAttempts(ip, "SIGNUP", WINDOW_MS);
+
+    if (attemptCount >= MAX_SIGNUPS) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
+        { error: "Too many signup attempts. Please try again later." },
+        { status: 429 }
+      );
+    }
+
+    const passwordRegex =
+          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+    if (!passwordRegex.test(password)) {
+      return NextResponse.json(
+        {
+          error:
+            "Password must be at least 8 characters and include uppercase, lowercase, and a number",
+        },
         { status: 400 }
       );
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const txResult = await prisma.$transaction(async (tx) => {
-      // Check if user already exists
       const existingUser = await tx.user.findUnique({
         where: { email: normalizedEmail },
       });
@@ -86,7 +68,6 @@ export async function POST(request: NextRequest) {
         return { error: isGoogleOnly ? "GOOGLE_ONLY" : "USER_EXISTS" };
       }
 
-      // Create user
       const createdUser = await tx.user.create({
         data: {
           email: normalizedEmail,
@@ -99,6 +80,12 @@ export async function POST(request: NextRequest) {
     });
 
     if ("error" in txResult) {
+      await recordAttempt({
+        key: ip,
+        type: "SIGNUP",
+        success: false,
+      });
+
       if (txResult.error === "GOOGLE_ONLY") {
         return NextResponse.json(
           { error: "Email already exists. Please sign in with Google." },
@@ -114,7 +101,13 @@ export async function POST(request: NextRequest) {
 
     const user = txResult.user;
 
-    const token = generateToken({ userId: user.id, email: user.email });
+    await recordAttempt({
+      key: ip,
+      type: "SIGNUP",
+      success: true,
+    });
+
+    const token = generateToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
 
     return NextResponse.json(
       {

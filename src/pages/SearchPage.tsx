@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
+import { useRepoBrowsePrefs } from "@/hooks/useRepoBrowsePrefs";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Grid, List, GitBranch, Clock, Activity } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -41,8 +42,7 @@ export default function SearchPage() {
   const initialUrl = searchParams?.get("repoUrl") || "";
 
   const [searchQuery, setSearchQuery] = useState(initialUrl);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [sortBy, setSortBy] = useState<"recent" | "stars" | "name">("recent");
+  const { viewMode, setViewMode, sortBy, setSortBy } = useRepoBrowsePrefs();
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -161,6 +161,7 @@ finally {
     <option value="name">Name</option>
   </select>
 </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -175,9 +176,7 @@ finally {
 
         {/* Repository Grid/List */}
         {loading ? (
-          <>
-            <div aria-live="polite" className="sr-only">Loading repositories...</div>
-            {viewMode === "grid" ? (
+          viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <Card key={i} className="glass">
@@ -233,8 +232,7 @@ finally {
                 </Card>
               ))}
             </div>
-          )}
-        </>
+          )
 ) : error ? (
   <div className="text-center py-12 text-red-500">
     {error}
@@ -455,4 +453,3 @@ finally {
     </DashboardLayout>
   );
 }
-
