@@ -136,6 +136,40 @@ User Question: ${message}
     }
   }
 
+  async analyzeRepository(repositoryId: number, type: string): Promise<{ analysis: string; isTruncated: boolean }> {
+    try {
+      const res = await fetch("/api/ai/analyze-repository", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.getAuthHeaders(),
+        },
+        body: JSON.stringify({ repositoryId, type }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data?.error || data?.details || "Failed to analyze repository"
+        );
+      }
+
+      const text = data?.analysis;
+      if (typeof text !== "string") {
+        throw new Error("Invalid response from AI service");
+      }
+
+      return {
+        analysis: text,
+        isTruncated: !!data?.isTruncated,
+      };
+    } catch (error) {
+      console.error("Repository analysis error:", error);
+      throw new Error("Failed to analyze repository");
+    }
+  }
+
   getChatHistory(): ChatMessage[] {
     return [];
   }

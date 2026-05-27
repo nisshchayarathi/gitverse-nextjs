@@ -264,6 +264,29 @@ export class GitService {
   }
 
   /**
+   * Check if a public GitHub repository exists and is accessible.
+   */
+  static async checkGithubRepositoryExists(url: string): Promise<boolean> {
+    try {
+      const cleanUrl = url.trim().replace(/\/$/, "").replace(/\.git$/, "");
+      const parts = cleanUrl.split("/");
+      const repo = parts[parts.length - 1];
+      const owner = parts[parts.length - 2];
+
+      if (!owner || !repo) return false;
+
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+        headers: {
+          "User-Agent": "GitVerse-App",
+        },
+      });
+      return res.status === 200;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Get all branches in the repository
    */
   async getBranches(): Promise<BranchData[]> {

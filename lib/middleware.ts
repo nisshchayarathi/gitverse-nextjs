@@ -42,13 +42,23 @@ export async function getAuthUser(
 
   if (!userPayload) return null;
 
-  // 3) Verify user existence in database to block deleted users with active JWTs
+  // 3) Verify user existence and token version to block deleted/revoked users
   try {
-    const userExists = await prisma.user.findUnique({
+    const dbUser = await prisma.user.findUnique({
       where: { id: userPayload.userId },
-      select: { id: true },
+      select: { id: true, tokenVersion: true },
     });
-    if (!userExists) return null;
+    if (!dbUser) return null;
+    // If token carries a tokenVersion, reject if the user's version has been
+    // incremented (e.g. after logout or password change). Tokens issued before
+    // this field was added carry no tokenVersion and are accepted for backward
+    // compatibility — they will naturally expire within 7 days.
+    if (
+      userPayload.tokenVersion != null &&
+      userPayload.tokenVersion < dbUser.tokenVersion
+    ) {
+      return null;
+    }
   } catch (error) {
     console.error("Database check failed in auth middleware:", error);
     return null;
@@ -109,6 +119,6 @@ export function sanitizeError(error: unknown): string {
   }
 }
 
-export function errorResponse(message: string, status: number = 400): NextResponse {
+export function badRequestResponse(message: string, status: number = 400): NextResponse {
   return NextResponse.json({ error: message }, { status });
 }
