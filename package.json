@@ -6,6 +6,7 @@
     "node": "22.x"
   },
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "cross-env NODE_OPTIONS=\"--dns-result-order=ipv4first --no-network-family-autoselection\" next dev",
     "build": "prisma generate && next build",
     "typecheck": "prisma generate && rm -f tsconfig.tsbuildinfo && tsc -p tsconfig.json --noEmit",
