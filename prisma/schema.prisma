@@ -27,12 +27,16 @@ model User {
   id                    Int          @id @default(autoincrement())
   email                 String       @unique
   passwordHash          String?      @map("password_hash") // Optional for OAuth users
+  tokenVersion          Int          @default(0) @map("token_version")
   name                  String
   emailVerified         DateTime?    @map("email_verified")
   image                 String?      @map("avatar_url")
   emailNotifications    Boolean      @default(true) @map("email_notifications")
   pushNotifications     Boolean      @default(false) @map("push_notifications")
   weeklyDigest          Boolean      @default(true) @map("weekly_digest")
+  lockedUntil           DateTime?    @map("locked_until")
+  failedLoginAttempts   Int          @default(0) @map("failed_login_attempts")
+  lastFailedAttemptAt   DateTime?    @map("last_failed_attempt_at")
   createdAt             DateTime     @default(now()) @map("created_at")
   updatedAt             DateTime     @updatedAt @map("updated_at")
   repositories          Repository[]
@@ -41,6 +45,7 @@ model User {
   sessions              Session[]
   githubAccount         GitHubAccount?
   githubRepos           GitHubRepo[]
+  loginAttempts         LoginAttempt[]
 
   @@map("users")
 }
@@ -144,8 +149,8 @@ model Session {
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("sessions")
   @@index([userId])
+  @@map("sessions")
 }
 
 model VerificationToken {
@@ -163,6 +168,7 @@ model Repository {
   name           String
   url            String
   description    String?
+  targetDirectory String?      @map("target_directory")
   readmePath     String?       @map("readme_path")
   readmeText     String?       @map("readme_text") @db.Text
   readmeFetchedAt DateTime?    @map("readme_fetched_at")
@@ -182,10 +188,12 @@ model Repository {
   files          File[]
   contributors   Contributor[]
   languages      Language[]
-  analysisJobs   AnalysisJob[]
+  analysisJobs        AnalysisJob[]
+  geminiAnalysisCache GeminiAnalysisCache[]
   @@index([url])
   @@map("repositories")
   @@index([userId])
+  @@index([userId, url, targetDirectory])
 }
 
 model AnalysisJob {
@@ -296,6 +304,13 @@ model File {
   @@map("files")
 }
 
+enum AttemptType {
+  LOGIN
+  SIGNUP
+  CHANGE_PASSWORD
+  DELETE_ACCOUNT
+}
+
 enum FileChangeType {
   ADDED
   MODIFIED
@@ -354,4 +369,41 @@ model Language {
   @@index([repositoryId])
   
   @@map("languages")
+}
+
+model GeminiAnalysisCache {
+  id             Int        @id @default(autoincrement())
+  repositoryId   Int        @map("repository_id")
+  commitHash     String     @map("commit_hash")
+  analysisType   String     @map("analysis_type")
+  promptHash     String     @map("prompt_hash")
+  model          String?
+  cachedResult   String     @map("cached_result") @db.Text
+  createdAt      DateTime   @default(now()) @map("created_at")
+  lastAccessedAt DateTime?  @map("last_accessed_at")
+  expiresAt      DateTime?  @map("expires_at")
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, commitHash, analysisType, promptHash])
+  @@index([expiresAt])
+  @@index([repositoryId])
+  @@map("gemini_analysis_cache")
+}
+
+model LoginAttempt {
+  id        Int         @id @default(autoincrement())
+  key       String
+  type      AttemptType
+  success   Boolean     @default(false)
+  email     String?
+  userId    Int?
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([key, type, createdAt(sort: Desc)])
+  @@index([email, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@map("login_attempts")
 }

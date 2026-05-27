@@ -1,5 +1,6 @@
 import React from "react";
 import { AlertTriangle } from "lucide-react";
+import { Button } from "./Button";
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -44,12 +45,11 @@ export class ErrorBoundary extends React.Component<
             This section encountered an unexpected error. Try refreshing the page, or
             contact support if the problem persists.
           </p>
-          <button
+          <Button
             onClick={() => this.setState({ hasError: false, error: null })}
-            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium transition-colors"
           >
             Try again
-          </button>
+          </Button>
           {process.env.NODE_ENV === "development" && this.state.error && (
             <details className="mt-4 text-left w-full max-w-md">
               <summary className="text-xs text-muted-foreground cursor-pointer">

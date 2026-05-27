@@ -1,53 +1,54 @@
-'use client'
+"use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import * as React from "react";
+import {
+  ThemeProvider as NextThemesProvider,
+  useTheme as useNextThemes,
+} from "next-themes";
 
-type Theme = 'light' | 'dark'
+type ThemeContextValue = {
+  theme: string | undefined;
+  resolvedTheme: string | undefined;
+  setTheme: (theme: string) => void;
+  toggleTheme: () => void;
+};
 
-interface ThemeContextType {
-  theme: Theme
-  toggleTheme: () => void
+const ThemeContext = React.createContext<ThemeContextValue | null>(null);
+
+function ThemeContextBridge({ children }: { children: React.ReactNode }) {
+  const { theme, resolvedTheme, systemTheme, setTheme } = useNextThemes();
+
+  const toggleTheme = React.useCallback(() => {
+    const current = resolvedTheme || theme || systemTheme;
+    setTheme(current === "dark" ? "light" : "dark");
+  }, [resolvedTheme, systemTheme, theme, setTheme]);
+
+  const value = React.useMemo(
+    () => ({
+      theme,
+      resolvedTheme,
+      setTheme,
+      toggleTheme,
+    }),
+    [resolvedTheme, setTheme, theme, toggleTheme],
+  );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
-
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setTheme] = useState<Theme>('light')
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-    const saved = localStorage.getItem('theme')
-    if (saved) {
-      setTheme(saved as Theme)
-    }
-  }, [])
-
-  useEffect(() => {
-    const root = document.documentElement
-    if (theme === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
-    localStorage.setItem('theme', theme)
-  }, [theme])
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
-  }
-
-  if (!mounted) {
-    return null
-  }
-
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <NextThemesProvider attribute="class" defaultTheme="system" enableSystem>
+      <ThemeContextBridge>{children}</ThemeContextBridge>
+    </NextThemesProvider>
+  );
 }
 
-export const useTheme = () => {
-  const context = useContext(ThemeContext)
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider')
+export function useTheme() {
+  const ctx = React.useContext(ThemeContext);
+  if (!ctx) {
+    throw new Error("useTheme must be used within ThemeProvider");
   }
-  return context
+  return ctx;
 }
+

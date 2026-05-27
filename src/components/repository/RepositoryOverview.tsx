@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   GitBranch,
@@ -25,6 +25,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import { EmptyState } from "@/components/ui/EmptyState";
+// FIXED: Injecting pre-built skeleton view component to completely block Cumulative Layout Shifts (CLS) #131
+import { RepositoryAnalysisSkeleton } from "@/components/ui/RepositoryAnalysisSkeleton";
 
 interface RepositoryData {
   id: string;
@@ -51,6 +54,27 @@ interface RepositoryOverviewProps {
 export const RepositoryOverview = ({
   repositoryData,
 }: RepositoryOverviewProps) => {
+  // FIXED: Trigger skeleton loader state if repositoryData payload is missing/fetching to preserve bounding box metrics #131
+  if (!repositoryData) {
+    return <RepositoryAnalysisSkeleton />;
+  }
+  const [isFavorited, setIsFavorited] = useState(false);
+
+  const handleToggleFavorite = async (id: string, nextState: boolean) => {
+    // Simulate server API latency of 1.5 seconds
+    await new Promise((resolve, reject) => {
+      setTimeout(() => {
+        // Simulate a 30% chance of failure to showcase the try/catch rollback
+        if (Math.random() > 0.7) {
+          reject(new Error("Database connection lost. Please try again."));
+        } else {
+          setIsFavorited(nextState);
+          resolve(null);
+        }
+      }, 1500);
+    });
+  };
+
   // IMPORTANT: derive README directly from props so it always matches the
   // currently-selected repository (avoids showing stale README when navigating).
   const readmeText: string | null = repositoryData?.readmeText ?? null;
@@ -185,12 +209,17 @@ export const RepositoryOverview = ({
     const base = kind === "image" ? githubRawBase : githubBlobBase;
     if (!base) return v;
 
-    // Handle absolute-from-repo-root paths like "/assets/logo.png".
     const pathPart = v.startsWith("/") ? v.slice(1) : v;
     return `${base}${pathPart}`;
   };
 
   const readmeSanitizeSchema = (() => {
+    const schema: any = {
+      ...(defaultSchema as any),
+      protocols: {
+        ...((defaultSchema as any).protocols || {}),
+        href: ["http", "https", "mailto"],
+      },
     // Allow common README HTML (like <img align="right" ...>) while keeping things safe.
     const schema: any = {
       ...(defaultSchema as any),
@@ -209,7 +238,6 @@ export const RepositoryOverview = ({
         img: ["src", "alt", "title", "width", "height", "align", "loading"],
       },
     };
-
     return schema;
   })();
 
@@ -276,6 +304,14 @@ export const RepositoryOverview = ({
                 Updated {repository.updatedAt}
               </span>
             </div>
+          </div>
+          {/* Favorite Action Button */}
+          <div className="flex-shrink-0 self-start sm:self-center">
+            <FavoriteButton
+              initialIsFavorited={isFavorited}
+              repositoryId={repository.id}
+              onToggle={handleToggleFavorite}
+            />
           </div>
         </div>
 
@@ -606,3 +642,5 @@ export const RepositoryOverview = ({
     </div>
   );
 };
+};
+

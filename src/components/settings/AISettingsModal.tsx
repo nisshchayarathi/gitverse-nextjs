@@ -32,7 +32,7 @@ export const AISettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="AI Summary Settings" size="md">
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Configure your LLM provider to generate module summaries. Keys are stored securely in your browser's local storage and are never sent to our servers.
+          Configure your LLM provider to generate module summaries. Keys are stored securely in your browser&apos;s local storage and are never sent to our servers.
         </p>
         
         <div>

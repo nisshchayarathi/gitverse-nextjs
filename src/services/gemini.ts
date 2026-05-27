@@ -22,8 +22,6 @@ export interface RepositoryContext {
 }
 
 class GeminiService {
-  private chatHistory: ChatMessage[] = [];
-
   constructor() {}
 
   private getAuthHeaders(): Record<string, string> {
@@ -40,7 +38,11 @@ class GeminiService {
     return true;
   }
 
-  async chat(message: string, context?: RepositoryContext): Promise<string> {
+  async chat(
+    message: string,
+    context?: RepositoryContext,
+    history: ChatMessage[] = []
+  ): Promise<string> {
     try {
       // Add repository context to the prompt if provided
       let enhancedMessage = message;
@@ -64,7 +66,7 @@ User Question: ${message}
           "Content-Type": "application/json",
           ...this.getAuthHeaders(),
         },
-        body: JSON.stringify({ prompt: enhancedMessage }),
+        body: JSON.stringify({ prompt: enhancedMessage, messages: history }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -79,11 +81,7 @@ User Question: ${message}
         throw new Error("Invalid response from AI service");
       }
 
-      // Store in chat history
-      this.chatHistory.push(
-        { role: "user", content: message, timestamp: new Date() },
-        { role: "assistant", content: text, timestamp: new Date() }
-      );
+      // Local chat history storage removed in favor of UI state
 
       return text;
     } catch (error) {
@@ -94,11 +92,12 @@ User Question: ${message}
 
   async *chatStream(
     message: string,
-    context?: RepositoryContext
+    context?: RepositoryContext,
+    history: ChatMessage[] = []
   ): AsyncGenerator<string> {
     try {
       // Server route isn't streaming; yield the full response once.
-      const text = await this.chat(message, context);
+      const text = await this.chat(message, context, history);
       yield text;
     } catch (error) {
       console.error("Gemini API streaming error:", error);
@@ -137,12 +136,46 @@ User Question: ${message}
     }
   }
 
+  async analyzeRepository(repositoryId: number, type: string): Promise<{ analysis: string; isTruncated: boolean }> {
+    try {
+      const res = await fetch("/api/ai/analyze-repository", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.getAuthHeaders(),
+        },
+        body: JSON.stringify({ repositoryId, type }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data?.error || data?.details || "Failed to analyze repository"
+        );
+      }
+
+      const text = data?.analysis;
+      if (typeof text !== "string") {
+        throw new Error("Invalid response from AI service");
+      }
+
+      return {
+        analysis: text,
+        isTruncated: !!data?.isTruncated,
+      };
+    } catch (error) {
+      console.error("Repository analysis error:", error);
+      throw new Error("Failed to analyze repository");
+    }
+  }
+
   getChatHistory(): ChatMessage[] {
-    return this.chatHistory;
+    return [];
   }
 
   clearChatHistory(): void {
-    this.chatHistory = [];
+    // No-op
   }
 }
 
