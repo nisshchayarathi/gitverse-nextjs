@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { errorResponse, requireAuth, sanitizeError } from "@/lib/middleware";
+import { requireAuth, sanitizeError } from "@/lib/middleware";
 
 export async function POST(request: NextRequest) {
   try {

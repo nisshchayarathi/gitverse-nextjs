@@ -6,7 +6,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "NODE_OPTIONS=\"--dns-result-order=ipv4first --no-network-family-autoselection\" next dev",
+    "dev": "cross-env NODE_OPTIONS=\"--dns-result-order=ipv4first --no-network-family-autoselection\" next dev",
     "build": "prisma generate && next build",
     "vercel-build": "node scripts/vercel-build.js",
     "typecheck": "prisma generate && rm -f tsconfig.tsbuildinfo && tsc -p tsconfig.json --noEmit",
@@ -46,6 +46,7 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "cross-env": "^10.1.0",
     "d3": "^7.9.0",
     "dotenv": "^16.4.5",
     "google-auth-library": "^10.3.0",
