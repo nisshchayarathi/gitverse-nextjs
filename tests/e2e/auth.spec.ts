@@ -4,8 +4,9 @@ test.describe('Authentication Smoke Tests', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the login page before each test
     await page.goto('/login')
-    // Wait for the page to be fully loaded and hydrated
-    await page.waitForLoadState('networkidle')
+    // Wait for DOM to be ready - do NOT use networkidle; Next.js dev keeps a
+    // WebSocket hot-reload connection open which prevents networkidle from firing
+    await page.waitForLoadState('domcontentloaded')
   })
 
   test('should render the login form correctly', async ({ page }) => {

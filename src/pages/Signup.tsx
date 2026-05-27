@@ -179,7 +179,7 @@ export default function Signup() {
     }
 
     if (!confirmPassword) {
-      newErrors.confirmPassword =
+      newErrors.confirmPassword = "Please confirm your password";
     } else if (password !== confirmPassword) {
       newErrors.confirmPassword =
         "Passwords do not match";
