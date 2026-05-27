@@ -3,8 +3,6 @@ import { ReactNode } from "react";
 import { Metadata } from "next";
 import { Inter, Source_Sans_3 } from "next/font/google";
 import { ThemeProvider } from "@/context/ThemeContext";
-import { Inter } from "next/font/google";
-import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
 import { Toaster } from "@/components/ui/toaster";
@@ -56,7 +54,8 @@ export const metadata: Metadata = {
     description: "Accelerate your open-source journey with interactive repository visualization, structural dependency graphs, and automated AI PR mentoring.",
     images: ["/api/og?title=GitVerse%20-%20AI%20Repository%20Analysis"],
     creator: "@gitverse",
-  },
+  }
+  ,
   robots: {
     index: true,
     follow: true,
@@ -72,24 +71,20 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${sourceSans.variable}`}>
+    <html lang="en" className={`${inter.variable} ${sourceSans.variable}`} suppressHydrationWarning>
       <body>
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <a
-          href="#main-content"
+        
+        <a href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-black focus:text-white focus:px-4 focus:py-2 focus:rounded"
         >
           Skip to main content
         </a>
-
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <NextAuthProvider>
             <AuthProvider>
               <main id="main-content">
                 {children}
               </main>
-
               <Toaster />
             </AuthProvider>
           </NextAuthProvider>

@@ -55,7 +55,7 @@ jobs:
               }
             }
 
-            // ── Helper: count open issues assigned to a user ──────────────
+            // ── Helper: count open issues assigned to a user (total) ────
             async function countAssignedIssues(username) {
               const { data } = await github.rest.issues.listForRepo({
                 owner, repo,
@@ -63,8 +63,47 @@ jobs:
                 state: 'open',
                 per_page: 100,
               });
-              // Filter out pull requests (GitHub API returns PRs in issues list)
               return data.filter(i => !i.pull_request).length;
+            }
+
+            // ── Helper: count issues assigned to a user TODAY ─────────────
+            // Checks how many issues were assigned to this user in the last 24 hours
+            // by scanning issue timeline/events for "assigned" events today
+            async function countAssignedToday(username) {
+              const now   = new Date();
+              const todayStart = new Date(
+                now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0
+              ).toISOString();
+
+              // Get all open issues assigned to the user
+              const { data: openIssues } = await github.rest.issues.listForRepo({
+                owner, repo,
+                assignee: username,
+                state: 'open',
+                per_page: 100,
+              });
+              const realIssues = openIssues.filter(i => !i.pull_request);
+
+              let countToday = 0;
+              for (const issue of realIssues) {
+                try {
+                  const { data: events } = await github.rest.issues.listEvents({
+                    owner, repo,
+                    issue_number: issue.number,
+                    per_page: 50,
+                  });
+                  // Check if an "assigned" event for this user happened today
+                  const assignedToday = events.some(e =>
+                    e.event === 'assigned' &&
+                    e.assignee?.login === username &&
+                    new Date(e.created_at) >= new Date(todayStart)
+                  );
+                  if (assignedToday) countToday++;
+                } catch (e) {
+                  console.log(`Could not fetch events for issue #${issue.number}: ${e.message}`);
+                }
+              }
+              return countToday;
             }
 
             // ── Helper: check if user is a maintainer / collaborator ──────
@@ -149,16 +188,16 @@ jobs:
                 return;
               }
 
-              // Check the 7-issue limit
+              // ── Check TOTAL open issue limit (max 7 at a time) ──────────
               const assignedCount = await countAssignedIssues(commenter);
 
               if (assignedCount >= LIMIT) {
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: issueNum,
                   body: [
-                    `## ❌ Assignment Limit Reached — @${commenter}`,
+                    `## ❌ Total Assignment Limit Reached — @${commenter}`,
                     ``,
-                    `You have already been assigned **${assignedCount} open issue(s)**, which is the maximum allowed limit of **${LIMIT} issues per contributor**.`,
+                    `You currently have **${assignedCount} open issue(s)** assigned, which is the maximum of **${LIMIT} issues at a time**.`,
                     ``,
                     `### What you can do:`,
                     `- ✅ Complete or close one of your existing assigned issues first`,
@@ -170,7 +209,30 @@ jobs:
                     `_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
                   ].join('\n'),
                 });
-                console.log(`🚫 @${commenter} hit the ${LIMIT}-issue limit. Assignment denied.`);
+                console.log(`🚫 @${commenter} hit the total ${LIMIT}-issue limit.`);
+                return;
+              }
+
+              // ── Check DAILY limit (max 7 new assignments per day) ─────────
+              const assignedTodayCount = await countAssignedToday(commenter);
+
+              if (assignedTodayCount >= LIMIT) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: [
+                    `## ❌ Daily Assignment Limit Reached — @${commenter}`,
+                    ``,
+                    `You have already been assigned **${assignedTodayCount} issue(s) today**, which is the daily maximum of **${LIMIT} issues per day**.`,
+                    ``,
+                    `### What you can do:`,
+                    `- ⏰ Come back **tomorrow** and comment \`/assign\` again`,
+                    `- 💪 Focus on completing the issues you already have today`,
+                    `- 📋 View your active issues [here](https://github.com/${owner}/${repo}/issues?q=is%3Aissue+is%3Aopen+assignee%3A${commenter})`,
+                    ``,
+                    `_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                  ].join('\n'),
+                });
+                console.log(`🚫 @${commenter} hit the daily ${LIMIT}-issue limit.`);
                 return;
               }
 
@@ -190,7 +252,8 @@ jobs:
                 });
               } catch {}
 
-              const remaining = LIMIT - assignedCount - 1;
+              const remainingTotal = LIMIT - assignedCount - 1;
+              const remainingToday = LIMIT - assignedTodayCount - 1;
               await github.rest.issues.createComment({
                 owner, repo, issue_number: issueNum,
                 body: [
@@ -207,8 +270,10 @@ jobs:
                   `|--------|-------|`,
                   `| 📌 Issue | #${issueNum} |`,
                   `| 👤 Assigned to | @${commenter} |`,
-                  `| 📊 Your active issues | ${assignedCount + 1} / ${LIMIT} |`,
-                  `| 🎟️ Remaining slots | ${remaining} |`,
+                  `| 📊 Total active issues | ${assignedCount + 1} / ${LIMIT} |`,
+                  `| 📅 Assigned today | ${assignedTodayCount + 1} / ${LIMIT} |`,
+                  `| 🎟️ Remaining total slots | ${remainingTotal} |`,
+                  `| ☀️ Remaining slots today | ${remainingToday} |`,
                   ``,
                   `Good luck! 🚀 Feel free to ask questions in the comments if you're stuck.`,
                   ``,
@@ -238,7 +303,16 @@ jobs:
               if (assignedCount >= LIMIT) {
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: issueNum,
-                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} already has **${assignedCount}/${LIMIT}** issues assigned. Please free up a slot first.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} already has **${assignedCount}/${LIMIT}** total open issues assigned. Please free up a slot first.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                });
+                return;
+              }
+
+              const assignedTodayCount = await countAssignedToday(targetUser);
+              if (assignedTodayCount >= LIMIT) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} has already been assigned **${assignedTodayCount}/${LIMIT}** issues today. The daily limit resets at midnight UTC.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
                 });
                 return;
               }

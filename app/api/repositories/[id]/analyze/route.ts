@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
-<<<<<<< standardize-api-errors
-import { apiError } from "@/lib/api-error";
-=======
 import prisma from "@/lib/prisma";
 
->>>>>>> main
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -15,36 +11,39 @@ export async function POST(
   try {
     const user = await requireAuth(request);
     const id = parseInt(params.id);
-
     if (isNaN(id)) {
-      return apiError(400, "Invalid repository ID");
+      return NextResponse.json(
+        { error: "Invalid repository ID" },
+        { status: 400 }
+      );
     }
 
-    // Verify ownership
     const repository = await repositoryService.getRepository(id, user.userId);
-
     if (!repository) {
-      return apiError(404, "Repository not found");
+      return NextResponse.json(
+        { error: "Repository not found" },
+        { status: 404 }
+      );
     }
 
     const existingJob = await prisma.analysisJob.findFirst({
-  where: {
-    repositoryId: id,
-    status: {
-      in: ["QUEUED", "PROCESSING"],
-    },
-  },
-});
+      where: {
+        repositoryId: id,
+        status: {
+          in: ["QUEUED", "PROCESSING"],
+        },
+      },
+    });
 
-if (existingJob) {
-  return NextResponse.json(
-    {
-      error: "Analysis already in progress",
-      jobId: existingJob.id,
-    },
-    { status: 409 }
-  );
-}
+    if (existingJob) {
+      return NextResponse.json(
+        {
+          error: "Analysis already in progress",
+          jobId: existingJob.id,
+        },
+        { status: 409 }
+      );
+    }
 
     const bodyText = await request.text();
     let scope: string | undefined = undefined;
@@ -72,8 +71,14 @@ if (existingJob) {
   } catch (error: any) {
     console.error("Analyze repository error:", sanitizeError(error));
     if (isHttpError(error)) {
-     return apiError(error.status, error.message);
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
     }
-    return apiError(500, "Failed to start analysis");
+    return NextResponse.json(
+      { error: "Failed to start analysis" },
+      { status: 500 }
+    );
   }
 }

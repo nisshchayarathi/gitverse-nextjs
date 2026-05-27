@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth , sanitizeError } from "@/lib/middleware";
-import bcrypt from "bcryptjs";
 import { requireAuth, sanitizeError } from "@/lib/middleware";
+import bcrypt from "bcryptjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -73,18 +72,17 @@ export async function DELETE(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-   let body;
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid or empty request body" },
+        { status: 400 }
+      );
+    }
 
-try {
-  body = await request.json();
-} catch {
-  return NextResponse.json(
-    { error: "Invalid or empty request body" },
-    { status: 400 }
-  );
-}
-
-const { currentPassword } = body;
+    const { currentPassword } = body;
     if (!currentPassword) {
       return NextResponse.json(
         { error: "Current password is required" },
@@ -116,59 +114,25 @@ const { currentPassword } = body;
     }
 
     await prisma.$transaction([
-  prisma.gitHubRepo.deleteMany({
-    where: {
-      userId: user.userId,
-    },
-  }),
-  prisma.gitHubAccount.deleteMany({
-    where: {
-      userId: user.userId,
-    },
-  }),
-  prisma.user.delete({
-    where: {
-      id: user.userId,
-    },
-  }),
-]);
+      prisma.gitHubRepo.deleteMany({ where: { userId: user.userId } }),
+      prisma.gitHubAccount.deleteMany({ where: { userId: user.userId } }),
+      prisma.user.delete({ where: { id: user.userId } }),
+    ]);
 
-    return NextResponse.json({ message: "Account deleted" });
-    // Delete related GitHub repositories
-await prisma.gitHubRepo.deleteMany({
-  where: {
-    userId: user.userId,
-  },
-});
-
-// Delete related GitHub accounts
-await prisma.gitHubAccount.deleteMany({
-  where: {
-    userId: user.userId,
-  },
-});
-
-// Delete the user
-await prisma.user.delete({
-  where: { id: user.userId },
-});
-
-return NextResponse.json(
-  { message: "Account deleted" },
-  {
-    headers: {
-      "Cache-Control": "no-store, no-cache, must-revalidate, private",
-    },
-  },
-);
-    
+    return NextResponse.json(
+      { message: "Account deleted" },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        },
+      },
+    );
   } catch (error: any) {
     console.error("Error deleting account:", sanitizeError(error));
 
     if (error?.code === "P2025") {
       return NextResponse.json(
         { error: "User not found" },
-        { status: 404 }
         {
           status: 404,
           headers: {
