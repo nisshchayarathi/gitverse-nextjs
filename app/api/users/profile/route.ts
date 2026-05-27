@@ -129,8 +129,46 @@ export async function PUT(request: NextRequest) {
       updateData.passwordHash = await bcrypt.hash(newPassword, 10);
     }
 
-    if (avatar) {
-      updateData.image = avatar;
+      if (avatar) {
+      if (typeof avatar !== "string") {
+        return NextResponse.json(
+          { error: "Invalid avatar format" },
+          { status: 400 }
+        );
+      }
+
+      if (avatar.startsWith("data:")) {
+        const mimeTypeMatch = avatar.match(/^data:([^;,]+)[;,]/);
+
+        if (!mimeTypeMatch || !mimeTypeMatch[1].startsWith("image/")) {
+          return NextResponse.json(
+            { error: "Avatar must be an image data URL" },
+            { status: 400 }
+          );
+        }
+
+        const base64Data = avatar.split(",")[1];
+
+        if (!base64Data) {
+          return NextResponse.json(
+            { error: "Invalid avatar data URL" },
+            { status: 400 }
+          );
+        }
+
+        const sizeInBytes = Math.ceil((base64Data.length * 3) / 4);
+
+        if (sizeInBytes > 500 * 1024) {
+          return NextResponse.json(
+            { error: "Avatar image is too large" },
+            { status: 413 }
+          );
+        }
+
+        updateData.image = avatar;
+      } else if (avatar.startsWith("http")) {
+        updateData.image = avatar;
+      }
     }
 
     const updatedUser = await prisma.user.update({

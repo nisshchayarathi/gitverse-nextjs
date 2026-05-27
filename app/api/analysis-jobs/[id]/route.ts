@@ -3,25 +3,43 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, isHttpError , sanitizeError } from "@/lib/middleware";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 
+const MAX_KICK_ENTRIES = 1000;
 const lastKickAtByJobId = new Map<string, number>();
+
 
 function kickLocalRunner(request: NextRequest, jobId: string) {
   if (process.env.NODE_ENV === "production") return;
 
   const now = Date.now();
   const lastKickAt = lastKickAtByJobId.get(jobId) ?? 0;
+
+
+  if (now - lastKickAt < 5000) return;
+
+  
+  if (lastKickAtByJobId.size > MAX_KICK_ENTRIES) {
+    const firstKey = lastKickAtByJobId.keys().next().value;
+    lastKickAtByJobId.delete(firstKey);
+  }
+
+
   if (now - lastKickAt < 5000) return; // throttle (best-effort)
+  if (lastKickAtByJobId.size >= MAX_KICK_ENTRIES) {
+  const firstKey = lastKickAtByJobId.keys().next().value;
+  lastKickAtByJobId.delete(firstKey);
+}
+
   lastKickAtByJobId.set(jobId, now);
 
   const origin = new URL(request.url).origin;
   const secret = process.env.ANALYSIS_RUNNER_SECRET;
+
   void fetch(`${origin}/api/internal/run-analysis`, {
     method: "POST",
     headers: secret ? { "x-analysis-runner-secret": secret } : undefined,
-  }).catch(() => {
-    // Best-effort only.
-  });
+  }).catch(() => {});
 }
+
 
 export async function GET(
   request: NextRequest,

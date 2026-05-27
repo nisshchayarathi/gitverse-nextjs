@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { repositoryService } from "@/lib/services/repositoryService";
+<<<<<<< standardize-api-errors
+import { apiError } from "@/lib/api-error";
+=======
 
 // Helper object containing secure caching headers to prevent data leakage
 const securityHeaders = {
@@ -10,6 +13,7 @@ const securityHeaders = {
   "Expires": "0",
 };
 
+>>>>>>> main
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -19,19 +23,27 @@ export async function GET(
     const id = parseInt(params.id);
 
     if (isNaN(id)) {
+<<<<<<< standardize-api-errors
+      return apiError(400, "Invalid repository ID");
+=======
       return NextResponse.json(
         { error: "Invalid repository ID" },
         { status: 400, headers: securityHeaders }
       );
+>>>>>>> main
     }
 
     const repository = await repositoryService.getRepository(id, user.userId);
 
     if (!repository) {
+<<<<<<< standardize-api-errors
+      return apiError(404, "Repository not found");
+=======
       return NextResponse.json(
         { error: "Repository not found" },
         { status: 404, headers: securityHeaders }
       );
+>>>>>>> main
     }
 
     const latestJob = await prisma.analysisJob.findFirst({
@@ -102,11 +114,16 @@ export async function DELETE(
     console.error("Delete repository error:", sanitizeError(error));
 
     if (isHttpError(error)) {
+<<<<<<< standardize-api-errors
+  return apiError(error.status, error.message);
+}
+=======
       return NextResponse.json(
         { error: error.message },
         { status: error.status, headers: securityHeaders }
       );
     }
+>>>>>>> main
 
     if (error.message === "Repository not found") {
       return NextResponse.json(
@@ -115,9 +132,13 @@ export async function DELETE(
       );
     }
 
+<<<<<<< standardize-api-errors
+    return apiError(500, "Failed to get repository");
+=======
     return NextResponse.json(
       { error: "Failed to delete repository" },
       { status: 500, headers: securityHeaders }
     );
+>>>>>>> main
   }
 }
