@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
+import { useRepoBrowsePrefs } from "@/hooks/useRepoBrowsePrefs";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Grid, List, GitBranch, Clock, Activity } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -41,8 +42,7 @@ export default function SearchPage() {
   const initialUrl = searchParams?.get("repoUrl") || "";
 
   const [searchQuery, setSearchQuery] = useState(initialUrl);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [sortBy, setSortBy] = useState<"recent" | "stars" | "name">("recent");
+  const { viewMode, setViewMode, sortBy, setSortBy } = useRepoBrowsePrefs();
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -161,6 +161,7 @@ finally {
     <option value="name">Name</option>
   </select>
 </div>
+            </div>
           </CardContent>
         </Card>
 

@@ -280,6 +280,155 @@ if (existingRepositoryName) {
       });
       const commits = await gitService.getCommits("--all", 1000);
 
+      // IMPORTANT: Do not load *all* existing commits for the repo.
+      // On large repos this can be huge and cause OOM/timeouts. We only need to
+      // know which of the commits we just fetched already exist.
+      const existingCommits =
+        commits.length > 0
+          ? await prisma.commit.findMany({
+              where: {
+                repositoryId,
+                hash: {
+                  in: commits.map((commit: { hash: string }) => commit.hash),
+                },
+              },
+              select: { hash: true },
+            })
+          : [];
+      const existingHashes = new Set(existingCommits.map((c) => c.hash));
+
+      // Filter out commits that already exist
+      const newCommits = commits.filter(
+        (commit: { hash: string }) => !existingHashes.has(commit.hash),
+      );
+
+
+      let insertedCount = 0;
+      let failedCount = 0;
+
+      const totalNewCommits = Math.max(1, newCommits.length);
+      const commitChunkSize = 100;
+
+      for (let i = 0; i < newCommits.length; i += commitChunkSize) {
+        checkAborted();
+        const chunk = newCommits.slice(i, i + commitChunkSize);
+
+        try {
+          const inserted = await prisma.commit.createMany({
+            data: chunk.map((commit) => ({
+              hash: commit.hash,
+              shortHash: commit.shortHash,
+              message: commit.message,
+              description: commit.description,
+              authorName: commit.authorName,
+              authorEmail: commit.authorEmail,
+              committedAt: commit.committedAt,
+              branch: commit.branch,
+              parents: commit.parents || [],
+              refs: commit.refs || [],
+              tags: commit.tags || [],
+              additions: commit.additions,
+              deletions: commit.deletions,
+              filesChanged: commit.filesChanged,
+              repositoryId,
+            })),
+            skipDuplicates: true,
+          });
+
+          insertedCount += inserted.count;
+
+          const insertedCommits =
+            chunk.length > 0
+              ? await prisma.commit.findMany({
+                  where: {
+                    repositoryId,
+                    hash: {
+                      in: chunk.map((commit: { hash: string }) => commit.hash),
+                    },
+                  },
+                  select: { id: true, hash: true },
+                })
+              : [];
+          const commitIdByHash = new Map(
+            insertedCommits.map((commit: { hash: string; id: number }) => [
+              commit.hash,
+              commit.id,
+            ]),
+          );
+
+          const fileChanges = chunk.flatMap(
+            (commit: {
+              hash: string;
+              fileChanges: Array<{
+                path: string;
+                additions: number;
+                deletions: number;
+                changeType: "added" | "modified" | "deleted";
+              }>;
+            }) => {
+            const commitId = commitIdByHash.get(commit.hash);
+            if (!commitId || commit.fileChanges.length === 0) return [];
+
+            return commit.fileChanges.map((change) => ({
+              path: change.path,
+              additions: change.additions,
+              deletions: change.deletions,
+              changeType: change.changeType.toUpperCase() as FileChangeType,
+              commitId,
+            }));
+            },
+          );
+
+          if (fileChanges.length > 0) {
+            await prisma.fileChange.createMany({
+              data: fileChanges,
+              skipDuplicates: true,
+            });
+          }
+
+          const pct = 25 + Math.round((Math.min(i + chunk.length, newCommits.length) / totalNewCommits) * 35);
+          await report({
+            progressPercent: Math.min(60, pct),
+            progressMessage: `Storing commits (${Math.min(i + chunk.length, newCommits.length)}/${newCommits.length})`,
+          });
+        } catch (error: any) {
+          failedCount += chunk.length;
+          console.error(`Failed to insert commit chunk starting at ${i}:`, error.message);
+        }
+
+        await yieldIfHighMemory();
+      }
+
+
+            checkAborted();
+const latestCommitHashes = commits.map((commit: { hash: string }) => commit.hash);
+      // Enforce commit retention window
+     
+if (latestCommitHashes.length > 0) { 
+await prisma.$transaction([
+  prisma.fileChange.deleteMany({
+    where: {
+      commit: {
+        repositoryId,
+        hash: {
+          notIn: latestCommitHashes,
+        },
+      },
+    },
+  }),
+
+  prisma.commit.deleteMany({
+    where: {
+      repositoryId,
+      hash: {
+        notIn: latestCommitHashes,
+      },
+    },
+  }),
+]);
+}
+     
+      // Analyze files
       checkAborted();
 
       await report({ progressPercent: 65, progressMessage: "Scanning files" });

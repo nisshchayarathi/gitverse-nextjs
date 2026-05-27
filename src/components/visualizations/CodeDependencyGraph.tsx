@@ -1,5 +1,6 @@
-import { useEffect, useRef, useMemo} from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import * as htmlToImage from "html-to-image";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
@@ -11,6 +12,7 @@ interface RepositoryFile {
 }
 
 interface Repository {
+  name: string;
   files?: RepositoryFile[];
 }
 
@@ -32,7 +34,31 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   }, [repository]);
   const zoomRef = useRef<any>(null);
   const svgSelectionRef = useRef<any>(null);
-  
+   const exportRef = useRef<HTMLDivElement>(null);
+  const exportGraph = async (format: "png" | "svg") => {
+    if (!exportRef.current) return;
+
+    try {
+      const options = {
+        backgroundColor: "#0f172a",
+        pixelRatio: 2,
+        cacheBust: true,
+      };
+
+      const dataUrl =
+        format === "png"
+          ? await htmlToImage.toPng(exportRef.current, options)
+          : await htmlToImage.toSvg(exportRef.current);
+
+      const link = document.createElement("a");
+      link.download = `gitverse-graph.${format}`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error("Export failed:", error);
+    }
+  };
+
 
   const handleZoomIn = () => {
     if (svgSelectionRef.current && zoomRef.current) {
@@ -343,7 +369,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     };
   }, [ currentParams, router, searchParams, graphData]);
 
-return (
+  return (
   <div className="relative">
     <Card className="glass p-4 sm:p-6 overflow-hidden">
       <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -357,6 +383,30 @@ return (
         </div>
 
         <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
+          <div className="relative">
+            <details className="group">
+              <summary className="list-none cursor-pointer px-3 py-1 rounded-md bg-primary text-primary-foreground">
+                Export
+              </summary>
+
+              <div className="absolute right-0 mt-2 w-40 rounded-md border bg-background shadow-lg z-50 overflow-hidden">
+                <button
+                  onClick={() => exportGraph("png")}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-muted"
+                >
+                  Download PNG
+                </button>
+
+                <button
+                  onClick={() => exportGraph("svg")}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-muted"
+                >
+                  Download SVG
+                </button>
+              </div>
+            </details>
+          </div>
+
           <div className="flex gap-3">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
@@ -371,7 +421,10 @@ return (
         </div>
       </div>
 
-      <div className="glass rounded-lg p-4 sm:p-6">
+      <div
+        ref={exportRef}
+        className="glass rounded-lg p-4 sm:p-6 relative overflow-visible"
+      >
         <h3 className="text-base sm:text-lg font-semibold mb-4">
           Code Dependencies
         </h3>
@@ -392,6 +445,10 @@ return (
             onZoomOut={handleZoomOut}
             onReset={handleReset}
           />
+        </div>
+
+        <div className="absolute bottom-2 right-3 text-[10px] text-white/70">
+          GitVerse • {repository?.name || "Repository"}
         </div>
       </div>
 

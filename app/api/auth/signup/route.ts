@@ -59,17 +59,21 @@ export async function POST(request: NextRequest) {
     }
     // Normalize email to lowercase
     const normalizedEmail = email.toLowerCase();
+    
+    const passwordRegex =
+          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
-    if (password.length < 6) {
+    if (!passwordRegex.test(password)) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
+        {
+          error:
+            "Password must be at least 8 characters and include uppercase, lowercase, and a number",
+        },
         { status: 400 }
       );
     }
-
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const txResult = await prisma.$transaction(async (tx) => {
       // Check if user already exists
       const existingUser = await tx.user.findUnique({

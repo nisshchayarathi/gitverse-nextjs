@@ -1,5 +1,4 @@
 'use client'
-
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -18,8 +17,6 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
   const pathname = usePathname()
 
   return (
-    <nav className="flex items-center space-x-2 text-sm text-secondary">
-      
     <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
       {items.map((item, index) => {
         const isLast = index === items.length - 1
@@ -27,18 +24,12 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
 
         return (
           <React.Fragment key={item.path}>
-            {index > 0 && <ChevronRight size={16} className="text-secondary" />}
-            {isLast || isActive ? (
-              <span className="font-medium text-secondary">
-            {/* CodeRabbit Fix: Changed text-secondary to text-muted-foreground for legible separator contrast */}
+            {index > 0 && (
+              <ChevronRight size={16} className="text-muted-foreground" />
+            )}
             {index > 0 && <ChevronRight size={16} className="text-muted-foreground" />}
-            
             {isLast || isActive ? (
-{isLast || isActive ? (
-  <span className="font-medium text-foreground">
-    {item.label}
-  </span>
-) : (
+              <span className="font-medium text-foreground">
                 {item.label}
               </span>
             ) : (
