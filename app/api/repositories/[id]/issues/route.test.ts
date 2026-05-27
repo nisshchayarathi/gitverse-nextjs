@@ -2,23 +2,22 @@ process.env.JWT_SECRET = "test-secret-key-12345";
 process.env.GEMINI_API_KEY = "test-gemini-api-key";
 
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "./route";
 
-vi.mock("@/lib/middleware", () => {
+jest.mock("@/lib/middleware", () => {
   return {
-    requireAuth: vi.fn().mockResolvedValue({
+    requireAuth: jest.fn().mockResolvedValue({
       userId: 1,
       email: "test@example.com",
     }),
-    isHttpError: vi.fn().mockReturnValue(false),
-    sanitizeError: vi.fn().mockImplementation((e) => e),
+    isHttpError: jest.fn().mockReturnValue(false),
+    sanitizeError: jest.fn().mockImplementation((e) => e),
   };
 });
 
-vi.mock("@/lib/services/repositoryService", () => ({
+jest.mock("@/lib/services/repositoryService", () => ({
   repositoryService: {
-    getRepository: vi.fn().mockResolvedValue({
+    getRepository: jest.fn().mockResolvedValue({
       id: 1,
       url: "https://github.com/test-owner/test-repo",
       files: [{ path: "src/components/layout/DashboardLayout.tsx" }],
@@ -26,8 +25,8 @@ vi.mock("@/lib/services/repositoryService", () => ({
   },
 }));
 
-vi.mock("@/lib/services/githubService", () => {
-  const mockGetIssues = vi.fn().mockResolvedValue([
+jest.mock("@/lib/services/githubService", () => {
+  const mockGetIssues = jest.fn().mockResolvedValue([
     {
       number: 101,
       title: "Fix responsive design in dashboard layout",
@@ -36,13 +35,13 @@ vi.mock("@/lib/services/githubService", () => {
       labels: [{ name: "good first issue" }],
     },
   ]);
-  const mockParseGitHubUrl = vi.fn().mockReturnValue({
+  const mockParseGitHubUrl = jest.fn().mockReturnValue({
     owner: "test-owner",
     repo: "test-repo",
   });
 
   return {
-    GitHubService: vi.fn().mockImplementation(() => ({
+    GitHubService: jest.fn().mockImplementation(() => ({
       getIssues: mockGetIssues,
     })),
   };
@@ -50,14 +49,14 @@ vi.mock("@/lib/services/githubService", () => {
 
 // Since the mock above defines standard class exports, we mock parseGitHubUrl static method
 import { GitHubService } from "@/lib/services/githubService";
-(GitHubService as any).parseGitHubUrl = vi.fn().mockReturnValue({
+(GitHubService as any).parseGitHubUrl = jest.fn().mockReturnValue({
   owner: "test-owner",
   repo: "test-repo",
 });
 
-vi.mock("@/lib/services/geminiService", () => ({
-  getGeminiService: vi.fn(() => ({
-    chatRaw: vi.fn().mockResolvedValue(
+jest.mock("@/lib/services/geminiService", () => ({
+  getGeminiService: jest.fn(() => ({
+    chatRaw: jest.fn().mockResolvedValue(
       JSON.stringify({
         matches: [
           {
@@ -72,10 +71,11 @@ vi.mock("@/lib/services/geminiService", () => ({
   })),
 }));
 
-vi.mock("@/lib/prisma", () => ({
+jest.mock("@/lib/prisma", () => ({
+  __esModule: true,
   default: {
     gitHubAccount: {
-      findUnique: vi.fn().mockResolvedValue({
+      findUnique: jest.fn().mockResolvedValue({
         accessToken: "test-access-token",
       }),
     },
@@ -90,7 +90,7 @@ function createRequest(skills = ""): NextRequest {
 
 describe("GET /api/repositories/[id]/issues", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   it("successfully fetches issues and maps them using Gemini", async () => {

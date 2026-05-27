@@ -1,28 +1,25 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
 
-vi.mock("@/lib/middleware", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/middleware")>();
+jest.mock("@/lib/middleware", () => {
   return {
-    ...actual,
-    requireAuth: vi.fn().mockResolvedValue({
+    requireAuth: jest.fn().mockResolvedValue({
       userId: 1,
       email: "test@example.com",
     }),
   };
 });
 
-vi.mock("@/lib/services/geminiService", () => ({
-  getGeminiService: vi.fn(() => ({
-    chatRaw: vi.fn(),
-    chatAboutRepository: vi.fn(),
+jest.mock("@/lib/services/geminiService", () => ({
+  getGeminiService: jest.fn(() => ({
+    chatRaw: jest.fn(),
+    chatAboutRepository: jest.fn(),
   })),
 }));
 
-vi.mock("@/lib/services/repositoryService", () => ({
+jest.mock("@/lib/services/repositoryService", () => ({
   repositoryService: {
-    getRepository: vi.fn(),
+    getRepository: jest.fn(),
   },
 }));
 
@@ -40,7 +37,7 @@ async function parseJsonResponse(response: Response) {
 
 describe("POST /api/ai/chat — messages validation", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   it("returns 400 when messages is missing", async () => {
