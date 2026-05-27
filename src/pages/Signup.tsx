@@ -179,11 +179,12 @@ export default function Signup() {
     }
 
     if (!confirmPassword) {
-      newErrors.confirmPassword =
-        "Please confirm your password";
+      newErrors.confirmPassword = "Please confirm your password";
     } else if (password !== confirmPassword) {
       newErrors.confirmPassword =
         "Passwords do not match";
+    }
+
     const passwordRegex =
           /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(password)) {

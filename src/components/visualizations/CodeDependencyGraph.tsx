@@ -14,6 +14,11 @@ interface Repository {
   files?: RepositoryFile[];
 }
 
+interface CodeDependencyGraphProps {
+  repository?: Repository;
+  highlightedPaths?: string[];
+}
+
 // Generate dependency graph from repository files
 const generateDependencyGraph = (repository?: Repository): GraphData => {
   const nodes: Node[] = [];
@@ -94,11 +99,8 @@ const generateDependencyGraph = (repository?: Repository): GraphData => {
   });
 
 
-interface CodeDependencyGraphProps {
-  repository?: Repository;
-}
 
-export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
+export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeDependencyGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -106,6 +108,9 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const zoomRef = useRef<any>(null);
   const svgSelectionRef = useRef<any>(null);
   
+  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   const graphAnalyzer = new GraphAnalyzer();
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
   const exportGraph = async (format: "png" | "svg") => {
@@ -161,6 +166,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
 
   useEffect(() => {
     if (!svgRef.current) return;
+
+    const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
     // If no data, show empty state
     if (graphData.nodes.length === 0) {
@@ -220,6 +227,11 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         d3.forceCollide().radius((d: any) => d.size / 2 + 10),
       );
 
+    const isHighlighted = (d: any) => {
+      if (!highlightedPaths || highlightedPaths.length === 0) return false;
+      return highlightedPaths.some(p => d.path && d.path.toLowerCase() === p.toLowerCase());
+    };
+
     // Draw links
     const link = g
       .append("g")
@@ -262,17 +274,17 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     // Node circles
     node
       .append("circle")
-      .attr("r", (d: any) => d.size / 3)
+      .attr("r", (d: any) => isHighlighted(d) ? d.size / 2.5 : d.size / 3)
       .attr("fill", (d: any) => typeColors[d.type])
-      .attr("stroke", "rgba(255,255,255,0.3)")
-      .attr("stroke-width", 2)
+      .attr("stroke", (d: any) => isHighlighted(d) ? "#f59e0b" : "rgba(255,255,255,0.3)")
+      .attr("stroke-width", (d: any) => isHighlighted(d) ? 4 : 2)
       .on("mouseenter", function (event: any, d: any) {
         d3.select(this)
           .transition()
           .duration(200)
-          .attr("r", d.size / 2.5)
-          .attr("stroke", "rgba(255,255,255,0.8)")
-          .attr("stroke-width", 3);
+          .attr("r", d.size / 2)
+          .attr("stroke", isHighlighted(d) ? "#f59e0b" : "rgba(255,255,255,0.8)")
+          .attr("stroke-width", isHighlighted(d) ? 5 : 3);
 
         // Highlight connected nodes
         link
@@ -298,6 +310,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
                 <div class="font-semibold text-sm">${d.name}</div>
                 <div class="text-xs capitalize">${d.type}</div>
                 <div class="text-xs">${d.path}</div>
+                ${isHighlighted(d) ? '<div class="text-xs text-amber-500 font-semibold font-mono">⚠️ Matched Issue Hotspot</div>' : ''}
               </div>
             `);
         }
@@ -320,9 +333,9 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         d3.select(this)
           .transition()
           .duration(200)
-          .attr("r", d.size / 3)
-          .attr("stroke", "rgba(255,255,255,0.3)")
-          .attr("stroke-width", 2);
+          .attr("r", isHighlighted(d) ? d.size / 2.5 : d.size / 3)
+          .attr("stroke", isHighlighted(d) ? "#f59e0b" : "rgba(255,255,255,0.3)")
+          .attr("stroke-width", isHighlighted(d) ? 4 : 2);
 
         link
           .transition()
@@ -343,11 +356,12 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .text((d: any) =>
         d.name.length > 15 ? d.name.slice(0, 12) + "..." : d.name,
       )
-      .attr("font-size", "10px")
+      .attr("font-size", (d: any) => isHighlighted(d) ? "11px" : "10px")
       .attr("dx", 0)
       .attr("dy", (d: any) => d.size / 3 + 15)
       .attr("text-anchor", "middle")
-      .attr("fill", "currentColor")
+      .attr("fill", (d: any) => isHighlighted(d) ? "#f59e0b" : "currentColor")
+      .attr("font-weight", (d: any) => isHighlighted(d) ? "bold" : "normal")
       .attr("pointer-events", "none");
 
     // Update positions on simulation tick
@@ -382,12 +396,12 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .transition()
       .duration(500)
       .delay((_d: any, i: number) => i * 30)
-      .attr("r", (d: any) => d.size / 3);
+      .attr("r", (d: any) => isHighlighted(d) ? d.size / 2.5 : d.size / 3);
 
     return () => {
       simulation.stop();
     };
-  }, [repository]);
+  }, [repository, highlightedPaths]);
 
   return (
     <div className="relative">

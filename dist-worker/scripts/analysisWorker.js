@@ -27,6 +27,7 @@ function getWorkerId() {
         `${os_1.default.hostname()}-${process.pid}-${Math.random().toString(16).slice(2)}`);
 }
 async function runJob(job, params) {
+    let isHeartbeatRunning = true;
     let heartbeatTimer = null;
     let lastProgressWriteAt = 0;
     let lastProgressPercent;
@@ -56,15 +57,26 @@ async function runJob(job, params) {
     };
     try {
         await writeProgress({ progressPercent: 0, progressMessage: "Processing" });
-        heartbeatTimer = setInterval(() => {
-            analysisJobService_1.analysisJobService
-                .heartbeat({
-                jobId: job.id,
-                workerId: params.workerId,
-                lockMs: params.lockMs,
-            })
-                .catch((e) => console.error("heartbeat failed", e));
-        }, params.heartbeatIntervalMs);
+        const runHeartbeat = async () => {
+            if (!isHeartbeatRunning)
+                return;
+            try {
+                await analysisJobService_1.analysisJobService.heartbeat({
+                    jobId: job.id,
+                    workerId: params.workerId,
+                    lockMs: params.lockMs,
+                });
+            }
+            catch (e) {
+                console.error("heartbeat failed", e);
+            }
+            finally {
+                if (isHeartbeatRunning) {
+                    heartbeatTimer = setTimeout(runHeartbeat, params.heartbeatIntervalMs);
+                }
+            }
+        };
+        heartbeatTimer = setTimeout(runHeartbeat, params.heartbeatIntervalMs);
         if (job.type !== "repository_analysis") {
             throw new Error(`Unsupported job type: ${job.type}`);
         }
@@ -90,8 +102,9 @@ async function runJob(job, params) {
         });
     }
     finally {
+        isHeartbeatRunning = false;
         if (heartbeatTimer)
-            clearInterval(heartbeatTimer);
+            clearTimeout(heartbeatTimer);
     }
 }
 async function startAnalysisWorkerLoop(opts) {

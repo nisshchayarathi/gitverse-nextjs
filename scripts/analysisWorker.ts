@@ -36,6 +36,7 @@ async function runJob(
     heartbeatIntervalMs: number;
   }
 ) {
+  let isHeartbeatRunning = true;
   let heartbeatTimer: NodeJS.Timeout | null = null;
   let lastProgressWriteAt = 0;
   let lastProgressPercent: number | undefined;
@@ -80,15 +81,33 @@ async function runJob(
   try {
     await writeProgress({ progressPercent: 0, progressMessage: "Processing" });
 
-    heartbeatTimer = setInterval(() => {
-      analysisJobService
-        .heartbeat({
+    const abortController = new AbortController();
+
+    let heartbeatReject: (reason?: any) => void;
+    const heartbeatPromise = new Promise((_, reject) => {
+      heartbeatReject = reject;
+    });
+
+    const runHeartbeat = async () => {
+      if (!isHeartbeatRunning) return;
+      try {
+        await analysisJobService.heartbeat({
           jobId: job.id,
           workerId: params.workerId,
           lockMs: params.lockMs,
-        })
-        .catch((e) => console.error("heartbeat failed", e));
-    }, params.heartbeatIntervalMs);
+        });
+        if (isHeartbeatRunning) {
+          heartbeatTimer = setTimeout(runHeartbeat, params.heartbeatIntervalMs);
+        }
+      } catch (e) {
+        console.error("heartbeat failed", e);
+        isHeartbeatRunning = false;
+        const err = new Error("Heartbeat failed, losing job lock.");
+        abortController.abort(err);
+        heartbeatReject(err);
+      }
+    };
+    heartbeatTimer = setTimeout(runHeartbeat, params.heartbeatIntervalMs);
 
     if (job.type !== "repository_analysis") {
       throw new Error(`Unsupported job type: ${job.type}`);
@@ -99,10 +118,13 @@ async function runJob(
 
     await repositoryService.analyzeRepository(job.repositoryId, job.userId, {
       scope,
+      signal: abortController.signal,
       onProgress: async (update) => {
         await writeProgress(update);
       },
     });
+
+    await Promise.race([analyzePromise, heartbeatPromise]);
 
     await analysisJobService.markDone({
       jobId: job.id,
@@ -120,7 +142,8 @@ async function runJob(
       maxAttempts: job.maxAttempts,
     });
   } finally {
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    isHeartbeatRunning = false;
+    if (heartbeatTimer) clearTimeout(heartbeatTimer);
   }
 }
 

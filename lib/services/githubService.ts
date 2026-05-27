@@ -423,6 +423,55 @@ export class GitHubService {
     }
   }
 
+  async getIssues(
+    owner: string,
+    repo: string,
+    params?: {
+      labels?: string;
+      state?: "open" | "closed" | "all";
+      per_page?: number;
+      page?: number;
+    }
+  ): Promise<any[]> {
+    const labelsStr = params?.labels !== undefined ? params.labels : "good first issue,help wanted";
+    const labels = labelsStr.split(",").map(l => l.trim()).filter(Boolean);
+
+    if (labels.length === 0) {
+      const response = await this.client.get(`/repos/${owner}/${repo}/issues`, {
+        params: {
+          state: params?.state || "open",
+          per_page: params?.per_page || 20,
+          page: params?.page || 1,
+        },
+      });
+      return response.data.filter((issue: any) => !issue.pull_request);
+    }
+
+    const fetchPromises = labels.map(async (label) => {
+      const response = await this.client.get(`/repos/${owner}/${repo}/issues`, {
+        params: {
+          labels: label,
+          state: params?.state || "open",
+          per_page: params?.per_page || 20,
+          page: params?.page || 1,
+        },
+      });
+      return response.data;
+    });
+
+    const results = await Promise.all(fetchPromises);
+    const allIssues = results.flat();
+
+    const uniqueIssues = new Map();
+    for (const issue of allIssues) {
+      if (!issue.pull_request && !uniqueIssues.has(issue.number)) {
+        uniqueIssues.set(issue.number, issue);
+      }
+    }
+
+    return Array.from(uniqueIssues.values());
+  }
+
   /**
    * Get repository languages
    */

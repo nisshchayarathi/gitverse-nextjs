@@ -200,6 +200,9 @@ if (existingRepositoryName) {
     });
 
     const report = async (update: RepositoryAnalysisProgress) => {
+      if (opts?.signal?.aborted) {
+        throw new Error(opts.signal.reason || "Analysis aborted");
+      }
       if (!opts?.onProgress) return;
       try {
         await opts.onProgress(update);
@@ -220,6 +223,9 @@ if (existingRepositoryName) {
     const checkAborted = () => {
       if (signal.aborted) {
         throw new Error(`Repository analysis timed out after ${timeoutMs / 60000} minutes`);
+      }
+      if (opts?.signal?.aborted) {
+        throw new Error(opts.signal.reason || "Analysis aborted");
       }
     };
 
