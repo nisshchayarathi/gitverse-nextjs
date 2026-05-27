@@ -51,7 +51,7 @@ export const LoadingSpinner: React.FC<{ message?: string }> = ({ message = 'Load
   return (
     <div className="flex flex-col items-center justify-center py-12">
       <Spinner size="lg" />
-      <p className="mt-4 text-secondary-600 dark:text-secondary-400">{message}</p>
+      <p className="mt-4 text-secondary">{message}</p>
     </div>
   )
 }

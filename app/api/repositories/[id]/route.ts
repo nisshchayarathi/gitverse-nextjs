@@ -3,7 +3,6 @@ import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { repositoryService } from "@/lib/services/repositoryService";
 
-// Helper object containing secure caching headers to prevent data leakage
 const securityHeaders = {
   "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
   "Pragma": "no-cache",
@@ -34,33 +33,9 @@ export async function GET(
       );
     }
 
-    const latestJob = await prisma.analysisJob.findFirst({
-      where: { repositoryId: id, userId: user.userId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        status: true,
-        type: true,
-        attempts: true,
-        maxAttempts: true,
-        nextRunAt: true,
-        progressPercent: true,
-        progressMessage: true,
-        startedAt: true,
-        finishedAt: true,
-        error: true,
-        updatedAt: true,
-        createdAt: true,
-      },
-    });
-
-    // Added securityHeaders here so user data is never cached by browsers
-    return NextResponse.json(
-      { repository, latestJob },
-      { status: 200, headers: securityHeaders }
-    );
+    return NextResponse.json(repository, { headers: securityHeaders });
   } catch (error: any) {
-    console.error("Get repository error:", sanitizeError(error));
+    console.error("Error fetching repository:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(
@@ -69,8 +44,15 @@ export async function GET(
       );
     }
 
+    if (error?.code === "P2002" || error?.code === "P2025") {
+      return NextResponse.json(
+        { error: "Repository not found" },
+        { status: 404, headers: securityHeaders }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Failed to get repository" },
+      { error: "Failed to fetch repository" },
       { status: 500, headers: securityHeaders }
     );
   }
@@ -91,9 +73,19 @@ export async function DELETE(
       );
     }
 
-    await repositoryService.deleteRepository(id, user.userId);
+    const repository = await repositoryService.getRepository(id, user.userId);
 
-    // Added securityHeaders here as well
+    if (!repository) {
+      return NextResponse.json(
+        { error: "Repository not found" },
+        { status: 404, headers: securityHeaders }
+      );
+    }
+
+    await prisma.repository.delete({
+      where: { id },
+    });
+
     return NextResponse.json(
       { message: "Repository deleted successfully" },
       { status: 200, headers: securityHeaders }
@@ -110,7 +102,7 @@ export async function DELETE(
 
     if (error.message === "Repository not found") {
       return NextResponse.json(
-        { error: error.message }, 
+        { error: error.message },
         { status: 404, headers: securityHeaders }
       );
     }

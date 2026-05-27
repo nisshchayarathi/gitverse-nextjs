@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { requireAuth, isHttpError, sanitizeError } from "@/lib/middleware";
 
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
         email: true,
         image: true,
         createdAt: true,
+        passwordHash: true,
       },
     });
 
@@ -35,30 +37,51 @@ export async function GET(request: NextRequest) {
       })) > 0;
 
     if (!userDetails) {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "User not found" },
+        {
+          status: 404,
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, private",
+          },
+        },
+      );
     }
 
-    return NextResponse.json({
-      id: userDetails.id,
-      name: userDetails.name,
-      email: userDetails.email,
-      image: userDetails.image,
-      createdAt: userDetails.createdAt,
-      avatarUrl: userDetails.image,
-      isGoogleLinked: hasGoogleAccount,
-    });
+    return NextResponse.json(
+      {
+        id: userDetails.id,
+        name: userDetails.name,
+        email: userDetails.email,
+        image: userDetails.image,
+        createdAt: userDetails.createdAt,
+        avatarUrl: userDetails.image,
+        isGoogleLinked: hasGoogleAccount,
+        hasPassword: userDetails.passwordHash !== null,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        },
+      },
+    );
   } catch (error: unknown) {
     if (isHttpError(error)) {
       return NextResponse.json(
-        { message: error.message },
+        { error: error.message },
         { status: error.status },
       );
     }
 
     console.error("Error fetching user:", sanitizeError(error));
     return NextResponse.json(
-      { message: "Failed to fetch user" },
-      { status: 500 },
+      { error: "Failed to fetch user" },
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        },
+      },
     );
   }
 }
@@ -75,28 +98,86 @@ export async function DELETE(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    await prisma.user.delete({
+    let password: string | undefined;
+    try {
+      const body = await request.json();
+      password = body.password;
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid or empty request body" },
+        { status: 400 },
+      );
+    }
+
+    const fullUser = await prisma.user.findUnique({
       where: { id: user.userId },
+      select: { passwordHash: true },
     });
 
-    return NextResponse.json({ message: "Account deleted" });
+    if (!fullUser) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 },
+      );
+    }
+
+    if (fullUser.passwordHash) {
+      if (!password) {
+        return NextResponse.json(
+          { error: "Password is required to delete your account" },
+          { status: 400 },
+        );
+      }
+
+      const isValid = await bcrypt.compare(password, fullUser.passwordHash);
+      if (!isValid) {
+        return NextResponse.json(
+          { error: "Incorrect password" },
+          { status: 401 },
+        );
+      }
+    }
+
+    await prisma.$transaction([
+      prisma.gitHubRepo.deleteMany({ where: { userId: user.userId } }),
+      prisma.gitHubAccount.deleteMany({ where: { userId: user.userId } }),
+      prisma.user.delete({ where: { id: user.userId } }),
+    ]);
+
+    return NextResponse.json(
+      { message: "Account deleted" },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        },
+      },
+    );
   } catch (error: unknown) {
     if (isHttpError(error)) {
       return NextResponse.json(
-        { message: error.message },
+        { error: error.message },
         { status: error.status },
       );
     }
 
+    console.error("Error deleting account:", sanitizeError(error));
+
     const prismaError = error as { code?: string };
     if (prismaError?.code === "P2025") {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 },
+      );
     }
 
-    console.error("Error deleting account:", sanitizeError(error));
     return NextResponse.json(
-      { message: "Failed to delete account" },
-      { status: 500 },
+      { error: "Failed to delete account" },
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        },
+      },
     );
   }
 }

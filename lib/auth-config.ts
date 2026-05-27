@@ -111,18 +111,13 @@ function prismaIntIdAdapter(): Adapter {
     },
 
     async createSession(session) {
-      const created = await prisma.session.create({
-        data: {
-          sessionToken: session.sessionToken,
-          userId: intUserId(session.userId),
-          expires: session.expires,
-        },
-      });
-
+      // No-op: with `session.strategy = "jwt"`, database sessions are never
+      // read by NextAuth.  Writing them here would produce orphaned rows
+      // that accumulate on every credentials sign-in.
       return {
-        sessionToken: created.sessionToken,
-        userId: String(created.userId),
-        expires: created.expires,
+        sessionToken: session.sessionToken,
+        userId: session.userId,
+        expires: session.expires,
       } satisfies AdapterSession;
     },
 
@@ -260,6 +255,13 @@ if ((googleClientId || googleClientSecret) && !isGoogleConfigured) {
   // Intentionally do not log secrets.
   console.warn(
     "[auth] Google OAuth is not fully configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to real values (not placeholders), then restart the dev server."
+  );
+}
+
+const nextAuthSecret = process.env.NEXTAUTH_SECRET;
+if (!nextAuthSecret) {
+  throw new Error(
+    "NEXTAUTH_SECRET environment variable is required. Generate one with: openssl rand -base64 32"
   );
 }
 
@@ -501,5 +503,5 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 7 * 24 * 60 * 60, // 7 days
   },
-  secret: process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET,
+  secret: process.env.NEXTAUTH_SECRET,
 };

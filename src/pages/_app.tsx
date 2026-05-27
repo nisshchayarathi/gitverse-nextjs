@@ -1,16 +1,22 @@
 import type { AppProps } from 'next/app'
-import { ThemeProvider } from '@/context/ThemeContext'
+import { SessionProvider } from "next-auth/react";
+import { ThemeProvider } from '@/components/ThemeProvider'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { Toaster } from '@/components/ui/toaster'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import '@/app/globals.css'
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <Component {...pageProps} />
-        <Toaster />
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <SessionProvider session={pageProps.session}>
+        <ThemeProvider>
+          <AuthProvider>
+            <Component {...pageProps} />
+            <Toaster />
+          </AuthProvider>
+        </ThemeProvider>
+      </SessionProvider>
+    </ErrorBoundary>
   )
 }

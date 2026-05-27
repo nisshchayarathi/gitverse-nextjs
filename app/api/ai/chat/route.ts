@@ -7,11 +7,40 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
     const body = await request.json();
+
+    /*
+     * Chat request validation: every POST must include a `messages` array.
+     * Each entry must be an object with non-empty `role` and `content` strings
+     * so downstream handlers never process malformed conversation payloads.
+     */
+    const { messages } = body;
+    if (!messages || !Array.isArray(messages)) {
+      return NextResponse.json(
+        { error: "messages is required and must be an array" },
+        { status: 400 }
+      );
+    }
+    for (const message of messages) {
+      if (
+        !message ||
+        typeof message !== "object" ||
+        typeof message.role !== "string" ||
+        !message.role.trim() ||
+        typeof message.content !== "string" ||
+        !message.content.trim()
+      ) {
+        return NextResponse.json(
+          { error: "Each message must include role and content" },
+          { status: 400 }
+        );
+      }
+    }
+
     const { repositoryId, question, conversationHistory, prompt } = body;
 
     // Free-form mode: client provides a prebuilt prompt.
     if (typeof prompt === "string" && prompt.trim()) {
-      const response = await getGeminiService().chatRaw(prompt);
+      const response = await getGeminiService().chatRaw(prompt, messages);
       return NextResponse.json({ response });
     }
 

@@ -1,0 +1,37 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# TypeScript / JavaScript / React / Next.js
+[*.{ts,tsx,js,jsx,mjs,cjs}]
+indent_style = space
+indent_size = 2
+
+# JSON and config-like files
+[*.{json,jsonc,yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# Markdown: keep trailing spaces (often used for hard line breaks)
+[*.md]
+trim_trailing_whitespace = false
+
+# Shell scripts
+[*.{sh,bash,zsh}]
+indent_style = space
+indent_size = 2
+
+# Makefiles require tabs for recipe lines
+[Makefile]
+indent_style = tab
+
+# Batch SQL and Prisma schema with consistent indentation for readability
+[*.{sql,prisma}]
+indent_style = space
+indent_size = 2

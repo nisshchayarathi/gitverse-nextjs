@@ -1,9 +1,14 @@
 "use client";
 
 export const dynamic = "force-dynamic";
-
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { isValidGithubUrl } from "@/lib/utils/validators";
+import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { isValidGithubUrl } from "@/lib/utils/validators";
+import { RecentReposList } from "@/components/RecentReposList";
+import { useRecentRepos } from "@/hooks/useRecentRepos";
 import {
   GitBranch,
   TrendingUp,
@@ -48,14 +53,103 @@ interface Repository {
 export default function Dashboard() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
+  const analyzeUrl = searchParams ? searchParams.get("analyzeUrl") : null;
   const [repoUrl, setRepoUrl] = useState("");
+  const [repoScope, setRepoScope] = useState("");
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
 
+  const { addRepo } = useRecentRepos();
+
   useEffect(() => {
     fetchRepositories();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const active = document.activeElement;
+
+      const isTyping =
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        active instanceof HTMLSelectElement ||
+        (active instanceof HTMLElement && active.isContentEditable);
+
+      if ((e.key === "/" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")) && !isTyping) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+
+      if (
+        e.key === "Escape" &&
+        isTyping &&
+        active === searchRef.current
+      ) {
+        setRepoUrl("");
+        setRepoScope("");
+        searchRef.current?.blur();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
+
+  // Trigger auto-analysis when analyzeUrl query parameter is provided
+  useEffect(() => {
+    if (analyzeUrl) {
+      setRepoUrl(analyzeUrl);
+      
+      const triggerAutoAnalyze = async () => {
+        setAnalyzing(true);
+        try {
+          const token = localStorage.getItem("gitverse_token");
+          const cleanUrl = analyzeUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
+          const urlParts = cleanUrl.split("/");
+          const name = urlParts[urlParts.length - 1] || "repository";
+          const owner = urlParts[urlParts.length - 2] || "unknown";
+
+          // Add to recent repositories locally
+          addRepo({
+            owner,
+            name,
+            url: analyzeUrl.trim(),
+          });
+
+          const response = await axios.post(
+            buildApiUrl("/api/repositories"),
+            {
+              name,
+              url: analyzeUrl.trim(),
+              description: `Repository from direct analysis: ${analyzeUrl}`,
+            },
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+
+          await fetchRepositories();
+          router.push(`/repo/${response.data.repository.id}`);
+          setRepoUrl("");
+        } catch (error: any) {
+          console.error("Auto analysis failed:", error);
+          toast({
+            title: "Analysis Failed",
+            description: error.response?.data?.error || error.message || "Failed to analyze repository",
+            variant: "destructive",
+          });
+        } finally {
+          setAnalyzing(false);
+        }
+      };
+      
+      void triggerAutoAnalyze();
+    }
+  }, [analyzeUrl, router, addRepo]);
 
   const fetchRepositories = async () => {
     try {
@@ -68,6 +162,11 @@ export default function Dashboard() {
       setRepositories(Array.isArray(repos) ? repos : []);
     } catch (error) {
       console.error("Error fetching repositories:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch repositories.",
+        variant: "destructive",
+      });
       setRepositories([]);
     } finally {
       setLoading(false);
@@ -79,9 +178,9 @@ export default function Dashboard() {
     : 0;
   const totalContributors = Array.isArray(repositories)
     ? repositories.reduce(
-        (sum, r: any) => sum + (r._count?.contributors || 0),
-        0
-      )
+      (sum, r: any) => sum + (r._count?.contributors || 0),
+      0
+    )
     : 0;
   const totalFiles = Array.isArray(repositories)
     ? repositories.reduce((sum, r: any) => sum + (r._count?.files || 0), 0)
@@ -114,48 +213,26 @@ export default function Dashboard() {
     },
   ];
 
-  const recentRepositories = Array.isArray(repositories)
-    ? repositories.slice(0, 3)
-    : [];
-
-  const formatTimeAgo = (date: string) => {
-    const now = new Date();
-    const then = new Date(date);
-    const diffInMinutes = Math.floor(
-      (now.getTime() - then.getTime()) / (1000 * 60)
-    );
-
-    if (diffInMinutes < 1) return "Just now";
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-    return then.toLocaleDateString();
-  };
-
-  const recentActivity = Array.isArray(repositories)
-    ? repositories
-        .filter((r: any) => r.status === "completed")
-        .slice(0, 5)
-        .map((repo: any) => ({
-          action: "Analyzed",
-          repo: repo.name,
-          time: formatTimeAgo(repo.lastAnalyzedAt || repo.createdAt),
-          status: repo.status,
-        }))
-    : [];
-
-    const handleAnalyze = async () => {
+  const handleAnalyze = async () => {
     if (!repoUrl.trim()) return;
+
+    if (!isValidGithubUrl(repoUrl)) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo).",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setAnalyzing(true);
     try {
       const token = localStorage.getItem("gitverse_token");
 
-      // Extract repo name from URL
-      const urlParts = repoUrl.trim().split("/");
-      const repoName = urlParts[urlParts.length - 1];
+      // Extract owner and name for recent storage
+      const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
+      const cleanParts = cleanUrl.split("/");
+      const ownerName = cleanParts[cleanParts.length - 2] || "unknown";
 
       const response = await axios.post(
         buildApiUrl("/api/repositories"),
@@ -163,32 +240,46 @@ export default function Dashboard() {
           name: repoName,
           url: repoUrl.trim(),
           description: `Repository from ${repoUrl}`,
+          scope: repoScope.trim() || undefined,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
+      // Add to recent repositories locally
+      addRepo({
+        owner: ownerName,
+        name: repoName,
+        url: repoUrl.trim(),
+      });
+
       // Check if this is an existing repository
       const isExisting = repositories.some(
         (r: any) => r.url === repoUrl.trim()
       );
 
-      // Refresh repositories list
       await fetchRepositories();
 
-      // Navigate to the repository
       router.push(`/repo/${response.data.repository.id}`);
 
-      // Show appropriate message
       if (isExisting) {
         console.log("Navigating to existing repository");
       }
 
       setRepoUrl("");
+      setRepoScope("");
     } catch (error: any) {
+
       console.error("Error creating repository:", error);
-      const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to analyze repository";
+      
+      let errMsg = "Failed to analyze repository";
+      if (error.response?.status === 404 || error.response?.data?.error === "NOT_FOUND") {
+        errMsg = "Repository not found. Please ensure the URL is correct and the repository is public.";
+      } else {
+        errMsg = error.response?.data?.message || error.response?.data?.error || error.message || errMsg;
+      }
+
       toast({
         title: "Analysis Failed",
         description: errMsg,
@@ -198,9 +289,91 @@ export default function Dashboard() {
       setAnalyzing(false);
     }
   };
+const formatTimeAgo = (date: string | Date | undefined) => {
+  if (!date) return 'Never';
+  const d = new Date(date);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - d.getTime()) / 1000);
+  
+  if (seconds < 60) return 'Just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString();
+};
 
+const recentActivity = repositories
+  .filter((r: any) => r.lastAnalyzedAt || r.createdAt)
+  .sort((a: any, b: any) => {
+    const aTime = new Date(a.lastAnalyzedAt || a.createdAt).getTime();
+    const bTime = new Date(b.lastAnalyzedAt || b.createdAt).getTime();
+    return bTime - aTime;
+  })
+  .slice(0, 5)
+  .map((r: any) => ({
+    action: 'Analyzed',
+    repo: r.name,
+    time: formatTimeAgo(r.lastAnalyzedAt || r.createdAt),
+  }));
+
+if (loading) {
   return (
     <DashboardLayout>
+      <div className="space-y-6">
+        
+        {/* Welcome skeleton */}
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+
+        {/* Input skeleton */}
+        <div className="p-6 border rounded-lg space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-44" />
+        </div>
+
+        {/* Stats skeleton */}
+        <div className="grid grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="p-4 border rounded-lg space-y-3">
+              <Skeleton className="h-4 w-3/5" />
+              <Skeleton className="h-7 w-2/5" />
+              <Skeleton className="h-3 w-4/5" />
+            </div>
+          ))}
+        </div>
+
+        {/* Cards skeleton */}
+        <div className="grid grid-cols-3 gap-6">
+          <div className="col-span-2 space-y-3">
+            <Skeleton className="h-5 w-2/5" />
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="p-4 border rounded-lg space-y-2">
+                <Skeleton className="h-4 w-3/10" />
+                <Skeleton className="h-3 w-7/10" />
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-1/2" />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </DashboardLayout>
+  );
+}
+  return (
+    <DashboardLayout>
+    <div className="min-h-screen bg-background"></div>
       <div className="space-y-6">
         {/* Welcome Section */}
         <div>
@@ -218,11 +391,13 @@ export default function Dashboard() {
             <div className="flex flex-col sm:flex-row gap-3">
               <Input
                 type="url"
+                ref={searchRef}
                 placeholder="https://github.com/username/repository"
                 value={repoUrl}
                 onChange={(e) => setRepoUrl(e.target.value)}
-                className="flex-1 bg-background/50"
-                onKeyPress={(e) => e.key === "Enter" && handleAnalyze()}
+                className="flex-1 bg-background/50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
+                aria-label="Repository URL to analyze"
               />
               <Button
                 onClick={handleAnalyze}
@@ -233,8 +408,23 @@ export default function Dashboard() {
                 {analyzing ? "Analyzing..." : "Analyze Repository"}
               </Button>
             </div>
+            <div className="flex flex-col sm:flex-row gap-3 mt-3">
+              <Input
+                type="text"
+                placeholder="Scope (e.g., packages/, src/) - Optional"
+                value={repoScope}
+                onChange={(e) => setRepoScope(e.target.value)}
+                className="flex-1 bg-background/50 max-w-sm"
+                onKeyPress={(e) => e.key === "Enter" && handleAnalyze()}
+              />
+            </div>
+            {/* Shortcut hint would go here */}
           </CardContent>
         </Card>
+
+        {/* Recent Repositories */}
+        <RecentReposList />
+
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -250,13 +440,23 @@ export default function Dashboard() {
                     <p className="text-xs text-muted-foreground mb-1 truncate">
                       {stat.label}
                     </p>
-                    <p className="text-2xl sm:text-3xl font-heading font-bold break-words">
-                      {stat.value}
-                    </p>
-                    <p className="text-xs text-accent mt-1 flex items-center gap-1 flex-wrap">
-                      <TrendingUp className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate">{stat.change}</span>
-                    </p>
+                    {loading ? (
+                      <div className="space-y-2">
+                        <Skeleton className="h-8 w-20" />
+                        <Skeleton className="h-4 w-28" />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-2xl sm:text-3xl font-heading font-bold break-words">
+                        {stat.value}
+                        </p>
+
+                        <p className="text-xs text-accent mt-1 flex items-center gap-1 flex-wrap">
+                        <TrendingUp className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{stat.change}</span>
+                        </p>
+                      </>
+                    )}
                   </div>
                   <div className="p-2 sm:p-3 rounded-lg bg-primary/10 flex-shrink-0">
                     <stat.icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
@@ -293,26 +493,45 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Loading repositories...
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 rounded-lg border border-border/50"
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                        <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                        <div className="space-y-2 min-w-0">
+                          <Skeleton className="h-5 w-32 sm:w-48" />
+                          <Skeleton className="h-4 w-40 sm:w-64" />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 sm:gap-4 mt-2 sm:mt-0">
+                        <Skeleton className="h-4 w-16" />
+                        <Skeleton className="h-4 w-12" />
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ) : recentRepositories.length === 0 ? (
+              ) : repositories.length === 0 ? (
                 <EmptyState
-                  icon={GitBranch}
-                  title="No Repositories Yet"
-                  description="You haven't analyzed any repositories yet. Enter a GitHub URL above to get started!"
-                  actionLabel="Analyze Repository"
-                  onAction={() => {
-                    const input = document.querySelector('input[type="url"]') as HTMLInputElement;
-                    if (input) {
-                      input.focus();
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }
-                  }}
+                 icon={GitBranch}
+                 title="No repositories yet"
+                 description="Start by importing a GitHub repository to explore commits, contributors, code structure, and repository insights."
+                 actionLabel="Analyze Repository"
+                 onAction={() => router.push("/analyze")}
                 />
               ) : (
                 <div className="space-y-3">
-                  {recentRepositories.map((repo) => (
+                  {[...repositories]
+                    .sort((a: any, b: any) => {
+                      const aTime = new Date(a.lastAnalyzedAt || a.createdAt).getTime();
+                      const bTime = new Date(b.lastAnalyzedAt || b.createdAt).getTime();
+                      return bTime - aTime;
+                    })
+                    .slice(0, 5)
+                    .map((repo: any) => (
                     <div
                       key={repo.id}
                       className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 rounded-lg border border-border/50 hover:border-primary/50 transition-colors cursor-pointer glass-hover"
@@ -349,7 +568,7 @@ export default function Dashboard() {
                           <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
                           {formatTimeAgo(
                             (repo as any).lastAnalyzedAt ||
-                              (repo as any).createdAt
+                            (repo as any).createdAt
                           )}
                         </div>
                       </div>
@@ -371,8 +590,21 @@ export default function Dashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {recentActivity.map((activity, index) => (
+              {loading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-start gap-2 sm:gap-3">
+                      <Skeleton className="mt-1 h-6 w-6 rounded-full flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-full max-w-[200px]" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recentActivity.map((activity: any, index: number) => (
                   <div key={index} className="flex items-start gap-2 sm:gap-3">
                     <div className="mt-1 p-1.5 rounded-full bg-accent/10 flex-shrink-0">
                       <Activity className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-accent" />
@@ -391,6 +623,7 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
+              )}
             </CardContent>
           </Card>
         </div>
