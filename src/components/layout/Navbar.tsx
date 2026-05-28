@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { GitBranch, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui'
+import { ThemeToggle } from '@/components/ThemeToggle'
+import { useEffect } from "react";
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -42,6 +44,7 @@ export const Navbar: React.FC = () => {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
             <Button className="bg-gradient-primary hover:opacity-90 transition-opacity" asChild>
               <Link href="/login">Sign In</Link>
             </Button>
@@ -75,6 +78,7 @@ export const Navbar: React.FC = () => {
                 </a>
               ))}
               <div className="flex flex-col gap-3 pt-4 border-t border-border/50">
+                <div className="flex justify-start"><ThemeToggle /></div>
                 <Button className="bg-gradient-primary" asChild>
                   <Link href="/login">Sign In</Link>
                 </Button>
@@ -89,3 +93,7 @@ export const Navbar: React.FC = () => {
     </nav>
   )
 }
+useEffect(() => {
+  const styleTag = document.getElementById("navbar-inline-css");
+  if (styleTag) styleTag.remove();
+}, []);

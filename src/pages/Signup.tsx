@@ -143,6 +143,7 @@ export default function Signup() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    const newErrors: any = {};
     e.preventDefault();
 
     if (!name || !email || !password || !confirmPassword) {
@@ -172,10 +173,20 @@ export default function Signup() {
       return;
     }
 
-    if (password.length < 8) {
-  toast({
-    title: "Error",
-    description: "Password must be at least 8 characters long",
+    if (!confirmPassword) {
+      newErrors.confirmPassword =
+        "Please confirm your password";
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword =
+        "Passwords do not match";
+    }
+    const passwordRegex =
+          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      toast({
+        title: "Error",
+        description:
+        "Password must be at least 8 characters and include uppercase, lowercase and a number",
         variant: "destructive",
       });
       return;

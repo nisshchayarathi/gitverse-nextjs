@@ -188,17 +188,15 @@ export function AIRepoMentorSection(props: {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const pinnedToBottomRef = useRef(true);
 
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
-    const el = bottomRef.current;
-    if (!el) return;
-    el.scrollIntoView({ behavior, block: "end" });
-  };
-
   useEffect(() => {
     if (!pinnedToBottomRef.current) return;
+    const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+      const el = bottomRef.current;
+      if (!el) return;
+      el.scrollIntoView({ behavior, block: "end" });
+    };
     const id = requestAnimationFrame(() => scrollToBottom("smooth"));
     return () => cancelAnimationFrame(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, isLoading]);
 
   const send = async (question: string) => {
@@ -311,9 +309,28 @@ export function AIRepoMentorSection(props: {
             }}
           >
             {messages.length === 1 && !isLoading && (
-              <div className="text-center text-xs text-muted-foreground py-6">
-                Ask a question about the repository to get started
-              </div>
+              <div className="flex flex-col items-center justify-center text-center py-8 px-4">
+  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">
+    <Sparkles className="h-6 w-6 text-primary" />
+  </div>
+
+  <h3 className="text-sm font-semibold mb-2">
+    No repository questions yet
+  </h3>
+
+  <p className="text-xs text-muted-foreground max-w-sm mb-4">
+    Ask about setup, architecture, contributors, scripts, or repository structure to start using the AI mentor.
+  </p>
+
+  <Button
+    type="button"
+    variant="outline"
+    onClick={() => send("How do I set this up locally?")}
+    disabled={props.disabled || isLoading}
+  >
+    Try Example Question
+  </Button>
+</div>
             )}
             {messages.map((m, idx) => (
               <div
@@ -340,18 +357,19 @@ export function AIRepoMentorSection(props: {
               </div>
             ))}
             {isLoading && (
-              <div className="flex gap-2 justify-start animate-pulse">
-                {/* Bot avatar skeleton */}
-                <div className="h-7 w-7 rounded-full bg-primary/15" />
+  <div className="flex gap-2 justify-start" aria-live="polite">
+    <div className="mt-0.5 h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 animate-pulse">
+      <Bot className="h-4 w-4 text-primary/50" aria-hidden="true" />
+    </div>
 
-                {/* Message bubble skeleton */}
-                <div className="max-w-[85%] rounded-lg px-3 py-3 bg-white/5 border border-white/10 space-y-2">
-                  <div className="h-3 w-3/4 bg-white/10 rounded" />
-                  <div className="h-3 w-full bg-white/10 rounded"/>
-                  <div className="h-3 w-1/2 bg-white/10 rounded" />
-                </div>
-              </div>
-            )}
+    <div className="max-w-[85%] w-full sm:w-2/3 rounded-lg px-3 py-3 bg-white/5 border border-white/10 space-y-2 animate-pulse">
+      <div className="h-3 w-3/4 rounded bg-white/10" />
+      <div className="h-3 w-full rounded bg-white/10" />
+      <div className="h-3 w-5/6 rounded bg-white/10" />
+      <div className="h-3 w-1/2 rounded bg-white/10" />
+    </div>
+  </div>
+)}
             <div ref={bottomRef} />
           </div>
 

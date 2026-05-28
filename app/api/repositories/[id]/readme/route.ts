@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
+import { apiError } from "@/lib/api-error";
 import { GitHubRateLimitError } from "@/lib/services/githubService";
-
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } },
@@ -12,10 +12,7 @@ export async function POST(
     const id = Number(params.id);
 
     if (!Number.isFinite(id)) {
-      return NextResponse.json(
-        { error: "Invalid repository ID" },
-        { status: 400 },
-      );
+      return apiError(400, "Invalid repository ID");
     }
 
     const repository = await repositoryService.fetchAndStoreReadme(
@@ -42,19 +39,13 @@ export async function POST(
     }
 
     if (isHttpError(error)) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status },
-      );
+      return apiError(error.status, error.message);
     }
 
     if (error?.message === "Repository not found") {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+      return apiError(404, error.message);
     }
 
-    return NextResponse.json(
-      { error: "Failed to fetch README" },
-      { status: 500 },
-    );
+    return apiError(500, "Failed to fetch README");
   }
 }

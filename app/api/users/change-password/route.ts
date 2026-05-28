@@ -3,6 +3,10 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { requireAuth, sanitizeError } from "@/lib/middleware";
 
+/**
+ * Handles authenticated password changes and invalidates
+ * existing sessions after a successful password update.
+ */
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
@@ -11,14 +15,14 @@ export async function POST(request: NextRequest) {
 
     if (!newPassword) {
       return NextResponse.json(
-        { error: "New password is required" },
+        { message: "New password is required" },
         { status: 400 }
       );
     }
 
     if (newPassword.length < 8) {
       return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
+        { message: "Password must be at least 8 characters" },
         { status: 400 }
       );
     }
@@ -28,15 +32,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (!userDetails) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json(
+        { message: "User not found" },
+        { status: 404 }
+      );
     }
 
-    const passwordHash =
-      userDetails.passwordHash || (userDetails as any).password;
+    const passwordHash = userDetails.passwordHash;
+
+    // Existing password users must verify current password
     if (passwordHash) {
       if (!currentPassword) {
         return NextResponse.json(
-          { error: "Current password is required" },
+          { message: "Current password is required" },
           { status: 400 }
         );
       }
@@ -48,24 +56,48 @@ export async function POST(request: NextRequest) {
 
       if (!isPasswordValid) {
         return NextResponse.json(
-          { error: "Current password is incorrect" },
+          { message: "Current password is incorrect" },
           { status: 401 }
         );
       }
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(
+      newPassword,
+      10
+    );
 
-    await prisma.user.update({
-      where: { id: user.userId },
-      data: { passwordHash: hashedPassword },
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.userId },
+        data: {
+          passwordHash: hashedPassword,
+          passwordChangedAt: new Date(
+            Math.floor(Date.now() / 1000) * 1000
+          ),
+          tokenVersion: {
+            increment: 1,
+          },
+        },
+      }),
+      prisma.session.deleteMany({
+        where: {
+          userId: user.userId,
+        },
+      }),
+    ]);
+
+    return NextResponse.json({
+      message: "Password changed successfully",
     });
-
-    return NextResponse.json({ message: "Password changed successfully" });
   } catch (error: any) {
-    console.error("Error changing password:", sanitizeError(error));
+    console.error(
+      "Error changing password:",
+      sanitizeError(error)
+    );
+
     return NextResponse.json(
-      { error: "Failed to change password" },
+      { message: "Failed to change password" },
       { status: 500 }
     );
   }

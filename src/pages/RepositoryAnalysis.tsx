@@ -3,7 +3,6 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useRef } from "react";
-import RepositoryAnalysisProgress  from "@/components/repository/RepositoryAnalysisProgress";
 import { useParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RepositoryOverview } from "@/components/repository/RepositoryOverview";
@@ -117,27 +116,15 @@ export default function RepositoryAnalysis() {
   const [repository, setRepository] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
   const [job, setJob] = useState<any>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [loadingJobs, setLoadingJobs] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollingJobRef = useRef<string | null>(null);
 
-  // Timeout / stuck state
-
-  
-  // Tracks last time progress changed  prevents falsely timing out active jobs
-
-  // ── Elapsed seconds ticker ────────────────────────────────────────
-
-// Initial fetch
   useEffect(() => {
-  fetchRepository();
-  fetchJobHistory();
-}, [id]);
+    fetchRepository();
+  }, [id]);
 
   useEffect(() => {
     // Guard against dual-polling when the dependency array changes mid-cycle.
@@ -191,24 +178,6 @@ export default function RepositoryAnalysis() {
     };
   }, [repository?.status, repository?.latestJob?.id, job?.id, job?.status]);
 
-  useEffect(() => {
-  if (!isAnalyzing) return;
-
-  setCurrentStep(0);
-
-  const interval = setInterval(() => {
-    setCurrentStep((prev) => {
-      if (prev < 4) {
-        return prev + 1;
-      }
-
-      return prev;
-    });
-  }, 2500);
-
-  return () => clearInterval(interval);
-}, [isAnalyzing]);
-
   const fetchRepository = async () => {
     if (!id) return;
     setError(null);
@@ -232,9 +201,19 @@ export default function RepositoryAnalysis() {
           setError(response.data.latestJob.error || "Analysis failed. Please try again later.");
         }
       }
-      console.log("Repository data:", response.data);
+      setLoading(false);
     } catch (err: any) {
       console.error("Error fetching repository:", err);
+
+      const isColdStart = err.response?.data?.error === "DATABASE_COLD_START";
+      
+      if (isColdStart) {
+        setError("Waking up database... Please wait.");
+        // Auto-retry in 3 seconds. Do not set loading to false so spinner stays.
+        setTimeout(fetchRepository, 3000);
+        return;
+      }
+
       setError(
         err.response?.data?.error ||
           err.response?.data?.message ||
@@ -246,7 +225,6 @@ export default function RepositoryAnalysis() {
         description: err.response?.data?.error || err.response?.data?.message || err.message || "Failed to load repository data.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -272,21 +250,31 @@ export default function RepositoryAnalysis() {
       }
 
       if (nextJob?.status === "FAILED") {
-        setError(nextJob?.error || "Analysis failed. Please try again later.");
+        const msg = nextJob?.error || "The repository analysis failed.";
+
+        setError(msg);
+
+        
+        setIsAnalyzing(false);
+        
         toast({
           title: "Analysis failed",
-          description: nextJob?.error || nextJob?.progressMessage || "The repository analysis encountered an unexpected error.",
+          description: msg,
           variant: "destructive",
         });
       }
     } catch (err: any) {
       console.error("Error fetching analysis job:", err);
-      setError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
-          err.message ||
-          "Failed to connect to the analysis service."
-      );
+      
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "Failed to connect to the analysis service.";
+      
+      // 1. Surface inline error state
+      setError(errorMessage);
+      
+      // 2. Stop polling
+      setIsAnalyzing(false);
+
+      // 3. Show a one-time toast notification
       toast({
         title: "Error checking analysis status",
         description: err.response?.data?.error || err.response?.data?.message || err.message || "Failed to connect to the analysis service.",
@@ -294,29 +282,6 @@ export default function RepositoryAnalysis() {
       });
     }
   };
-
-  const fetchJobHistory = async () => {
-  if (!id) return;
-
-  try {
-    setLoadingJobs(true);
-
-    const token = localStorage.getItem("gitverse_token");
-
-    const response = await axios.get(
-      buildApiUrl(`/api/repositories/${id}/jobs`),
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    );
-
-    setJobs(response.data.jobs || []);
-  } catch (error) {
-    console.error("Error fetching job history:", error);
-  } finally {
-    setLoadingJobs(false);
-  }
-};
 
   const handleDeleteRepository = async () => {
     if (!id) return;
@@ -445,48 +410,57 @@ export default function RepositoryAnalysis() {
               )}
             </div>
 
-                {isAnalyzing ? (
-  <div className="animate-fade-in-up">
-    <RepositoryAnalysisProgress currentStep={currentStep} />
-
-    <div className="mt-6 glass rounded-lg p-4 text-center">
-      <p className="text-sm text-muted-foreground">
-        {job?.progressPercent != null && job?.progressPercent >= 0
-          ? `${Math.min(Math.round(job.progressPercent), 100)}% complete`
-          : "Processing repository analysis..."}
-      </p>
-
-      {job?.progressMessage && (
-        <p className="text-sm mt-2 text-primary font-medium">
-          {job.progressMessage}
-        </p>
-      )}
-    </div>
-  </div>
-) : error && !repository ? (
-  <div className="glass rounded-lg p-12 text-center space-y-4 animate-fade-in-up">
-    <div className="flex justify-center">
-      <XCircle className="h-12 w-12 text-red-500" />
-    </div>
-
-    <div>
-      <h3 className="font-semibold text-lg text-red-500">
-        Failed to Load Repository
-      </h3>
-
-      <p className="text-sm text-muted-foreground mt-1">
-        {error}
-      </p>
-    </div>
-
-    <button
-      onClick={() => fetchRepository()}
-      className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-300 text-sm font-medium shadow-lg shadow-primary/25"
-    >
-      Retry Loading
-    </button>
-  </div>
-) : (
+            {isAnalyzing ? (
+              <div className="glass rounded-lg p-12 text-center space-y-4 animate-pulse">
+                <div className="flex justify-center">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold mb-2">
+                    Analyzing Repository
+                  </h2>
+                  <p className="text-muted-foreground">
+                    We&apos;re analyzing the repository structure, commits,
+                    contributors, and more.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {job?.progressPercent != null && job?.progressPercent >= 0
+                      ? `${Math.min(Math.round(job.progressPercent), 100)}%${job?.progressMessage ? ` — ${job.progressMessage}` : ""}`
+                      : job?.progressMessage
+                        ? job.progressMessage
+                        : "This may take a few moments depending on the repository size..."}
+                  </p>
+                </div>
+                <div className="flex justify-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <GitCommit className="h-4 w-4" />
+                    Processing commits
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Finding contributors
+                  </div>
+                </div>
+              </div>
+            ) : error && !repository ? (
+              <div className="glass rounded-lg p-12 text-center space-y-4 animate-fade-in-up">
+                <div className="flex justify-center">
+                  <XCircle className="h-12 w-12 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg text-red-500">Failed to Load Repository</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {error}
+                  </p>
+                </div>
+                <button
+                  onClick={() => fetchRepository()}
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-300 text-sm font-medium shadow-lg shadow-primary/25"
+                >
+                  Retry Loading
+                </button>
+              </div>
+            ) : (
               <>
                 {/* Tab navigation */}
                 <div className="glass rounded-lg p-2 animate-fade-in-up">
@@ -512,56 +486,7 @@ export default function RepositoryAnalysis() {
                 </div>
 
                 {/* Content */}
-<div className="animate-fade-in-up">
-  {renderContent()}
-</div>
-
-{/* Analysis History */}
-<div className="glass rounded-lg p-6 mt-6">
-  <h2 className="text-2xl font-bold mb-4">
-    Analysis History
-  </h2>
-
-  {loadingJobs ? (
-    <p className="text-muted-foreground">
-      Loading analysis history...
-    </p>
-  ) : jobs.length === 0 ? (
-    <p className="text-muted-foreground">
-      No analysis history found.
-    </p>
-  ) : (
-    <div className="space-y-4">
-      {jobs.map((historyJob: any) => (
-        <div
-          key={historyJob.id}
-          onClick={() =>
-            router.push(`/analysis/${historyJob.id}`)
-          }
-          className="border rounded-lg p-4 cursor-pointer hover:bg-white/5 transition-all"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold">
-                {historyJob.status}
-              </p>
-
-              <p className="text-sm text-muted-foreground">
-                {historyJob.summary || "No summary available"}
-              </p>
-
-              <p className="text-xs text-muted-foreground mt-1">
-                {new Date(
-                  historyJob.createdAt,
-                ).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )}
-</div>
+                <div className="animate-fade-in-up">{renderContent()}</div>
               </>
             )}
           </>
@@ -623,5 +548,3 @@ export default function RepositoryAnalysis() {
     </DashboardLayout>
   );
 }
-
-

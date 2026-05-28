@@ -1,6 +1,4 @@
-﻿"use client";
-
-import {
+﻿import {
   GitBranch,
   Star,
   GitFork,
@@ -633,4 +631,3 @@ export const RepositoryOverview = ({
     </div>
   );
 };
-
