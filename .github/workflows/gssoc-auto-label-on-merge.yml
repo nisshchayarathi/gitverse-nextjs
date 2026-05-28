@@ -6,6 +6,7 @@ name: GSSoC — Auto Label on Merge
 # • Applies gssoc:approved + level label to the LINKED ISSUE
 # • Confirms or corrects the difficulty level label on PR
 # • Adds mentor:nisshchayarathi attribution
+# • Auto-assigns the PR author to the PR on merge
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -31,6 +32,19 @@ jobs:
             const { owner, repo } = context.repo;
             const pr = context.payload.pull_request;
             const prNum = pr.number;
+            const prAuthor = pr.user.login;
+
+            // ── Auto-assign PR author to the PR ──────────────────────────────
+            try {
+              await github.rest.issues.addAssignees({
+                owner, repo,
+                issue_number: prNum,
+                assignees: [prAuthor],
+              });
+              console.log(`👤 Auto-assigned PR author @${prAuthor} to PR #${prNum}`);
+            } catch (e) {
+              console.log(`⚠️ Could not auto-assign @${prAuthor} to PR #${prNum}: ${e.message}`);
+            }
 
             // ── Ensure all labels exist ───────────────────────────────────────
             const allLabels = [
@@ -217,6 +231,7 @@ jobs:
                       `| Field | Value |`,
                       `|-------|-------|`,
                       `| 🔀 Merged PR | #${prNum} |`,
+                      `| 👤 Contributor | @${prAuthor} |`,
                       `| 🎯 Difficulty | \`${level}\` |`,
                       `| 🏆 Status | \`gssoc:approved\` |`,
                       `| 🎓 Mentor | [@nisshchayarathi](https://github.com/nisshchayarathi) |`,

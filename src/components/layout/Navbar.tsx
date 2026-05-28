@@ -92,3 +92,7 @@ export const Navbar: React.FC = () => {
     </nav>
   )
 }
+useEffect(() => {
+  const styleTag = document.getElementById("navbar-inline-css");
+  if (styleTag) styleTag.remove();
+}, []);

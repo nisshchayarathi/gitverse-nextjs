@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
         email: true,
         image: true,
         createdAt: true,
+        passwordHash: true,
       },
     });
 
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
         createdAt: userDetails.createdAt,
         avatarUrl: (userDetails as any).image,
         isGoogleLinked: hasGoogleAccount,
+        hasPassword: userDetails.passwordHash !== null,
       },
       {
         headers: {
@@ -71,6 +73,7 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+    const userId = user.userId.toString();
 
     let body;
     try {
@@ -85,32 +88,44 @@ export async function DELETE(request: NextRequest) {
     const { currentPassword } = body;
     if (!currentPassword) {
       return NextResponse.json(
-        { error: "Current password is required" },
-        { status: 400 }
+        { error: "Invalid or empty request body" },
+        { status: 400 },
       );
     }
 
-    const existingUser = await prisma.user.findUnique({
+    const fullUser = await prisma.user.findUnique({
       where: { id: user.userId },
+      select: { passwordHash: true },
     });
 
-    if (!existingUser || !existingUser.passwordHash) {
+    if (!fullUser) {
       return NextResponse.json(
-        { error: "Password verification unavailable for this account" },
-        { status: 400 }
+        { error: "User not found" },
+        { status: 404 },
       );
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      currentPassword,
-      existingUser.passwordHash
-    );
+    if (fullUser.passwordHash) {
+      if (!password) {
+        return NextResponse.json(
+          { error: "Password is required to delete your account" },
+          { status: 400 },
+        );
+      }
 
-    if (!isPasswordValid) {
-      return NextResponse.json(
-        { error: "Incorrect password" },
-        { status: 401 }
-      );
+      const isValid = await bcrypt.compare(password, fullUser.passwordHash);
+      if (!isValid) {
+        await recordAttempt({
+          key: userId,
+          type: "DELETE_ACCOUNT",
+          success: false,
+          userId: user.userId,
+        });
+        return NextResponse.json(
+          { error: "Incorrect password" },
+          { status: 401 },
+        );
+      }
     }
 
     await prisma.$transaction([

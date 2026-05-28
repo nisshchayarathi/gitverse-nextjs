@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { apiError } from "@/lib/api-error";
+import { GitHubRateLimitError } from "@/lib/services/githubService";
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } },

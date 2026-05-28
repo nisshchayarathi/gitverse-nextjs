@@ -18,8 +18,7 @@ import {
   EmptyState,
   Skeleton,
 } from "@/components/ui";
-import { buildApiUrl } from "@/services/apiConfig";
-import axios from "axios";
+import { useRepositories } from "@/hooks/useRepositories";
 
 interface Repository {
   id: string;
@@ -43,38 +42,7 @@ export default function SearchPage() {
 
   const [searchQuery, setSearchQuery] = useState(initialUrl);
   const { viewMode, setViewMode, sortBy, setSortBy } = useRepoBrowsePrefs();
-  const [repositories, setRepositories] = useState<Repository[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    fetchRepositories();
-  }, []);
-
-  const fetchRepositories = async () => {
-     setError("");
-    try {
-      const token = localStorage.getItem("gitverse_token");
-      const response = await axios.get(buildApiUrl("/api/repositories"), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // API returns { repositories: [...] }
-      const repos = response.data.repositories || [];
-      setRepositories(Array.isArray(repos) ? repos : []);
-    }  
-    catch (error) {
-  console.error("Error fetching repositories:", error);
-
-  setRepositories([]);
-
-  setError(
-    "Failed to load repositories. Please check your connection and try again."
-  );
-}
-finally {
-      setLoading(false);
-    }
-  };
+  const { repos: repositories, isLoading: loading, isLoadingMore, hasMore, loadMore, error } = useRepositories({ limit: 12 });
 
   const filteredRepositories = Array.isArray(repositories)
     ? repositories.filter(
@@ -447,6 +415,19 @@ finally {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        )}
+        
+        {hasMore && !loading && !error && sortedRepositories.length > 0 && (
+          <div className="flex justify-center mt-6">
+            <Button 
+              variant="outline" 
+              onClick={loadMore} 
+              disabled={isLoadingMore}
+              className="min-w-[150px]"
+            >
+              {isLoadingMore ? "Loading..." : "Load More"}
+            </Button>
           </div>
         )}
       </div>

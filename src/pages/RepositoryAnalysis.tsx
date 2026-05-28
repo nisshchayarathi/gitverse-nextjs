@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +25,8 @@ import {
   ArrowLeft,
   Trash2,
   Activity,
-  Copy,
   CheckCircle2,
   Clock,
-  RefreshCw,
   Loader2,
   XCircle,
 } from "lucide-react";
@@ -109,11 +107,8 @@ export default function RepositoryAnalysis() {
   const [repository, setRepository] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
   const [job, setJob] = useState<any>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [loadingJobs, setLoadingJobs] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
@@ -259,7 +254,6 @@ export default function RepositoryAnalysis() {
         description: err.response?.data?.error || err.message || "Failed to load repository data.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };

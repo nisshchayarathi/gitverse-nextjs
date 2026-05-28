@@ -30,12 +30,43 @@ function getAdapterChoice(connectionString: string): PrismaAdapterChoice {
   return "pg";
 }
 
-function createPrismaClient(): PrismaClient {
+function withRetry(client: PrismaClient) {
+  return client.$extends({
+    query: {
+      $allModels: {
+        async $allOperations({ operation, model, args, query }) {
+          let retries = 0;
+          const maxRetries = 3;
+          while (true) {
+            try {
+              return await query(args);
+            } catch (error: any) {
+              const isColdStartError =
+                error?.code === 'P1001' ||
+                error?.code === 'P2024' ||
+                error?.message?.toLowerCase().includes('timeout') ||
+                error?.message?.toLowerCase().includes('connection pool') ||
+                error?.message?.toLowerCase().includes('connect') ||
+                error?.message?.toLowerCase().includes('fetch failed');
+
+              if (!isColdStartError || retries >= maxRetries) {
+                throw error;
+              }
+              retries++;
+              const backoff = Math.pow(2, retries) * 500; // 1s, 2s, 4s
+              console.warn(`[Prisma Retry] DB connection error (attempt ${retries}/${maxRetries}). Retrying in ${backoff}ms...`);
+              await new Promise((r) => setTimeout(r, backoff));
+            }
+          }
+        },
+      },
+    },
+  });
+}
+
+function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL;
 
-  // IMPORTANT: Prisma Client is configured to use the "client" engine (driver adapters).
-  // Instantiating PrismaClient without an adapter will throw.
-  // We intentionally defer instantiation until runtime so builds don't require secrets.
   if (!connectionString) {
     throw new Error("DATABASE_URL is required");
   }
@@ -43,10 +74,8 @@ function createPrismaClient(): PrismaClient {
   const adapterChoice = getAdapterChoice(connectionString);
 
   if (adapterChoice === "neon-http") {
-    // Your environment is rejecting Neon WebSocket connections (expects HTTP 101).
-    // Use Neon HTTP mode to avoid WS handshakes entirely.
     const adapter = new PrismaNeonHttp(connectionString, {} as any);
-    return new PrismaClient({ adapter, log: ["error", "warn"] });
+    return withRetry(new PrismaClient({ adapter, log: ["error", "warn"] }));
   }
 
   const poolMaxRaw = process.env.PG_POOL_MAX;
@@ -78,18 +107,20 @@ function createPrismaClient(): PrismaClient {
 
   const adapter = new PrismaPg(pool);
 
-  return new PrismaClient({
+  return withRetry(new PrismaClient({
     adapter,
     log: ["error", "warn"],
-  });
+  }));
 }
+
+type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
 
 // Prevent multiple instances in development
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prisma: ExtendedPrismaClient | undefined;
 };
 
-export function getPrisma(): PrismaClient {
+export function getPrisma(): ExtendedPrismaClient {
   if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = createPrismaClient();
   }
@@ -97,7 +128,7 @@ export function getPrisma(): PrismaClient {
   return globalForPrisma.prisma;
 }
 
-const prisma = new Proxy({} as PrismaClient, {
+const prisma = new Proxy({} as ExtendedPrismaClient, {
   get(_target, prop) {
     const client = getPrisma() as unknown as Record<PropertyKey, unknown>;
     return client[prop];

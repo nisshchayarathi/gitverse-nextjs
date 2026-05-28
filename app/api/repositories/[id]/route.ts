@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError, getPrismaErrorResponse } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { repositoryService } from "@/lib/services/repositoryService";
 
@@ -61,7 +61,7 @@ export async function GET(
       );
     }
     return NextResponse.json(
-      { error: "Failed to get repository" },
+      { error: "Failed to fetch repository" },
       { status: 500, headers: securityHeaders }
     );
   }
