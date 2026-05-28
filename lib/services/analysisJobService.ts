@@ -56,7 +56,7 @@ export class AnalysisJobService {
             status: { in: ["QUEUED", "PROCESSING"] },
           },
         });
-        if (existingJob) return existingJob;
+        if (activeJob) return activeJob;
 
         // The active job may have completed between the P2002 and the lookup. Retry exactly once.
         return await prisma.analysisJob.create({

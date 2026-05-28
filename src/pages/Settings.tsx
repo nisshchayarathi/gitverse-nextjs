@@ -1,7 +1,7 @@
 "use client";
 
 export const dynamic = "force-dynamic";
-
+import { Modal } from "@/components/ui";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { User, Lock, Shield, Trash2, AlertCircle } from "lucide-react";
 import { Save } from "lucide-react";
@@ -23,7 +23,7 @@ import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 
 export default function Settings() {
-  const { user, logout, isLoading: authLoading } = useAuth();
+  const { user, logout, updateUser, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);

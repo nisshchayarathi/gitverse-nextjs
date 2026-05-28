@@ -473,9 +473,9 @@ export class RepositoryService {
 
       const [contributors, languages] = await Promise.all([
         gitService.getContributors(),
-        gitService.detectLanguages({
-          targetDirectory: repository.targetDirectory ?? null,
-        }),
+        gitService.detectLanguages(
+  repository.targetDirectory ?? undefined
+),
       ]);
 
       checkAborted();

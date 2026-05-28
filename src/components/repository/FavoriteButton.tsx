@@ -21,7 +21,7 @@ export const FavoriteButton: React.FC<FavoriteButtonProps> = ({
   // Set up optimistic UI state
   const [optimisticIsFavorited, setOptimisticIsFavorited] = useOptimistic(
     initialIsFavorited,
-    (currentState: boolean, optimisticValue: boolean) => optimisticValue
+    (_currentState: boolean, optimisticValue: boolean) => optimisticValue
   )
 
   const handleToggle = () => {

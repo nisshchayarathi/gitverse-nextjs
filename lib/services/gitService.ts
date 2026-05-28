@@ -2,7 +2,6 @@ import { exec, spawn, type ExecOptions, type SpawnOptions } from "child_process"
 import { promisify } from "util";
 import * as path from "path";
 import * as fs from "fs/promises";
-import { createReadStream } from "fs";
 import readline from "readline";
 
 const execPromiseRaw = promisify(exec);
@@ -19,24 +18,6 @@ const MAX_COMMITS_DEFAULT = 1000;
 const MAX_CONTRIBUTOR_COMMITS = 3000;
 const MAX_FILE_BYTES_TO_READ_FOR_LINECOUNT = 256 * 1024; // 256KB
 
-function countLinesReadStream(filePath: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const stream = createReadStream(filePath, { encoding: "utf-8" });
-    let lines = 0;
-    let remaining = "";
-
-    stream.on("data", (chunk: string) => {
-      lines += (remaining + chunk).split("\n").length - 1;
-      remaining = chunk.endsWith("\n") ? "" : chunk.slice(chunk.lastIndexOf("\n") + 1);
-    });
-
-    stream.on("end", () => {
-      resolve(lines + (remaining ? 1 : 0));
-    });
-
-    stream.on("error", reject);
-  });
-}
 
 function execPromise(
   command: string,
@@ -730,10 +711,6 @@ export class GitService {
         language: string | null;
       }[] = [];
       const filePaths = stdout.trim().split("\n").filter(Boolean);
-      const scopedPrefix =
-        opts?.targetDirectory?.trim()
-          ? `${opts.targetDirectory.trim().replace(/\\/g, "/").replace(/\/+$/, "")}/`
-          : null;
 
       // Process in chunks to avoid blocking the event loop on huge monorepos
       const concurrencyLimit = 50;

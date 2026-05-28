@@ -127,34 +127,13 @@ export default function RepositoryAnalysis() {
   const pollingJobRef = useRef<string | null>(null);
 
   // Timeout / stuck state
-  const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  const pollingStartedAt = useRef<number | null>(null);
+  
   // Tracks last time progress changed  prevents falsely timing out active jobs
-  const lastProgressAt = useRef<number | null>(null);
-  const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
 
   // ── Elapsed seconds ticker ────────────────────────────────────────
-  useEffect(() => {
-    if (isAnalyzing && !analysisTimedOut) {
-      elapsedTimer.current = setInterval(() => {
-        if (pollingStartedAt.current) {
-          setElapsedSeconds(
-            Math.floor((Date.now() - pollingStartedAt.current) / 1000)
-          );
-        }
-      }, 1000);
-    } else {
-      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
-    }
-    return () => {
-      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
-    };
-  }, [isAnalyzing, analysisTimedOut]);
 
-  // ── Initial fetch ─────────────────────────────────────────────────� Initial fetch ─────────────────────────────────────────────────
+// Initial fetch
   useEffect(() => {
   fetchRepository();
   fetchJobHistory();
@@ -466,13 +445,6 @@ export default function RepositoryAnalysis() {
               )}
             </div>
 
-            {/* {isAnalyzing ? (
-              <div className="glass rounded-lg p-12 text-center space-y-4 animate-pulse">
-                <div className="flex justify-center">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
-                </div>
-                <div> */}
-
                 {isAnalyzing ? (
   <div className="animate-fade-in-up">
     <RepositoryAnalysisProgress currentStep={currentStep} />
@@ -492,52 +464,29 @@ export default function RepositoryAnalysis() {
     </div>
   </div>
 ) : error && !repository ? (
+  <div className="glass rounded-lg p-12 text-center space-y-4 animate-fade-in-up">
+    <div className="flex justify-center">
+      <XCircle className="h-12 w-12 text-red-500" />
+    </div>
 
-                  <h2 className="text-xl font-semibold mb-2">
-                    Analyzing Repository
-                  </h2>
-                  <p className="text-muted-foreground">
-                    We&apos;re analyzing the repository structure, commits,
-                    contributors, and more.
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {job?.progressPercent != null && job?.progressPercent >= 0
-                      ? `${Math.min(Math.round(job.progressPercent), 100)}%${job?.progressMessage ? ` — ${job.progressMessage}` : ""}`
-                      : job?.progressMessage
-                        ? job.progressMessage
-                        : "This may take a few moments depending on the repository size..."}
-                  </p>
-                </div>
-                <div className="flex justify-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <GitCommit className="h-4 w-4" />
-                    Processing commits
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Finding contributors
-                  </div>
-                </div>
-              </div>
-            ) : error && !repository ? (
-              <div className="glass rounded-lg p-12 text-center space-y-4 animate-fade-in-up">
-                <div className="flex justify-center">
-                  <XCircle className="h-12 w-12 text-red-500" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-red-500">Failed to Load Repository</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {error}
-                  </p>
-                </div>
-                <button
-                  onClick={() => fetchRepository()}
-                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-300 text-sm font-medium shadow-lg shadow-primary/25"
-                >
-                  Retry Loading
-                </button>
-              </div>
-            ) : (
+    <div>
+      <h3 className="font-semibold text-lg text-red-500">
+        Failed to Load Repository
+      </h3>
+
+      <p className="text-sm text-muted-foreground mt-1">
+        {error}
+      </p>
+    </div>
+
+    <button
+      onClick={() => fetchRepository()}
+      className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-300 text-sm font-medium shadow-lg shadow-primary/25"
+    >
+      Retry Loading
+    </button>
+  </div>
+) : (
               <>
                 {/* Tab navigation */}
                 <div className="glass rounded-lg p-2 animate-fade-in-up">
@@ -562,7 +511,6 @@ export default function RepositoryAnalysis() {
                   </div>
                 </div>
 
-                {/* Content */}
                 {/* Content */}
 <div className="animate-fade-in-up">
   {renderContent()}

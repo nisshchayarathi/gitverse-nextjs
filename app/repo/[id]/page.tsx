@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
-import RepositoryAnalysis from '@/pages/RepositoryAnalysis'
+import RepositoryAnalysis from '../../../src/pages/RepositoryAnalysis'
 
 interface PageProps {
   params: { id: string }
