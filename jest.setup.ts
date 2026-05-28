@@ -16,16 +16,20 @@ Object.assign(globalThis, {
   MessagePort,
 });
 
-// 2. Now we can safely require undici
-const { fetch, Request, Response, Headers, FormData, Blob, File } = require('undici');
-
-// 3. Polyfill Web APIs for Next.js App Router tests
-Object.assign(globalThis, {
-  Request,
-  Response,
-  Headers,
-  fetch,
-  FormData,
-  Blob,
-  File,
-});
+// 2. Conditionally polyfill Web APIs using undici only if they are not already exposed by Node natively
+if (!globalThis.fetch || !globalThis.Request || !globalThis.Response) {
+  try {
+    const undici = require('undici');
+    Object.assign(globalThis, {
+      Request: globalThis.Request || undici.Request,
+      Response: globalThis.Response || undici.Response,
+      Headers: globalThis.Headers || undici.Headers,
+      fetch: globalThis.fetch || undici.fetch,
+      FormData: globalThis.FormData || undici.FormData,
+      Blob: globalThis.Blob || undici.Blob,
+      File: globalThis.File || undici.File,
+    });
+  } catch (e) {
+    console.warn("Native Web APIs are missing and undici polyfill failed to load:", e);
+  }
+}

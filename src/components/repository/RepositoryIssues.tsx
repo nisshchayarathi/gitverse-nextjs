@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import {
   Card,
@@ -49,6 +49,8 @@ export function RepositoryIssues({ repository }: RepositoryIssuesProps) {
   const [selectedIssue, setSelectedIssue] = useState<IssueMatch | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const requestSeq = useRef(0);
+
   const predefinedSkills = ["TypeScript", "React", "CSS", "Prisma", "Node.js", "Jest"];
 
   const getAuthHeaders = () => {
@@ -58,6 +60,7 @@ export function RepositoryIssues({ repository }: RepositoryIssuesProps) {
 
   const fetchIssues = async (customSkills?: string) => {
     if (!repository?.id) return;
+    const currentSeq = ++requestSeq.current;
     setLoading(true);
     setError(null);
     setSelectedIssue(null);
@@ -70,18 +73,23 @@ export function RepositoryIssues({ repository }: RepositoryIssuesProps) {
           headers: getAuthHeaders(),
         }
       );
+      if (currentSeq !== requestSeq.current) return;
+
       const fetchedIssues = res.data.issues || [];
       setIssues(fetchedIssues);
       if (fetchedIssues.length > 0) {
         setSelectedIssue(fetchedIssues[0]);
       }
     } catch (err: any) {
+      if (currentSeq !== requestSeq.current) return;
       console.error("Error fetching good first issues:", err);
       setError(
         err.response?.data?.error || "Failed to load good first issues. Make sure your GitHub integration is healthy."
       );
     } finally {
-      setLoading(false);
+      if (currentSeq === requestSeq.current) {
+        setLoading(false);
+      }
     }
   };
 

@@ -185,33 +185,17 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       durationMs,
     });
 
-    await repositoryService.analyzeRepository(job.repositoryId, {
-      onProgress: async (update) => {
-        await analysisJobService.updateProgress({
-          jobId: job.id,
-          workerId,
-          update,
-        });
-      },
-    });
-
-    await analysisJobService.markDone({ jobId: job.id, workerId });
-
     return NextResponse.json({ ok: true, jobId: job.id, status: "DONE" });
-  } catch (error: any) {
-    const message = String(error?.message || error || "Unknown error");
-
-    await analysisJobService.markFailed({
-      jobId: job.id,
-      status: "DONE",
-      durationMs,
-    });
   } catch (error: any) {
     // Clean up heartbeat
     isHeartbeatRunning = false;
     if (heartbeatTimer) clearTimeout(heartbeatTimer);
     heartbeatTimer = null;
 
+    // Abort analysis to stop any in-flight work
+    abortController.abort(error);
+
+    const message = String(error?.message || error || "Unknown error");
     const isTimeout = error?.code === "WORKER_TIMEOUT";
     const safeMessage = isTimeout
       ? "Analysis timed out — will retry"
@@ -260,8 +244,6 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
         error: repoErr?.message ?? String(repoErr),
       });
     }
-
-    });
 
     return NextResponse.json(
       { ok: false, jobId: job.id, status: "FAILED", error: message },
