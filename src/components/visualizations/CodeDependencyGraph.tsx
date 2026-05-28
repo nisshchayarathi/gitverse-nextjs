@@ -17,7 +17,7 @@ interface Repository {
 }
 
 interface CodeDependencyGraphProps {
-  repository?: Repository;
+  repository?: any;
 }
 
 export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
