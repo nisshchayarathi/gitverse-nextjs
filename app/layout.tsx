@@ -2,8 +2,6 @@ import "@/lib/env";
 import { ReactNode } from "react";
 import { Metadata } from "next";
 import { Inter, Source_Sans_3 } from "next/font/google";
-import { ThemeProvider } from "@/context/ThemeContext";
-import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
@@ -72,8 +70,6 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${sourceSans.variable}`}>
-      <body>
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <a

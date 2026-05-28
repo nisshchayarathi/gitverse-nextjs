@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { requireAuth , sanitizeError } from "@/lib/middleware";
 import bcrypt from "bcryptjs";
+import prisma from "@/lib/prisma";
 import { requireAuth, sanitizeError } from "@/lib/middleware";
+import {
+  isRateLimited,
+  recordAttempt,
+} from "@/lib/services/rateLimitService";
+
+const MAX_ATTEMPTS = 3;
+const WINDOW_MS = 15 * 60 * 1000;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,6 +25,7 @@ export async function GET(request: NextRequest) {
         email: true,
         image: true,
         createdAt: true,
+        passwordHash: true,
       },
     });
 
@@ -48,6 +55,7 @@ export async function GET(request: NextRequest) {
         createdAt: userDetails.createdAt,
         avatarUrl: (userDetails as any).image,
         isGoogleLinked: hasGoogleAccount,
+        hasPassword: userDetails.passwordHash !== null,
       },
       {
         headers: {
@@ -72,109 +80,82 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+    const userId = user.userId.toString();
 
-   let body;
-
-try {
-  body = await request.json();
-} catch {
-  return NextResponse.json(
-    { error: "Invalid or empty request body" },
-    { status: 400 }
-  );
-}
-
-const { currentPassword } = body;
-    if (!currentPassword) {
+    if (await isRateLimited(userId, "DELETE_ACCOUNT", MAX_ATTEMPTS, WINDOW_MS)) {
       return NextResponse.json(
-        { error: "Current password is required" },
-        { status: 400 }
+        { error: "Too many attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": "900" } },
       );
     }
 
-    const existingUser = await prisma.user.findUnique({
+    let password: string | undefined;
+    try {
+      const body = await request.json();
+      password = body.password;
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid or empty request body" },
+        { status: 400 },
+      );
+    }
+
+    const fullUser = await prisma.user.findUnique({
       where: { id: user.userId },
+      select: { passwordHash: true },
     });
 
-    if (!existingUser || !existingUser.passwordHash) {
+    if (!fullUser) {
       return NextResponse.json(
-        { error: "Password verification unavailable for this account" },
-        { status: 400 }
+        { error: "User not found" },
+        { status: 404 },
       );
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      currentPassword,
-      existingUser.passwordHash
-    );
+    if (fullUser.passwordHash) {
+      if (!password) {
+        return NextResponse.json(
+          { error: "Password is required to delete your account" },
+          { status: 400 },
+        );
+      }
 
-    if (!isPasswordValid) {
-      return NextResponse.json(
-        { error: "Incorrect password" },
-        { status: 401 }
-      );
+      const isValid = await bcrypt.compare(password, fullUser.passwordHash);
+      if (!isValid) {
+        await recordAttempt({
+          key: userId,
+          type: "DELETE_ACCOUNT",
+          success: false,
+          userId: user.userId,
+        });
+        return NextResponse.json(
+          { error: "Incorrect password" },
+          { status: 401 },
+        );
+      }
     }
 
     await prisma.$transaction([
-  prisma.gitHubRepo.deleteMany({
-    where: {
-      userId: user.userId,
-    },
-  }),
-  prisma.gitHubAccount.deleteMany({
-    where: {
-      userId: user.userId,
-    },
-  }),
-  prisma.user.delete({
-    where: {
-      id: user.userId,
-    },
-  }),
-]);
+      prisma.gitHubRepo.deleteMany({ where: { userId: user.userId } }),
+      prisma.gitHubAccount.deleteMany({ where: { userId: user.userId } }),
+      prisma.user.delete({ where: { id: user.userId } }),
+    ]);
 
-    return NextResponse.json({ message: "Account deleted" });
-    // Delete related GitHub repositories
-await prisma.gitHubRepo.deleteMany({
-  where: {
-    userId: user.userId,
-  },
-});
-
-// Delete related GitHub accounts
-await prisma.gitHubAccount.deleteMany({
-  where: {
-    userId: user.userId,
-  },
-});
-
-// Delete the user
-await prisma.user.delete({
-  where: { id: user.userId },
-});
-
-return NextResponse.json(
-  { message: "Account deleted" },
-  {
-    headers: {
-      "Cache-Control": "no-store, no-cache, must-revalidate, private",
-    },
-  },
-);
-    
+    return NextResponse.json(
+      { message: "Account deleted" },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        },
+      },
+    );
   } catch (error: any) {
     console.error("Error deleting account:", sanitizeError(error));
 
     if (error?.code === "P2025") {
       return NextResponse.json(
         { error: "User not found" },
-        { status: 404 }
-        {
-          status: 404,
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate, private",
-          },
-        },
+        { status: 404 },
       );
     }
 

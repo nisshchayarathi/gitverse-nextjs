@@ -182,10 +182,11 @@ if (existingRepositoryName) {
    */
   async analyzeRepository(
     repositoryId: number,
+    userId: number,
     opts?: { onProgress?: RepositoryAnalysisProgressReporter; scope?: string; timeoutMs?: number },
   ) {
-    const repository = await prisma.repository.findUnique({
-      where: { id: repositoryId },
+    const repository = await prisma.repository.findFirst({
+      where: { id: repositoryId, userId },
     });
 
     if (!repository) {
@@ -788,19 +789,25 @@ await prisma.$transaction([
    * Delete a repository and all its data
    */
   async deleteRepository(id: number, userId: number) {
-    const repository = await prisma.repository.findFirst({
+    const result = await prisma.repository.deleteMany({
       where: { id, userId },
     });
 
-    if (!repository) {
+    if (result.count === 0) {
       throw new Error("Repository not found");
     }
 
-    await prisma.repository.delete({
-      where: { id },
-    });
-
     return { success: true };
+  }
+  //Explicitly set the status of a repository
+  async setRepositoryStatus(
+    repositoryId: number,
+    status: "pending" | "analyzing" | "completed" | "failed",
+  ): Promise<void> {
+    await prisma.repository.update({
+      where: { id: repositoryId },
+      data: { status },
+    });
   }
 
   /**

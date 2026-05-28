@@ -1,3 +1,4 @@
+import { Input } from "@/components/ui/Input";
 import { useState, useRef, useEffect } from "react";
 import { Send, Loader2, Sparkles, User, Bot, Copy, Check } from "lucide-react";
 import { Card } from "@/components/ui";
@@ -311,7 +312,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
           )}
         </div>
         <form onSubmit={handleSubmit} className="flex gap-2">
-          <input
+          <Input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}

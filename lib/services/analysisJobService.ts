@@ -101,16 +101,19 @@ export class AnalysisJobService {
       ? Math.max(0, Math.min(100, Math.round(params.update.progressPercent)))
       : undefined;
 
+    const where: any = { id: params.jobId };
+    if (params.workerId) {
+      where.lockedBy = params.workerId;
+    }
+
     await prisma.analysisJob.update({
-      where: { id: params.jobId },
+      where,
       data: {
         progressPercent: pct,
         progressMessage: params.update.progressMessage,
         progressDetails: params.update.progressDetails as any,
-        // Heartbeat: extend lock while we’re actively working
         ...(params.workerId
           ? {
-              lockedBy: params.workerId,
               lockExpiresAt: new Date(Date.now() + lockExtension),
             }
           : {}),
@@ -119,8 +122,13 @@ export class AnalysisJobService {
   }
 
   async markDone(params: { jobId: string; workerId?: string }): Promise<void> {
+    const where: any = { id: params.jobId };
+    if (params.workerId) {
+      where.lockedBy = params.workerId;
+    }
+
     await prisma.analysisJob.update({
-      where: { id: params.jobId },
+      where,
       data: {
         status: "DONE",
         progressPercent: 100,
@@ -141,13 +149,18 @@ export class AnalysisJobService {
     attempts: number;
     maxAttempts: number;
   }): Promise<void> {
-   const shouldRetry =
-  params.attempts < params.maxAttempts &&
-  isRetryableError(params.error);
+    const where: any = { id: params.jobId };
+    if (params.workerId) {
+      where.lockedBy = params.workerId;
+    }
+
+    const shouldRetry =
+      params.attempts < params.maxAttempts &&
+      isRetryableError(params.error);
     if (shouldRetry) {
       const delay = computeBackoffMs(params.attempts);
       await prisma.analysisJob.update({
-        where: { id: params.jobId },
+        where,
         data: {
           status: "QUEUED",
           nextRunAt: new Date(Date.now() + delay),
@@ -162,7 +175,7 @@ export class AnalysisJobService {
     }
 
     await prisma.analysisJob.update({
-      where: { id: params.jobId },
+      where,
       data: {
         status: "FAILED",
         finishedAt: new Date(),

@@ -49,16 +49,27 @@ export async function getAuthUser(
       select: { id: true, tokenVersion: true },
     });
     if (!dbUser) return null;
-    // If token carries a tokenVersion, reject if the user's version has been
+    // JWT-authenticated users must provide a valid tokenVersion.
+    // This allows logout/password-change invalidation to immediately
+    // revoke previously issued tokens.
     // incremented (e.g. after logout or password change). Tokens issued before
     // this field was added carry no tokenVersion and are accepted for backward
     // compatibility — they will naturally expire within 7 days.
-    if (
-      userPayload.tokenVersion != null &&
-      userPayload.tokenVersion < dbUser.tokenVersion
-    ) {
-      return null;
-    }
+    const isJwtAuth = !!(
+  authHeader && authHeader.startsWith("Bearer ")
+);
+
+if (isJwtAuth) {
+  // Reject legacy JWTs without tokenVersion
+  if (userPayload.tokenVersion == null) {
+    return null;
+  }
+
+  // Require exact token version match
+if (userPayload.tokenVersion !== dbUser.tokenVersion) {
+  return null;
+}
+}
   } catch (error) {
     console.error("Database check failed in auth middleware:", error);
     return null;

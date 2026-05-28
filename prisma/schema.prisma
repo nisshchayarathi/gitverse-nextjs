@@ -34,6 +34,9 @@ model User {
   emailNotifications    Boolean      @default(true) @map("email_notifications")
   pushNotifications     Boolean      @default(false) @map("push_notifications")
   weeklyDigest          Boolean      @default(true) @map("weekly_digest")
+  lockedUntil           DateTime?    @map("locked_until")
+  failedLoginAttempts   Int          @default(0) @map("failed_login_attempts")
+  lastFailedAttemptAt   DateTime?    @map("last_failed_attempt_at")
   createdAt             DateTime     @default(now()) @map("created_at")
   updatedAt             DateTime     @updatedAt @map("updated_at")
   repositories          Repository[]
@@ -42,6 +45,7 @@ model User {
   sessions              Session[]
   githubAccount         GitHubAccount?
   githubRepos           GitHubRepo[]
+  loginAttempts         LoginAttempt[]
 
   @@map("users")
 }
@@ -300,6 +304,13 @@ model File {
   @@map("files")
 }
 
+enum AttemptType {
+  LOGIN
+  SIGNUP
+  CHANGE_PASSWORD
+  DELETE_ACCOUNT
+}
+
 enum FileChangeType {
   ADDED
   MODIFIED
@@ -378,4 +389,21 @@ model GeminiAnalysisCache {
   @@index([expiresAt])
   @@index([repositoryId])
   @@map("gemini_analysis_cache")
+}
+
+model LoginAttempt {
+  id        Int         @id @default(autoincrement())
+  key       String
+  type      AttemptType
+  success   Boolean     @default(false)
+  email     String?
+  userId    Int?
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([key, type, createdAt(sort: Desc)])
+  @@index([email, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@map("login_attempts")
 }
