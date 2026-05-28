@@ -12,12 +12,12 @@ interface RepositoryFile {
 }
 
 interface Repository {
-  name: string;
+  name?: string
   files?: RepositoryFile[];
 }
 
 interface CodeDependencyGraphProps {
-  repository?: any;
+  repository?: Repository;
 }
 
 export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
