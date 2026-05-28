@@ -1,32 +1,32 @@
 import { PrismaClient } from "@prisma/client";
 import { Pool as PgPool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaNeonHttp } from "@prisma/adapter-neon";
+import { PrismaNeonHttp, PrismaNeon } from "@prisma/adapter-neon";
+import { Pool as NeonPool, neonConfig } from "@neondatabase/serverless";
+import ws from "ws";
 
-type PrismaAdapterChoice = "pg" | "neon-http";
+// Set webSocketConstructor so @neondatabase/serverless works via WebSockets in Node.js/serverless environments
+neonConfig.webSocketConstructor = ws;
+
+type PrismaAdapterChoice = "pg" | "neon-http" | "neon-ws";
 
 function getAdapterChoice(connectionString: string): PrismaAdapterChoice {
   const envChoice = (process.env.PRISMA_ADAPTER || "").trim().toLowerCase();
   if (envChoice === "pg") return "pg";
-  if (envChoice === "neon" || envChoice === "neon-http") return "neon-http";
+  if (envChoice === "neon-http") return "neon-http";
+  if (envChoice === "neon" || envChoice === "neon-ws") return "neon-ws";
 
-  // Heuristics:
-  // - If you're using Neon pooler (`-pooler.` host), prefer TCP via `pg` adapter.
-  //   The Neon HTTP driver uses `fetch()` and can be flaky/blocked in some environments.
-  // - Otherwise, fall back to Neon HTTP for Neon URLs.
   let host = "";
   try {
     host = new URL(connectionString).host;
   } catch {
-    // Ignore URL parsing errors; fall through.
+    // Ignore URL parsing errors; fall through
   }
 
   const isNeonHost =
     host.endsWith(".neon.tech") || connectionString.includes("neon.tech");
-  const isPoolerHost = host.includes("-pooler.");
 
-  if (isPoolerHost) return "pg";
-  if (isNeonHost) return "neon-http";
+  if (isNeonHost) return "neon-ws";
   return "pg";
 }
 
@@ -73,11 +73,7 @@ function createPrismaClient() {
 
   const adapterChoice = getAdapterChoice(connectionString);
 
-  if (adapterChoice === "neon-http") {
-    const adapter = new PrismaNeonHttp(connectionString, {} as any);
-    return withRetry(new PrismaClient({ adapter, log: ["error", "warn"] }));
-  }
-
+  // Connection Pool configuration
   const poolMaxRaw = process.env.PG_POOL_MAX;
   const defaultPoolMax = process.env.NODE_ENV === "production" ? 2 : 1;
   const poolMax = poolMaxRaw ? Number(poolMaxRaw) : defaultPoolMax;
@@ -93,6 +89,33 @@ function createPrismaClient() {
       ? connectionTimeoutMs
       : 30000;
 
+  if (adapterChoice === "neon-ws") {
+    // 1. WebSocket-based pooled adapter for Neon in serverless environment
+    const pool = new NeonPool({
+      connectionString,
+      connectionTimeoutMillis: normalizedConnectionTimeoutMs,
+      idleTimeoutMillis: process.env.NODE_ENV === "production" ? 30000 : 10000,
+      max: normalizedPoolMax,
+    });
+
+    pool.on("error", (err) => {
+      console.error("Unexpected Neon WebSocket pool error:", err);
+    });
+
+    const adapter = new PrismaNeon(pool as any);
+    return withRetry(new PrismaClient({
+      adapter,
+      log: ["error", "warn"],
+    }));
+  }
+
+  if (adapterChoice === "neon-http") {
+    // 2. HTTP-based fetch adapter for Neon (no pooling)
+    const adapter = new PrismaNeonHttp(connectionString, {} as any);
+    return withRetry(new PrismaClient({ adapter, log: ["error", "warn"] }));
+  }
+
+  // 3. Default: pg TCP connection pool adapter
   const pool = new PgPool({
     connectionString,
     connectionTimeoutMillis: normalizedConnectionTimeoutMs,
@@ -102,7 +125,7 @@ function createPrismaClient() {
   });
 
   pool.on("error", (err) => {
-    console.error("Unexpected pool error:", err);
+    console.error("Unexpected pg TCP pool error:", err);
   });
 
   const adapter = new PrismaPg(pool);
@@ -115,7 +138,6 @@ function createPrismaClient() {
 
 type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
 
-// Prevent multiple instances in development
 const globalForPrisma = globalThis as unknown as {
   prisma: ExtendedPrismaClient | undefined;
 };

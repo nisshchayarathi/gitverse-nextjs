@@ -1,8 +1,19 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as htmlToImage from "html-to-image";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
+import { MapControls } from "./MapControls";
+import { toast } from "sonner";
+
+interface RepositoryFile {
+  path: string;
+  lines?: number;
+}
+
+interface Repository {
+  files?: RepositoryFile[];
+}
 
 interface CodeDependencyGraphProps {
   repository?: any;
@@ -13,29 +24,52 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
 
+  const zoomRef = useRef<any>(null);
+  const svgSelectionRef = useRef<any>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  
   const graphAnalyzer = new GraphAnalyzer();
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
+
   const exportGraph = async (format: "png" | "svg") => {
     if (!exportRef.current) return;
 
+    setIsExporting(true);
+    const toastId = toast.loading(`Exporting graph as ${format.toUpperCase()}...`);
+    
     try {
+      // Create options for higher resolution output, especially for PNG
       const options = {
-        backgroundColor: "#0f172a",
-        pixelRatio: 2,
+        backgroundColor: "#0f172a", // Dark background to match the theme
+        pixelRatio: 3, // High DPI for crisp text
         cacheBust: true,
+        style: {
+          margin: "0",
+          borderRadius: "0",
+          boxShadow: "none"
+        }
       };
+
+      // We wait a tiny bit to ensure React state has flushed (e.g. MapControls is hidden if we chose to hide them, though we exclude them by not wrapping them in exportRef)
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const dataUrl =
         format === "png"
           ? await htmlToImage.toPng(exportRef.current, options)
-          : await htmlToImage.toSvg(exportRef.current);
+          : await htmlToImage.toSvg(exportRef.current, options);
 
       const link = document.createElement("a");
-      link.download = `gitverse-graph.${format}`;
+      const repoName = repository?.name ? `-${repository.name}` : "";
+      link.download = `gitverse${repoName}-map.${format}`;
       link.href = dataUrl;
       link.click();
+      
+      toast.success(`Graph exported successfully!`, { id: toastId });
     } catch (error) {
       console.error("Export failed:", error);
+      toast.error("Failed to export the graph. Please try again.", { id: toastId });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -278,29 +312,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
-            <div className="relative">
-              <details className="group">
-                <summary className="list-none cursor-pointer px-3 py-1 rounded-md bg-primary text-primary-foreground">
-                  Export
-                </summary>
-
-                <div className="absolute right-0 mt-2 w-40 rounded-md border bg-background shadow-lg z-50 overflow-hidden">
-                  <button
-                    onClick={() => exportGraph("png")}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted"
-                  >
-                    Download PNG
-                  </button>
-
-                  <button
-                    onClick={() => exportGraph("svg")}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted"
-                  >
-                    Download SVG
-                  </button>
-                </div>
-              </details>
-            </div>
             <div className="flex gap-3">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
@@ -313,40 +324,50 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             </div>
           </div>
         </div>
-        <div
-          ref={exportRef}
-          className="glass rounded-lg p-4 sm:p-6 relative overflow-visible"
-        >
-          <h3 className="text-base sm:text-lg font-semibold mb-4">
-            Code Dependencies
-          </h3>
-          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-            <svg
-              ref={svgRef}
-              width="100%"
-              height="auto"
-              className="text-foreground min-h-96 sm:min-h-96"
-              style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
-              viewBox="0 0 900 600"
-              preserveAspectRatio="xMidYMid meet"
-            />
+
+        <div className="relative">
+          <div
+            ref={exportRef}
+            className="glass rounded-lg p-4 sm:p-6 relative overflow-visible"
+          >
+            <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">
+              Code Dependencies
+            </h3>
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <svg
+                ref={svgRef}
+                width="100%"
+                height="auto"
+                className="text-white min-h-96 sm:min-h-96"
+                style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
+                viewBox="0 0 900 600"
+                preserveAspectRatio="xMidYMid meet"
+              />
+            </div>
+            <div className="absolute bottom-2 right-3 text-[10px] text-white/70">
+              GitVerse • {repository?.name || "Repository"}
+            </div>
           </div>
-          <div className="absolute bottom-2 right-3 text-[10px] text-white/70">
-            GitVerse • {repository?.name || "Repository"}
-          </div>
+
+          <MapControls 
+            onZoomIn={handleZoomIn} 
+            onZoomOut={handleZoomOut} 
+            onReset={handleReset} 
+            onExportPng={() => exportGraph("png")}
+            onExportSvg={() => exportGraph("svg")}
+            isExporting={isExporting}
+          />
         </div>
+
         <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
           💡 Drag nodes to reposition • Scroll to zoom • Hover for details
         </p>
+
         <div
           ref={tooltipRef}
-          className="
-    fixed p-3 rounded-lg pointer-events-none shadow-xl border
-    translate-x-[-120px] translate-y-[-120px]
-    sm:translate-x-[-250px] sm:translate-y-[-250px]
-  "
+          className="fixed p-3 rounded-lg pointer-events-none shadow-xl border translate-x-[-120px] translate-y-[-120px] sm:translate-x-[-250px] sm:translate-y-[-250px]"
           style={{
-            opacity: 1, // control with state later
+            opacity: 0,
             backgroundColor: "rgba(0, 0, 0, 0.9)",
             color: "white",
             zIndex: 9999,

@@ -3,6 +3,7 @@ import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { apiError } from "@/lib/api-error";
+import { isValidGitScope } from "@/lib/utils/validators";
 
 export async function POST(
   request: NextRequest,
@@ -23,6 +24,10 @@ export async function POST(
     }
 
     const { scope } = await request.json();
+
+    if (scope != null && (typeof scope !== "string" || !isValidGitScope(scope))) {
+      return apiError(400, "Invalid scope. Only alphanumeric characters, underscore, dot, slash, and hyphen are allowed.");
+    }
 
     const job = await analysisJobService.createRepositoryAnalysisJob({
       repositoryId: id,
