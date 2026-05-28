@@ -1,5 +1,11 @@
 # GitVerse
 
+[![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![MIT License](https://img.shields.io/badge/License-MIT-1E3A8A?style=flat-square)](#-license)
+[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-10B981?style=flat-square&logo=github&logoColor=white)](https://github.com/samarthtalwar9/gitverse-nextjs/pulls)
+
 Turn any GitHub repo into an interactive map of its architecture, modules, and risks.
 
 GitVerse is built for the moment you open a new codebase and ask: “Where do I start?”
@@ -161,10 +167,10 @@ To ensure consistent performance and predictability, paginated API endpoints in 
 
 ### Query Parameters
 
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `limit` | `number` | `10` | The maximum number of items to return (clamped to max `50` for safety). |
-| `cursor`| `string` | `null` | The ID of the last item received in the previous page. Omit for the first page. |
+| Parameter | Type     | Default | Description                                                                     |
+| :-------- | :------- | :------ | :------------------------------------------------------------------------------ |
+| `limit`   | `number` | `10`    | The maximum number of items to return (clamped to max `50` for safety).         |
+| `cursor`  | `string` | `null`  | The ID of the last item received in the previous page. Omit for the first page. |
 
 ### Example Request
 
@@ -194,11 +200,11 @@ When fetching data in the UI (e.g., via infinite scrolling or "Load More" button
 const loadMore = async () => {
   if (!nextCursor || isLoading) return;
   setIsLoading(true);
-  
+
   try {
     const res = await fetch(`/api/auth/sessions?limit=20&cursor=${nextCursor}`);
     const data = await res.json();
-    
+
     setItems((prev) => [...prev, ...data.items]);
     setNextCursor(data.nextCursor);
   } finally {
