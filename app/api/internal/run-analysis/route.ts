@@ -1,48 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import {
+  isAnalysisRunnerAuthorized,
+  registerUnhandledRejectionLogger,
+} from "@/lib/utils/analysisRunner";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { repositoryService } from "@/lib/services/repositoryService";
 
 export const runtime = "nodejs";
 
-function isAuthorized(request: NextRequest): boolean {
-  const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
 
-  // If a secret is configured, require it for non-GET requests.
-  // (Vercel Cron triggers are GET-only and cannot send custom headers.)
-  if (configuredSecret && request.method !== "GET") {
-    const headerSecret = request.headers.get("x-analysis-runner-secret");
-    const url = new URL(request.url);
-    const querySecret = url.searchParams.get("secret");
-
-    return headerSecret === configuredSecret || querySecret === configuredSecret;
-  }
-
-  // Vercel Cron: triggers are plain HTTP GETs to your `path`.
-  // Per Vercel docs, cron-triggered functions contain `vercel-cron/1.0` as the User-Agent.
-  // Note: User-Agent can be spoofed, but this is the strongest option that works with
-  // `vercel.json` crons (which don't support custom headers).
-  const ua = (request.headers.get("user-agent") || "").toLowerCase();
-  const isVercelCron =
-    process.env.VERCEL === "1" &&
-    process.env.VERCEL_ENV === "production" &&
-    ua.includes("vercel-cron/");
-  if (request.method === "GET" && isVercelCron) return true;
-
-  // In dev, allow calling without a secret.
-  if (!configuredSecret) {
-    return process.env.NODE_ENV !== "production";
-  }
-
-  const headerSecret = request.headers.get("x-analysis-runner-secret");
-  const url = new URL(request.url);
-  const querySecret = url.searchParams.get("secret");
-
-  return headerSecret === configuredSecret || querySecret === configuredSecret;
-}
 
 async function runOnce(request: NextRequest): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
+  registerUnhandledRejectionLogger();
+  if (!isAnalysisRunnerAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

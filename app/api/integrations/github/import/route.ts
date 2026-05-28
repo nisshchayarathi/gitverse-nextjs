@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware";
+import { requireAuth , sanitizeError } from "@/lib/middleware";
 import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
 import { repositoryService } from "@/lib/services/repositoryService";
 

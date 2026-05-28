@@ -6,10 +6,14 @@ import {
   ServerCrash,
   Bug,
 } from 'lucide-react'
+import { Navbar, Footer } from "@/components/layout";
 
 export default function SecurityPage() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      
+      <main className="min-h-screen bg-background text-foreground">
 
       {/* Hero Section */}
       <section className="relative overflow-hidden border-b border-border/50">
@@ -121,5 +125,8 @@ export default function SecurityPage() {
         </div>
       </section>
     </main>
+       
+        <Footer />
+    </div>
   )
 }

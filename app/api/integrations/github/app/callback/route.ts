@@ -1,3 +1,4 @@
+import { sanitizeError } from "@/lib/middleware";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { GitHubAppService } from "@/lib/services/githubAppService";

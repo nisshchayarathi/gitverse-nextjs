@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -18,20 +18,44 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui";
+import { buildApiUrl } from "@/services/apiConfig";
+
+interface FileData {
+  name: string;
+  path: string;
+  size?: number;
+  extension?: string;
+  language?: string;
+  lines?: number;
+  createdAt?: string;
+}
+
+interface FileStats {
+  path: string;
+  commitCount: number;
+  additions: number;
+  deletions: number;
+}
+
+interface RepositoryData {
+  id?: number;
+  name?: string;
+  files?: FileData[];
+}
 
 interface FileNode {
   name: string;
   type: "file" | "folder";
   path: string;
   size?: number;
-  fileData?: any; // Reference to the actual file object from repository
+  fileData?: FileData; // Reference to the actual file object from repository
   children?: FileNode[];
 }
 
 interface FileTreeProps {
   node: FileNode;
   level?: number;
-  onFileSelect?: (fileData: any) => void;
+  onFileSelect?: (fileData: FileData) => void;
 }
 
 const FileTreeNode: React.FC<FileTreeProps> = ({
@@ -129,14 +153,18 @@ const formatBytes = (bytes: number): string => {
 };
 
 interface FileStructureProps {
-  repository?: any;
+  repository?: RepositoryData;
 }
 
 export const FileStructure = ({ repository }: FileStructureProps) => {
-  const [selectedFile, setSelectedFile] = useState<any | null>(null);
+  const [selectedFile, setSelectedFile] = useState<FileData | null>(null);
+  const [fileStatsByPath, setFileStatsByPath] = useState<
+    Record<string, FileStats>
+  >({});
+  const [fileStatsLoading, setFileStatsLoading] = useState(false);
 
   // Build file tree from repository files
-  const buildFileTree = (files: any[]): FileNode => {
+  const buildFileTree = (files: FileData[]): FileNode => {
     const root: FileNode = {
       name: repository?.name || "root",
       type: "folder",
@@ -144,7 +172,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
       children: [],
     };
 
-    files?.forEach((file: any) => {
+    files?.forEach((file: FileData) => {
       const parts = file.path.split("/").filter(Boolean);
       let current = root;
 
@@ -174,38 +202,94 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
     return root;
   };
 
-  const fileTree = buildFileTree(repository?.files || []);
+  const files = useMemo(() => repository?.files || [], [repository?.files]);
+  const fileTree = useMemo(() => buildFileTree(files), [files, repository?.name]);
 
-  const handleFileSelect = (fileData: any) => {
+  useEffect(() => {
+    if (!repository?.id || files.length === 0) {
+      setFileStatsByPath({});
+      setFileStatsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const fetchFileStats = async () => {
+      setFileStatsLoading(true);
+
+      try {
+        const token =
+          typeof window !== "undefined"
+            ? localStorage.getItem("gitverse_token")
+            : null;
+        const response = await fetch(
+          buildApiUrl(`/api/repositories/${repository.id}/files/stats`),
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ paths: files.map((file) => file.path) }),
+            signal: controller.signal,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load file statistics");
+        }
+
+        const data = await response.json();
+        const nextStats = (data.stats || []).reduce(
+          (acc: Record<string, FileStats>, stat: FileStats) => {
+            acc[stat.path] = stat;
+            return acc;
+          },
+          {}
+        );
+
+        setFileStatsByPath(nextStats);
+      } catch (error: any) {
+        if (error.name !== "AbortError") {
+          console.error("Error fetching file statistics:", error);
+          setFileStatsByPath({});
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setFileStatsLoading(false);
+        }
+      }
+    };
+
+    fetchFileStats();
+
+    return () => controller.abort();
+  }, [files, repository?.id]);
+
+  const handleFileSelect = (fileData: FileData) => {
     setSelectedFile(fileData);
   };
 
-  // Count commits for a specific file
-  const getFileCommitCount = (filePath: string): number => {
+  const getFileStats = (filePath: string): FileStats => {
     return (
-      repository?.commits?.reduce((count: number, commit: any) => {
-        const fileChanged = commit.fileChanges?.some(
-          (fc: any) => fc.path === filePath
-        );
-        return fileChanged ? count + 1 : count;
-      }, 0) || 0
+      fileStatsByPath[filePath] || {
+        path: filePath,
+        commitCount: 0,
+        additions: 0,
+        deletions: 0,
+      }
     );
   };
 
-  // Get file changes stats
-  const getFileChangeStats = (filePath: string) => {
-    let additions = 0;
-    let deletions = 0;
-    repository?.commits?.forEach((commit: any) => {
-      commit.fileChanges?.forEach((change: any) => {
-        if (change.path === filePath) {
-          additions += change.additions || 0;
-          deletions += change.deletions || 0;
-        }
-      });
-    });
-    return { additions, deletions };
-  };
+  const selectedFileStats = selectedFile
+    ? getFileStats(selectedFile.path)
+    : null;
+  const selectedFileTotalChanges = selectedFileStats
+    ? selectedFileStats.additions + selectedFileStats.deletions
+    : 0;
+  const selectedFileNetChange = selectedFileStats
+    ? selectedFileStats.additions - selectedFileStats.deletions
+    : 0;
 
   return (
     <div className="space-y-4">
@@ -295,7 +379,9 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                   </span>
                 </div>
                 <p className="text-3xl font-bold">
-                  {getFileCommitCount(selectedFile.path)}
+                  {fileStatsLoading
+                    ? "..."
+                    : selectedFileStats?.commitCount.toLocaleString() || 0}
                 </p>
               </div>
 
@@ -329,9 +415,9 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                       </p>
                       <p className="text-2xl font-bold text-green-400">
                         +
-                        {getFileChangeStats(
-                          selectedFile.path
-                        ).additions.toLocaleString()}
+                        {fileStatsLoading
+                          ? "..."
+                          : selectedFileStats?.additions.toLocaleString() || 0}
                       </p>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -346,9 +432,9 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                       </p>
                       <p className="text-2xl font-bold text-red-400">
                         -
-                        {getFileChangeStats(
-                          selectedFile.path
-                        ).deletions.toLocaleString()}
+                        {fileStatsLoading
+                          ? "..."
+                          : selectedFileStats?.deletions.toLocaleString() || 0}
                       </p>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -362,17 +448,15 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                         Net Change
                       </p>
                       <p
-                        className={`text-2xl font-bold ${getFileChangeStats(selectedFile.path).additions - getFileChangeStats(selectedFile.path).deletions >= 0 ? "text-green-400" : "text-red-400"}`}
+                        className={`text-2xl font-bold ${
+                          selectedFileNetChange >= 0
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
                       >
-                        {getFileChangeStats(selectedFile.path).additions -
-                          getFileChangeStats(selectedFile.path).deletions >=
-                        0
-                          ? "+"
-                          : ""}
-                        {(
-                          getFileChangeStats(selectedFile.path).additions -
-                          getFileChangeStats(selectedFile.path).deletions
-                        ).toLocaleString()}
+                        {fileStatsLoading
+                          ? "..."
+                          : `${selectedFileNetChange >= 0 ? "+" : ""}${selectedFileNetChange.toLocaleString()}`}
                       </p>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -395,11 +479,10 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                       Changes per Commit
                     </p>
                     <p className="text-2xl font-bold">
-                      {getFileCommitCount(selectedFile.path) > 0
+                      {!fileStatsLoading && selectedFileStats?.commitCount
                         ? Math.round(
-                            (getFileChangeStats(selectedFile.path).additions +
-                              getFileChangeStats(selectedFile.path).deletions) /
-                              getFileCommitCount(selectedFile.path)
+                            selectedFileTotalChanges /
+                              selectedFileStats.commitCount
                           )
                         : 0}
                     </p>
@@ -413,14 +496,10 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                       Churn Ratio
                     </p>
                     <p className="text-2xl font-bold">
-                      {getFileChangeStats(selectedFile.path).additions +
-                        getFileChangeStats(selectedFile.path).deletions >
-                      0
+                      {!fileStatsLoading && selectedFileTotalChanges > 0
                         ? (
-                            (getFileChangeStats(selectedFile.path).deletions /
-                              (getFileChangeStats(selectedFile.path).additions +
-                                getFileChangeStats(selectedFile.path)
-                                  .deletions)) *
+                            ((selectedFileStats?.deletions || 0) /
+                              selectedFileTotalChanges) *
                             100
                           ).toFixed(1)
                         : 0}
@@ -467,8 +546,10 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     Total Modifications
                   </p>
                   <p className="text-lg font-semibold">
-                    {getFileCommitCount(selectedFile.path)}{" "}
-                    {getFileCommitCount(selectedFile.path) === 1
+                    {fileStatsLoading
+                      ? "..."
+                      : selectedFileStats?.commitCount.toLocaleString() || 0}{" "}
+                    {selectedFileStats?.commitCount === 1
                       ? "commit"
                       : "commits"}
                   </p>
@@ -478,10 +559,9 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     Impact
                   </p>
                   <p className="text-lg font-semibold">
-                    {(
-                      getFileChangeStats(selectedFile.path).additions +
-                      getFileChangeStats(selectedFile.path).deletions
-                    ).toLocaleString()}{" "}
+                    {fileStatsLoading
+                      ? "..."
+                      : selectedFileTotalChanges.toLocaleString()}{" "}
                     changes
                   </p>
                 </div>

@@ -1,27 +1,73 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { getGeminiService } from "@/lib/services/geminiService";
 import { repositoryService } from "@/lib/services/repositoryService";
+import { createRateLimiter } from "@/lib/utils/ipRateLimit";
+
+// Rate limiter: 20 requests per user per minute across all AI chat calls.
+// Prevents a single authenticated user from burning Gemini quota unchecked.
+const aiChatLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 20 });
+
+// Allowed roles in the conversation history. Rejecting "system" entries from
+// client payloads prevents prompt injection via injected context.
+const ALLOWED_MESSAGE_ROLES = new Set(["user", "model"]);
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
-    const body = await request.json();
-    const { repositoryId, question, conversationHistory, prompt } = body;
 
-    // Free-form mode: client provides a prebuilt prompt.
-    if (typeof prompt === "string" && prompt.trim()) {
-      const response = await getGeminiService().chatRaw(prompt);
-      return NextResponse.json({ response });
+    // Per-user rate limiting
+    if (!aiChatLimiter.check(user.userId)) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before sending another message." },
+        { status: 429 }
+      );
     }
 
+    const body = await request.json();
+    const { repositoryId, question, conversationHistory } = body;
+
+    // Validate conversationHistory if provided.
+    // Only "user" and "model" roles are accepted to prevent system-role injection.
+    if (conversationHistory !== undefined) {
+      if (!Array.isArray(conversationHistory)) {
+        return NextResponse.json(
+          { error: "conversationHistory must be an array" },
+          { status: 400 }
+        );
+      }
+      for (const msg of conversationHistory) {
+        if (
+          !msg ||
+          typeof msg !== "object" ||
+          typeof msg.role !== "string" ||
+          !ALLOWED_MESSAGE_ROLES.has(msg.role) ||
+          typeof msg.content !== "string" ||
+          !msg.content.trim()
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "Each conversationHistory entry must have role ('user' or 'model') and a non-empty content string",
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    // All AI chat requests must supply a repositoryId so the ownership check
+    // below runs for every call. The previous free-form prompt path that
+    // bypassed this check has been removed.
     if (!repositoryId || !question) {
       return NextResponse.json(
-        { error: "Repository ID and question are required" },
+        { error: "repositoryId and question are required" },
         { status: 400 }
       );
     }
 
+    // Ownership check: getRepository returns null if the repository does not
+    // belong to the requesting user, so unauthorized access returns 404.
     const repository = await repositoryService.getRepository(
       repositoryId,
       user.userId
