@@ -12,3 +12,12 @@ export function isValidGithubUrl(url: string): boolean {
   const githubRegex = /^https?:\/\/(www\.)?github\.com\/[a-zA-Z0-9-._]+\/[a-zA-Z0-9-._]+(\.git)?\/?$/;
   return githubRegex.test(url.trim());
 }
+
+/**
+ * Validates that a git scope/path contains only safe characters.
+ * Shell metacharacters (; | $ ` \ ' " ( ) { } < > & #) are rejected.
+ */
+export function isValidGitScope(value: string): boolean {
+  if (!value || typeof value !== "string") return false;
+  return /^[a-zA-Z0-9_./-]+$/.test(value);
+}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError, getPrismaErrorResponse } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { repositoryService } from "@/lib/services/repositoryService";
 
@@ -36,6 +36,12 @@ export async function GET(
     return NextResponse.json(repository, { headers: securityHeaders });
   } catch (error: any) {
     console.error("Error fetching repository:", sanitizeError(error));
+
+    const prismaError = getPrismaErrorResponse(error);
+    if (prismaError) {
+      // Return 503 DATABASE_COLD_START response if applicable
+      return prismaError;
+    }
 
     if (isHttpError(error)) {
       return NextResponse.json(
@@ -92,6 +98,11 @@ export async function DELETE(
     );
   } catch (error: any) {
     console.error("Delete repository error:", sanitizeError(error));
+
+    const prismaError = getPrismaErrorResponse(error);
+    if (prismaError) {
+      return prismaError;
+    }
 
     if (isHttpError(error)) {
       return NextResponse.json(

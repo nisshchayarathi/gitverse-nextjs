@@ -4,9 +4,7 @@ export const dynamic = "force-dynamic";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { isValidGithubUrl } from "@/lib/utils/validators";
 import { useState, useRef, useEffect } from "react";
-import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { isValidGithubUrl } from "@/lib/utils/validators";
 import { RecentReposList } from "@/components/RecentReposList";
 import { useRecentRepos } from "@/hooks/useRecentRepos";
 import {
@@ -154,21 +152,32 @@ export default function Dashboard() {
   const fetchRepositories = async () => {
     try {
       const token = localStorage.getItem("gitverse_token");
-      const response = await axios.get(buildApiUrl("/api/repositories"), {
+      const response = await axios.get(buildApiUrl("/api/repositories?limit=1000"), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // API returns { repositories: [...] }
-      const repos = response.data.repositories || [];
+      // API returns { data: [...], nextCursor, hasMore }
+      const repos = response.data.data || [];
       setRepositories(Array.isArray(repos) ? repos : []);
-    } catch (error) {
+      setLoading(false);
+    } catch (error: any) {
       console.error("Error fetching repositories:", error);
+      
+      const isColdStart = error.response?.data?.error === "DATABASE_COLD_START";
+      if (isColdStart) {
+        toast({
+          title: "Waking up database...",
+          description: "This may take a few seconds.",
+        });
+        setTimeout(fetchRepositories, 3000);
+        return;
+      }
+
       toast({
         title: "Error",
         description: "Failed to fetch repositories.",
         variant: "destructive",
       });
       setRepositories([]);
-    } finally {
       setLoading(false);
     }
   };

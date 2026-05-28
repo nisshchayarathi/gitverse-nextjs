@@ -28,7 +28,6 @@ export default function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deletePassword, setDeletePassword] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const didInitProfileForm = useRef(false);
@@ -40,7 +39,6 @@ export default function Settings() {
 
   const initialEmailRef = useRef<string>(user?.email || "");
   const [isGoogleLinked, setIsGoogleLinked] = useState<boolean | null>(null);
-  const [hasPassword, setHasPassword] = useState(false);
   const [emailChangeNewPassword, setEmailChangeNewPassword] = useState("");
 
   // When using Google login, `user` arrives async from NextAuth session.
@@ -75,7 +73,6 @@ export default function Settings() {
       }
 
       setIsGoogleLinked(!!res.data?.isGoogleLinked);
-      setHasPassword(!!res.data?.hasPassword);
       setUserFetchStatus("success");
     } catch (err) {
       console.error("Error fetching user info:", err);
@@ -331,7 +328,6 @@ export default function Settings() {
   };
 
   const handleDeleteAccount = () => {
-    setDeletePassword("");
     setShowDeleteModal(true);
   };
 
@@ -344,7 +340,6 @@ export default function Settings() {
       await axios.delete(buildApiUrl("/api/users/me"), {
         withCredentials: true,
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        data: { password: deletePassword },
       });
 
       await logout();
@@ -808,52 +803,47 @@ export default function Settings() {
           </div>
         </div>
       </div>
-      <Modal
-        isOpen={showDeleteModal}
-        onClose={() => { setShowDeleteModal(false); setDeletePassword(""); }}
-        title="Delete Account"
-        size="sm"
-      >
-        <p className="text-muted-foreground mb-4">
-          This permanently deletes your account and all data. This cannot be undone.
-        </p>
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-account-title"
+          onKeyDown={(e) => e.key === "Escape" && setShowDeleteModal(false)}
+          onClick={(e) => e.target === e.currentTarget && setShowDeleteModal(false)}
+        >
+          <Card className="w-full max-w-sm">
+            <CardHeader>
+              <CardTitle id="delete-account-title">Delete Account</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-6">
+                This permanently deletes your account and all data. This cannot be undone.
+              </p>
 
-        {hasPassword && (
-          <>
-            <p className="text-sm text-muted-foreground mb-4">
-              Enter your password to confirm.
-            </p>
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDeleteModal(false)}
+                >
+                  Cancel
+                </Button>
 
-            <Input
-              type="password"
-              placeholder="Password"
-              value={deletePassword}
-              onChange={(e) => setDeletePassword(e.target.value)}
-              className="mb-6"
-            />
-          </>
-        )}
-
-        <div className="flex gap-3 justify-end">
-          <Button
-            variant="outline"
-            onClick={() => { setShowDeleteModal(false); setDeletePassword(""); }}
-          >
-            Cancel
-          </Button>
-
-          <Button
-            variant="destructive"
-            onClick={() => {
-              setShowDeleteModal(false);
-              confirmDeleteAccount();
-            }}
-            disabled={isDeletingAccount || (hasPassword && !deletePassword)}
-          >
-            {isDeletingAccount ? "Deleting..." : "Delete Account"}
-          </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    confirmDeleteAccount();
+                  }}
+                  disabled={isDeletingAccount}
+                >
+                  {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </Modal>
+      )}
 
     </DashboardLayout>
   );
