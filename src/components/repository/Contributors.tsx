@@ -66,7 +66,9 @@ export function Contributors({ repository }: ContributorsProps) {
       percentage: contrib.percentage,
       firstCommit: contrib.firstCommit,
       lastCommit: contrib.lastCommit,
-      weeklyActivity: [],
+      weeklyActivity: Array.from({ length: 12 }, () =>
+        Math.floor(contrib.commits / 12)
+      ), // TODO: Replace with real weekly activity data from GitHub stats API
       rank: index + 1,
     })) || [];
 
