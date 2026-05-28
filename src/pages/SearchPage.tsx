@@ -89,7 +89,12 @@ finally {
   const sortedRepositories = [...filteredRepositories].sort((a, b) => {
     if (sortBy === "stars") return (b.stars || 0) - (a.stars || 0);
     if (sortBy === "name") return a.name.localeCompare(b.name);
-    return 0; // 'recent' is already sorted
+    
+    // Sort by recent explicitly (fallback to 0 if dates are missing)
+    const dateA = new Date((a as any).lastAnalyzedAt || a.createdAt || 0).getTime();
+    const dateB = new Date((b as any).lastAnalyzedAt || b.createdAt || 0).getTime();
+    
+    return dateB - dateA; // Descending order (newest first)
   });
 
   return (
