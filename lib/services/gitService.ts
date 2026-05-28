@@ -1,7 +1,6 @@
 import { spawn, type SpawnOptions } from "child_process";
 import * as path from "path";
 import * as fs from "fs/promises";
-import { createReadStream } from "fs";
 import readline from "readline";
 
 const DEFAULT_GIT_TIMEOUT_MS = 2 * 60 * 1000;
@@ -11,24 +10,6 @@ const MAX_COMMITS_DEFAULT = 1000;
 const MAX_CONTRIBUTOR_COMMITS = 3000;
 const MAX_FILE_BYTES_TO_READ_FOR_LINECOUNT = 256 * 1024; // 256KB
 
-function countLinesReadStream(filePath: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const stream = createReadStream(filePath, { encoding: "utf-8" });
-    let lines = 0;
-    let remaining = "";
-
-    stream.on("data", (chunk: string) => {
-      lines += (remaining + chunk).split("\n").length - 1;
-      remaining = chunk.endsWith("\n") ? "" : chunk.slice(chunk.lastIndexOf("\n") + 1);
-    });
-
-    stream.on("end", () => {
-      resolve(lines + (remaining ? 1 : 0));
-    });
-
-    stream.on("error", reject);
-  });
-}
 
 function spawnOutput(
   command: string,

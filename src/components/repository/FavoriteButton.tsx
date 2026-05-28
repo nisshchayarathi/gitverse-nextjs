@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useOptimistic, useTransition } from 'react'
+import React, { useState, useTransition } from 'react'
 import { Heart } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/hooks/use-toast'
@@ -19,10 +19,9 @@ export const FavoriteButton: React.FC<FavoriteButtonProps> = ({
   const [isPending, startTransition] = useTransition()
 
   // Set up optimistic UI state
-  const [optimisticIsFavorited, setOptimisticIsFavorited] = useOptimistic(
-    initialIsFavorited,
-    (currentState: boolean, optimisticValue: boolean) => optimisticValue
-  )
+  const [optimisticIsFavorited, setOptimisticIsFavorited] = useState(
+  initialIsFavorited
+)
 
   const handleToggle = () => {
     // Instantly reflect the user's action in the UI

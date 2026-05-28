@@ -3,7 +3,6 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
-import { useRepoBrowsePrefs } from "@/hooks/useRepoBrowsePrefs";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Grid, List, GitBranch, Clock, Activity } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -18,7 +17,8 @@ import {
   EmptyState,
   Skeleton,
 } from "@/components/ui";
-import { useRepositories } from "@/hooks/useRepositories";
+import { buildApiUrl } from "@/services/apiConfig";
+import axios from "axios";
 
 interface Repository {
   id: string;
@@ -41,8 +41,40 @@ export default function SearchPage() {
   const initialUrl = searchParams?.get("repoUrl") || "";
 
   const [searchQuery, setSearchQuery] = useState(initialUrl);
-  const { viewMode, setViewMode, sortBy, setSortBy } = useRepoBrowsePrefs();
-  const { repos: repositories, isLoading: loading, isLoadingMore, hasMore, loadMore, error } = useRepositories({ limit: 12 });
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [sortBy, setSortBy] = useState<"recent" | "stars" | "name">("recent");
+  const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchRepositories();
+  }, []);
+
+  const fetchRepositories = async () => {
+     setError("");
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      const response = await axios.get(buildApiUrl("/api/repositories"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // API returns { repositories: [...] }
+      const repos = response.data.repositories || [];
+      setRepositories(Array.isArray(repos) ? repos : []);
+    }  
+    catch (error) {
+  console.error("Error fetching repositories:", error);
+
+  setRepositories([]);
+
+  setError(
+    "Failed to load repositories. Please check your connection and try again."
+  );
+}
+finally {
+      setLoading(false);
+    }
+  };
 
   const filteredRepositories = Array.isArray(repositories)
     ? repositories.filter(
@@ -129,7 +161,7 @@ export default function SearchPage() {
     <option value="name">Name</option>
   </select>
 </div>
-            </div>
+</div>
           </CardContent>
         </Card>
 
@@ -415,19 +447,6 @@ export default function SearchPage() {
                 </CardContent>
               </Card>
             ))}
-          </div>
-        )}
-        
-        {hasMore && !loading && !error && sortedRepositories.length > 0 && (
-          <div className="flex justify-center mt-6">
-            <Button 
-              variant="outline" 
-              onClick={loadMore} 
-              disabled={isLoadingMore}
-              className="min-w-[150px]"
-            >
-              {isLoadingMore ? "Loading..." : "Load More"}
-            </Button>
           </div>
         )}
       </div>

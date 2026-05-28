@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 export const dynamic = "force-dynamic";
 
@@ -254,9 +254,9 @@ export default function RepositoryAnalysis() {
 
         setError(msg);
 
-        pollingStartedAt.current = null;
+        
         setIsAnalyzing(false);
-        setAnalysisError(nextJob?.error || "The repository analysis failed.");
+        
         toast({
           title: "Analysis failed",
           description: msg,

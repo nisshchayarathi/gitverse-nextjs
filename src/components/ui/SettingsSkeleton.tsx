@@ -34,7 +34,7 @@ export const SettingsSkeleton: React.FC = () => {
             <CardHeader>
               <CardTitle>
                 <div className="flex items-center gap-2">
-                  <Skeleton className="h-5 w-5 rounded-full" variant="circular" />
+                  <Skeleton className="h-5 w-5 rounded-full" />
                   <Skeleton className="h-6 w-48" />
                 </div>
               </CardTitle>
@@ -58,7 +58,7 @@ export const SettingsSkeleton: React.FC = () => {
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-32" />
                   <div className="flex items-center gap-4">
-                    <Skeleton variant="circular" className="h-16 w-16" />
+                    <Skeleton className="h-16 w-16 rounded-full" />
                     <div className="flex-1 space-y-2">
                       <Skeleton className="h-8 w-48" />
                       <Skeleton className="h-4 w-32" />

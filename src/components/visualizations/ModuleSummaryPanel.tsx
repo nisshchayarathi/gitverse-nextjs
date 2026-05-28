@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Settings, Sparkles, X } from "lucide-react";
 import { useAISettings } from "@/hooks/useAISettings";
-import { ClientAIProvider, AIContext } from "@/lib/ai/clientProvider";
+import { AIContext } from "@/lib/ai/clientProvider";
 
 interface Props {
   nodeId: string;
@@ -57,7 +57,7 @@ export const ModuleSummaryPanel: React.FC<Props> = ({
         files: filesToInclude.map(f => ({ path: f.path, size: f.size || 0 }))
       };
 
-      const result = await ClientAIProvider.generateModuleSummary(settings.provider, activeKey, context);
+      const result = "AI summary generation is temporarily unavailable.";
       setSummary(result);
     } catch (err: any) {
       setError(err.message || "Failed to generate summary");

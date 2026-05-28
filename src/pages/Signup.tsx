@@ -143,6 +143,7 @@ export default function Signup() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    const newErrors: any = {};
     e.preventDefault();
 
     if (!name || !email || !password || !confirmPassword) {

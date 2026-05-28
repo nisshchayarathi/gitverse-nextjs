@@ -242,6 +242,7 @@ export default function Dashboard() {
       const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
       const cleanParts = cleanUrl.split("/");
       const ownerName = cleanParts[cleanParts.length - 2] || "unknown";
+      const repoName = cleanParts[cleanParts.length - 1] || "repository";
 
       const response = await axios.post(
         buildApiUrl("/api/repositories"),
@@ -382,8 +383,8 @@ if (loading) {
 }
   return (
     <DashboardLayout>
-    <div className="min-h-screen bg-background"></div>
-      <div className="space-y-6">
+  <div className="min-h-screen bg-background">
+    <div className="space-y-6">
         {/* Welcome Section */}
         <div>
           <h1 className="text-2xl sm:text-3xl font-heading font-bold mb-2">
@@ -685,6 +686,7 @@ if (loading) {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
     </DashboardLayout>
   );

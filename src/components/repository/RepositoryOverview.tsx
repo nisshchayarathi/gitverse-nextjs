@@ -26,6 +26,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import { useState } from "react";
+import { FavoriteButton } from "./FavoriteButton";
 
 interface RepositoryData {
   id: string;
@@ -54,7 +56,7 @@ export const RepositoryOverview = ({
 }: RepositoryOverviewProps) => {
   const [isFavorited, setIsFavorited] = useState(false);
 
-  const handleToggleFavorite = async (id: string, nextState: boolean) => {
+  const handleToggleFavorite = async (_id: string, nextState: boolean) => {
     // Simulate server API latency of 1.5 seconds
     await new Promise((resolve, reject) => {
       setTimeout(() => {

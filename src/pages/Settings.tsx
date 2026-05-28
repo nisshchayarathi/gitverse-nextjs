@@ -1,9 +1,9 @@
 "use client";
 
 export const dynamic = "force-dynamic";
-
-import { useEffect, useState, useRef, useCallback } from "react";
-import { User, Lock, Shield, Trash2, AlertCircle, Save, Cpu } from "lucide-react";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { User, Lock, Shield, Trash2, AlertCircle, Cpu } from "lucide-react";
+import { Save } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   Card,
@@ -23,7 +23,7 @@ import axios from "axios";
 import { useAISettings, AIProviderType } from "@/hooks/useAISettings";
 
 export default function Settings() {
-  const { user, logout, isLoading: authLoading } = useAuth();
+  const { user, logout, updateUser, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
