@@ -56,24 +56,26 @@ export function Contributors({ repository }: ContributorsProps) {
   // Use real contributors from repository or empty array
   const contributors: Contributor[] =
     repository?.contributors?.map((contrib: any, index: number) => ({
-      id: contrib.id.toString(),
+      id: contrib.id?.toString() || "",
       name: contrib.name,
       email: contrib.email,
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${contrib.name}`,
-      commits: contrib.commits,
-      additions: contrib.additions,
-      deletions: contrib.deletions,
-      percentage: contrib.percentage,
+      commits: contrib.commits || 0,
+      additions: contrib.additions || 0,
+      deletions: contrib.deletions || 0,
+      percentage: contrib.percentage || 0,
       firstCommit: contrib.firstCommit,
       lastCommit: contrib.lastCommit,
-      weeklyActivity: Array.from({ length: 12 }, (_, index) => {
-        const baseActivity = Math.floor(contrib.commits / 12);
-        const remainder = contrib.commits % 12;
+      weeklyActivity: contrib.commits
+        ? Array.from({ length: 12 }, (_, index) => {
+            const baseActivity = Math.floor(contrib.commits / 12);
+            const remainder = contrib.commits % 12;
 
-        return index < remainder
-          ? baseActivity + 1
-          : baseActivity;
-      }), // TODO: Replace with real weekly activity data from GitHub stats API
+            return index < remainder
+              ? baseActivity + 1
+              : baseActivity;
+          })
+        : Array.from({ length: 12 }, () => 0), // TODO: Replace with real weekly activity data from GitHub stats API
       rank: index + 1,
     })) || [];
 
