@@ -305,8 +305,7 @@ export const authOptions: NextAuthOptions = {
             // If the PKCE code_verifier cookie is lost/mismatched (common in some dev setups),
             // Google returns invalid_grant at the token exchange step.
             // Using state-only is sufficient for local dev and avoids that failure mode.
-            checks: ["state"],
-            allowDangerousEmailAccountLinking: true,
+            checks: ["state", "pkce"],
           }),
         ]
       : []),

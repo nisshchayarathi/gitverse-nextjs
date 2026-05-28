@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { generateToken } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import crypto from "crypto";
+import { sendVerificationEmail } from "@/lib/email";
 import {
   getClientIp,
   countAttempts,
@@ -99,28 +100,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = txResult.user;
+const user = txResult.user;
 
-    await recordAttempt({
-      key: ip,
-      type: "SIGNUP",
-      success: true,
-    });
+await recordAttempt({
+  key: ip,
+  type: "SIGNUP",
+  success: true,
+});
 
-    const token = generateToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
+// Generate email verification token
+const verifyToken = crypto.randomBytes(32).toString("hex");
+await prisma.verificationToken.create({
+  data: {
+    identifier: user.email,
+    token: verifyToken,
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+  },
+});
 
-    return NextResponse.json(
-      {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          avatarUrl: (user as any).image,
-        },
-        token,
-      },
-      { status: 201 }
-    );
+// Send verification email
+await sendVerificationEmail(user.email, verifyToken);
+
+return NextResponse.json(
+  {
+    message: "Account created! Please check your email to verify your account.",
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      avatarUrl: (user as any).image,
+    },
+  },
+  { status: 201 }
+);
   } catch (error: any) {
     if (error?.code === "P2002") {
       return NextResponse.json(
