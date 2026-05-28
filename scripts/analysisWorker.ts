@@ -116,7 +116,7 @@ async function runJob(
     const details = job.progressDetails as any;
     const scope = details?.scope;
 
-    await repositoryService.analyzeRepository(job.repositoryId, job.userId, {
+    const analyzePromise = repositoryService.analyzeRepository(job.repositoryId, job.userId, {
       scope,
       signal: abortController.signal,
       onProgress: async (update) => {

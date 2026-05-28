@@ -1,16 +1,11 @@
-﻿"use client";
+"use client";
 
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef, useMemo } from "react";
-
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import Link from "next/link";
-
-
-import { useState, useEffect, useRef } from "react";
-import RepositoryAnalysisProgress  from "@/components/repository/RepositoryAnalysisProgress";
-import { useParams } from "next/navigation";
+import RepositoryAnalysisProgress from "@/components/repository/RepositoryAnalysisProgress";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RepositoryOverview } from "@/components/repository/RepositoryOverview";
 import { FileStructure } from "@/components/repository/FileStructure";
@@ -19,7 +14,6 @@ import { Contributors } from "@/components/repository/Contributors";
 import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
 import { RepositoryIssues } from "@/components/repository/RepositoryIssues";
-import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 import {
   Home,
@@ -37,10 +31,13 @@ import {
   RefreshCw,
   Loader2,
   XCircle,
+  AlertCircle,
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import { buildApiUrl } from "@/services/apiConfig";
+import { Modal } from "@/components/ui/Modal";
+
 // Local fallback skeleton UI (avoids missing import)
 const RepositoryAnalysisSkeleton: React.FC = () => {
   return (
@@ -56,11 +53,6 @@ const RepositoryAnalysisSkeleton: React.FC = () => {
 
 // How long before we stop polling and show a "stuck" error (8 minutes)
 const ANALYSIS_TIMEOUT_MS = 8 * 60 * 1000;
-// Start polling every 2s, back off to 5s max
-const POLL_INTERVAL_INITIAL_MS = 2000;
-const POLL_INTERVAL_MAX_MS = 5000;
-const POLL_INTERVAL_STEP_MS = 500;
-import { Modal } from "@/components/ui/Modal";
 
 type TabType =
   | "overview"
@@ -167,13 +159,16 @@ export default function RepositoryAnalysis() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const pollingStartedAt = useRef<number | null>(null);
-  // Tracks last time progress changed  prevents falsely timing out active jobs
+  // Tracks last time progress changed - prevents falsely timing out active jobs
   const lastProgressAt = useRef<number | null>(null);
   const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
 
   // ── Elapsed seconds ticker ────────────────────────────────────────
   useEffect(() => {
     if (isAnalyzing && !analysisTimedOut) {
+      if (!pollingStartedAt.current) {
+        pollingStartedAt.current = Date.now();
+      }
       elapsedTimer.current = setInterval(() => {
         if (pollingStartedAt.current) {
           setElapsedSeconds(
@@ -189,58 +184,38 @@ export default function RepositoryAnalysis() {
     };
   }, [isAnalyzing, analysisTimedOut]);
 
-  
-
-  // Timeout / stuck state
-  const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  const pollingStartedAt = useRef<number | null>(null);
-  // Tracks last time progress changed — prevents falsely timing out active jobs
-  const lastProgressAt = useRef<number | null>(null);
-  const elapsedTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // â”€â”€ Elapsed seconds ticker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Initial fetch ─────────────────────────────────────────────────
   useEffect(() => {
-    if (isAnalyzing && !analysisTimedOut) {
-      elapsedTimer.current = setInterval(() => {
-        if (pollingStartedAt.current) {
-          setElapsedSeconds(
-            Math.floor((Date.now() - pollingStartedAt.current) / 1000)
-          );
+    fetchRepository();
+    fetchJobHistory();
+  }, [id]);
+
+  // ── Step progression simulation during active analysis ──
+  useEffect(() => {
+    if (!isAnalyzing) return;
+
+    setCurrentStep(0);
+
+    const interval = setInterval(() => {
+      setCurrentStep((prev) => {
+        if (prev < 4) {
+          return prev + 1;
         }
-      }, 1000);
-    } else {
-      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
-    }
-    return () => {
-      if (elapsedTimer.current) clearInterval(elapsedTimer.current);
-    };
-  }, [isAnalyzing, analysisTimedOut]);
+        return prev;
+      });
+    }, 2500);
 
-  // â”€â”€ Initial fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // ── Initial fetch ─────────────────────────────────────────────────� Initial fetch ─────────────────────────────────────────────────
-  useEffect(() => {
-  fetchRepository();
-  fetchJobHistory();
-}, [id]);
+    return () => clearInterval(interval);
+  }, [isAnalyzing]);
 
-  // â”€â”€ Job polling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Job polling ───────────────────────────────────────────────────
   useEffect(() => {
-    if (!job || job.status === "DONE" || job.status === "FAILED") return;
-
-    const repoStatus = repository?.status;
-    const jobStatus = job?.status;
-  useEffect(() => {
-    // Guard against dual-polling when the dependency array changes mid-cycle.
     const jobId = job?.id || repository?.latestJob?.id;
     if (!jobId) return;
 
     if (pollingJobRef.current !== jobId) {
       pollingJobRef.current = jobId;
     } else {
-      // Same jobId triggered a re-run; bail to avoid stacking loops.
       return;
     }
 
@@ -265,7 +240,6 @@ export default function RepositoryAnalysis() {
     const poll = async () => {
       if (stopped) return;
 
-      // â”€â”€ Timeout guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (
         lastProgressAt.current &&
         Date.now() - lastProgressAt.current > ANALYSIS_TIMEOUT_MS
@@ -275,8 +249,7 @@ export default function RepositoryAnalysis() {
         setIsAnalyzing(false);
         setAnalysisError(
           "Analysis has been queued for over 8 minutes without progress. " +
-          "The background worker may not be running. Please try again later " +
-          "or contact the maintainer."
+          "The background worker may not be running. Please try again later."
         );
         return;
       }
@@ -301,31 +274,7 @@ export default function RepositoryAnalysis() {
     };
   }, [repository?.status, repository?.latestJob?.id, job?.id, job?.status]);
 
-  // =========================
-  // FETCH REPOSITORY (FIXED)
-  // =========================
-  const fetchRepository = async () => {
-    if (!id) return;
-
-    setError(null); // âœ… reset error on retry
-  useEffect(() => {
-  if (!isAnalyzing) return;
-
-  setCurrentStep(0);
-
-  const interval = setInterval(() => {
-    setCurrentStep((prev) => {
-      if (prev < 4) {
-        return prev + 1;
-      }
-
-      return prev;
-    });
-  }, 2500);
-
-  return () => clearInterval(interval);
-}, [isAnalyzing]);
-
+  // ── Fetch Repository ──────────────────────────────────────────────
   const fetchRepository = async () => {
     if (!id) return;
     setError(null);
@@ -354,23 +303,13 @@ export default function RepositoryAnalysis() {
           setError(response.data.latestJob.error || "Analysis failed. Please try again later.");
         }
       }
-    } catch (error: any) {
-      setError(
-        error?.response?.data?.error ||
-        "Failed to load repository. Check your connection and try again."
-      );
-
-      toast({
-        title: "Error",
-        description: "Failed to load repository data",
-      console.log("Repository data:", response.data);
     } catch (err: any) {
       console.error("Error fetching repository:", err);
       setError(
         err.response?.data?.error ||
           err.response?.data?.message ||
           err.message ||
-          "Analysis failed. Please try again later."
+          "Failed to load repository."
       );
       toast({
         title: "Error fetching repository",
@@ -382,6 +321,7 @@ export default function RepositoryAnalysis() {
     }
   };
 
+  // ── Fetch Job Status ──────────────────────────────────────────────
   const fetchJob = async (jobId: string) => {
     if (!jobId) return;
 
@@ -396,47 +336,41 @@ export default function RepositoryAnalysis() {
       );
 
       const nextJob = response.data.job || response.data;
-      // Use functional setJob so we always compare against the latest job
-      // state, avoiding the stale-closure bug where the polling loop holds
-      // an old snapshot of job and never sees progress-only updates.
-      setJob((prevJob: { progressPercent: null; progressMessage: null; }) => {
-  const prevPercent = prevJob?.progressPercent ?? null;
-  const prevMessage = prevJob?.progressMessage ?? null;
+      setJob((prevJob: any) => {
+        const prevPercent = prevJob?.progressPercent ?? null;
+        const prevMessage = prevJob?.progressMessage ?? null;
 
-  const nextPercent = nextJob?.progressPercent ?? null;
-  const nextMessage = nextJob?.progressMessage ?? null;
+        const nextPercent = nextJob?.progressPercent ?? null;
+        const nextMessage = nextJob?.progressMessage ?? null;
 
-  if (nextPercent !== prevPercent || nextMessage !== prevMessage) {
-    lastProgressAt.current = Date.now();
-  }
+        if (nextPercent !== prevPercent || nextMessage !== prevMessage) {
+          lastProgressAt.current = Date.now();
+        }
 
-  return {
-    ...prevJob,
-    ...nextJob,
+        return {
+          ...prevJob,
+          ...nextJob,
+          progressPercent:
+            typeof nextJob?.progressPercent === "number" &&
+            Number.isFinite(nextJob.progressPercent)
+              ? nextJob.progressPercent
+              : prevJob?.progressPercent ?? 0,
 
-    progressPercent:
-      typeof nextJob?.progressPercent === "number" &&
-      Number.isFinite(nextJob.progressPercent)
-        ? nextJob.progressPercent
-        : prevJob?.progressPercent ?? 0,
+          progressMessage:
+            typeof nextJob?.progressMessage === "string" &&
+            nextJob.progressMessage.trim().length > 0
+              ? nextJob.progressMessage
+              : prevJob?.progressMessage ?? "Analyzing repository...",
+        };
+      });
 
-    progressMessage:
-      typeof nextJob?.progressMessage === "string" &&
-      nextJob.progressMessage.trim().length > 0
-        ? nextJob.progressMessage
-        : prevJob?.progressMessage ?? "Analyzing repository...",
-  };
-});
       if (nextJob?.status === "DONE") {
-        // Job finished — refresh repository once to load results.
         await fetchRepository();
       }
 
       if (nextJob?.status === "FAILED") {
         const msg = nextJob?.error || "The repository analysis failed.";
-
         setError(msg);
-
         pollingStartedAt.current = null;
         setIsAnalyzing(false);
         setAnalysisError(nextJob?.error || "The repository analysis failed.");
@@ -446,32 +380,15 @@ export default function RepositoryAnalysis() {
           variant: "destructive",
         });
       }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch analysis job status",
-        setError(nextJob?.error || "Analysis failed. Please try again later.");
-        toast({
-          title: "Analysis failed",
-          description: nextJob?.error || nextJob?.progressMessage || "The repository analysis encountered an unexpected error.",
-          variant: "destructive",
-        });
-      }
     } catch (err: any) {
       console.error("Error fetching analysis job:", err);
-      
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "Failed to connect to the analysis service.";
-      
-      // 1. Surface inline error state
+      const errorMessage =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to connect to the analysis service.";
       setError(errorMessage);
-      
-      // 2. Stop polling to prevent spamming the user/server
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-      setIsPolling(false); // If you are tracking polling via a boolean state
-
-      // 3. Show a one-time toast notification
+      setIsAnalyzing(false);
       toast({
         title: "Error checking analysis status",
         description: errorMessage,
@@ -481,27 +398,26 @@ export default function RepositoryAnalysis() {
   };
 
   const fetchJobHistory = async () => {
-  if (!id) return;
+    if (!id) return;
 
-  try {
-    setLoadingJobs(true);
+    try {
+      setLoadingJobs(true);
+      const token = localStorage.getItem("gitverse_token");
 
-    const token = localStorage.getItem("gitverse_token");
+      const response = await axios.get(
+        buildApiUrl(`/api/repositories/${id}/jobs`),
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
-    const response = await axios.get(
-      buildApiUrl(`/api/repositories/${id}/jobs`),
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    );
-
-    setJobs(response.data.jobs || []);
-  } catch (error) {
-    console.error("Error fetching job history:", error);
-  } finally {
-    setLoadingJobs(false);
-  }
-};
+      setJobs(response.data.jobs || []);
+    } catch (error) {
+      console.error("Error fetching job history:", error);
+    } finally {
+      setLoadingJobs(false);
+    }
+  };
 
   const handleDeleteRepository = async () => {
     if (!id) return;
@@ -533,25 +449,24 @@ export default function RepositoryAnalysis() {
     }
   };
 
-  // â”€â”€ Tab content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleCopyLink = async () => {
-  try {
-    await navigator.clipboard.writeText(window.location.href);
+    try {
+      await navigator.clipboard.writeText(window.location.href);
 
-    toast({
-      title: "Link copied",
-      description: "Analysis job link copied to clipboard.",
-    });
-  } catch (error) {
-    console.error("Failed to copy link:", error);
+      toast({
+        title: "Link copied",
+        description: "Analysis job link copied to clipboard.",
+      });
+    } catch (error) {
+      console.error("Failed to copy link:", error);
 
-    toast({
-      title: "Copy failed",
-      description: "Unable to copy analysis link.",
-      variant: "destructive",
-    });
-  }
-};
+      toast({
+        title: "Copy failed",
+        description: "Unable to copy analysis link.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -574,113 +489,57 @@ export default function RepositoryAnalysis() {
     }
   };
 
-  // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const formatElapsed = (secs: number) => {
     if (secs < 60) return `${secs}s`;
     return `${Math.floor(secs / 60)}m ${secs % 60}s`;
   };
-  
 
-
-  
   const lastProgressMessageRef = useRef("Analyzing repository...");
 
-const safeProgressPercent = useMemo(() => {
-  const value = Number(job?.progressPercent);
+  const safeProgressPercent = useMemo(() => {
+    const value = Number(job?.progressPercent);
 
-  if (Number.isNaN(value) || !Number.isFinite(value)) {
-    return 0;
-  }
+    if (Number.isNaN(value) || !Number.isFinite(value)) {
+      return 0;
+    }
 
-  return Math.min(100, Math.max(0, value));
-}, [job?.progressPercent]);
+    return Math.min(100, Math.max(0, value));
+  }, [job?.progressPercent]);
 
-useEffect(() => {
-  if (
+  useEffect(() => {
+    if (
+      typeof job?.progressMessage === "string" &&
+      job.progressMessage.trim().length > 0
+    ) {
+      lastProgressMessageRef.current = job.progressMessage;
+    }
+  }, [job?.progressMessage]);
+
+  const safeProgressMessage =
     typeof job?.progressMessage === "string" &&
     job.progressMessage.trim().length > 0
-  ) {
-    lastProgressMessageRef.current = job.progressMessage;
-  }
-}, [job?.progressMessage]);
+      ? job.progressMessage
+      : lastProgressMessageRef.current || "Analyzing repository...";
 
-const safeProgressMessage =
-  typeof job?.progressMessage === "string" &&
-  job.progressMessage.trim().length > 0
-    ? job.progressMessage
-    : lastProgressMessageRef.current || "Analyzing repository...";
-
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Render ────────────────────────────────────────────────────────
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {showDeleteDialog && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-            <div className="glass p-6 rounded-lg max-w-sm mx-4">
-              <h2 className="text-lg font-semibold mb-2">Delete Repository?</h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                This action cannot be undone. The repository and all its data will be permanently deleted.
-              </p>
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => setShowDeleteDialog(false)}
-                  disabled={isDeleting}
-                  className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteRepository}
-                  disabled={isDeleting}
-                  className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white disabled:opacity-50"
-                >
-                  {isDeleting ? "Deleting..." : "Delete"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {loading ? (
           <RepositoryAnalysisSkeleton />
-        ) : error ? (
-          <div className="glass border border-red-500/40 p-4 rounded-lg text-red-300 flex items-start gap-2">
-            <span>⚠️</span>
-            <span>{error}</span>
+        ) : error && !repository ? (
+          <div className="glass border border-red-500/40 p-12 rounded-lg text-center space-y-4">
+            <div className="flex justify-center text-red-500 text-4xl">⚠️</div>
+            <h3 className="font-semibold text-lg text-red-400">Failed to Load Repository</h3>
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-300 text-sm font-medium"
+            >
+              Back to Dashboard
+            </button>
           </div>
         ) : !job ? (
-          <EmptyState
-            icon={Activity}
-            title="No analysis jobs found"
-            description="We couldn't find any analysis history for this repository. Run your first analysis to get started!"
-            actionLabel="Go to Dashboard"
-            onAction={() => router.push("/dashboard")}
-          />
-        ) : (
-          <>
-            {/* âœ… IMPROVED ERROR UI */}
-            {error && (
-              <div className="glass border border-red-500/40 p-4 rounded-lg text-red-300 flex items-start gap-2">
-                <span>âš ï¸</span>
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-              <Link href="/dashboard" className="glass p-2 rounded-lg hover:bg-white/10">
-                <ArrowLeft className="h-4 w-4" />
-          <div className="glass rounded-lg p-12 text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Loading Repository</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Fetching repository data and analysis results...
-              </p>
-            </div>
-          </div>
-        ) : !job && !error ? (
           <div className="text-center py-12 flex flex-col items-center gap-4 animate-fade-in-up">
             <Activity className="h-12 w-12 text-muted-foreground/50" />
             <div>
@@ -698,7 +557,7 @@ const safeProgressMessage =
           </div>
         ) : (
           <>
-            {/* Header with back button */}
+            {/* Header with back, copy, and delete buttons */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 animate-fade-in-up">
               <Link
                 href="/dashboard"
@@ -732,68 +591,45 @@ const safeProgressMessage =
                   )}
                 </div>
               </div>
-              <button
-  onClick={handleCopyLink}
-  className="glass p-2 rounded-lg hover:bg-white/10 transition-all duration-300 flex-shrink-0"
-  title="Copy analysis link"
-  aria-label="Copy analysis link"
->
-  <Copy className="h-4 w-4 sm:h-5 sm:w-5" />
-</button>
-              {/* Delete button */}
-              <button
-                onClick={() => setShowDeleteDialog(true)}
-                className="glass p-2 rounded-lg hover:bg-red-500/20 transition-all duration-300 text-red-500 hover:text-red-400 flex-shrink-0"
-                title="Delete repository"
-              >
-                <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
-              </button>
-              {/* Delete button only if repository exists */}
-              {repository && (
+
+              <div className="flex items-center gap-2 self-end sm:self-center">
                 <button
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="glass p-2 rounded-lg hover:bg-red-500/20 transition-all duration-300 text-red-500 hover:text-red-400 flex-shrink-0"
-                  title="Delete repository"
+                  onClick={handleCopyLink}
+                  className="glass p-2 rounded-lg hover:bg-white/10 transition-all duration-300 flex-shrink-0"
+                  title="Copy analysis link"
+                  aria-label="Copy analysis link"
                 >
-                  <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <Copy className="h-4 w-4 sm:h-5 sm:w-5" />
                 </button>
-              )}
+
+                {repository && (
+                  <button
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="glass p-2 rounded-lg hover:bg-red-500/20 transition-all duration-300 text-red-500 hover:text-red-400 flex-shrink-0"
+                    title="Delete repository"
+                  >
+                    <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* {isAnalyzing ? (
-              <div className="glass rounded-lg p-12 text-center space-y-4 animate-pulse">
-                <div className="flex justify-center">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
-                </div>
-                <div> */}
+            {/* Main Content Area */}
+            {isAnalyzing ? (
+              /* ── Analyzing / Polling State ── */
+              <div className="space-y-6 animate-fade-in-up">
+                <RepositoryAnalysisProgress currentStep={currentStep} />
 
-                {isAnalyzing ? (
-  <div className="animate-fade-in-up">
-    <RepositoryAnalysisProgress currentStep={currentStep} />
-
-    <div className="mt-6 glass rounded-lg p-4 text-center">
-      <p className="text-sm text-muted-foreground">
-        {job?.progressPercent != null && job?.progressPercent >= 0
-          ? `${Math.min(Math.round(job.progressPercent), 100)}% complete`
-          : "Processing repository analysis..."}
-      </p>
-
-      {job?.progressMessage && (
-        <p className="text-sm mt-2 text-primary font-medium">
-          {job.progressMessage}
-        </p>
-      )}
-    </div>
-  </div>
-) : error && !repository ? (
-
-                  <h2 className="text-xl font-semibold mb-2">
-                    Analyzing Repository
-                  </h2>
-                  <p className="text-muted-foreground">
-                    We&apos;re analyzing the repository structure, commits,
-                    contributors, and more.
-                  </p>
+                <div className="glass rounded-lg p-12 text-center space-y-4">
+                  <div className="flex justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold mb-2">Analyzing Repository</h2>
+                    <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                      We're scanning and parsing the repository structure, commits, contributors, and more.
+                    </p>
+                  </div>
 
                   {/* Progress bar */}
                   <div className="mt-4 max-w-sm mx-auto">
@@ -818,31 +654,18 @@ const safeProgressMessage =
                   </p>
 
                   {/* Warn if queued too long (>60s with no progress) */}
-                  {elapsedSeconds > 60 && safeProgressPercent === 0  && (
+                  {elapsedSeconds > 60 && safeProgressPercent === 0 && (
                     <div className="mt-4 max-w-sm mx-auto p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                       <p className="text-xs text-yellow-400 flex items-start gap-2">
-                        <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                        Still queued after {formatElapsed(elapsedSeconds)}. 
-                        The worker runs every 5 minutes via GitHub Actions â€” 
-                        it should pick this up shortly.
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        Still queued after {formatElapsed(elapsedSeconds)}. The worker runs every 5 minutes via GitHub Actions — it should pick this up shortly.
                       </p>
                     </div>
                   )}
                 </div>
-                <div className="flex justify-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <GitCommit className="h-4 w-4" />
-                    Processing commits
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Finding contributors
-                  </div>
-                </div>
               </div>
-
             ) : analysisTimedOut || analysisError ? (
-              /* â”€â”€ Timeout / error state â”€â”€ */
+              /* ── Timeout / error state ── */
               <div className="glass rounded-lg p-12 text-center space-y-6">
                 <div className="flex justify-center">
                   <div className="p-4 rounded-full bg-red-500/10">
@@ -854,7 +677,7 @@ const safeProgressMessage =
                     {analysisTimedOut ? "Analysis Timed Out" : "Analysis Failed"}
                   </h2>
                   <p className="text-muted-foreground max-w-md mx-auto text-sm">
-                    {analysisError}
+                    {analysisError || error}
                   </p>
                 </div>
                 <div className="flex justify-center gap-3">
@@ -881,9 +704,8 @@ const safeProgressMessage =
                   </button>
                 </div>
               </div>
-
             ) : (
-              /* â”€â”€ Done â€” show tabs â”€â”€ */
+              /* ── Done — show tabs and history ── */
               <>
                 {/* Tab navigation */}
                 <div className="glass rounded-lg p-2 animate-fade-in-up">
@@ -909,57 +731,52 @@ const safeProgressMessage =
                 </div>
 
                 {/* Content */}
-                {/* Content */}
-<div className="animate-fade-in-up">
-  {renderContent()}
-</div>
+                <div className="animate-fade-in-up animate-fade-in-up-container mt-6">
+                  {renderContent()}
+                </div>
 
-{/* Analysis History */}
-<div className="glass rounded-lg p-6 mt-6">
-  <h2 className="text-2xl font-bold mb-4">
-    Analysis History
-  </h2>
+                {/* Analysis History */}
+                <div className="glass rounded-lg p-6 mt-6">
+                  <h2 className="text-2xl font-bold mb-4">
+                    Analysis History
+                  </h2>
 
-  {loadingJobs ? (
-    <p className="text-muted-foreground">
-      Loading analysis history...
-    </p>
-  ) : jobs.length === 0 ? (
-    <p className="text-muted-foreground">
-      No analysis history found.
-    </p>
-  ) : (
-    <div className="space-y-4">
-      {jobs.map((historyJob: any) => (
-        <div
-          key={historyJob.id}
-          onClick={() =>
-            router.push(`/analysis/${historyJob.id}`)
-          }
-          className="border rounded-lg p-4 cursor-pointer hover:bg-white/5 transition-all"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold">
-                {historyJob.status}
-              </p>
-
-              <p className="text-sm text-muted-foreground">
-                {historyJob.summary || "No summary available"}
-              </p>
-
-              <p className="text-xs text-muted-foreground mt-1">
-                {new Date(
-                  historyJob.createdAt,
-                ).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )}
-</div>
+                  {loadingJobs ? (
+                    <p className="text-muted-foreground">
+                      Loading analysis history...
+                    </p>
+                  ) : jobs.length === 0 ? (
+                    <p className="text-muted-foreground">
+                      No analysis history found.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {jobs.map((historyJob: any) => (
+                        <div
+                          key={historyJob.id}
+                          onClick={() =>
+                            router.push(`/analysis/${historyJob.id}`)
+                          }
+                          className="border rounded-lg p-4 cursor-pointer hover:bg-white/5 transition-all"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold text-sm capitalize">
+                                {historyJob.status?.toLowerCase()}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {historyJob.summary || "No summary available"}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {new Date(historyJob.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </>
@@ -1005,8 +822,7 @@ const safeProgressMessage =
               {isDeleting ? (
                 <>
                   <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
-                  <span className="hidden sm:inline">Deleting...</span>
-                  <span className="sm:hidden">Deleting...</span>
+                  <span>Deleting...</span>
                 </>
               ) : (
                 <>
@@ -1021,5 +837,3 @@ const safeProgressMessage =
     </DashboardLayout>
   );
 }
-
-

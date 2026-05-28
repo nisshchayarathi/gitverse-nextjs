@@ -2,9 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { isValidGithubUrl } from "@/lib/utils/validators";
 import { useState, useRef, useEffect } from "react";
-import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isValidGithubUrl } from "@/lib/utils/validators";
 import { RecentReposList } from "@/components/RecentReposList";
@@ -233,6 +231,7 @@ export default function Dashboard() {
       const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
       const cleanParts = cleanUrl.split("/");
       const ownerName = cleanParts[cleanParts.length - 2] || "unknown";
+      const repoName = cleanParts[cleanParts.length - 1] || "repository";
 
       const response = await axios.post(
         buildApiUrl("/api/repositories"),

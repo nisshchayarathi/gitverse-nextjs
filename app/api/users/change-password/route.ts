@@ -60,29 +60,23 @@ export async function POST(request: NextRequest) {
         );
       }
 
-    if (!currentPassword) {
-      return NextResponse.json(
-        { error: "Current password is required" },
-        { status: 400 }
+      const isPasswordValid = await bcrypt.compare(
+        currentPassword,
+        passwordHash
       );
-    }
 
-    const isPasswordValid = await bcrypt.compare(
-      currentPassword,
-      passwordHash,
-    );
-
-    if (!isPasswordValid) {
-      await recordAttempt({
-        key: userId,
-        type: "CHANGE_PASSWORD",
-        success: false,
-        userId: user.userId,
-      });
-      return NextResponse.json(
-        { error: "Current password is incorrect" },
-        { status: 401 }
-      );
+      if (!isPasswordValid) {
+        await recordAttempt({
+          key: userId,
+          type: "CHANGE_PASSWORD",
+          success: false,
+          userId: user.userId,
+        });
+        return NextResponse.json(
+          { error: "Current password is incorrect" },
+          { status: 401 }
+        );
+      }
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);

@@ -1,5 +1,4 @@
-﻿"use client";
-
+import React, { useState } from "react";
 import {
   GitBranch,
   Star,
@@ -25,9 +24,19 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { EmptyState } from "@/components/ui/EmptyState";
-// FIXED: Injecting pre-built skeleton view component to completely block Cumulative Layout Shifts (CLS) #131
-import { RepositoryAnalysisSkeleton } from "@/components/ui/RepositoryAnalysisSkeleton";
+import { FavoriteButton } from "./FavoriteButton";
+
+const RepositoryAnalysisSkeleton: React.FC = () => {
+  return (
+    <div className="glass p-6 rounded-lg">
+      <div className="animate-pulse space-y-4">
+        <div className="h-6 w-1/3 bg-muted rounded" />
+        <div className="h-4 w-full bg-muted rounded" />
+        <div className="h-40 w-full bg-muted rounded" />
+      </div>
+    </div>
+  );
+};
 
 interface RepositoryData {
   id: string;
@@ -220,9 +229,6 @@ export const RepositoryOverview = ({
         ...((defaultSchema as any).protocols || {}),
         href: ["http", "https", "mailto"],
       },
-    // Allow common README HTML (like <img align="right" ...>) while keeping things safe.
-    const schema: any = {
-      ...(defaultSchema as any),
       tagNames: Array.from(
         new Set([...(defaultSchema as any).tagNames, "img"]),
       ),
@@ -641,6 +647,5 @@ export const RepositoryOverview = ({
       </div>
     </div>
   );
-};
 };
 
