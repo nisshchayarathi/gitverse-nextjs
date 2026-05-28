@@ -154,11 +154,11 @@ export default function Dashboard() {
   const fetchRepositories = async () => {
     try {
       const token = localStorage.getItem("gitverse_token");
-      const response = await axios.get(buildApiUrl("/api/repositories"), {
+      const response = await axios.get(buildApiUrl("/api/repositories?limit=1000"), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // API returns { repositories: [...] }
-      const repos = response.data.repositories || [];
+      // API returns { data: [...], nextCursor, hasMore }
+      const repos = response.data.data || [];
       setRepositories(Array.isArray(repos) ? repos : []);
     } catch (error) {
       console.error("Error fetching repositories:", error);

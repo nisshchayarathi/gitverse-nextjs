@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { apiError } from "@/lib/api-error";
@@ -37,7 +37,7 @@ export async function POST(
   } catch (error: any) {
     console.error("Analyze repository error:", sanitizeError(error));
     if (isHttpError(error)) {
-     return apiError(error.status, error.message);
+      return apiError(error.status, error.message);
     }
     return apiError(500, "Failed to start analysis");
   }

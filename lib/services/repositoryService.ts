@@ -182,10 +182,11 @@ if (existingRepositoryName) {
    */
   async analyzeRepository(
     repositoryId: number,
+    userId: number,
     opts?: { onProgress?: RepositoryAnalysisProgressReporter; scope?: string; timeoutMs?: number },
   ) {
-    const repository = await prisma.repository.findUnique({
-      where: { id: repositoryId },
+    const repository = await prisma.repository.findFirst({
+      where: { id: repositoryId, userId },
     });
 
     if (!repository) {
@@ -758,12 +759,11 @@ await prisma.$transaction([
     return repository;
   }
 
-  /**
-   * List all repositories for a user
-   */
-  async listRepositories(userId: number) {
+  async listRepositories(userId: number, limit: number = 10, cursor?: number) {
     const repositories = await prisma.repository.findMany({
       where: { userId },
+      take: limit + 1, // Fetch one extra to determine if hasMore
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
         _count: {
           select: {
@@ -778,29 +778,48 @@ await prisma.$transaction([
           take: 3,
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" } // Deterministic tie-breaker
+      ],
     });
 
-    return repositories;
+    let nextCursor: number | undefined = undefined;
+    if (repositories.length > limit) {
+      const nextItem = repositories.pop();
+      nextCursor = nextItem?.id;
+    }
+
+    return {
+      data: repositories,
+      nextCursor,
+      hasMore: nextCursor !== undefined,
+    };
   }
 
   /**
    * Delete a repository and all its data
    */
   async deleteRepository(id: number, userId: number) {
-    const repository = await prisma.repository.findFirst({
+    const result = await prisma.repository.deleteMany({
       where: { id, userId },
     });
 
-    if (!repository) {
+    if (result.count === 0) {
       throw new Error("Repository not found");
     }
 
-    await prisma.repository.delete({
-      where: { id },
-    });
-
     return { success: true };
+  }
+  //Explicitly set the status of a repository
+  async setRepositoryStatus(
+    repositoryId: number,
+    status: "pending" | "analyzing" | "completed" | "failed",
+  ): Promise<void> {
+    await prisma.repository.update({
+      where: { id: repositoryId },
+      data: { status },
+    });
   }
 
   /**

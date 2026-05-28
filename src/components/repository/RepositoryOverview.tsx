@@ -1,5 +1,5 @@
-﻿"use client";
-
+import { useState } from "react";
+import { FavoriteButton } from "./FavoriteButton";
 import {
   GitBranch,
   Star,
@@ -631,4 +631,3 @@ export const RepositoryOverview = ({
     </div>
   );
 };
-
