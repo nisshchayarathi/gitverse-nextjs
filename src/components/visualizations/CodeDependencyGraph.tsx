@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as htmlToImage from "html-to-image";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
@@ -26,27 +26,43 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const zoomRef = useRef<any>(null);
   const svgSelectionRef = useRef<any>(null);
 
+  const zoomRef = useRef<any>(null);
+  const svgSelectionRef = useRef<any>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  
   const graphAnalyzer = new GraphAnalyzer();
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
   const exportGraph = async (format: "png" | "svg") => {
     if (!exportRef.current) return;
     try {
+      // Create options for higher resolution output, especially for PNG
       const options = {
-        backgroundColor: "#0f172a",
-        pixelRatio: 2,
+        backgroundColor: "#0f172a", // Dark background to match the theme
+        pixelRatio: 3, // High DPI for crisp text
         cacheBust: true,
+        style: {
+          margin: "0",
+          borderRadius: "0",
+          boxShadow: "none"
+        }
       };
       const dataUrl =
         format === "png"
           ? await htmlToImage.toPng(exportRef.current, options)
           : await htmlToImage.toSvg(exportRef.current);
       const link = document.createElement("a");
-      link.download = `gitverse-graph.${format}`;
+      const repoName = repository?.name ? `-${repository.name}` : "";
+      link.download = `gitverse${repoName}-map.${format}`;
       link.href = dataUrl;
       link.click();
+      
+      toast.success(`Graph exported successfully!`, { id: toastId });
     } catch (error) {
       console.error("Export failed:", error);
+      toast.error("Failed to export the graph. Please try again.", { id: toastId });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -307,6 +323,15 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           <div className="absolute bottom-2 right-3 text-[10px] text-white/70">
             GitVerse • {repository?.name || "Repository"}
           </div>
+
+          <MapControls 
+            onZoomIn={handleZoomIn} 
+            onZoomOut={handleZoomOut} 
+            onReset={handleReset} 
+            onExportPng={() => exportGraph("png")}
+            onExportSvg={() => exportGraph("svg")}
+            isExporting={isExporting}
+          />
         </div>
 
         <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
