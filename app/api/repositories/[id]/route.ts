@@ -16,47 +16,50 @@ export async function GET(
   try {
     const user = await requireAuth(request);
     const id = parseInt(params.id);
-
     if (isNaN(id)) {
       return NextResponse.json(
         { error: "Invalid repository ID" },
         { status: 400, headers: securityHeaders }
       );
     }
-
     const repository = await repositoryService.getRepository(id, user.userId);
-
     if (!repository) {
       return NextResponse.json(
         { error: "Repository not found" },
         { status: 404, headers: securityHeaders }
       );
     }
-
-    return NextResponse.json(repository, { headers: securityHeaders });
+    const latestJob = await prisma.analysisJob.findFirst({
+      where: { repositoryId: id, userId: user.userId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        type: true,
+        attempts: true,
+        maxAttempts: true,
+        nextRunAt: true,
+        progressPercent: true,
+        progressMessage: true,
+        startedAt: true,
+        finishedAt: true,
+        error: true,
+        updatedAt: true,
+        createdAt: true,
+      },
+    });
+    return NextResponse.json(
+      { repository, latestJob },
+      { status: 200, headers: securityHeaders }
+    );
   } catch (error: any) {
-    console.error("Error fetching repository:", sanitizeError(error));
-
-    const prismaError = getPrismaErrorResponse(error);
-    if (prismaError) {
-      // Return 503 DATABASE_COLD_START response if applicable
-      return prismaError;
-    }
-
+    console.error("Get repository error:", sanitizeError(error));
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
         { status: error.status, headers: securityHeaders }
       );
     }
-
-    if (error?.code === "P2002" || error?.code === "P2025") {
-      return NextResponse.json(
-        { error: "Repository not found" },
-        { status: 404, headers: securityHeaders }
-      );
-    }
-
     return NextResponse.json(
       { error: "Failed to fetch repository" },
       { status: 500, headers: securityHeaders }
@@ -71,53 +74,31 @@ export async function DELETE(
   try {
     const user = await requireAuth(request);
     const id = parseInt(params.id);
-
     if (isNaN(id)) {
       return NextResponse.json(
         { error: "Invalid repository ID" },
         { status: 400, headers: securityHeaders }
       );
     }
-
-    const repository = await repositoryService.getRepository(id, user.userId);
-
-    if (!repository) {
-      return NextResponse.json(
-        { error: "Repository not found" },
-        { status: 404, headers: securityHeaders }
-      );
-    }
-
-    await prisma.repository.delete({
-      where: { id },
-    });
-
+    await repositoryService.deleteRepository(id, user.userId);
     return NextResponse.json(
       { message: "Repository deleted successfully" },
       { status: 200, headers: securityHeaders }
     );
   } catch (error: any) {
     console.error("Delete repository error:", sanitizeError(error));
-
-    const prismaError = getPrismaErrorResponse(error);
-    if (prismaError) {
-      return prismaError;
-    }
-
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
         { status: error.status, headers: securityHeaders }
       );
     }
-
     if (error.message === "Repository not found") {
       return NextResponse.json(
         { error: error.message },
         { status: 404, headers: securityHeaders }
       );
     }
-
     return NextResponse.json(
       { error: "Failed to delete repository" },
       { status: 500, headers: securityHeaders }

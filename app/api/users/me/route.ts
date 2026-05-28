@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { requireAuth, sanitizeError } from "@/lib/middleware";
-import {
-  isRateLimited,
-  recordAttempt,
-} from "@/lib/services/rateLimitService";
-
-const MAX_ATTEMPTS = 3;
-const WINDOW_MS = 15 * 60 * 1000;
+import bcrypt from "bcryptjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -82,18 +75,18 @@ export async function DELETE(request: NextRequest) {
     const user = await requireAuth(request);
     const userId = user.userId.toString();
 
-    if (await isRateLimited(userId, "DELETE_ACCOUNT", MAX_ATTEMPTS, WINDOW_MS)) {
+    let body;
+    try {
+      body = await request.json();
+    } catch {
       return NextResponse.json(
-        { error: "Too many attempts. Please try again later." },
-        { status: 429, headers: { "Retry-After": "900" } },
+        { error: "Invalid or empty request body" },
+        { status: 400 }
       );
     }
 
-    let password: string | undefined;
-    try {
-      const body = await request.json();
-      password = body.password;
-    } catch {
+    const { currentPassword } = body;
+    if (!currentPassword) {
       return NextResponse.json(
         { error: "Invalid or empty request body" },
         { status: 400 },
@@ -155,7 +148,12 @@ export async function DELETE(request: NextRequest) {
     if (error?.code === "P2025") {
       return NextResponse.json(
         { error: "User not found" },
-        { status: 404 },
+        {
+          status: 404,
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, private",
+          },
+        },
       );
     }
 

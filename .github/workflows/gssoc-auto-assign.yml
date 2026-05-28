@@ -223,15 +223,24 @@ jobs:
                 return;
               }
 
-              // ── Concurrent issue limit check (max 1 at a time) ───────────────
+              // Check if commenter is already assigned to this issue
+              if (currentAssignees.includes(commenter)) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: `Hey @${commenter}! You are **already assigned** to this issue. Go ahead and work on it! 💪\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                });
+                return;
+              }
+
+              // ── Check TOTAL open issue limit (max 7 at a time) ──────────
               const assignedCount = await countAssignedIssues(commenter);
               if (assignedCount >= TOTAL_LIMIT) {
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: issueNum,
                   body: [
-                    `## ❌ You Already Have an Active Issue — @${commenter}`,
+                    `## ❌ Total Assignment Limit Reached — @${commenter}`,
                     ``,
-                    `You currently have **${assignedCount} open issue(s)** assigned. Our policy allows only **1 issue at a time** — please resolve your current issue before picking up a new one.`,
+                    `You currently have **${assignedCount} open issue(s)** assigned, which is the maximum of **${LIMIT} issues at a time**.`,
                     ``,
                     `### What you can do:`,
                     `- ✅ Complete or close your existing assigned issue first`,
@@ -243,19 +252,20 @@ jobs:
                     `_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
                   ].join('\n'),
                 });
-                console.log(`🚫 @${commenter} already has ${assignedCount} active issue(s) — denied.`);
+                console.log(`🚫 @${commenter} hit the total ${LIMIT}-issue limit.`);
                 return;
               }
 
-              // ── Daily limit check (max 4 per day) ────────────────────────────
+              // ── Check DAILY limit (max 7 new assignments per day) ─────────
               const assignedTodayCount = await countAssignedToday(commenter);
-              if (assignedTodayCount >= DAILY_LIMIT) {
+
+              if (assignedTodayCount >= LIMIT) {
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: issueNum,
                   body: [
                     `## ❌ Daily Assignment Limit Reached — @${commenter}`,
                     ``,
-                    `You have already been assigned **${assignedTodayCount} issue(s) today**, which is the daily maximum of **${DAILY_LIMIT} issues per day**.`,
+                    `You have already been assigned **${assignedTodayCount} issue(s) today**, which is the daily maximum of **${LIMIT} issues per day**.`,
                     ``,
                     `### What you can do:`,
                     `- ⏰ Come back **tomorrow** and comment \`/assign\` again`,
@@ -265,7 +275,7 @@ jobs:
                     `_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
                   ].join('\n'),
                 });
-                console.log(`🚫 @${commenter} hit the daily ${DAILY_LIMIT}-issue limit.`);
+                console.log(`🚫 @${commenter} hit the daily ${LIMIT}-issue limit.`);
                 return;
               }
 
@@ -284,7 +294,8 @@ jobs:
                 });
               } catch {}
 
-              const remainingToday = DAILY_LIMIT - assignedTodayCount - 1;
+              const remainingTotal = LIMIT - assignedCount - 1;
+              const remainingToday = LIMIT - assignedTodayCount - 1;
               await github.rest.issues.createComment({
                 owner, repo, issue_number: issueNum,
                 body: [
@@ -301,11 +312,10 @@ jobs:
                   `|--------|-------|`,
                   `| 📌 Issue | #${issueNum} |`,
                   `| 👤 Assigned to | @${commenter} |`,
-                  `| 🔒 Active issues | ${assignedCount + 1} / ${TOTAL_LIMIT} |`,
-                  `| 📅 Assigned today | ${assignedTodayCount + 1} / ${DAILY_LIMIT} |`,
-                  `| ☀️ Remaining today | ${remainingToday} |`,
-                  ``,
-                  `> ⚠️ You **cannot pick up another issue** until this one is resolved or unassigned.`,
+                  `| 📊 Total active issues | ${assignedCount + 1} / ${LIMIT} |`,
+                  `| 📅 Assigned today | ${assignedTodayCount + 1} / ${LIMIT} |`,
+                  `| 🎟️ Remaining total slots | ${remainingTotal} |`,
+                  `| ☀️ Remaining slots today | ${remainingToday} |`,
                   ``,
                   `Good luck! 🚀 Feel free to ask questions in the comments if you're stuck.`,
                   ``,
@@ -344,7 +354,16 @@ jobs:
               if (assignedTodayCount >= DAILY_LIMIT) {
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: issueNum,
-                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} has already hit the daily limit (**${assignedTodayCount}/${DAILY_LIMIT}**). Resets at midnight UTC.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} already has **${assignedCount}/${LIMIT}** total open issues assigned. Please free up a slot first.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                });
+                return;
+              }
+
+              const assignedTodayCount = await countAssignedToday(targetUser);
+              if (assignedTodayCount >= LIMIT) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} has already been assigned **${assignedTodayCount}/${LIMIT}** issues today. The daily limit resets at midnight UTC.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
                 });
                 return;
               }

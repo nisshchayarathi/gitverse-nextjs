@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
-import { apiError } from "@/lib/api-error";
-import { isValidGitScope } from "@/lib/utils/validators";
+import prisma from "@/lib/prisma";
 
 export async function POST(
   request: NextRequest,
@@ -12,18 +11,52 @@ export async function POST(
   try {
     const user = await requireAuth(request);
     const id = parseInt(params.id);
-
     if (isNaN(id)) {
-      return apiError(400, "Invalid repository ID");
+      return NextResponse.json(
+        { error: "Invalid repository ID" },
+        { status: 400 }
+      );
     }
 
     const repository = await repositoryService.getRepository(id, user.userId);
-
     if (!repository) {
-      return apiError(404, "Repository not found");
+      return NextResponse.json(
+        { error: "Repository not found" },
+        { status: 404 }
+      );
     }
 
-    const { scope } = await request.json();
+    const existingJob = await prisma.analysisJob.findFirst({
+      where: {
+        repositoryId: id,
+        status: {
+          in: ["QUEUED", "PROCESSING"],
+        },
+      },
+    });
+
+    if (existingJob) {
+      return NextResponse.json(
+        {
+          error: "Analysis already in progress",
+          jobId: existingJob.id,
+        },
+        { status: 409 }
+      );
+    }
+
+    const bodyText = await request.text();
+    let scope: string | undefined = undefined;
+    if (bodyText) {
+      try {
+        const json = JSON.parse(bodyText);
+        if (json.scope && typeof json.scope === "string") {
+          scope = json.scope;
+        }
+      } catch (e) {
+        // ignore JSON parse errors
+      }
+    }
 
     if (scope != null && (typeof scope !== "string" || !isValidGitScope(scope))) {
       return apiError(400, "Invalid scope. Only alphanumeric characters, underscore, dot, slash, and hyphen are allowed.");
@@ -42,8 +75,14 @@ export async function POST(
   } catch (error: any) {
     console.error("Analyze repository error:", sanitizeError(error));
     if (isHttpError(error)) {
-      return apiError(error.status, error.message);
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
     }
-    return apiError(500, "Failed to start analysis");
+    return NextResponse.json(
+      { error: "Failed to start analysis" },
+      { status: 500 }
+    );
   }
 }
