@@ -183,7 +183,12 @@ if (existingRepositoryName) {
   async analyzeRepository(
     repositoryId: number,
     userId: number,
-    opts?: { onProgress?: RepositoryAnalysisProgressReporter; scope?: string; timeoutMs?: number },
+    opts?: {
+      onProgress?: RepositoryAnalysisProgressReporter;
+      scope?: string;
+      timeoutMs?: number;
+      signal?: AbortSignal;
+    },
   ) {
     const repository = await prisma.repository.findFirst({
       where: { id: repositoryId, userId },

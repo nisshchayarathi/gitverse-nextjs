@@ -6,9 +6,6 @@ import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import Link from "next/link";
 import RepositoryAnalysisProgress from "@/components/repository/RepositoryAnalysisProgress";
-
-import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RepositoryOverview } from "@/components/repository/RepositoryOverview";
 import { FileStructure } from "@/components/repository/FileStructure";
@@ -33,10 +30,8 @@ import {
   Loader2,
   XCircle,
   AlertCircle,
+  Copy,
 } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
 import { buildApiUrl } from "@/services/apiConfig";
 import { Modal } from "@/components/ui/Modal";
@@ -155,6 +150,9 @@ export default function RepositoryAnalysis() {
   const [analysisTimedOut, setAnalysisTimedOut] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(false);
 
   const pollingStartedAt = useRef<number | null>(null);
   // Tracks last time progress changed - prevents falsely timing out active jobs
@@ -616,25 +614,26 @@ export default function RepositoryAnalysis() {
               </div>
 
               <div className="flex items-center gap-2 self-end sm:self-center">
-              {/* Delete button only if repository exists */}
-              {repository && (
-                <button
-                  onClick={handleCopyLink}
-                  className="glass p-2 rounded-lg hover:bg-white/10 transition-all duration-300 flex-shrink-0"
-                  title="Copy analysis link"
-                  aria-label="Copy analysis link"
-                >
-                  <Copy className="h-4 w-4 sm:h-5 sm:w-5" />
-                </button>
-
+                {/* Copy and Delete buttons only if repository exists */}
                 {repository && (
-                  <button
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="glass p-2 rounded-lg hover:bg-red-500/20 transition-all duration-300 text-red-500 hover:text-red-400 flex-shrink-0"
-                    title="Delete repository"
-                  >
-                    <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
-                  </button>
+                  <>
+                    <button
+                      onClick={handleCopyLink}
+                      className="glass p-2 rounded-lg hover:bg-white/10 transition-all duration-300 flex-shrink-0"
+                      title="Copy analysis link"
+                      aria-label="Copy analysis link"
+                    >
+                      <Copy className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </button>
+
+                    <button
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="glass p-2 rounded-lg hover:bg-red-500/20 transition-all duration-300 text-red-500 hover:text-red-400 flex-shrink-0"
+                      title="Delete repository"
+                    >
+                      <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -687,33 +686,11 @@ export default function RepositoryAnalysis() {
                       </p>
                     </div>
                   )}
-            {isAnalyzing ? (
-              <div className="glass rounded-lg p-12 text-center space-y-4 animate-pulse">
-                <div className="flex justify-center">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold mb-2">
-                    Analyzing Repository
-                  </h2>
-                  <p className="text-muted-foreground">
-                    We&apos;re analyzing the repository structure, commits,
-                    contributors, and more.
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {job?.progressPercent != null && job?.progressPercent >= 0
-                      ? `${Math.min(Math.round(job.progressPercent), 100)}%${job?.progressMessage ? ` — ${job.progressMessage}` : ""}`
-                      : job?.progressMessage
-                        ? job.progressMessage
-                        : "This may take a few moments depending on the repository size..."}
-                  </p>
                 </div>
               </div>
             ) : analysisTimedOut || analysisError ? (
               /* ── Timeout / error state ── */
               <div className="glass rounded-lg p-12 text-center space-y-6">
-            ) : error && !repository ? (
-              <div className="glass rounded-lg p-12 text-center space-y-4 animate-fade-in-up">
                 <div className="flex justify-center">
                   <XCircle className="h-12 w-12 text-red-500" />
                 </div>
@@ -722,7 +699,22 @@ export default function RepositoryAnalysis() {
                     {analysisTimedOut ? "Analysis Timed Out" : "Analysis Failed"}
                   </h2>
                   <p className="text-muted-foreground max-w-md mx-auto text-sm">
-                    {analysisError || error}
+                    {analysisError || "The repository analysis task took too long or failed to process."}
+                  </p>
+                </div>
+                <button
+                  onClick={() => router.push("/dashboard")}
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-300 text-sm font-medium shadow-lg shadow-primary/25"
+                >
+                  Back to Dashboard
+                </button>
+              </div>
+            ) : error && !repository ? (
+              <div className="glass rounded-lg p-12 text-center space-y-4 animate-fade-in-up">
+                <div className="flex justify-center">
+                  <XCircle className="h-12 w-12 text-red-500" />
+                </div>
+                <div>
                   <h3 className="font-semibold text-lg text-red-500">Failed to Load Repository</h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     {error}

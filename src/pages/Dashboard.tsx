@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { isValidGithubUrl } from "@/lib/utils/validators";
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RecentReposList } from "@/components/RecentReposList";

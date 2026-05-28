@@ -4,6 +4,7 @@ import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
 import { ModuleSummaryPanel } from "./ModuleSummaryPanel";
 import { AISettingsModal } from "../settings/AISettingsModal";
+import * as htmlToImage from "html-to-image";
 
 interface RepositoryFile {
   path: string;
@@ -15,11 +16,8 @@ interface Repository {
 }
 
 interface CodeDependencyGraphProps {
-  repository?: Repository;
-  highlightedPaths?: string[];
-
-interface CodeDependencyGraphProps {
   repository?: any;
+  highlightedPaths?: string[];
 }
 
 export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeDependencyGraphProps) {
@@ -31,8 +29,6 @@ export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeD
 
   const graphAnalyzer = new GraphAnalyzer();
   const exportRef = useRef<HTMLDivElement>(null);
-
-  const graphAnalyzer = new GraphAnalyzer();
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
   const exportGraph = async (format: "png" | "svg") => {
     if (!exportRef.current) return;
@@ -298,51 +294,30 @@ export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeD
 
   return (
     <div className="relative">
-    <Card className="glass p-4 sm:p-6 overflow-hidden">
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h3 className="text-base sm:text-lg font-semibold">
-            Code Dependency Graph
-          </h3>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Interactive visualization of file dependencies and relationships
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
-          <div className="flex gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
-              <span>Folders</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
-              <span>Files</span>
+      <Card className="glass p-4 sm:p-6 overflow-hidden">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h3 className="text-base sm:text-lg font-semibold">
+              Code Dependency Graph
+            </h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Interactive visualization of file dependencies and relationships
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
+            <div className="flex gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
+                <span>Folders</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+                <span>Files</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div className="glass rounded-lg p-4 sm:p-6">
-        <h3 className="text-base sm:text-lg font-semibold mb-4">
-          Code Dependencies
-        </h3>
-        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <svg
-            ref={svgRef}
-            width="100%"
-            height="auto"
-            className="text-foreground min-h-96 sm:min-h-96"
-            style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
-            viewBox="0 0 900 600"
-            preserveAspectRatio="xMidYMid meet"
-          />
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
-        💡 Drag nodes to reposition • Scroll to zoom • Hover for details
-      </p>
-      <div
-  ref={tooltipRef}
-  className="
+
         <div
           ref={exportRef}
           className="glass rounded-lg p-4 sm:p-6 relative overflow-visible"
@@ -365,39 +340,16 @@ export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeD
             GitVerse • {repository?.name || "Repository"}
           </div>
         </div>
+
         <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
           💡 Drag nodes to reposition • Scroll to zoom • Hover for details
         </p>
+
         <div
           ref={tooltipRef}
-          className="
-    fixed p-3 rounded-lg pointer-events-none shadow-xl border
-    translate-x-[-120px] translate-y-[-120px]
-    sm:translate-x-[-250px] sm:translate-y-[-250px]
-  "
-  style={{
-    opacity: 1, // control with state later
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
-    color: "white",
-    zIndex: 9999,
-    backdropFilter: "blur(8px)",
-    left: "0px",
-    top: "0px",
-    whiteSpace: "nowrap",
-  }}
-/>
-
-    </Card>
-      {selectedNode && (
-        <ModuleSummaryPanel
-          nodeId={selectedNode.id}
-          nodeName={selectedNode.name}
-          nodeType={selectedNode.type}
-          repositoryFiles={repository?.files || []}
-          onClose={() => setSelectedNode(null)}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+          className="fixed p-3 rounded-lg pointer-events-none shadow-xl border translate-x-[-120px] translate-y-[-120px] sm:translate-x-[-250px] sm:translate-y-[-250px]"
           style={{
-            opacity: 1, // control with state later
+            opacity: 0,
             backgroundColor: "rgba(0, 0, 0, 0.9)",
             color: "white",
             zIndex: 9999,
@@ -406,6 +358,17 @@ export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeD
             top: "0px",
             whiteSpace: "nowrap",
           }}
+        />
+      </Card>
+
+      {selectedNode && (
+        <ModuleSummaryPanel
+          nodeId={selectedNode.id}
+          nodeName={selectedNode.name}
+          nodeType={selectedNode.type}
+          repositoryFiles={repository?.files || []}
+          onClose={() => setSelectedNode(null)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
       )}
 

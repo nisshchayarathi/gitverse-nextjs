@@ -74,10 +74,14 @@ export const ModuleSummaryPanel: React.FC<Props> = ({
           <p className="text-xs text-muted-foreground capitalize">{nodeType}</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={onOpenSettings} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenSettings}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            aria-label="Settings"
+          >
             <Settings size={18} />
-          </button>
-          <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary">
           </Button>
           <Button
             variant="ghost"
@@ -87,7 +91,7 @@ export const ModuleSummaryPanel: React.FC<Props> = ({
             aria-label="Close panel"
           >
             <X size={18} />
-          </button>
+          </Button>
         </div>
       </div>
 

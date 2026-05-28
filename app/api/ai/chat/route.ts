@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth(request);
 
     // Per-user rate limiting
-    if (!aiChatLimiter.check(user.userId)) {
+    if (!aiChatLimiter.check(String(user.userId))) {
       return NextResponse.json(
         { error: "Too many requests. Please wait before sending another message." },
         { status: 429 }

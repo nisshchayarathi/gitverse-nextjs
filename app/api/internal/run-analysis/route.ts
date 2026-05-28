@@ -72,7 +72,6 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const job = await analysisJobService.claimNextJob({ workerId });
   if (!job) {
     return new NextResponse(null, { status: 204 });
   }

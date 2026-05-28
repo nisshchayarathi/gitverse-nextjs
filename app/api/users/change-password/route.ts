@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { requireAuth, sanitizeError } from "@/lib/middleware";
+import { recordAttempt } from "@/lib/services/rateLimitService";
 
 /**
  * Handles authenticated password changes and invalidates
@@ -56,15 +57,13 @@ export async function POST(request: NextRequest) {
 
       if (!isPasswordValid) {
         await recordAttempt({
-          key: userId,
+          key: String(user.userId),
           type: "CHANGE_PASSWORD",
           success: false,
           userId: user.userId,
         });
         return NextResponse.json(
           { error: "Current password is incorrect" },
-        return NextResponse.json(
-          { message: "Current password is incorrect" },
           { status: 401 }
         );
       }

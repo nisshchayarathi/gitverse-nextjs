@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useState } from "react";
 import { FavoriteButton } from "./FavoriteButton";
 import {
   GitBranch,
@@ -26,7 +25,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { FavoriteButton } from "./FavoriteButton";
 
 const RepositoryAnalysisSkeleton: React.FC = () => {
   return (
@@ -228,9 +226,6 @@ export const RepositoryOverview = ({
         ...((defaultSchema as any).protocols || {}),
         href: ["http", "https", "mailto"],
       },
-    // Allow common README HTML (like <img align="right" ...>) while keeping things safe.
-    const schema: any = {
-      ...(defaultSchema as any),
       tagNames: Array.from(
         new Set([...(defaultSchema as any).tagNames, "img"]),
       ),
