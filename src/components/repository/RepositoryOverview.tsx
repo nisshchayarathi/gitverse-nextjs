@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { FavoriteButton } from "./FavoriteButton";
 import {
   GitBranch,
@@ -25,6 +25,18 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+
+const RepositoryAnalysisSkeleton: React.FC = () => {
+  return (
+    <div className="glass p-6 rounded-lg">
+      <div className="animate-pulse space-y-4">
+        <div className="h-6 w-1/3 bg-muted rounded" />
+        <div className="h-4 w-full bg-muted rounded" />
+        <div className="h-40 w-full bg-muted rounded" />
+      </div>
+    </div>
+  );
+};
 
 interface RepositoryData {
   id: string;
@@ -208,9 +220,12 @@ export const RepositoryOverview = ({
   };
 
   const readmeSanitizeSchema = (() => {
-    // Allow common README HTML (like <img align="right" ...>) while keeping things safe.
     const schema: any = {
       ...(defaultSchema as any),
+      protocols: {
+        ...((defaultSchema as any).protocols || {}),
+        href: ["http", "https", "mailto"],
+      },
       tagNames: Array.from(
         new Set([...(defaultSchema as any).tagNames, "img"]),
       ),
@@ -631,3 +646,4 @@ export const RepositoryOverview = ({
     </div>
   );
 };
+

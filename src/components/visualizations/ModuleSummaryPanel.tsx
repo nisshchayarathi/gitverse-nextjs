@@ -79,7 +79,7 @@ export const ModuleSummaryPanel: React.FC<Props> = ({
             size="icon"
             onClick={onOpenSettings}
             className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            aria-label="Open settings"
+            aria-label="Settings"
           >
             <Settings size={18} />
           </Button>

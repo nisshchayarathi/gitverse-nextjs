@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { useAISettings, AIProviderType } from "@/hooks/useAISettings";
+import { Modal } from "@/components/ui/Modal";
 
 export default function Settings() {
   const { user, logout, isLoading: authLoading } = useAuth();

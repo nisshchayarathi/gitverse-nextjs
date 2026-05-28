@@ -1,19 +1,34 @@
-import { useEffect, useRef } from "react";
-import * as htmlToImage from "html-to-image";
+import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
+import { ModuleSummaryPanel } from "./ModuleSummaryPanel";
+import { AISettingsModal } from "../settings/AISettingsModal";
+import * as htmlToImage from "html-to-image";
+
+interface RepositoryFile {
+  path: string;
+  lines?: number;
+}
+
+interface Repository {
+  files?: RepositoryFile[];
+}
 
 interface CodeDependencyGraphProps {
   repository?: any;
+  highlightedPaths?: string[];
 }
 
-export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
+export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeDependencyGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const exportRef = useRef<HTMLDivElement>(null);
+  
+  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const graphAnalyzer = new GraphAnalyzer();
+  const exportRef = useRef<HTMLDivElement>(null);
   const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
   const exportGraph = async (format: "png" | "svg") => {
     if (!exportRef.current) return;
@@ -41,6 +56,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
 
   useEffect(() => {
     if (!svgRef.current) return;
+
+    const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
     // If no data, show empty state
     if (graphData.nodes.length === 0) {
@@ -91,14 +108,19 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           .forceLink(links)
           .id((d: any) => d.id)
           .distance(100)
-          .strength((d: any) => d.strength * 0.5),
+          .strength((d: any) => d.strength * 0.5)
       )
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force(
         "collision",
-        d3.forceCollide().radius((d: any) => d.size / 2 + 10),
+        d3.forceCollide().radius((d: any) => d.size / 2 + 10)
       );
+
+    const isHighlighted = (d: any) => {
+      if (!highlightedPaths || highlightedPaths.length === 0) return false;
+      return highlightedPaths.some(p => d.path && d.path.toLowerCase() === p.toLowerCase());
+    };
 
     // Draw links
     const link = g
@@ -106,11 +128,9 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .selectAll("line")
       .data(links)
       .join("line")
-      .attr("stroke", (d: any) =>
-        d.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)",
-      )
+      .attr("stroke", (d: any) => d.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)")
       .attr("stroke-width", (d: any) => d.strength * 2)
-      .attr("stroke-dasharray", (d: any) => (d.isCyclic ? "5,5" : "none"))
+      .attr("stroke-dasharray", (d: any) => d.isCyclic ? "5,5" : "none")
       .attr("stroke-opacity", 0.6);
 
     // Draw nodes
@@ -136,23 +156,30 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             if (!d.active) simulation.alphaTarget(0);
             d.fx = null;
             d.fy = null;
-          }),
+          })
+          .on("click", (_event: any, d: any) => {
+            // Let user click a node to view its AI summary
+            setSelectedNode(d);
+          })
       );
 
     // Node circles
     node
       .append("circle")
-      .attr("r", (d: any) => d.size / 3)
+      .attr("r", (d: any) => isHighlighted(d) ? d.size / 2.5 : d.size / 3)
       .attr("fill", (d: any) => typeColors[d.type])
-      .attr("stroke", "rgba(255,255,255,0.3)")
-      .attr("stroke-width", 2)
+      .attr("stroke", (d: any) => isHighlighted(d) ? "#f59e0b" : "rgba(255,255,255,0.3)")
+      .attr("stroke-width", (d: any) => isHighlighted(d) ? 4 : 2)
+      .on("click", (_event: any, d: any) => {
+        setSelectedNode(d);
+      })
       .on("mouseenter", function (event: any, d: any) {
         d3.select(this)
           .transition()
           .duration(200)
-          .attr("r", d.size / 2.5)
-          .attr("stroke", "rgba(255,255,255,0.8)")
-          .attr("stroke-width", 3);
+          .attr("r", d.size / 2)
+          .attr("stroke", isHighlighted(d) ? "#f59e0b" : "rgba(255,255,255,0.8)")
+          .attr("stroke-width", isHighlighted(d) ? 5 : 3);
 
         // Highlight connected nodes
         link
@@ -161,10 +188,10 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           .attr("stroke", (l: any) =>
             l.source.id === d.id || l.target.id === d.id
               ? typeColors[d.type]
-              : "rgba(255,255,255,0.1)",
+              : "rgba(255,255,255,0.1)"
           )
           .attr("stroke-opacity", (l: any) =>
-            l.source.id === d.id || l.target.id === d.id ? 1 : 0.2,
+            l.source.id === d.id || l.target.id === d.id ? 1 : 0.2
           );
 
         if (tooltipRef.current) {
@@ -178,6 +205,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
                 <div class="font-semibold text-sm">${d.name}</div>
                 <div class="text-xs capitalize">${d.type}</div>
                 <div class="text-xs">${d.path}</div>
+                ${isHighlighted(d) ? '<div class="text-xs text-amber-500 font-semibold font-mono">⚠️ Matched Issue Hotspot</div>' : ''}
               </div>
             `);
         }
@@ -200,16 +228,14 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         d3.select(this)
           .transition()
           .duration(200)
-          .attr("r", d.size / 3)
-          .attr("stroke", "rgba(255,255,255,0.3)")
-          .attr("stroke-width", 2);
+          .attr("r", isHighlighted(d) ? d.size / 2.5 : d.size / 3)
+          .attr("stroke", isHighlighted(d) ? "#f59e0b" : "rgba(255,255,255,0.3)")
+          .attr("stroke-width", isHighlighted(d) ? 4 : 2);
 
         link
           .transition()
           .duration(200)
-          .attr("stroke", (l: any) =>
-            l.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)",
-          )
+          .attr("stroke", (l: any) => l.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)")
           .attr("stroke-opacity", 0.6);
 
         if (tooltipRef.current) {
@@ -221,13 +247,14 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     node
       .append("text")
       .text((d: any) =>
-        d.name.length > 15 ? d.name.slice(0, 12) + "..." : d.name,
+        d.name.length > 15 ? d.name.slice(0, 12) + "..." : d.name
       )
-      .attr("font-size", "10px")
+      .attr("font-size", (d: any) => isHighlighted(d) ? "11px" : "10px")
       .attr("dx", 0)
       .attr("dy", (d: any) => d.size / 3 + 15)
       .attr("text-anchor", "middle")
-      .attr("fill", "currentColor")
+      .attr("fill", (d: any) => isHighlighted(d) ? "#f59e0b" : "currentColor")
+      .attr("font-weight", (d: any) => isHighlighted(d) ? "bold" : "normal")
       .attr("pointer-events", "none");
 
     // Update positions on simulation tick
@@ -258,12 +285,12 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .transition()
       .duration(500)
       .delay((_d: any, i: number) => i * 30)
-      .attr("r", (d: any) => d.size / 3);
+      .attr("r", (d: any) => isHighlighted(d) ? d.size / 2.5 : d.size / 3);
 
     return () => {
       simulation.stop();
     };
-  }, [repository]);
+  }, [repository, highlightedPaths]);
 
   return (
     <div className="relative">
@@ -278,29 +305,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
-            <div className="relative">
-              <details className="group">
-                <summary className="list-none cursor-pointer px-3 py-1 rounded-md bg-primary text-primary-foreground">
-                  Export
-                </summary>
-
-                <div className="absolute right-0 mt-2 w-40 rounded-md border bg-background shadow-lg z-50 overflow-hidden">
-                  <button
-                    onClick={() => exportGraph("png")}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted"
-                  >
-                    Download PNG
-                  </button>
-
-                  <button
-                    onClick={() => exportGraph("svg")}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted"
-                  >
-                    Download SVG
-                  </button>
-                </div>
-              </details>
-            </div>
             <div className="flex gap-3">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
@@ -313,6 +317,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             </div>
           </div>
         </div>
+
         <div
           ref={exportRef}
           className="glass rounded-lg p-4 sm:p-6 relative overflow-visible"
@@ -335,18 +340,16 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             GitVerse • {repository?.name || "Repository"}
           </div>
         </div>
+
         <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
           💡 Drag nodes to reposition • Scroll to zoom • Hover for details
         </p>
+
         <div
           ref={tooltipRef}
-          className="
-    fixed p-3 rounded-lg pointer-events-none shadow-xl border
-    translate-x-[-120px] translate-y-[-120px]
-    sm:translate-x-[-250px] sm:translate-y-[-250px]
-  "
+          className="fixed p-3 rounded-lg pointer-events-none shadow-xl border translate-x-[-120px] translate-y-[-120px] sm:translate-x-[-250px] sm:translate-y-[-250px]"
           style={{
-            opacity: 1, // control with state later
+            opacity: 0,
             backgroundColor: "rgba(0, 0, 0, 0.9)",
             color: "white",
             zIndex: 9999,
@@ -357,6 +360,22 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           }}
         />
       </Card>
+
+      {selectedNode && (
+        <ModuleSummaryPanel
+          nodeId={selectedNode.id}
+          nodeName={selectedNode.name}
+          nodeType={selectedNode.type}
+          repositoryFiles={repository?.files || []}
+          onClose={() => setSelectedNode(null)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+        />
+      )}
+
+      <AISettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   );
 }

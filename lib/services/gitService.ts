@@ -753,10 +753,6 @@ export class GitService {
         language: string | null;
       }[] = [];
       const filePaths = stdout.trim().split("\n").filter(Boolean);
-      const scopedPrefix =
-        opts?.targetDirectory?.trim()
-          ? `${opts.targetDirectory.trim().replace(/\\/g, "/").replace(/\/+$/, "")}/`
-          : null;
 
       // Process in chunks to avoid blocking the event loop on huge monorepos
       const concurrencyLimit = 50;
