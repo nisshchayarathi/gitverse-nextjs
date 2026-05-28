@@ -1,10 +1,12 @@
-import { normalizeKnownRepoHttpUrl, normalizeTargetDirectory } from "@/lib/utils/repositoryUtils";import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
+import { normalizeKnownRepoHttpUrl, normalizeTargetDirectory } from "@/lib/utils/repositoryUtils";
+import { NextRequest, NextResponse } from "next/server";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
 import { GitService } from "@/lib/services/gitService";
 import { logger } from "@/lib/logger";
+
 function kickLocalRunner(request: NextRequest) {
   if (process.env.NODE_ENV === "production") return;
   const origin = new URL(request.url).origin;
@@ -23,30 +25,6 @@ function kickProductionWorker() {
   void triggerAnalysisWorkerWorkflow().catch((error) => {
     logger.error({ err: sanitizeError(error) }, "Failed to dispatch analysis worker workflow");
   });
-}
-
-function normalizeGitHubRepoUrl(input: string): string | null {
-  const trimmed = input.trim();
-
-  const patterns = [
-    /^https:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+?)(?:\.git)?\/?$/i,
-    /^http:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+?)(?:\.git)?\/?$/i,
-    /^git@github\.com:([^/\s]+)\/([^/\s#?]+?)(?:\.git)?$/i,
-    /^ssh:\/\/git@github\.com\/([^/\s]+)\/([^/\s#?]+?)(?:\.git)?$/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = trimmed.match(pattern);
-
-    if (match) {
-      const owner = match[1];
-      const repo = match[2];
-
-      return `https://github.com/${owner}/${repo}`;
-    }
-  }
-
-  return null;
 }
 
 export async function POST(request: NextRequest) {
