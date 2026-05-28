@@ -3,7 +3,7 @@ import { Send, Loader2, X, Minimize2, Maximize2, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { Card } from "@/components/ui";
+import { Card, CopyToClipboard } from "@/components/ui";
 import { geminiService, ChatMessage } from "@/services/gemini";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -274,12 +274,19 @@ User Question: ${input}`;
                 className.includes("hljs")) ||
               text.includes("\n");
             if (isBlock) {
+              const codeString = text.replace(/\n$/, "");
               return (
-                <pre className="bg-white/5 rounded-lg p-3 my-2 overflow-x-auto">
-                  <code className="text-sm font-mono" {...props}>
-                    {children}
-                  </code>
-                </pre>
+                <div className="relative group my-2">
+                  <pre className="bg-white/5 rounded-lg p-3 overflow-x-auto">
+                    <code className="text-sm font-mono" {...props}>
+                      {children}
+                    </code>
+                  </pre>
+                  <CopyToClipboard
+                    text={codeString}
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                  />
+                </div>
               );
             }
             return (

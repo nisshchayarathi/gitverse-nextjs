@@ -201,9 +201,19 @@ export default function RepositoryAnalysis() {
           setError(response.data.latestJob.error || "Analysis failed. Please try again later.");
         }
       }
-      console.log("Repository data:", response.data);
+      setLoading(false);
     } catch (err: any) {
       console.error("Error fetching repository:", err);
+
+      const isColdStart = err.response?.data?.error === "DATABASE_COLD_START";
+      
+      if (isColdStart) {
+        setError("Waking up database... Please wait.");
+        // Auto-retry in 3 seconds. Do not set loading to false so spinner stays.
+        setTimeout(fetchRepository, 3000);
+        return;
+      }
+
       setError(
         err.response?.data?.error ||
           err.response?.data?.message ||
@@ -215,7 +225,6 @@ export default function RepositoryAnalysis() {
         description: err.response?.data?.error || err.response?.data?.message || err.message || "Failed to load repository data.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -241,21 +250,31 @@ export default function RepositoryAnalysis() {
       }
 
       if (nextJob?.status === "FAILED") {
-        setError(nextJob?.error || "Analysis failed. Please try again later.");
+        const msg = nextJob?.error || "The repository analysis failed.";
+
+        setError(msg);
+
+        pollingStartedAt.current = null;
+        setIsAnalyzing(false);
+        setAnalysisError(nextJob?.error || "The repository analysis failed.");
         toast({
           title: "Analysis failed",
-          description: nextJob?.error || nextJob?.progressMessage || "The repository analysis encountered an unexpected error.",
+          description: msg,
           variant: "destructive",
         });
       }
     } catch (err: any) {
       console.error("Error fetching analysis job:", err);
-      setError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
-          err.message ||
-          "Failed to connect to the analysis service."
-      );
+      
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "Failed to connect to the analysis service.";
+      
+      // 1. Surface inline error state
+      setError(errorMessage);
+      
+      // 2. Stop polling
+      setIsAnalyzing(false);
+
+      // 3. Show a one-time toast notification
       toast({
         title: "Error checking analysis status",
         description: err.response?.data?.error || err.response?.data?.message || err.message || "Failed to connect to the analysis service.",

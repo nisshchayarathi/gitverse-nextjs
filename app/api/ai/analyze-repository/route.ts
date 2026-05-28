@@ -9,10 +9,15 @@ import {
   setGeminiAnalysisCache,
 } from "@/lib/services/geminiAnalysisCacheService";
 import { buildTreeFromFiles, truncateTree, stringifyTree } from "@/lib/utils/tokenLimits";
+import { validateContentType } from "@/lib/utils/aiRequestValidation";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+
+    const contentTypeError = validateContentType(request);
+    if (contentTypeError) return contentTypeError;
+
     const body = await request.json();
     const { repositoryId, type } = body;
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Children, isValidElement } from "react";
 import { FavoriteButton } from "./FavoriteButton";
 import {
   GitBranch,
@@ -20,6 +20,7 @@ import {
   CardDescription,
   CardContent,
   Skeleton,
+  CopyToClipboard,
 } from "@/components/ui";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -566,12 +567,31 @@ export const RepositoryOverview = ({
                         </code>
                       );
                     },
-                    pre: (props) => (
-                      <pre
-                        className="my-3 p-3 rounded-lg bg-black/30 overflow-auto"
-                        {...props}
-                      />
-                    ),
+                    pre: ({ children, ...props }) => {
+                      let codeText = "";
+                      Children.forEach(children, (child) => {
+                        if (isValidElement(child) && child.props) {
+                          codeText = String(child.props.children || "");
+                        }
+                      });
+
+                      return (
+                        <div className="relative group my-3">
+                          <pre
+                            className="p-3 rounded-lg bg-black/30 overflow-auto"
+                            {...props}
+                          >
+                            {children}
+                          </pre>
+                          {codeText && (
+                            <CopyToClipboard
+                              text={codeText.replace(/\n$/, "")}
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                            />
+                          )}
+                        </div>
+                      );
+                    },
                     ul: (props) => (
                       <ul
                         className="list-disc pl-6 my-2 space-y-1"

@@ -1,48 +1,48 @@
 import { NextRequest } from "next/server";
+import crypto from "crypto";
 
 const lastKickAtByJobId = new Map<string, number>();
 
+const EPHEMERAL_SECRET = !process.env.ANALYSIS_RUNNER_SECRET
+  ? crypto.randomBytes(32).toString("hex")
+  : undefined;
+
+export function getEphemeralSecret(): string | undefined {
+  return EPHEMERAL_SECRET;
+}
+
+function timingSafeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 export function isAnalysisRunnerAuthorized(request: NextRequest): boolean {
-  const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
-
-  if (configuredSecret && request.method !== "GET") {
-    const headerSecret = request.headers.get("x-analysis-runner-secret");
-
-    const url = new URL(request.url);
-    const querySecret = url.searchParams.get("secret");
-
-    return (
-      headerSecret === configuredSecret ||
-      querySecret === configuredSecret
-    );
-  }
-
-  const ua = (
-    request.headers.get("user-agent") || ""
-  ).toLowerCase();
-
-  const isVercelCron =
-    process.env.VERCEL === "1" &&
-    process.env.VERCEL_ENV === "production" &&
-    ua.includes("vercel-cron/");
-
-  if (request.method === "GET" && isVercelCron) {
-    return true;
-  }
+  const configuredSecret =
+    process.env.ANALYSIS_RUNNER_SECRET || EPHEMERAL_SECRET;
 
   if (!configuredSecret) {
-    return process.env.NODE_ENV !== "production";
+    return false;
   }
 
   const headerSecret = request.headers.get("x-analysis-runner-secret");
+  if (headerSecret && timingSafeCompare(headerSecret, configuredSecret)) {
+    return true;
+  }
 
   const url = new URL(request.url);
   const querySecret = url.searchParams.get("secret");
+  if (querySecret && timingSafeCompare(querySecret, configuredSecret)) {
+    return true;
+  }
 
-  return (
-    headerSecret === configuredSecret ||
-    querySecret === configuredSecret
-  );
+  return false;
 }
 
 export function shouldThrottleJobKick(jobId: string): boolean {
