@@ -7,7 +7,10 @@ import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GitVerse - AI-Powered Repository Analysis",
+  title: {
+    default: "GitVerse | Interactive Repository Maps",
+    template: "%s | GitVerse",
+  },
   description: "Contribution made easy with repo visualization and PR Mentor",
 };
 
