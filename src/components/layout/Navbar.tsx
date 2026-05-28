@@ -1,22 +1,29 @@
-import React, { useState } from 'react'
-import Link from 'next/link'
-import { GitBranch, Menu, X } from 'lucide-react'
-import { Button } from '@/components/ui'
-import { ThemeToggle } from '@/components/ThemeToggle'
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { GitBranch, Menu, X } from "lucide-react";
+import { Button } from "@/components/ui";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const Navbar: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
 
   const navLinks = [
-    { name: 'Features', href: '#features' },
-    { name: 'How it Works', href: '#how-it-works' },
-    { name: 'Pricing', href: '#pricing' },
-  ]
+    { name: "Features", href: "#features" },
+    { name: "How it Works", href: "#how-it-works" },
+    { name: "Pricing", href: "#pricing" },
+  ];
+
+  // ✅ useEffect must be INSIDE component
+  useEffect(() => {
+    const styleTag = document.getElementById("navbar-inline-css");
+    if (styleTag) styleTag.remove();
+  }, []);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
+          
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
             <div className="relative">
@@ -50,7 +57,7 @@ export const Navbar: React.FC = () => {
             <Button className="bg-gradient-primary hover:opacity-90 transition-opacity" asChild>
               <Link href="/signup">Get Started</Link>
             </Button>
-          </div> 
+          </div>
 
           {/* Mobile Menu Button */}
           <button
@@ -76,11 +83,16 @@ export const Navbar: React.FC = () => {
                   {link.name}
                 </a>
               ))}
+
               <div className="flex flex-col gap-3 pt-4 border-t border-border/50">
-                <div className="flex justify-start"><ThemeToggle /></div>
+                <div className="flex justify-start">
+                  <ThemeToggle />
+                </div>
+
                 <Button className="bg-gradient-primary" asChild>
                   <Link href="/login">Sign In</Link>
                 </Button>
+
                 <Button className="bg-gradient-primary" asChild>
                   <Link href="/signup">Get Started</Link>
                 </Button>
@@ -90,9 +102,5 @@ export const Navbar: React.FC = () => {
         )}
       </div>
     </nav>
-  )
-}
-useEffect(() => {
-  const styleTag = document.getElementById("navbar-inline-css");
-  if (styleTag) styleTag.remove();
-}, []);
+  );
+};

@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
 import { Command } from "cmdk";
 import {
   LayoutDashboard,
@@ -15,19 +14,34 @@ import {
 
 interface CommandPaletteProps {
   open: boolean;
-  setOpen: (open: boolean) => void;
+  setOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(newTheme);
+    localStorage.setItem("theme", newTheme);
+  };
 
   // Toggle the menu when ⌘K is pressed
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setOpen(open => !open);
+        setOpen((open) => !open);
       }
     };
     document.addEventListener("keydown", down);
@@ -122,9 +136,7 @@ export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
 
             <Command.Group heading="Quick Actions">
               <Command.Item
-                onSelect={() => runCommand(() => {
-                  setTheme(theme === "dark" ? "light" : "dark");
-                })}
+                onSelect={() => runCommand(() => toggleTheme())}
                 className="flex items-center gap-2 px-2 py-2 text-sm rounded-md aria-selected:bg-accent aria-selected:text-accent-foreground cursor-pointer text-foreground"
               >
                 <Moon className="h-4 w-4" />
