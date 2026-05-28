@@ -1,14 +1,16 @@
 import { normalizeKnownRepoHttpUrl, normalizeTargetDirectory } from "@/lib/utils/repositoryUtils";import { NextRequest, NextResponse } from "next/server";
+import { isValidGitScope } from "@/lib/utils/validators";
 import { isHttpError, requireAuth, sanitizeError, getPrismaErrorResponse } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
 import { GitService } from "@/lib/services/gitService";
 import { logger } from "@/lib/logger";
+import { getEphemeralSecret } from "@/lib/utils/analysisRunner";
 function kickLocalRunner(request: NextRequest) {
   if (process.env.NODE_ENV === "production") return;
   const origin = new URL(request.url).origin;
-  const secret = process.env.ANALYSIS_RUNNER_SECRET;
+  const secret = process.env.ANALYSIS_RUNNER_SECRET || getEphemeralSecret();
   void fetch(`${origin}/api/internal/run-analysis`, {
     method: "POST",
     headers: secret ? { "x-analysis-runner-secret": secret } : undefined,
@@ -103,9 +105,16 @@ export async function POST(request: NextRequest) {
 
     console.log("Repository created:", repository.id);
 
+    const rawScope = body.scope;
+    if (rawScope != null && (typeof rawScope !== "string" || !isValidGitScope(rawScope))) {
+      return NextResponse.json(
+        { error: "Invalid scope. Only alphanumeric characters, underscore, dot, slash, and hyphen are allowed." },
+        { status: 400 },
+      );
+    }
     let trimmedScope: string | undefined = undefined;
-    if (body.scope && typeof body.scope === "string") {
-      trimmedScope = body.scope.trim();
+    if (rawScope && typeof rawScope === "string") {
+      trimmedScope = rawScope.trim();
     }
     const job = await analysisJobService.createRepositoryAnalysisJob({
       repositoryId: repository.id,

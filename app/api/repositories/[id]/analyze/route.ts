@@ -58,6 +58,10 @@ export async function POST(
       }
     }
 
+    if (scope != null && (typeof scope !== "string" || !isValidGitScope(scope))) {
+      return apiError(400, "Invalid scope. Only alphanumeric characters, underscore, dot, slash, and hyphen are allowed.");
+    }
+
     const job = await analysisJobService.createRepositoryAnalysisJob({
       repositoryId: id,
       userId: user.userId,

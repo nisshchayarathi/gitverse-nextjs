@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
   Button,
+  CopyToClipboard,
 } from "@/components/ui";
 import { buildApiUrl } from "@/services/apiConfig";
 
@@ -82,12 +83,19 @@ function MentorMarkdown({ content }: { content: string }) {
             );
           }
 
+          const codeString = text.replace(/\n$/, "");
           return (
-            <pre className="my-2 overflow-x-auto rounded-lg bg-black/40 p-3 border border-white/10">
-              <code className={className} {...props}>
-                {children}
-              </code>
-            </pre>
+            <div className="relative group my-2">
+              <pre className="overflow-x-auto rounded-lg bg-black/40 p-3 border border-white/10">
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              </pre>
+              <CopyToClipboard
+                text={codeString}
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+              />
+            </div>
           );
         },
       }}

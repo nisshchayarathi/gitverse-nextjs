@@ -115,10 +115,15 @@ export async function getAuthUser(
       select: {
         id: true,
         tokenVersion: true,
+        lockedUntil: true,
       },
     });
 
     if (!dbUser) {
+      return null;
+    }
+
+    if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
       return null;
     }
 
