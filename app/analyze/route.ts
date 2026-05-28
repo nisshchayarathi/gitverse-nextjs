@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
+import { validateRepoUrl } from "@/utils/repoUrlValidator";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
 import { normalizeTargetDirectory } from "@/lib/utils/repositoryUtils";
 
@@ -91,6 +92,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Validate URL format using the enhanced validator
+      const validation = validateRepoUrl(url);
+      if (!validation.isValid) {
+        return NextResponse.json(
+          { 
+            error: validation.error || "Invalid repository URL",
+            suggestion: validation.suggestion
+          },
       const normalizedUrl = normalizeKnownRepoHttpUrl(url);
       if (!normalizedUrl) {
         return NextResponse.json(
@@ -109,6 +118,9 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+
+      // Use the normalized URL
+      const normalizedUrl = validation.parsed!.normalizedUrl;
 
       const repo = await repositoryService.createRepository({
         name,

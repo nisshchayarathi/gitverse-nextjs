@@ -31,6 +31,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
+import { validateRepoUrl } from "@/utils/repoUrlValidator";
 import { toast } from "@/hooks/use-toast";
 
 interface Repository {
@@ -48,6 +49,11 @@ interface Repository {
   updatedAt?: string;
 }
 
+interface UrlError {
+  error: string;
+  suggestion?: string;
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const router = useRouter();
@@ -59,6 +65,7 @@ export default function Dashboard() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [urlError, setUrlError] = useState<UrlError | null>(null);
 
   const { addRepo } = useRecentRepos();
 
@@ -225,6 +232,15 @@ export default function Dashboard() {
   const handleAnalyze = async () => {
     if (!repoUrl.trim()) return;
 
+    // Clear previous errors
+    setUrlError(null);
+
+    // Validate URL client-side first
+    const validation = validateRepoUrl(repoUrl.trim());
+    if (!validation.isValid) {
+      setUrlError({
+        error: validation.error || "Invalid repository URL",
+        suggestion: validation.suggestion,
     if (!isValidGithubUrl(repoUrl)) {
       toast({
         title: "Invalid URL",
@@ -238,6 +254,9 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem("gitverse_token");
 
+      // Use the normalized URL and extract repo name from parsed result
+      const normalizedUrl = validation.parsed!.normalizedUrl;
+      const repoName = validation.parsed!.repo;
       // Extract owner and name for recent storage
       const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
       const cleanParts = cleanUrl.split("/");
@@ -247,7 +266,7 @@ export default function Dashboard() {
         buildApiUrl("/api/repositories"),
         {
           name: repoName,
-          url: repoUrl.trim(),
+          url: normalizedUrl,
           description: `Repository from ${repoUrl}`,
           scope: repoScope.trim() || undefined,
         },
@@ -281,6 +300,9 @@ export default function Dashboard() {
     } catch (error: any) {
 
       console.error("Error creating repository:", error);
+      const errorMsg = error.response?.data?.error || "Failed to analyze repository";
+      const suggestion = error.response?.data?.suggestion;
+      setUrlError({ error: errorMsg, suggestion });
       
       let errMsg = "Failed to analyze repository";
       if (error.response?.status === 404 || error.response?.data?.error === "NOT_FOUND") {
@@ -398,6 +420,29 @@ if (loading) {
         <Card className="glass glow-primary">
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <Input
+                  type="url"
+                  placeholder="https://github.com/username/repository"
+                  value={repoUrl}
+                  onChange={(e) => {
+                    setRepoUrl(e.target.value);
+                    setUrlError(null);
+                  }}
+                  className={`flex-1 bg-background/50 ${urlError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  onKeyPress={(e) => e.key === "Enter" && handleAnalyze()}
+                />
+                {urlError && (
+                  <div className="mt-2 text-sm text-destructive">
+                    <p className="font-medium">{urlError.error}</p>
+                    {urlError.suggestion && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {urlError.suggestion}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
               <Input
                 type="url"
                 ref={searchRef}
