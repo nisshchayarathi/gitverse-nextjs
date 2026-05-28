@@ -1,5 +1,5 @@
 import { normalizeKnownRepoHttpUrl, normalizeTargetDirectory } from "@/lib/utils/repositoryUtils";import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError, getPrismaErrorResponse } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
@@ -126,6 +126,11 @@ export async function POST(request: NextRequest) {
 
     const stack = process.env.NODE_ENV === 'development' ? error.stack : error.stack?.split('\n').slice(0, 3).join('\n');
     logger.error({ err: sanitizeError(error), stack }, "Create repository error");
+    const prismaError = getPrismaErrorResponse(error);
+    if (prismaError) {
+      return prismaError;
+    }
+
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
@@ -143,13 +148,26 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request);
-    const repositories = await repositoryService.listRepositories(user.userId);
+    
+    const { searchParams } = new URL(request.url);
+    const limitParam = searchParams.get("limit");
+    const cursorParam = searchParams.get("cursor");
 
-    return NextResponse.json({ repositories });
+    const limit = limitParam ? parseInt(limitParam, 10) : 10;
+    const cursor = cursorParam ? parseInt(cursorParam, 10) : undefined;
+
+    const result = await repositoryService.listRepositories(user.userId, limit, cursor);
+
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error("List repositories error:", error);
 
     logger.error({ err: sanitizeError(error) }, "List repositories error");
+    const prismaError = getPrismaErrorResponse(error);
+    if (prismaError) {
+      return prismaError;
+    }
+
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },

@@ -39,6 +39,7 @@ model User {
   lastFailedAttemptAt   DateTime?    @map("last_failed_attempt_at")
   createdAt             DateTime     @default(now()) @map("created_at")
   updatedAt             DateTime     @updatedAt @map("updated_at")
+  passwordChangedAt     DateTime?    @map("password_changed_at")
   repositories          Repository[]
   analysisJobs          AnalysisJob[]
   accounts              Account[]
@@ -120,26 +121,29 @@ model PRReview {
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             Int     @map("user_id")
+  id                 String   @id @default(cuid())
+  userId             Int      @map("user_id")
   type               String
   provider           String
-  providerAccountId  String  @map("provider_account_id")
-  refresh_token      String? @db.Text
-  access_token       String? @db.Text
+  providerAccountId  String   @map("provider_account_id")
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
   expires_at         Int?
   token_type         String?
   scope              String?
-  id_token           String? @db.Text
+  id_token           String?  @db.Text
   session_state      String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Index on userId for fast lookup of all accounts belonging to a user
   @@index([userId])
+  // Index on provider to speed up OAuth provider-based queries (e.g. filtering by provider: "google")
+  @@index([provider])
   @@unique([provider, providerAccountId])
   @@map("accounts")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
 }
 
 model Session {

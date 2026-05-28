@@ -17,6 +17,9 @@ interface Repository {
 interface CodeDependencyGraphProps {
   repository?: Repository;
   highlightedPaths?: string[];
+
+interface CodeDependencyGraphProps {
+  repository?: any;
 }
 
 export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeDependencyGraphProps) {
@@ -27,6 +30,33 @@ export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeD
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const graphAnalyzer = new GraphAnalyzer();
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  const graphAnalyzer = new GraphAnalyzer();
+  const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
+  const exportGraph = async (format: "png" | "svg") => {
+    if (!exportRef.current) return;
+
+    try {
+      const options = {
+        backgroundColor: "#0f172a",
+        pixelRatio: 2,
+        cacheBust: true,
+      };
+
+      const dataUrl =
+        format === "png"
+          ? await htmlToImage.toPng(exportRef.current, options)
+          : await htmlToImage.toSvg(exportRef.current);
+
+      const link = document.createElement("a");
+      link.download = `gitverse-graph.${format}`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error("Export failed:", error);
+    }
+  };
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -313,6 +343,34 @@ export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeD
       <div
   ref={tooltipRef}
   className="
+        <div
+          ref={exportRef}
+          className="glass rounded-lg p-4 sm:p-6 relative overflow-visible"
+        >
+          <h3 className="text-base sm:text-lg font-semibold mb-4">
+            Code Dependencies
+          </h3>
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <svg
+              ref={svgRef}
+              width="100%"
+              height="auto"
+              className="text-foreground min-h-96 sm:min-h-96"
+              style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
+              viewBox="0 0 900 600"
+              preserveAspectRatio="xMidYMid meet"
+            />
+          </div>
+          <div className="absolute bottom-2 right-3 text-[10px] text-white/70">
+            GitVerse • {repository?.name || "Repository"}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
+          💡 Drag nodes to reposition • Scroll to zoom • Hover for details
+        </p>
+        <div
+          ref={tooltipRef}
+          className="
     fixed p-3 rounded-lg pointer-events-none shadow-xl border
     translate-x-[-120px] translate-y-[-120px]
     sm:translate-x-[-250px] sm:translate-y-[-250px]
@@ -338,6 +396,16 @@ export function CodeDependencyGraph({ repository, highlightedPaths = [] }: CodeD
           repositoryFiles={repository?.files || []}
           onClose={() => setSelectedNode(null)}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          style={{
+            opacity: 1, // control with state later
+            backgroundColor: "rgba(0, 0, 0, 0.9)",
+            color: "white",
+            zIndex: 9999,
+            backdropFilter: "blur(8px)",
+            left: "0px",
+            top: "0px",
+            whiteSpace: "nowrap",
+          }}
         />
       )}
 

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+let lastCleanupAt = 0;
 export type AttemptType = "LOGIN" | "SIGNUP" | "CHANGE_PASSWORD" | "DELETE_ACCOUNT";
 
 const RETENTION_DAYS = 7;
@@ -20,6 +21,22 @@ export function getClientIp(request: NextRequest): string {
   return request.ip ?? "unknown";
 }
 
+async function maybeCleanupStaleAttempts() {
+  const now = Date.now();
+
+  if (now - lastCleanupAt < CLEANUP_INTERVAL_MS) {
+    return;
+  }
+
+  lastCleanupAt = now;
+
+  try {
+    await cleanupStaleAttempts();
+  } catch (error) {
+    console.error("Background cleanup failed:", error);
+  }
+}
+
 export async function isRateLimited(
   key: string,
   type: AttemptType,
@@ -27,6 +44,7 @@ export async function isRateLimited(
   windowMs: number
 ): Promise<boolean> {
   try {
+    void maybeCleanupStaleAttempts();
     const since = new Date(Date.now() - windowMs);
 
     const count = await prisma.loginAttempt.count({
@@ -51,6 +69,7 @@ export async function countAttempts(
   windowMs: number
 ): Promise<number> {
   try {
+    void maybeCleanupStaleAttempts();
     const since = new Date(Date.now() - windowMs);
 
     return await prisma.loginAttempt.count({

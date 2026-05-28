@@ -72,8 +72,8 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  const job = await analysisJobService.claimNextJob({ workerId });
   if (!job) {
-    log("info", "No pending jobs", { workerId });
     return new NextResponse(null, { status: 204 });
   }
 
@@ -96,7 +96,7 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       workerId,
       update: {
         progressPercent: job.progressPercent ?? 0,
-        progressMessage: job.progressMessage ?? "Starting analysis…",
+        progressMessage: job.progressMessage ?? "Processing",
       },
     });
   } catch (err: any) {
@@ -185,8 +185,23 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       durationMs,
     });
 
-    return NextResponse.json({
-      ok: true,
+    await repositoryService.analyzeRepository(job.repositoryId, {
+      onProgress: async (update) => {
+        await analysisJobService.updateProgress({
+          jobId: job.id,
+          workerId,
+          update,
+        });
+      },
+    });
+
+    await analysisJobService.markDone({ jobId: job.id, workerId });
+
+    return NextResponse.json({ ok: true, jobId: job.id, status: "DONE" });
+  } catch (error: any) {
+    const message = String(error?.message || error || "Unknown error");
+
+    await analysisJobService.markFailed({
       jobId: job.id,
       status: "DONE",
       durationMs,
@@ -206,9 +221,8 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
 
     log("error", isTimeout ? "Job timed out" : "Job failed", {
       workerId,
-      jobId: job.id,
-      durationMs,
-      attempt: job.attempts,
+      error: message,
+      attempts: job.attempts,
       maxAttempts: job.maxAttempts,
       internalError: error?.message ?? String(error),
     });
@@ -247,22 +261,14 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       });
     }
 
+    });
+
     return NextResponse.json(
-      {
-        ok: false,
-        jobId: job.id,
-        status: isTimeout ? "TIMEOUT" : "FAILED",
-        error: safeMessage,
-        durationMs,
-      },
+      { ok: false, jobId: job.id, status: "FAILED", error: message },
       { status: 500 },
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Route exports
-// ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
   return runOnce(request);
