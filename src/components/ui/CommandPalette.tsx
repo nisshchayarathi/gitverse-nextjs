@@ -14,7 +14,7 @@ import {
 
 interface CommandPaletteProps {
   open: boolean;
-  setOpen: (open: boolean) => void;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
@@ -26,7 +26,7 @@ export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setOpen(!open);
+        setOpen((prev) => !prev);
       }
     };
     document.addEventListener("keydown", down);
