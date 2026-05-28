@@ -30,4 +30,10 @@ jobs:
 
       - name: Unit tests
         run: npm test
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+          JWT_SECRET: "dummy-secret"
+          NEXTAUTH_SECRET: "dummy-secret"
+          NEXTAUTH_URL: "http://localhost:3000"
+          GEMINI_API_KEY: "dummy-key"
 

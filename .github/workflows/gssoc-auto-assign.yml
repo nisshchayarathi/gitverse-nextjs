@@ -1,0 +1,429 @@
+name: GSSoC — Auto Assign Issue
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Runs when someone comments on an issue.
+# • Filters out bot comments immediately
+# • Anyone can self-assign any open issue
+# • Max 1 issue at a time — must resolve before picking another
+# • Daily cap: max 4 new assignments per day per contributor
+# • Maintainer can comment "/unassign @username" to free up a slot
+# • Maintainer can comment "/assign @username" to assign someone manually
+# • Uses Node.js 24 compatible action (github-script@v7 + node20 env var)
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  auto-assign:
+    name: Auto Assign Issue (1 at a time, max 4/day)
+    runs-on: ubuntu-latest
+
+    # Only run on issue comments (not PR comments) and skip bots entirely
+    if: |
+      !github.event.issue.pull_request &&
+      !contains(github.event.comment.user.login, '[bot]') &&
+      github.event.comment.user.type != 'Bot'
+
+    permissions:
+      issues: write
+      pull-requests: read
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # Fix Node.js 20 deprecation warning
+
+    steps:
+      - name: Handle issue assignment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const comment   = context.payload.comment;
+            const issue     = context.payload.issue;
+            const issueNum  = issue.number;
+            const commenter = comment.user.login;
+            const commentBody = comment.body.trim();
+
+            const TOTAL_LIMIT = 1;  // Only 1 issue at a time
+            const DAILY_LIMIT = 4;  // Max 4 new assignments per day
+
+            // ── Extra bot guard (defence-in-depth) ───────────────────────────
+            if (
+              commenter.endsWith('[bot]') ||
+              comment.user.type === 'Bot' ||
+              commenter === 'github-actions'
+            ) {
+              console.log(`🤖 Skipping bot comment from @${commenter}`);
+              return;
+            }
+
+            // ── Ensure required labels exist ──────────────────────────────────
+            const requiredLabels = [
+              { name: 'gssoc:assigned',  color: 'fbca04', description: 'GSSoC: Issue has been assigned' },
+              { name: 'gssoc:available', color: '0e8a16', description: 'GSSoC: Issue is available to pick up' },
+              { name: "GSSoC'26",        color: '0e8a16', description: 'Part of GirlScript Summer of Code 2026' },
+            ];
+            for (const label of requiredLabels) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name: label.name });
+              } catch (e) {
+                if (e.status === 404) {
+                  await github.rest.issues.createLabel({ owner, repo, ...label });
+                }
+              }
+            }
+
+            // ── Helper: count open issues currently assigned to a user ────────
+            async function countAssignedIssues(username) {
+              try {
+                const { data } = await github.rest.issues.listForRepo({
+                  owner, repo,
+                  assignee: username,
+                  state: 'open',
+                  per_page: 100,
+                });
+                return data.filter(i => !i.pull_request).length;
+              } catch (e) {
+                console.log(`⚠️ Could not count assigned issues for @${username}: ${e.message}`);
+                return 0;
+              }
+            }
+
+            // ── Helper: count issues assigned to a user TODAY (UTC) ───────────
+            // Strategy: use GitHub search API — much faster and no per-issue loop
+            async function countAssignedToday(username) {
+              try {
+                const todayUTC = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+                const q = `repo:${owner}/${repo} is:issue assignee:${username} created:>=${todayUTC}`;
+                // We look at timeline events on issues assigned today via search
+                // Simpler approach: search for issues where the user was assigned today
+                // GitHub doesn't expose "assigned date" in search, so we use the
+                // events API but only for issues created/updated today to limit calls.
+                const { data: searchResult } = await github.rest.search.issuesAndPullRequests({
+                  q: `repo:${owner}/${repo} is:issue assignee:${username} updated:>=${todayUTC}`,
+                  per_page: 50,
+                });
+                const recentIssues = searchResult.items.filter(i => !i.pull_request);
+
+                let countToday = 0;
+                const todayStart = new Date(todayUTC + 'T00:00:00Z');
+
+                for (const iss of recentIssues) {
+                  try {
+                    const { data: events } = await github.rest.issues.listEvents({
+                      owner, repo,
+                      issue_number: iss.number,
+                      per_page: 100,
+                    });
+                    const assignedToday = events.some(e =>
+                      e.event === 'assigned' &&
+                      e.assignee?.login === username &&
+                      new Date(e.created_at) >= todayStart
+                    );
+                    if (assignedToday) countToday++;
+                  } catch (e) {
+                    console.log(`Could not check events for #${iss.number}: ${e.message}`);
+                  }
+                }
+                return countToday;
+              } catch (e) {
+                console.log(`⚠️ Could not count today's assignments for @${username}: ${e.message}`);
+                return 0; // fail open — let the assignment proceed if we can't check
+              }
+            }
+
+            // ── Helper: check if user is a maintainer / owner ────────────────
+            async function isMaintainer(username) {
+              try {
+                const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner, repo, username,
+                });
+                return ['admin', 'maintain', 'write'].includes(data.permission);
+              } catch {
+                // If repo owner is commenting, they won't fail but just in case:
+                return username === owner;
+              }
+            }
+
+            // ── Current assignees on this issue ───────────────────────────────
+            const currentAssignees = issue.assignees.map(a => a.login);
+
+            // ─────────────────────────────────────────────────────────────────
+            // DETECT COMMANDS
+            // ─────────────────────────────────────────────────────────────────
+            const selfAssignPatterns = [
+              /^\/assign$/i,
+              /^\/take$/i,
+              /^\/claim$/i,
+              /i('d like| want) to (work on|fix|take|handle|tackle) this/i,
+              /^(can i|may i) (work on|take|fix|handle|tackle) this\??$/i,
+              /^assign (this |it )?to me\??$/i,
+              /^i('ll| will) (work on|fix|take|handle|tackle) this/i,
+            ];
+
+            const maintainerAssignMatch = commentBody.match(/^\/assign\s+@([\w-]+)$/i);
+            const unassignMatch         = commentBody.match(/^\/unassign\s+@([\w-]+)$/i);
+
+            const selfUnassignPatterns = [
+              /^\/unassign$/i,
+              /^\/drop$/i,
+              /^\/abandon$/i,
+              /i('m| am) (no longer|not) (working on|able to)/i,
+              /^unassign me\??$/i,
+            ];
+
+            const isSelfAssign      = selfAssignPatterns.some(rx => rx.test(commentBody));
+            const isSelfUnassign    = selfUnassignPatterns.some(rx => rx.test(commentBody));
+            const isMaintainerUnassign = unassignMatch !== null;
+
+            // If no command matched at all — exit silently
+            if (!isSelfAssign && !maintainerAssignMatch && !isSelfUnassign && !isMaintainerUnassign) {
+              console.log(`ℹ️ No command found in comment by @${commenter} — skipping.`);
+              return;
+            }
+
+            // ═════════════════════════════════════════════════════════════════
+            // HANDLE SELF-ASSIGN
+            // ═════════════════════════════════════════════════════════════════
+            if (isSelfAssign) {
+
+              // Issue closed?
+              if (issue.state === 'closed') {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: `Hey @${commenter}! ❌ This issue is already **closed**. Please look for an open issue to contribute to.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                });
+                return;
+              }
+
+              // Already assigned to commenter?
+              if (currentAssignees.includes(commenter)) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: `Hey @${commenter}! You are **already assigned** to this issue. Go ahead and work on it! 💪\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                });
+                return;
+              }
+
+              // Already assigned to someone else?
+              if (currentAssignees.length > 0) {
+                const assigneeList = currentAssignees.map(a => `@${a}`).join(', ');
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: [
+                    `Hey @${commenter}! ⚠️ This issue is already assigned to ${assigneeList}.`,
+                    ``,
+                    `Please pick another open issue. Browse available ones [here](https://github.com/${owner}/${repo}/issues?q=is%3Aissue+is%3Aopen+no%3Aassignee).`,
+                    ``,
+                    `_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                  ].join('\n'),
+                });
+                return;
+              }
+
+              // ── Concurrent issue limit check (max 1 at a time) ───────────────
+              const assignedCount = await countAssignedIssues(commenter);
+              if (assignedCount >= TOTAL_LIMIT) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: [
+                    `## ❌ You Already Have an Active Issue — @${commenter}`,
+                    ``,
+                    `You currently have **${assignedCount} open issue(s)** assigned. Our policy allows only **1 issue at a time** — please resolve your current issue before picking up a new one.`,
+                    ``,
+                    `### What you can do:`,
+                    `- ✅ Complete or close your existing assigned issue first`,
+                    `- 🔁 Comment \`/unassign\` on an issue you no longer want to work on`,
+                    `- 📋 View your assigned issues [here](https://github.com/${owner}/${repo}/issues?q=is%3Aissue+is%3Aopen+assignee%3A${commenter})`,
+                    ``,
+                    `Once you've wrapped up your current issue, come back and comment \`/assign\` here! 🙏`,
+                    ``,
+                    `_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                  ].join('\n'),
+                });
+                console.log(`🚫 @${commenter} already has ${assignedCount} active issue(s) — denied.`);
+                return;
+              }
+
+              // ── Daily limit check (max 4 per day) ────────────────────────────
+              const assignedTodayCount = await countAssignedToday(commenter);
+              if (assignedTodayCount >= DAILY_LIMIT) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: [
+                    `## ❌ Daily Assignment Limit Reached — @${commenter}`,
+                    ``,
+                    `You have already been assigned **${assignedTodayCount} issue(s) today**, which is the daily maximum of **${DAILY_LIMIT} issues per day**.`,
+                    ``,
+                    `### What you can do:`,
+                    `- ⏰ Come back **tomorrow** and comment \`/assign\` again`,
+                    `- 💪 Focus on completing the issue(s) you already have`,
+                    `- 📋 View your active issues [here](https://github.com/${owner}/${repo}/issues?q=is%3Aissue+is%3Aopen+assignee%3A${commenter})`,
+                    ``,
+                    `_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                  ].join('\n'),
+                });
+                console.log(`🚫 @${commenter} hit the daily ${DAILY_LIMIT}-issue limit.`);
+                return;
+              }
+
+              // ── All checks passed — assign! ───────────────────────────────────
+              await github.rest.issues.addAssignees({
+                owner, repo, issue_number: issueNum,
+                assignees: [commenter],
+              });
+
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number: issueNum, labels: ['gssoc:assigned'],
+              });
+              try {
+                await github.rest.issues.removeLabel({
+                  owner, repo, issue_number: issueNum, name: 'gssoc:available',
+                });
+              } catch {}
+
+              const remainingToday = DAILY_LIMIT - assignedTodayCount - 1;
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: issueNum,
+                body: [
+                  `## ✅ Issue Assigned — @${commenter}`,
+                  ``,
+                  `You have been assigned to this issue! Here's what to do next:`,
+                  ``,
+                  `1. 🍴 Fork the repo and create a new branch: \`git checkout -b fix/issue-${issueNum}\``,
+                  `2. 💻 Work on the fix and commit your changes`,
+                  `3. 🔀 Open a PR with \`closes #${issueNum}\` in the description`,
+                  `4. ⏳ Please complete this within **7 days** or it may be unassigned`,
+                  ``,
+                  `| Detail | Value |`,
+                  `|--------|-------|`,
+                  `| 📌 Issue | #${issueNum} |`,
+                  `| 👤 Assigned to | @${commenter} |`,
+                  `| 🔒 Active issues | ${assignedCount + 1} / ${TOTAL_LIMIT} |`,
+                  `| 📅 Assigned today | ${assignedTodayCount + 1} / ${DAILY_LIMIT} |`,
+                  `| ☀️ Remaining today | ${remainingToday} |`,
+                  ``,
+                  `> ⚠️ You **cannot pick up another issue** until this one is resolved or unassigned.`,
+                  ``,
+                  `Good luck! 🚀 Feel free to ask questions in the comments if you're stuck.`,
+                  ``,
+                  `_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                ].join('\n'),
+              });
+              console.log(`✅ Assigned #${issueNum} to @${commenter} (active: ${assignedCount + 1}/${TOTAL_LIMIT}, today: ${assignedTodayCount + 1}/${DAILY_LIMIT})`);
+              return;
+            }
+
+            // ═════════════════════════════════════════════════════════════════
+            // HANDLE MAINTAINER /assign @username
+            // ═════════════════════════════════════════════════════════════════
+            if (maintainerAssignMatch) {
+              const targetUser = maintainerAssignMatch[1];
+              const canAssign  = await isMaintainer(commenter);
+
+              if (!canAssign) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: `@${commenter} ❌ Only maintainers can assign issues to others. Assign yourself by commenting \`/assign\`.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                });
+                return;
+              }
+
+              const assignedCount = await countAssignedIssues(targetUser);
+              if (assignedCount >= TOTAL_LIMIT) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} already has **${assignedCount}/${TOTAL_LIMIT}** active issue. They must resolve it first.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                });
+                return;
+              }
+
+              const assignedTodayCount = await countAssignedToday(targetUser);
+              if (assignedTodayCount >= DAILY_LIMIT) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} has already hit the daily limit (**${assignedTodayCount}/${DAILY_LIMIT}**). Resets at midnight UTC.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                });
+                return;
+              }
+
+              await github.rest.issues.addAssignees({
+                owner, repo, issue_number: issueNum, assignees: [targetUser],
+              });
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number: issueNum, labels: ['gssoc:assigned'],
+              });
+              try {
+                await github.rest.issues.removeLabel({
+                  owner, repo, issue_number: issueNum, name: 'gssoc:available',
+                });
+              } catch {}
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: issueNum,
+                body: `✅ @${targetUser} has been assigned to this issue by @${commenter}. (active: ${assignedCount + 1}/${TOTAL_LIMIT}, today: ${assignedTodayCount + 1}/${DAILY_LIMIT})\n\n> ⚠️ @${targetUser} cannot pick up another issue until this one is resolved.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+              });
+              console.log(`✅ Maintainer @${commenter} assigned #${issueNum} to @${targetUser}`);
+              return;
+            }
+
+            // ═════════════════════════════════════════════════════════════════
+            // HANDLE UNASSIGN
+            // ═════════════════════════════════════════════════════════════════
+            if (isSelfUnassign || isMaintainerUnassign) {
+              let targetUser = commenter;
+
+              if (isMaintainerUnassign) {
+                const canUnassign = await isMaintainer(commenter);
+                if (!canUnassign) {
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: issueNum,
+                    body: `@${commenter} ❌ Only maintainers can unassign other contributors.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                  });
+                  return;
+                }
+                targetUser = unassignMatch[1];
+              }
+
+              if (!currentAssignees.includes(targetUser)) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issueNum,
+                  body: `@${commenter} ℹ️ @${targetUser} is not assigned to this issue.\n\n_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                });
+                return;
+              }
+
+              await github.rest.issues.removeAssignees({
+                owner, repo, issue_number: issueNum, assignees: [targetUser],
+              });
+
+              const remaining = currentAssignees.filter(a => a !== targetUser);
+              if (remaining.length === 0) {
+                await github.rest.issues.addLabels({
+                  owner, repo, issue_number: issueNum, labels: ['gssoc:available'],
+                });
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner, repo, issue_number: issueNum, name: 'gssoc:assigned',
+                  });
+                } catch {}
+              }
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: issueNum,
+                body: [
+                  `## 🔓 Unassigned — @${targetUser}`,
+                  ``,
+                  isSelfUnassign
+                    ? `@${targetUser} has unassigned themselves. This issue is now **open for others** to pick up.`
+                    : `@${targetUser} has been unassigned by maintainer @${commenter}. This issue is now **open for others** to pick up.`,
+                  ``,
+                  `Anyone can comment \`/assign\` to take it. 👇`,
+                  ``,
+                  `_GSSoC'26 automation · [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+                ].join('\n'),
+              });
+              console.log(`🔓 Unassigned @${targetUser} from issue #${issueNum}`);
+            }
