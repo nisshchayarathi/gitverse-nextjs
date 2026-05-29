@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 
 type GeminiCacheKey = {
   repositoryId: number;
+  userId: number;
   commitHash: string;
   analysisType: string;
   promptHash: string;
@@ -50,8 +51,9 @@ export async function getGeminiAnalysisCache(
 
   const row = await prisma.geminiAnalysisCache.findUnique({
     where: {
-      repositoryId_commitHash_analysisType_promptHash: {
+      repositoryId_userId_commitHash_analysisType_promptHash: {
         repositoryId: key.repositoryId,
+        userId: key.userId,
         commitHash: key.commitHash,
         analysisType: key.analysisType,
         promptHash: key.promptHash,
@@ -89,8 +91,9 @@ export async function setGeminiAnalysisCache(
 
   await prisma.geminiAnalysisCache.upsert({
     where: {
-      repositoryId_commitHash_analysisType_promptHash: {
+      repositoryId_userId_commitHash_analysisType_promptHash: {
         repositoryId: key.repositoryId,
+        userId: key.userId,
         commitHash: key.commitHash,
         analysisType: key.analysisType,
         promptHash: key.promptHash,
@@ -98,6 +101,7 @@ export async function setGeminiAnalysisCache(
     },
     create: {
       repositoryId: key.repositoryId,
+      userId: key.userId,
       commitHash: key.commitHash,
       analysisType: key.analysisType,
       promptHash: key.promptHash,
@@ -125,6 +129,14 @@ export async function invalidateGeminiAnalysisCacheForRepository(
       repositoryId,
       commitHash: { not: keepCommitHash },
     },
+  });
+}
+
+export async function invalidateAllGeminiAnalysisCacheForRepository(
+  repositoryId: number,
+): Promise<void> {
+  await prisma.geminiAnalysisCache.deleteMany({
+    where: { repositoryId },
   });
 }
 

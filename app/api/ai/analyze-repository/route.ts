@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
 
     const cached = await getGeminiAnalysisCache({
       repositoryId,
+      userId: user.userId,
       commitHash,
       analysisType: type,
       promptHash,
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
     });
 
     await setGeminiAnalysisCache(
-      { repositoryId, commitHash, analysisType: type, promptHash },
+      { repositoryId, userId: user.userId, commitHash, analysisType: type, promptHash },
       analysis,
       { model: "gemini-2.5-flash" },
     );
