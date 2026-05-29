@@ -4,14 +4,8 @@ import prisma from "@/lib/prisma";
 import { requireAuth, isHttpError, sanitizeError } from "@/lib/middleware";
 
 /**
- * POST /api/users/change-password
- *
- * Securely modifies the password of the currently authenticated user.
- * Validates the current password if one is already set on the account,
- * enforces a minimum password length of 8 characters, and securely hashes the new password before storage.
- *
- * @param request - The incoming HTTP NextRequest containing currentPassword and newPassword fields.
- * @returns A JSON response with status code 200 on success, or a 400/401/404/500 error response.
+ * Handles authenticated password changes and invalidates
+ * existing sessions after a successful password update.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -21,14 +15,14 @@ export async function POST(request: NextRequest) {
 
     if (!newPassword || typeof newPassword !== "string") {
       return NextResponse.json(
-        { error: "New password is required" },
+        { message: "New password is required" },
         { status: 400 }
       );
     }
 
     if (newPassword.length < 8) {
       return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
+        { message: "Password must be at least 8 characters" },
         { status: 400 }
       );
     }
@@ -38,58 +32,72 @@ export async function POST(request: NextRequest) {
     });
 
     if (!userDetails) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json(
+        { message: "User not found" },
+        { status: 404 }
+      );
     }
 
     const passwordHash = userDetails.passwordHash;
-    if (!passwordHash) {
-      return NextResponse.json(
-        { error: "Cannot set password: account uses OAuth authentication" },
-        { status: 400 }
+
+    // Existing password users must verify current password
+    if (passwordHash) {
+      if (!currentPassword) {
+        return NextResponse.json(
+          { message: "Current password is required" },
+          { status: 400 }
+        );
+      }
+
+      const isPasswordValid = await bcrypt.compare(
+        currentPassword,
+        passwordHash
       );
+
+      if (!isPasswordValid) {
+        return NextResponse.json(
+          { message: "Current password is incorrect" },
+          { status: 401 }
+        );
+      }
     }
 
-    if (!currentPassword) {
-      return NextResponse.json(
-        { error: "Current password is required" },
-        { status: 400 }
-      );
-    }
-
-    const isPasswordValid = await bcrypt.compare(
-      currentPassword,
-      passwordHash,
+    const hashedPassword = await bcrypt.hash(
+      newPassword,
+      10
     );
 
-    if (!isPasswordValid) {
-      return NextResponse.json(
-        { error: "Current password is incorrect" },
-        { status: 401 }
-      );
-    }
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.userId },
+        data: {
+          passwordHash: hashedPassword,
+          passwordChangedAt: new Date(
+            Math.floor(Date.now() / 1000) * 1000
+          ),
+          tokenVersion: {
+            increment: 1,
+          },
+        },
+      }),
+      prisma.session.deleteMany({
+        where: {
+          userId: user.userId,
+        },
+      }),
+    ]);
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    await prisma.user.update({
-      where: { id: user.userId },
-      data: {
-        passwordHash: hashedPassword,
-        tokenVersion: { increment: 1 },
-      },
+    return NextResponse.json({
+      message: "Password changed successfully",
     });
+  } catch (error: any) {
+    console.error(
+      "Error changing password:",
+      sanitizeError(error)
+    );
 
-    return NextResponse.json({ message: "Password changed successfully" });
-  } catch (error: unknown) {
-    if (isHttpError(error)) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status },
-      );
-    }
-
-    console.error("Error changing password:", sanitizeError(error));
     return NextResponse.json(
-      { error: "Failed to change password" },
+      { message: "Failed to change password" },
       { status: 500 }
     );
   }

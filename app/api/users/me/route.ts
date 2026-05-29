@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { requireAuth, isHttpError, sanitizeError } from "@/lib/middleware";
+import { requireAuth, sanitizeError } from "@/lib/middleware";
+import {
+  isRateLimited,
+  recordAttempt,
+} from "@/lib/services/rateLimitService";
+
+const MAX_ATTEMPTS = 3;
+const WINDOW_MS = 15 * 60 * 1000;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -97,6 +104,14 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+    const userId = user.userId.toString();
+
+    if (await isRateLimited(userId, "DELETE_ACCOUNT", MAX_ATTEMPTS, WINDOW_MS)) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": "900" } },
+      );
+    }
 
     let password: string | undefined;
     try {
@@ -131,6 +146,12 @@ export async function DELETE(request: NextRequest) {
 
       const isValid = await bcrypt.compare(password, fullUser.passwordHash);
       if (!isValid) {
+        await recordAttempt({
+          key: userId,
+          type: "DELETE_ACCOUNT",
+          success: false,
+          userId: user.userId,
+        });
         return NextResponse.json(
           { error: "Incorrect password" },
           { status: 401 },

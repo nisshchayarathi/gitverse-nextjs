@@ -101,6 +101,45 @@ function safeParseReviewJson(text: string): PRReviewResponse | null {
   return { summary, overallScore, issues, praise };
 }
 
+function shouldIgnoreFile(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  
+  if (
+    lower.includes("package-lock.json") || 
+    lower.includes("yarn.lock") || 
+    lower.includes("pnpm-lock.yaml") || 
+    lower.includes("bun.lockb")
+  ) {
+    return true;
+  }
+  
+  if (
+    lower.startsWith("dist/") || 
+    lower.startsWith("build/") || 
+    lower.startsWith("out/") || 
+    lower.includes("/.next/") ||
+    lower.includes("node_modules/") || 
+    lower.includes("vendor/")
+  ) {
+    return true;
+  }
+  
+  if (
+    lower.endsWith(".min.js") || 
+    lower.endsWith(".min.css") || 
+    lower.endsWith(".svg") || 
+    lower.endsWith(".png") || 
+    lower.endsWith(".jpg") || 
+    lower.endsWith(".csv") || 
+    lower.endsWith(".pdf") ||
+    lower.endsWith(".map")
+  ) {
+    return true;
+  }
+  
+  return false;
+}
+
 function buildDiffForPrompt(
   files: Array<{
     filename: string;
@@ -115,8 +154,11 @@ function buildDiffForPrompt(
   const maxChars = 60_000;
   const maxPatchCharsPerFile = 4_000;
 
-  const selected = files.slice(0, maxFiles);
-  const stats = selected
+  const validFiles = files.filter((f) => !shouldIgnoreFile(f.filename));
+  const selected = validFiles.slice(0, maxFiles);
+  
+  const stats = files
+
     .map(
       (f) =>
         `- ${f.filename} (${f.status}) +${f.additions}/-${f.deletions} (~${f.changes})`,
@@ -231,8 +273,33 @@ Changed files (subset):\n${stats}
 Diff (subset, may be truncated):\n${diff}
 `;
 
-  const gemini = new GeminiService();
-  const raw = await gemini.chatRaw(prompt);
+  let raw: string;
+  try {
+    const gemini = new GeminiService();
+    raw = await gemini.chatRaw(prompt);
+  } catch (error: any) {
+    console.error("[reviewPullRequest] Gemini API Error:", error?.message || error);
+    // Graceful fallback for payload too large or timeouts
+    return {
+      review: {
+        summary: "The pull request diff was too large or complex for the AI to analyze fully, or the AI service timed out. Please review the changes manually.",
+        overallScore: 50,
+        issues: [{
+          title: "PR Diff Too Large / Analysis Timeout",
+          severity: "medium",
+          category: "maintainability",
+          file: null,
+          line: null,
+          explanation: "The AI service encountered an error processing the size or complexity of this PR.",
+          suggestion: "Consider breaking this PR into smaller, more focused changes, or rely on manual code review."
+        }],
+        praise: []
+      },
+      prTitle: pr.title,
+      prUrl: pr.html_url
+    };
+  }
+
   const parsed = safeParseReviewJson(raw);
   if (!parsed) {
     throw new Error("AI response was not valid JSON");

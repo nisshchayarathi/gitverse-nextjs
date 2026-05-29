@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -24,24 +25,30 @@ enum PullRequestStatus {
 }
 
 model User {
-  id                    Int          @id @default(autoincrement())
-  email                 String       @unique
-  passwordHash          String?      @map("password_hash") // Optional for OAuth users
-  tokenVersion          Int          @default(0) @map("token_version")
-  name                  String
-  emailVerified         DateTime?    @map("email_verified")
-  image                 String?      @map("avatar_url")
-  emailNotifications    Boolean      @default(true) @map("email_notifications")
-  pushNotifications     Boolean      @default(false) @map("push_notifications")
-  weeklyDigest          Boolean      @default(true) @map("weekly_digest")
-  createdAt             DateTime     @default(now()) @map("created_at")
-  updatedAt             DateTime     @updatedAt @map("updated_at")
-  repositories          Repository[]
-  analysisJobs          AnalysisJob[]
-  accounts              Account[]
-  sessions              Session[]
-  githubAccount         GitHubAccount?
-  githubRepos           GitHubRepo[]
+  id                  Int            @id @default(autoincrement())
+  email               String         @unique
+  passwordHash        String?        @map("password_hash") // Optional for OAuth users
+  tokenVersion        Int            @default(0) @map("token_version")
+  name                String
+  emailVerified       DateTime?      @map("email_verified")
+  image               String?        @map("avatar_url")
+  emailNotifications  Boolean        @default(true) @map("email_notifications")
+  pushNotifications   Boolean        @default(false) @map("push_notifications")
+  weeklyDigest        Boolean        @default(true) @map("weekly_digest")
+  lockedUntil         DateTime?      @map("locked_until")
+  failedLoginAttempts Int            @default(0) @map("failed_login_attempts")
+  lastFailedAttemptAt DateTime?      @map("last_failed_attempt_at")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+  passwordChangedAt   DateTime?      @map("password_changed_at")
+  repositories        Repository[]
+  analysisJobs        AnalysisJob[]
+  accounts            Account[]
+  sessions            Session[]
+  githubAccount       GitHubAccount?
+  githubRepos         GitHubRepo[]
+  loginAttempts       LoginAttempt[]
+  aiRequestLogs       AiRequestLog[]
 
   @@map("users")
 }
@@ -62,15 +69,15 @@ model GitHubAccount {
 }
 
 model GitHubRepo {
-  id           Int      @id @default(autoincrement())
-  userId       Int      @map("user_id")
-  repoFullName String   @map("repo_full_name")
-  installationId BigInt? @map("installation_id")
-  enabled      Boolean  @default(true)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  repoFullName   String   @map("repo_full_name")
+  installationId BigInt?  @map("installation_id")
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   pullRequests PullRequest[]
 
   @@unique([userId, repoFullName])
@@ -91,7 +98,7 @@ model PullRequest {
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
 
-  repo    GitHubRepo  @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  repo    GitHubRepo @relation(fields: [repoId], references: [id], onDelete: Cascade)
   reviews PRReview[]
 
   @@unique([repoId, prNumber])
@@ -116,26 +123,29 @@ model PRReview {
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             Int     @map("user_id")
-  type               String
-  provider           String
-  providerAccountId  String  @map("provider_account_id")
-  refresh_token      String? @db.Text
-  access_token       String? @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String? @db.Text
-  session_state      String?
+  id                String   @id @default(cuid())
+  userId            Int      @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String   @map("provider_account_id")
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
   @@unique([provider, providerAccountId])
+  // Index on userId for fast lookup of all accounts belonging to a user
+  @@index([userId])
+  // Index on provider to speed up OAuth provider-based queries (e.g. filtering by provider: "google")
+  @@index([provider])
   @@map("accounts")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
 }
 
 model Session {
@@ -153,75 +163,76 @@ model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   @@unique([identifier, token])
   @@map("verification_tokens")
 }
 
 model Repository {
-  id             Int           @id @default(autoincrement())
-  name           String
-  url            String
-  description    String?
-  targetDirectory String?      @map("target_directory")
-  readmePath     String?       @map("readme_path")
-  readmeText     String?       @map("readme_text") @db.Text
-  readmeFetchedAt DateTime?    @map("readme_fetched_at")
-  defaultBranch  String        @default("main") @map("default_branch")
-  isPrivate      Boolean       @default(false) @map("is_private")
-  stars          Int           @default(0)
-  forks          Int           @default(0)
-  size           Int           @default(0) // Size in bytes
-  lastAnalyzedAt DateTime?     @map("last_analyzed_at")
-  status         String        @default("pending") // pending, analyzing, completed, failed
-  userId         Int           @map("user_id")
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
-  branches       Branch[]
-  commits        Commit[]
-  files          File[]
-  contributors   Contributor[]
-  languages      Language[]
+  id                  Int                   @id @default(autoincrement())
+  name                String
+  url                 String
+  description         String?
+  targetDirectory     String?               @map("target_directory")
+  readmePath          String?               @map("readme_path")
+  readmeText          String?               @map("readme_text") @db.Text
+  readmeFetchedAt     DateTime?             @map("readme_fetched_at")
+  defaultBranch       String                @default("main") @map("default_branch")
+  isPrivate           Boolean               @default(false) @map("is_private")
+  stars               Int                   @default(0)
+  forks               Int                   @default(0)
+  size                Int                   @default(0) // Size in bytes
+  lastAnalyzedAt      DateTime?             @map("last_analyzed_at")
+  status              String                @default("pending") // pending, analyzing, completed, failed
+  userId              Int                   @map("user_id")
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+  branches            Branch[]
+  commits             Commit[]
+  files               File[]
+  contributors        Contributor[]
+  languages           Language[]
   analysisJobs        AnalysisJob[]
   geminiAnalysisCache GeminiAnalysisCache[]
+
   @@index([url])
-  @@map("repositories")
   @@index([userId])
   @@index([userId, url, targetDirectory])
+  @@map("repositories")
 }
 
 model AnalysisJob {
-  id             String    @id @default(uuid()) @db.Uuid
-  status         JobStatus @default(QUEUED)
-  type           String    @default("repository_analysis")
+  id     String    @id @default(uuid()) @db.Uuid
+  status JobStatus @default(QUEUED)
+  type   String    @default("repository_analysis")
 
-  repositoryId   Int       @map("repository_id")
-  repository     Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  repositoryId Int        @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
-  userId         Int       @map("user_id")
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  attempts       Int       @default(0)
-  maxAttempts    Int       @default(3) @map("max_attempts")
-  nextRunAt      DateTime  @default(now()) @map("next_run_at")
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3) @map("max_attempts")
+  nextRunAt   DateTime @default(now()) @map("next_run_at")
 
-  progressPercent Int?     @map("progress_percent")
-  progressMessage String?  @map("progress_message")
-  progressDetails Json?    @map("progress_details")
+  progressPercent Int?    @map("progress_percent")
+  progressMessage String? @map("progress_message")
+  progressDetails Json?   @map("progress_details")
 
-  lockedAt       DateTime? @map("locked_at")
-  lockedBy       String?   @map("locked_by")
-  lockExpiresAt  DateTime? @map("lock_expires_at")
+  lockedAt      DateTime? @map("locked_at")
+  lockedBy      String?   @map("locked_by")
+  lockExpiresAt DateTime? @map("lock_expires_at")
 
-  startedAt      DateTime? @map("started_at")
-  finishedAt     DateTime? @map("finished_at")
+  startedAt  DateTime? @map("started_at")
+  finishedAt DateTime? @map("finished_at")
 
-  error          String?
+  error String?
 
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Worker queue: fetch next jobs to process
   @@index([status, nextRunAt])
@@ -252,25 +263,25 @@ model Branch {
 }
 
 model Commit {
-  id           Int        @id @default(autoincrement())
+  id           Int          @id @default(autoincrement())
   hash         String
-  shortHash    String     @map("short_hash")
+  shortHash    String       @map("short_hash")
   message      String
   description  String?
-  authorName   String     @map("author_name")
-  authorEmail  String     @map("author_email")
-  authorAvatar String?    @map("author_avatar")
-  committedAt  DateTime   @map("committed_at")
+  authorName   String       @map("author_name")
+  authorEmail  String       @map("author_email")
+  authorAvatar String?      @map("author_avatar")
+  committedAt  DateTime     @map("committed_at")
   branch       String
-  parents      String[]   @default([]) // Parent commit hashes for merge/branch tracking
-  refs         String[]   @default([]) // Git ref decorations from %D (branches, remotes, HEAD -> ...)
-  tags         String[]   @default([]) // Git tags associated with this commit
-  additions    Int        @default(0)
-  deletions    Int        @default(0)
-  filesChanged Int        @default(0) @map("files_changed")
-  repositoryId Int        @map("repository_id")
-  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  createdAt    DateTime   @default(now()) @map("created_at")
+  parents      String[]     @default([]) // Parent commit hashes for merge/branch tracking
+  refs         String[]     @default([]) // Git ref decorations from %D (branches, remotes, HEAD -> ...)
+  tags         String[]     @default([]) // Git tags associated with this commit
+  additions    Int          @default(0)
+  deletions    Int          @default(0)
+  filesChanged Int          @default(0) @map("files_changed")
+  repositoryId Int          @map("repository_id")
+  repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now()) @map("created_at")
   fileChanges  FileChange[]
 
   // Unique constraint prevents duplicate commits per repository
@@ -300,6 +311,13 @@ model File {
   @@map("files")
 }
 
+enum AttemptType {
+  LOGIN
+  SIGNUP
+  CHANGE_PASSWORD
+  DELETE_ACCOUNT
+}
+
 enum FileChangeType {
   ADDED
   MODIFIED
@@ -307,19 +325,20 @@ enum FileChangeType {
 }
 
 model FileChange {
-  id        Int      @id @default(autoincrement())
-  path      String
-  additions Int      @default(0)
-  deletions Int      @default(0)
-  changeType FileChangeType  @map("change_type") // added, modified, deleted
-  commitId  Int      @map("commit_id")
-  commit    Commit   @relation(fields: [commitId], references: [id], onDelete: Cascade)
-  fileId    Int?     @map("file_id")
-  file      File?    @relation(fields: [fileId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now()) @map("created_at")
+  id         Int            @id @default(autoincrement())
+  path       String
+  additions  Int            @default(0)
+  deletions  Int            @default(0)
+  changeType FileChangeType @map("change_type") // added, modified, deleted
+  commitId   Int            @map("commit_id")
+  commit     Commit         @relation(fields: [commitId], references: [id], onDelete: Cascade)
+  fileId     Int?           @map("file_id")
+  file       File?          @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  createdAt  DateTime       @default(now()) @map("created_at")
+
   @@index([fileId])
-  @@map("file_changes")
   @@index([commitId])
+  @@map("file_changes")
 }
 
 model Contributor {
@@ -356,21 +375,20 @@ model Language {
   @@unique([repositoryId, name])
   // Index for fast language lookup per repository
   @@index([repositoryId])
-  
   @@map("languages")
 }
 
 model GeminiAnalysisCache {
-  id             Int        @id @default(autoincrement())
-  repositoryId   Int        @map("repository_id")
-  commitHash     String     @map("commit_hash")
-  analysisType   String     @map("analysis_type")
-  promptHash     String     @map("prompt_hash")
+  id             Int       @id @default(autoincrement())
+  repositoryId   Int       @map("repository_id")
+  commitHash     String    @map("commit_hash")
+  analysisType   String    @map("analysis_type")
+  promptHash     String    @map("prompt_hash")
   model          String?
-  cachedResult   String     @map("cached_result") @db.Text
-  createdAt      DateTime   @default(now()) @map("created_at")
-  lastAccessedAt DateTime?  @map("last_accessed_at")
-  expiresAt      DateTime?  @map("expires_at")
+  cachedResult   String    @map("cached_result") @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+  lastAccessedAt DateTime? @map("last_accessed_at")
+  expiresAt      DateTime? @map("expires_at")
 
   repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
@@ -378,4 +396,50 @@ model GeminiAnalysisCache {
   @@index([expiresAt])
   @@index([repositoryId])
   @@map("gemini_analysis_cache")
+}
+
+model LoginAttempt {
+  id        Int         @id @default(autoincrement())
+  key       String
+  type      AttemptType
+  success   Boolean     @default(false)
+  email     String?
+  userId    Int?
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([key, type, createdAt(sort: Desc)])
+  @@index([email, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@map("login_attempts")
+}
+
+model AiRequestLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  ip        String
+  endpoint  String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([ip, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@map("ai_request_logs")
+}
+
+model WebhookEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  event     String
+  action    String?
+  payload   Json
+  status    String   @default("pending") // pending, processing, completed, failed
+  error     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@map("webhook_events")
 }

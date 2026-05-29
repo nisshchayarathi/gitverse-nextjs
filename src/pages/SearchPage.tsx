@@ -1,9 +1,8 @@
 "use client";
 
 export const dynamic = "force-dynamic";
-
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { useRepoBrowsePrefs } from "@/hooks/useRepoBrowsePrefs";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Grid, List, GitBranch, Clock, Activity } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -42,7 +41,8 @@ export default function SearchPage() {
   const initialUrl = searchParams?.get("repoUrl") || "";
 
   const [searchQuery, setSearchQuery] = useState(initialUrl);
-  const { viewMode, setViewMode, sortBy, setSortBy } = useRepoBrowsePrefs();
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [sortBy, setSortBy] = useState<"recent" | "stars" | "name">("recent");
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,15 +62,24 @@ export default function SearchPage() {
       const repos = response.data.repositories || [];
       setRepositories(Array.isArray(repos) ? repos : []);
     }  
-    catch (error) {
+    catch (error: any) {
   console.error("Error fetching repositories:", error);
 
   setRepositories([]);
 
-  setError(
-    "Failed to load repositories. Please check your connection and try again."
-  );
+  const message =
+    error?.response?.data?.message ||
+    "Failed to load repositories. Please check your connection and try again.";
+
+  setError(message);
+
+  toast({
+    title: "Error",
+    description: message,
+    variant: "destructive",
+  });
 }
+
 finally {
       setLoading(false);
     }
@@ -161,7 +170,7 @@ finally {
     <option value="name">Name</option>
   </select>
 </div>
-            </div>
+</div>
           </CardContent>
         </Card>
 
