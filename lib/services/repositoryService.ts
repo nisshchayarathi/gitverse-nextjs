@@ -759,12 +759,11 @@ await prisma.$transaction([
     return repository;
   }
 
-  /**
-   * List all repositories for a user
-   */
-  async listRepositories(userId: number) {
+  async listRepositories(userId: number, limit: number = 10, cursor?: number) {
     const repositories = await prisma.repository.findMany({
       where: { userId },
+      take: limit + 1, // Fetch one extra to determine if hasMore
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
         _count: {
           select: {
@@ -779,10 +778,23 @@ await prisma.$transaction([
           take: 3,
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" } // Deterministic tie-breaker
+      ],
     });
 
-    return repositories;
+    let nextCursor: number | undefined = undefined;
+    if (repositories.length > limit) {
+      const nextItem = repositories.pop();
+      nextCursor = nextItem?.id;
+    }
+
+    return {
+      data: repositories,
+      nextCursor,
+      hasMore: nextCursor !== undefined,
+    };
   }
 
   /**

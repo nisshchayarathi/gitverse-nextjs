@@ -345,9 +345,12 @@ export class GitHubService {
     params?: { per_page?: number; max_pages?: number },
   ): Promise<GitHubPullRequestFile[]> {
     const perPage = Math.min(Math.max(params?.per_page ?? 100, 1), 100);
-    const maxPages = Math.min(Math.max(params?.max_pages ?? 10, 1), 50);
+    const maxPages = Math.min(Math.max(params?.max_pages ?? 5, 1), 50);
+    const maxTotalPatchChars = 2_000_000; // Limit total patch data loaded in memory to ~2MB
 
     const all: GitHubPullRequestFile[] = [];
+    let currentPatchChars = 0;
+
     for (let page = 1; page <= maxPages; page++) {
       const response = await this.client.get(
         `/repos/${owner}/${repo}/pulls/${pullNumber}/files`,
@@ -361,8 +364,19 @@ export class GitHubService {
 
       const items: GitHubPullRequestFile[] = response.data;
       if (!Array.isArray(items) || items.length === 0) break;
-      all.push(...items);
+      
+      for (const item of items) {
+        all.push(item);
+        if (item.patch) {
+          currentPatchChars += item.patch.length;
+        }
+      }
+
       if (items.length < perPage) break;
+      if (currentPatchChars >= maxTotalPatchChars) {
+        console.warn(`[getPullRequestFiles] Halting pagination early: patch size limit exceeded (${currentPatchChars} chars)`);
+        break;
+      }
     }
 
     return all;

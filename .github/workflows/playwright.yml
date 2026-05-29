@@ -20,6 +20,12 @@ jobs:
       run: npx playwright install --with-deps
     - name: Run Playwright tests
       run: npm run test:e2e
+      env:
+        DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+        JWT_SECRET: "dummy-secret"
+        NEXTAUTH_SECRET: "dummy-secret"
+        NEXTAUTH_URL: "http://localhost:3000"
+        GEMINI_API_KEY: "dummy-key"
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:

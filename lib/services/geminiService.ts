@@ -63,6 +63,17 @@ export class GeminiService {
       return response.text();
     } catch (error: any) {
       console.error("Gemini analysis error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
       throw new Error(`AI analysis failed: ${error.message}`);
     }
   }
@@ -77,7 +88,7 @@ export class GeminiService {
       code,
       language,
       analysisType,
-      context
+      context,
     );
 
     try {
@@ -85,8 +96,19 @@ export class GeminiService {
       const response = await result.response;
       return response.text();
     } catch (error: any) {
-      console.error("Gemini code analysis error:", error);
-      throw new Error(`Code analysis failed: ${error.message}`);
+      console.error("Gemini analysis error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
+      throw new Error(`AI analysis failed: ${error.message}`);
     }
   }
 
@@ -99,7 +121,7 @@ export class GeminiService {
     let prompt = this.buildRepositoryChatPrompt(
       question,
       conversationHistory,
-      context
+      context,
     );
 
     try {
@@ -108,6 +130,17 @@ export class GeminiService {
       return response.text();
     } catch (error: any) {
       console.error("Gemini chat error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
       throw new Error(`AI chat failed: ${error.message}`);
     }
   }
@@ -117,7 +150,7 @@ export class GeminiService {
    */
   async chatRaw(
     prompt: string,
-    history?: Array<{ role: "user" | "assistant"; content: string }>
+    history?: Array<{ role: "user" | "assistant"; content: string }>,
   ): Promise<string> {
     if (!prompt?.trim()) {
       throw new Error("Prompt is required");
@@ -146,7 +179,18 @@ export class GeminiService {
         return response.text();
       }
     } catch (error: any) {
-      console.error("Gemini raw chat error:", error);
+      console.error("Gemini chat error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
       throw new Error(`AI chat failed: ${error.message}`);
     }
   }
@@ -197,7 +241,7 @@ Provide only the commit messages, one per line.
    */
   private buildRepositoryAnalysisPrompt(
     type: string,
-    context?: AIAnalysisRequest["context"]
+    context?: AIAnalysisRequest["context"],
   ): string {
     const baseContext = `
 Repository Context:
@@ -279,7 +323,7 @@ Prioritize by impact and effort.`;
     code: string,
     language: string,
     analysisType: string,
-    context?: string
+    context?: string,
   ): string {
     const basePrompt = `Language: ${language}\n${context ? `Context: ${context}\n` : ""}\n\nCode:\n\`\`\`${language}\n${code}\n\`\`\`\n\n`;
 
@@ -337,7 +381,7 @@ Provide refactored code examples.`;
   private buildRepositoryChatPrompt(
     question: string,
     conversationHistory?: Array<{ role: string; content: string }>,
-    context?: AIRepositoryChatRequest["context"]
+    context?: AIRepositoryChatRequest["context"],
   ): string {
     let prompt =
       "You are an expert code analyst helping developers understand their repository.\n\n";

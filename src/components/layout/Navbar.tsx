@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { GitBranch, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui'
@@ -6,6 +6,11 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    const styleTag = document.getElementById("navbar-inline-css");
+    if (styleTag) styleTag.remove();
+  }, []);
 
   const navLinks = [
     { name: 'Features', href: '#features' },
@@ -92,7 +97,3 @@ export const Navbar: React.FC = () => {
     </nav>
   )
 }
-useEffect(() => {
-  const styleTag = document.getElementById("navbar-inline-css");
-  if (styleTag) styleTag.remove();
-}, []);

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { getGeminiService } from "@/lib/services/geminiService";
 import { repositoryService } from "@/lib/services/repositoryService";
-import { createRateLimiter } from "@/lib/utils/ipRateLimit";
-
-// Rate limiter: 20 requests per user per minute across all AI chat calls.
-// Prevents a single authenticated user from burning Gemini quota unchecked.
-const aiChatLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 20 });
+import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
+import { getClientIp } from "@/lib/services/rateLimitService";
+import {
+  validateContentType,
+  AI_REQUEST_LIMITS,
+} from "@/lib/utils/aiRequestValidation";
 
 // Allowed roles in the conversation history. Rejecting "system" entries from
 // client payloads prevents prompt injection via injected context.
@@ -16,13 +17,19 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    // Per-user rate limiting
-    if (!aiChatLimiter.check(user.userId)) {
+    // Per-user rate limiting (DB-backed, shared across serverless containers)
+    const allowed = await checkAiRateLimit(
+      String(user.userId), "userId", "chat", 20, 60_000
+    );
+    if (!allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please wait before sending another message." },
         { status: 429 }
       );
     }
+
+    const contentTypeError = validateContentType(request);
+    if (contentTypeError) return contentTypeError;
 
     const body = await request.json();
     const { repositoryId, question, conversationHistory } = body;
@@ -33,6 +40,14 @@ export async function POST(request: NextRequest) {
       if (!Array.isArray(conversationHistory)) {
         return NextResponse.json(
           { error: "conversationHistory must be an array" },
+          { status: 400 }
+        );
+      }
+      if (conversationHistory.length > AI_REQUEST_LIMITS.MAX_CONVERSATION_HISTORY_COUNT) {
+        return NextResponse.json(
+          {
+            error: `Too many conversation history entries (max ${AI_REQUEST_LIMITS.MAX_CONVERSATION_HISTORY_COUNT})`,
+          },
           { status: 400 }
         );
       }
@@ -53,6 +68,14 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
+        if (msg.content.length > AI_REQUEST_LIMITS.MAX_MESSAGE_CONTENT_CHARS) {
+          return NextResponse.json(
+            {
+              error: `Message content too long (max ${AI_REQUEST_LIMITS.MAX_MESSAGE_CONTENT_CHARS} characters)`,
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -62,6 +85,15 @@ export async function POST(request: NextRequest) {
     if (!repositoryId || !question) {
       return NextResponse.json(
         { error: "repositoryId and question are required" },
+        { status: 400 }
+      );
+    }
+
+    if (typeof question === "string" && question.length > AI_REQUEST_LIMITS.MAX_QUESTION_CHARS) {
+      return NextResponse.json(
+        {
+          error: `Question too long (max ${AI_REQUEST_LIMITS.MAX_QUESTION_CHARS} characters)`,
+        },
         { status: 400 }
       );
     }
@@ -98,6 +130,12 @@ export async function POST(request: NextRequest) {
       question,
       conversationHistory,
       context,
+    });
+
+    void logAiRequest({
+      userId: user.userId,
+      ip: getClientIp(request),
+      endpoint: "chat",
     });
 
     return NextResponse.json({ response, question });

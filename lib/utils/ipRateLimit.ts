@@ -1,69 +1,63 @@
-/**
- * ipRateLimit.ts
- *
- * Lightweight in-process rate limiter for Next.js API routes.
- *
- * Limitations: per-process only. In a multi-replica or serverless deployment
- * each replica maintains its own counter, so the effective limit is
- * `maxRequests * replicaCount`. For stricter enforcement use a shared store
- * (Redis / Upstash). This implementation is intentionally kept dependency-free
- * and provides a meaningful improvement over having no limit at all.
- *
- * Usage:
- *   const limiter = createRateLimiter({ windowMs: 60_000, maxRequests: 20 });
- *   if (!limiter.check(userId)) {
- *     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
- *   }
- */
+import prisma from "@/lib/prisma";
 
-interface RateLimiterOptions {
-  /** Time window in milliseconds (default: 60 000 = 1 minute) */
-  windowMs?: number;
-  /** Maximum requests allowed per key within the window (default: 20) */
-  maxRequests?: number;
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+let lastCleanupAt = 0;
+
+async function cleanupStaleLogs(): Promise<void> {
+  const now = Date.now();
+  if (now - lastCleanupAt < CLEANUP_INTERVAL_MS) return;
+  lastCleanupAt = now;
+
+  try {
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    await prisma.aiRequestLog.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    });
+  } catch (error) {
+    console.error("AI request log cleanup failed:", error);
+  }
 }
 
-interface BucketEntry {
-  count: number;
-  windowStart: number;
+async function checkAiRateLimit(
+  key: string,
+  field: "userId" | "ip",
+  endpoint: string,
+  maxRequests: number = 20,
+  windowMs: number = 60_000
+): Promise<boolean> {
+  try {
+    void cleanupStaleLogs();
+    const since = new Date(Date.now() - windowMs);
+
+    const where =
+      field === "userId"
+        ? { userId: Number(key), endpoint, createdAt: { gte: since } }
+        : { ip: key, endpoint, createdAt: { gte: since } };
+
+    const count = await prisma.aiRequestLog.count({ where });
+    return count < maxRequests;
+  } catch (error) {
+    console.error("AI rate limit check failed, allowing request:", error);
+    return true;
+  }
 }
 
-export function createRateLimiter(options: RateLimiterOptions = {}) {
-  const windowMs = options.windowMs ?? 60_000;
-  const maxRequests = options.maxRequests ?? 20;
-
-  // Map of key -> { count, windowStart }.
-  // Stale buckets are pruned on each check to prevent unbounded memory growth.
-  const buckets = new Map<string, BucketEntry>();
-
-  return {
-    /**
-     * Returns true if the key is within the allowed rate, false if it should
-     * be throttled.
-     */
-    check(key: string): boolean {
-      const now = Date.now();
-
-      // Prune expired entries every call (cheap for small maps)
-      for (const [k, entry] of buckets) {
-        if (now - entry.windowStart >= windowMs) {
-          buckets.delete(k);
-        }
-      }
-
-      const entry = buckets.get(key);
-
-      if (!entry || now - entry.windowStart >= windowMs) {
-        buckets.set(key, { count: 1, windowStart: now });
-        return true;
-      }
-
-      if (entry.count >= maxRequests) {
-        return false;
-      }
-
-      entry.count += 1;
-      return true;
-    },
-  };
+async function logAiRequest(params: {
+  userId?: number;
+  ip: string;
+  endpoint: string;
+}): Promise<void> {
+  try {
+    await prisma.aiRequestLog.create({
+      data: {
+        userId: params.userId ?? null,
+        ip: params.ip,
+        endpoint: params.endpoint,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to log AI request:", error);
+  }
 }
+
+export { checkAiRateLimit, logAiRequest, cleanupStaleLogs };

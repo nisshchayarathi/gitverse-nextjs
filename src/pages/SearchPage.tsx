@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { useRepoBrowsePrefs } from "@/hooks/useRepoBrowsePrefs";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -42,6 +43,7 @@ export default function SearchPage() {
   const initialUrl = searchParams?.get("repoUrl") || "";
 
   const [searchQuery, setSearchQuery] = useState(initialUrl);
+  // Merged: Using useRepoBrowsePrefs from your branch 
   const { viewMode, setViewMode, sortBy, setSortBy } = useRepoBrowsePrefs();
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,7 @@ export default function SearchPage() {
   }, []);
 
   const fetchRepositories = async () => {
-     setError("");
+    setError("");
     try {
       const token = localStorage.getItem("gitverse_token");
       const response = await axios.get(buildApiUrl("/api/repositories"), {
@@ -61,17 +63,24 @@ export default function SearchPage() {
       // API returns { repositories: [...] }
       const repos = response.data.repositories || [];
       setRepositories(Array.isArray(repos) ? repos : []);
-    }  
-    catch (error) {
-  console.error("Error fetching repositories:", error);
+    } catch (error: any) {
+      console.error("Error fetching repositories:", error);
 
-  setRepositories([]);
+      setRepositories([]);
 
-  setError(
-    "Failed to load repositories. Please check your connection and try again."
-  );
-}
-finally {
+      // Merged: Using the toast error handling from main
+      const message =
+        error?.response?.data?.message ||
+        "Failed to load repositories. Please check your connection and try again.";
+
+      setError(message);
+
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
     }
   };
@@ -86,6 +95,7 @@ finally {
       )
     : [];
 
+  // Merged: Using your fix for explicit date sorting
   const sortedRepositories = [...filteredRepositories].sort((a, b) => {
     if (sortBy === "stars") return (b.stars || 0) - (a.stars || 0);
     if (sortBy === "name") return a.name.localeCompare(b.name);
@@ -124,48 +134,48 @@ finally {
                   className="pl-10 bg-background/50"
                 />
               </div>
-            <div className="flex gap-2 flex-row flex-wrap justify-end">
-  <div className="flex gap-2">
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => setViewMode("grid")}
-      aria-label="Grid view"
-      className={
-        viewMode === "grid"
-          ? "bg-primary/10 text-primary border-primary"
-          : ""
-      }
-    >
-      <Grid className="h-4 w-4" />
-    </Button>
+              <div className="flex gap-2 flex-row flex-wrap justify-end">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewMode("grid")}
+                    aria-label="Grid view"
+                    className={
+                      viewMode === "grid"
+                        ? "bg-primary/10 text-primary border-primary"
+                        : ""
+                    }
+                  >
+                    <Grid className="h-4 w-4" />
+                  </Button>
 
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => setViewMode("list")}
-      aria-label="List view"
-      className={
-        viewMode === "list"
-          ? "bg-primary/10 text-primary border-primary"
-          : ""
-      }
-    >
-      <List className="h-4 w-4" />
-    </Button>
-  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewMode("list")}
+                    aria-label="List view"
+                    className={
+                      viewMode === "list"
+                        ? "bg-primary/10 text-primary border-primary"
+                        : ""
+                    }
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
 
-  <select
-    value={sortBy}
-    onChange={(e) => setSortBy(e.target.value as any)}
-    className="px-3 py-2 rounded-md border border-input bg-background text-sm min-w-[110px]"
-    aria-label="Sort repositories"
-  >
-    <option value="recent">Recent</option>
-    <option value="stars">Most Stars</option>
-    <option value="name">Name</option>
-  </select>
-</div>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-3 py-2 rounded-md border border-input bg-background text-sm min-w-[110px]"
+                  aria-label="Sort repositories"
+                >
+                  <option value="recent">Recent</option>
+                  <option value="stars">Most Stars</option>
+                  <option value="name">Name</option>
+                </select>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -219,242 +229,4 @@ finally {
                 <Card key={i} className="glass">
                   <CardContent className="pt-4 sm:pt-6">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                      <Skeleton className="h-12 w-12 rounded-lg flex-shrink-0 self-center" />
-                      <div className="flex-1 w-full space-y-3">
-                        <div className="flex gap-2">
-                          <Skeleton className="h-6 w-1/3" />
-                          <Skeleton className="h-5 w-16 rounded-full" />
-                        </div>
-                        <Skeleton className="h-4 w-full max-w-2xl" />
-                        <div className="flex gap-4 mt-2">
-                          <Skeleton className="h-4 w-16" />
-                          <Skeleton className="h-4 w-20" />
-                          <Skeleton className="h-4 w-24" />
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )
-) : error ? (
-  <div className="text-center py-12 text-red-500">
-    {error}
-  </div>
-) : sortedRepositories.length === 0 ? (
-          searchQuery ? (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <EmptyState
-                icon={Search}
-                title="No repositories found"
-                description={`We couldn't find any repositories matching "${searchQuery}". Try adjusting your search term.`}
-                suggestions={[
-                  "Try another repository",
-                  "Check the GitHub username",
-                ]}
-                actionLabel="Clear Search"
-                onAction={() => setSearchQuery("")}
-              />
-              
-              {repositories.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between px-2 sm:px-0">
-                    <h2 className="text-xl font-heading font-semibold flex items-center gap-2">
-                      <GitBranch className="h-5 w-5 text-primary" />
-                      Explore Available Repositories
-                    </h2>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                    {repositories.slice(0, 3).map((repo, index) => (
-                      <Card
-                        key={repo.id}
-                        className="glass glass-hover cursor-pointer transition-transform hover:scale-[1.02] focus-within:scale-[1.02]"
-                        onClick={() => router.push(`/repo/${repo.id}`)}
-                        style={{ animationDelay: `${index * 0.05}s` }}
-                      >
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-lg bg-primary/10">
-                                <GitBranch className="h-5 w-5 text-primary" />
-                              </div>
-                              <div>
-                                <CardTitle className="font-heading text-base sm:text-lg break-all">
-                                  {repo.name}
-                                </CardTitle>
-                                <CardDescription className="text-xs font-mono break-all max-w-[180px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[400px]">
-                                  {repo.url}
-                                </CardDescription>
-                              </div>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-xs sm:text-sm text-muted-foreground mb-4 line-clamp-2 min-h-[32px]">
-                            {repo.description || "No description available"}
-                          </p>
-                          <div className="flex flex-wrap items-center justify-between text-xs sm:text-sm">
-                            <div className="flex items-center gap-4 text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Activity className="h-4 w-4" />
-                                {(repo as any)._count?.commits || 0}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <GitBranch className="h-4 w-4" />
-                                {(repo as any)._count?.branches || 0}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              {new Date(
-                                (repo as any).lastAnalyzedAt || (repo as any).createdAt
-                              ).toLocaleDateString()}
-                            </div>
-                          </div>
-                          <div className="mt-3 pt-3 border-t border-border/50">
-                            {(repo as any).languages?.[0]?.name ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-accent/10 text-accent">
-                                {(repo as any).languages[0].name}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-muted/50 text-muted-foreground">
-                                No language
-                              </span>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <EmptyState
-              icon={GitBranch}
-              title="No Repositories Yet"
-              description="You haven't analyzed any repositories. Head to the dashboard to get started!"
-              actionLabel="Go to Dashboard"
-              onAction={() => router.push("/dashboard")}
-            />
-          )
-        ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {sortedRepositories.map((repo, index) => (
-              <Card
-                key={repo.id}
-                className="glass glass-hover cursor-pointer transition-transform hover:scale-[1.02] focus-within:scale-[1.02]"
-                onClick={() => router.push(`/repo/${repo.id}`)}
-                style={{ animationDelay: `${index * 0.05}s` }}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <GitBranch className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="font-heading text-base sm:text-lg break-all">
-                          {repo.name}
-                        </CardTitle>
-                        <CardDescription className="text-xs font-mono break-all max-w-[180px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[400px]">
-                          {repo.url}
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-4 line-clamp-2 min-h-[32px]">
-                    {repo.description || "No description available"}
-                  </p>
-                  <div className="flex flex-wrap items-center justify-between text-xs sm:text-sm">
-                    <div className="flex items-center gap-4 text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Activity className="h-4 w-4" />
-                        {(repo as any)._count?.commits || 0}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <GitBranch className="h-4 w-4" />
-                        {(repo as any)._count?.branches || 0}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {new Date(
-                        (repo as any).lastAnalyzedAt || (repo as any).createdAt
-                      ).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-border/50">
-                    {(repo as any).languages?.[0]?.name ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-accent/10 text-accent">
-                        {(repo as any).languages[0].name}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-muted/50 text-muted-foreground">
-                        No language
-                      </span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {sortedRepositories.map((repo, index) => (
-              <Card
-                key={repo.id}
-                className="glass glass-hover cursor-pointer transition-transform hover:scale-[1.01] focus-within:scale-[1.01]"
-                onClick={() => router.push(`/repo/${repo.id}`)}
-                style={{ animationDelay: `${index * 0.05}s` }}
-              >
-                <CardContent className="pt-4 sm:pt-6">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                    <div className="p-3 rounded-lg bg-primary/10 self-center">
-                      <GitBranch className="h-6 w-6 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1">
-                        <h3 className="font-heading font-semibold text-base sm:text-lg break-all">
-                          {repo.name}
-                        </h3>
-                        {(repo as any).languages?.[0]?.name && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-accent/10 text-accent">
-                            {(repo as any).languages[0].name}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 min-h-[24px]">
-                        {repo.description || "No description available"}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Activity className="h-4 w-4" />
-                          {(repo as any)._count?.commits || 0} commits
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <GitBranch className="h-4 w-4" />
-                          {(repo as any)._count?.branches || 0} branches
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {new Date(
-                            (repo as any).lastAnalyzedAt ||
-                              (repo as any).createdAt
-                          ).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    </DashboardLayout>
-  );
-}
+                      <Skeleton className="h-
