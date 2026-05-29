@@ -112,7 +112,7 @@ export function AIRepositoryOverlay({ repository }: AIRepositoryOverlayProps) {
       const totalLines = repository.stats?.lines || 0;
 
       // Debug log to check contributor data
-      console.log("Contributors data:", {
+
         contributorsArray,
         contributorsCount,
         hasContributors: contributorsArray.length > 0,

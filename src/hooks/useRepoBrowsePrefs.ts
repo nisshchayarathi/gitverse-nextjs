@@ -42,7 +42,7 @@ function savePrefs(prefs: RepoBrowsePrefs): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
   } catch {
-    console.log("Failed to save preferences — localStorage unavailable");
+    console.error("Failed to save preferences — localStorage unavailable");
   }
 }
 

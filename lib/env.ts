@@ -16,7 +16,7 @@ function shouldSkipEnvValidation() {
 
 function validateEnv() {
   if (shouldSkipEnvValidation()) {
-    console.log("⚠️ Skipping environment validation in test/CI environment");
+
 
     return;
   }
@@ -33,7 +33,7 @@ function validateEnv() {
     );
   }
 
-  console.log("✅ Environment variables validated successfully");
+
 }
 
 validateEnv();

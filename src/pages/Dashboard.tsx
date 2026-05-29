@@ -300,7 +300,7 @@ export default function Dashboard() {
       router.push(`/repo/${response.data.repository.id}`);
 
       if (isExisting) {
-        console.log("Navigating to existing repository");
+
       }
 
       setRepoUrl("");
