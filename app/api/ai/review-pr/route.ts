@@ -5,6 +5,7 @@ import {
   reviewPullRequest,
 } from "@/lib/services/prReviewService";
 import prisma from "@/lib/prisma";
+import { decryptToken, encryptToken } from "@/lib/utils/encryption";
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     // scope probing, and rate limit exhaustion through server-side proxying.
     const account = await prisma.gitHubAccount.findUnique({
       where: { userId: user.userId },
-      select: { accessToken: true },
+      select: { accessToken: true, id: true },
     });
 
     if (!account?.accessToken) {
@@ -46,11 +47,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let githubToken: string;
+    try {
+      githubToken = decryptToken(account.accessToken);
+    } catch {
+      // Legacy plaintext token — fallback, then re-encrypt and persist
+      githubToken = account.accessToken;
+      await prisma.gitHubAccount.update({
+        where: { id: account.id },
+        data: { accessToken: encryptToken(githubToken) },
+      });
+    }
+
     const result = await reviewPullRequest({
       owner: parsed.owner,
       repo: parsed.repo,
       number: parsed.number,
-      githubToken: account.accessToken,
+      githubToken,
     });
 
     return NextResponse.json({
