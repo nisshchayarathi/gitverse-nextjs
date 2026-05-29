@@ -111,13 +111,6 @@ export function AIRepositoryOverlay({ repository }: AIRepositoryOverlayProps) {
         repository.stats?.contributors || contributorsArray.length || 0;
       const totalLines = repository.stats?.lines || 0;
 
-      // Debug log to check contributor data
-
-        contributorsArray,
-        contributorsCount,
-        hasContributors: contributorsArray.length > 0,
-      });
-
       let contextualPrompt = "";
 
       // Only send full context on first message
