@@ -444,7 +444,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           <h3 className="text-base sm:text-lg font-semibold mb-4">
             Code Dependencies
           </h3>
-          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <div className="relative overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
             <svg
               ref={svgRef}
               width="100%"
@@ -453,6 +453,11 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
               style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
               viewBox="0 0 900 600"
               preserveAspectRatio="xMidYMid meet"
+            />
+            <MapControls
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              onReset={handleReset}
             />
           </div>
           <div className="absolute bottom-2 right-3 text-[10px] text-white/70">
@@ -464,40 +469,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         </p>
         <div
           ref={tooltipRef}
-          className="
-      </div>
-      <div className="glass rounded-lg p-4 sm:p-6">
-        <h3 className="text-base sm:text-lg font-semibold mb-4">
-          Code Dependencies
-        </h3>
-        <div className="relative overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <svg
-            ref={svgRef}
-            width="100%"
-            height="auto"
-            className="text-foreground min-h-96 sm:min-h-96"
-            style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
-            viewBox="0 0 900 600"
-            preserveAspectRatio="xMidYMid meet"
-          />
-          <MapControls 
-            onZoomIn={handleZoomIn} 
-            onZoomOut={handleZoomOut} 
-            onReset={handleReset} 
-          />
-        </div>
-
-      </div>
-      <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
-        💡 Drag nodes to reposition • Scroll to zoom • Hover for details
-      </p>
-      <div
-  ref={tooltipRef}
-  className="
-    fixed p-3 rounded-lg pointer-events-none shadow-xl border
-    translate-x-[-120px] translate-y-[-120px]
-    sm:translate-x-[-250px] sm:translate-y-[-250px]
-  "
+          className="fixed p-3 rounded-lg pointer-events-none shadow-xl border translate-x-[-120px] translate-y-[-120px] sm:translate-x-[-250px] sm:translate-y-[-250px]"
           style={{
             opacity: 0, // control with state later
             backgroundColor: "rgba(0, 0, 0, 0.9)",

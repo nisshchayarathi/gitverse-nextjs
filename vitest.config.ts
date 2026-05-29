@@ -6,6 +6,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    env: {
+      JWT_SECRET: "test-secret-for-vitest",
+    },
     include: ["__tests__/**/*.test.ts"],
     exclude: ["node_modules", ".next", "dist-worker"],
     coverage: {

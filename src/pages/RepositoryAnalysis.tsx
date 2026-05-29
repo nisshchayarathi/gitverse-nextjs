@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -355,6 +355,7 @@ export default function RepositoryAnalysis() {
       toast({
         title: "Error",
         description: "Failed to load repository data",
+      });
       console.log("Repository data:", response.data);
     } catch (err: any) {
       console.error("Error fetching repository:", err);
@@ -435,17 +436,6 @@ export default function RepositoryAnalysis() {
         toast({
           title: "Analysis failed",
           description: msg,
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch analysis job status",
-        setError(nextJob?.error || "Analysis failed. Please try again later.");
-        toast({
-          title: "Analysis failed",
-          description: nextJob?.error || nextJob?.progressMessage || "The repository analysis encountered an unexpected error.",
           variant: "destructive",
         });
       }
@@ -600,49 +590,15 @@ const safeProgressMessage =
     ? job.progressMessage
     : lastProgressMessageRef.current || "Analyzing repository...";
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        {showDeleteDialog && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-            <div className="glass p-6 rounded-lg max-w-sm mx-4">
-              <h2 className="text-lg font-semibold mb-2">Delete Repository?</h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                This action cannot be undone. The repository and all its data will be permanently deleted.
-              </p>
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => setShowDeleteDialog(false)}
-                  disabled={isDeleting}
-                  className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteRepository}
-                  disabled={isDeleting}
-                  className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white disabled:opacity-50"
-                >
-                  {isDeleting ? "Deleting..." : "Delete"}
-                </button>
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”�          <>
+            {/* IMPROVED ERROR UI */}
+            {error && (
+              <div className="glass border border-red-500/40 p-4 rounded-lg text-red-300 flex items-start gap-2 mb-4">
+                <span>⚠️</span>
+                <span>{error}</span>
               </div>
-            </div>
-          </div>
-        )}
-
-        {loading ? (
-          <RepositoryAnalysisSkeleton />
-        ) : error ? (
-          <div className="glass border border-red-500/40 p-4 rounded-lg text-red-300 flex items-start gap-2">
-            <span>⚠️</span>
-            <span>{error}</span>
-          </div>
-        ) : !job ? (
-          <EmptyState
-            icon={Activity}
-            title="No analysis jobs found"
-            description="We couldn't find any analysis history for this repository. Run your first analysis to get started!"
+            )}
+            {/* Header with back button */}r first analysis to get started!"
             actionLabel="Go to Dashboard"
             onAction={() => router.push("/dashboard")}
           />

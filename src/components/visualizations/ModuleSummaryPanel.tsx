@@ -114,7 +114,6 @@ export const ModuleSummaryPanel: React.FC<Props> = ({
             className="h-8 w-8 text-muted-foreground hover:text-foreground"
             aria-label="Close panel"
           >
-          <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary">
             <X size={18} />
           </Button>
         </div>
