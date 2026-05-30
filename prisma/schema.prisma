@@ -25,22 +25,22 @@ enum PullRequestStatus {
 }
 
 model User {
-  id                  Int            @id @default(autoincrement())
-  email               String         @unique
-  passwordHash        String?        @map("password_hash") // Optional for OAuth users
-  tokenVersion        Int            @default(0) @map("token_version")
+  id                  Int                   @id @default(autoincrement())
+  email               String                @unique
+  passwordHash        String?               @map("password_hash") // Optional for OAuth users
+  tokenVersion        Int                   @default(0) @map("token_version")
   name                String
-  emailVerified       DateTime?      @map("email_verified")
-  image               String?        @map("avatar_url")
-  emailNotifications  Boolean        @default(true) @map("email_notifications")
-  pushNotifications   Boolean        @default(false) @map("push_notifications")
-  weeklyDigest        Boolean        @default(true) @map("weekly_digest")
-  lockedUntil         DateTime?      @map("locked_until")
-  failedLoginAttempts Int            @default(0) @map("failed_login_attempts")
-  lastFailedAttemptAt DateTime?      @map("last_failed_attempt_at")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-  passwordChangedAt   DateTime?      @map("password_changed_at")
+  emailVerified       DateTime?             @map("email_verified")
+  image               String?               @map("avatar_url")
+  emailNotifications  Boolean               @default(true) @map("email_notifications")
+  pushNotifications   Boolean               @default(false) @map("push_notifications")
+  weeklyDigest        Boolean               @default(true) @map("weekly_digest")
+  lockedUntil         DateTime?             @map("locked_until")
+  failedLoginAttempts Int                   @default(0) @map("failed_login_attempts")
+  lastFailedAttemptAt DateTime?             @map("last_failed_attempt_at")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+  passwordChangedAt   DateTime?             @map("password_changed_at")
   repositories        Repository[]
   analysisJobs        AnalysisJob[]
   accounts            Account[]
@@ -49,6 +49,7 @@ model User {
   githubRepos         GitHubRepo[]
   loginAttempts       LoginAttempt[]
   aiRequestLogs       AiRequestLog[]
+  geminiAnalysisCache GeminiAnalysisCache[]
 
   @@map("users")
 }
@@ -382,6 +383,7 @@ model Language {
 model GeminiAnalysisCache {
   id             Int       @id @default(autoincrement())
   repositoryId   Int       @map("repository_id")
+  userId         Int       @map("user_id")
   commitHash     String    @map("commit_hash")
   analysisType   String    @map("analysis_type")
   promptHash     String    @map("prompt_hash")
@@ -392,10 +394,12 @@ model GeminiAnalysisCache {
   expiresAt      DateTime? @map("expires_at")
 
   repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([repositoryId, commitHash, analysisType, promptHash])
+  @@unique([repositoryId, userId, commitHash, analysisType, promptHash])
   @@index([expiresAt])
   @@index([repositoryId])
+  @@index([userId])
   @@map("gemini_analysis_cache")
 }
 
