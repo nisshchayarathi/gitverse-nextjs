@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { requireAuth, sanitizeError } from "@/lib/middleware";
+import { requireAuth, isHttpError, sanitizeError } from "@/lib/middleware";
 import bcrypt from "bcryptjs";
 
 const ALLOWED_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
@@ -20,16 +20,16 @@ function isValidAvatarUrl(avatar: string): boolean {
   try {
     const parsedUrl = new URL(avatar);
 
-  if (!["http:", "https:", "blob:"].includes(parsedUrl.protocol)) {
-  return false;
-}
+    if (!["http:", "https:", "blob:"].includes(parsedUrl.protocol)) {
+      return false;
+    }
 
     if (
-  parsedUrl.protocol !== "blob:" &&
-  (!parsedUrl.hostname || !parsedUrl.hostname.includes("."))
-) {
-  return false;
-}
+      parsedUrl.protocol !== "blob:" &&
+      (!parsedUrl.hostname || !parsedUrl.hostname.includes("."))
+    ) {
+      return false;
+    }
 
     const pathname = parsedUrl.pathname.toLowerCase();
 
@@ -41,6 +41,17 @@ function isValidAvatarUrl(avatar: string): boolean {
   }
 }
 
+/**
+ * PUT /api/users/profile
+ *
+ * Updates the profile details (name, email, avatar, and optional password) of the authenticated user.
+ * If the user's email is changing and they have a linked Google account, their Google account is
+ * securely unlinked, and they must provide a new password. Both the Google account unlinking
+ * and user profile update are performed atomically in a single Prisma transaction.
+ *
+ * @param request - The incoming HTTP NextRequest containing updated profile fields.
+ * @returns A JSON response with the updated User details and status code 200, or a 400/401/500 error response.
+ */
 export async function PUT(request: NextRequest) {
   try {
     const user = await requireAuth(request);
@@ -50,11 +61,18 @@ export async function PUT(request: NextRequest) {
     if (!name || !email) {
       return NextResponse.json(
         { error: "Name and email are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
- if ("avatar" in body && avatar !== undefined && avatar !== null && typeof avatar !== "string") {
+    if (typeof name !== "string" || typeof email !== "string") {
+      return NextResponse.json(
+        { error: "Name and email must be strings" },
+        { status: 400 },
+      );
+    }
+
+    if ("avatar" in body && avatar !== undefined && avatar !== null && typeof avatar !== "string") {
       return NextResponse.json(
         { error: "Avatar must be a valid image URL" },
         { status: 400 }
@@ -81,7 +99,7 @@ export async function PUT(request: NextRequest) {
     if (existingUser) {
       return NextResponse.json(
         { error: "Email is already in use" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -107,7 +125,7 @@ export async function PUT(request: NextRequest) {
             error:
               "Changing email will unlink your Google account. Please provide newPassword to set a new password.",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -117,10 +135,6 @@ export async function PUT(request: NextRequest) {
           { status: 400 }
         );
       }
-
-      await prisma.account.deleteMany({
-        where: { userId: user.userId, provider: "google" },
-      });
     }
 
     const updateData: Prisma.UserUpdateInput = { name, email };
@@ -129,7 +143,7 @@ export async function PUT(request: NextRequest) {
       updateData.passwordHash = await bcrypt.hash(newPassword, 10);
     }
 
-      if (avatar) {
+    if (avatar) {
       if (typeof avatar !== "string") {
         return NextResponse.json(
           { error: "Invalid avatar format" },
@@ -171,27 +185,43 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: user.userId },
-      data: updateData,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        image: true,
-        createdAt: true,
-      },
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      if (isEmailChanging && hasLinkedGoogle) {
+        // Unlink Google account atomically within the transaction
+        await tx.account.deleteMany({
+          where: { userId: user.userId, provider: "google" },
+        });
+      }
+
+      return await tx.user.update({
+        where: { id: user.userId },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          createdAt: true,
+        },
+      });
     });
 
     return NextResponse.json({
       ...updatedUser,
-      avatarUrl: (updatedUser as any).image,
+      avatarUrl: updatedUser.image,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+
     console.error("Error updating profile:", sanitizeError(error));
     return NextResponse.json(
       { error: "Failed to update profile" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

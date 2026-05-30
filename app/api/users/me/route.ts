@@ -13,6 +13,15 @@ const WINDOW_MS = 15 * 60 * 1000;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+/**
+ * GET /api/users/me
+ *
+ * Retrieves the profile information of the currently authenticated user,
+ * including basic profile fields and checking whether a Google account is linked.
+ *
+ * @param request - The incoming HTTP NextRequest.
+ * @returns A JSON response with the user's details and status code 200, or a 401/404/500 error response.
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request);
@@ -53,7 +62,7 @@ export async function GET(request: NextRequest) {
         email: userDetails.email,
         image: userDetails.image,
         createdAt: userDetails.createdAt,
-        avatarUrl: (userDetails as any).image,
+        avatarUrl: userDetails.image,
         isGoogleLinked: hasGoogleAccount,
         hasPassword: userDetails.passwordHash !== null,
       },
@@ -63,7 +72,14 @@ export async function GET(request: NextRequest) {
         },
       },
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+
     console.error("Error fetching user:", sanitizeError(error));
     return NextResponse.json(
       { error: "Failed to fetch user" },
@@ -77,6 +93,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * DELETE /api/users/me
+ *
+ * Permanently deletes the account of the currently authenticated user.
+ *
+ * @param request - The incoming HTTP NextRequest.
+ * @returns A JSON response confirming deletion and status code 200, or a 401/404/500 error response.
+ */
 export async function DELETE(request: NextRequest) {
   try {
     const user = await requireAuth(request);
@@ -149,10 +173,18 @@ export async function DELETE(request: NextRequest) {
         },
       },
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+
     console.error("Error deleting account:", sanitizeError(error));
 
-    if (error?.code === "P2025") {
+    const prismaError = error as { code?: string };
+    if (prismaError?.code === "P2025") {
       return NextResponse.json(
         { error: "User not found" },
         { status: 404 },

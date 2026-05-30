@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { requireAuth, sanitizeError } from "@/lib/middleware";
+import { requireAuth, isHttpError, sanitizeError } from "@/lib/middleware";
 
 /**
  * Handles authenticated password changes and invalidates
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
-    if (!newPassword) {
+    if (!newPassword || typeof newPassword !== "string") {
       return NextResponse.json(
         { message: "New password is required" },
         { status: 400 }

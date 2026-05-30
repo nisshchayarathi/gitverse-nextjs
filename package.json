@@ -21,9 +21,10 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:validation": "tsx scripts/test-validation.ts",
     "test:e2e": "playwright test",
-    "test": "jest",
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {

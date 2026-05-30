@@ -4,7 +4,11 @@ import type { JWTPayload } from "./auth";
 import prisma from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
 
+/**
+ * Representation of an authenticated request carrying a verified user payload.
+ */
 export interface AuthenticatedRequest {
+  /** The verified JWT payload associated with the authenticated user session. */
   user: JWTPayload;
 }
 
@@ -177,7 +181,7 @@ export async function requireAuth(
 }
 
 /**
- * Ensures the authenticated user owns the requested resource.
+seen * Ensures the authenticated user owns the requested resource.
  */
 export async function requireOwnership(
   request: NextRequest,
@@ -192,9 +196,20 @@ export async function requireOwnership(
   return user;
 }
 
+/**
+ * Standard HTTP Error container that carries a status code and detailed error message.
+ * Used internally to control status codes thrown during route processing and middleware guards.
+ */
 export class HttpError extends Error {
+  /** The specific HTTP status code for this error (e.g. 400, 401, 403, 404). */
   status: number;
 
+  /**
+   * Constructs a new HttpError.
+   *
+   * @param status - The HTTP status code.
+   * @param message - The human-readable error description.
+   */
   constructor(status: number, message: string) {
     super(message);
     this.status = status;
@@ -212,6 +227,12 @@ export function isHttpError(
   );
 }
 
+/**
+ * Sanitizes unknown error objects into safe, human-readable strings.
+ *
+ * @param error - The caught unknown error context.
+ * @returns A clean string representing the error message.
+ */
 export function sanitizeError(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -228,7 +249,14 @@ export function sanitizeError(error: unknown): string {
   }
 }
 
-export function badRequestResponse(message: string, status: number = 400): NextResponse {
+/**
+ * Standard JSON error response builder.
+ *
+ * @param message - The error message.
+ * @param status - The HTTP status code (defaults to 400).
+ * @returns A Next.js NextResponse containing the error.
+ */
+export function errorResponse(message: string, status: number = 400): NextResponse {
   return NextResponse.json({ error: message }, { status });
 }
 
