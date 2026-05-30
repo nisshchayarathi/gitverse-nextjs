@@ -16,15 +16,15 @@ test.describe('Search Page Tests', () => {
 
     test('should have search input field', async ({ page }) => {
       const searchInput = page.locator('input[type="search"], input[placeholder*="search" i]')
-      await expect(searchInput.first()).toBeVisible({ timeout: 10000 }).catch(() => {
-        expect(page.locator('body')).toBeVisible()
+      await expect(searchInput.first()).toBeVisible({ timeout: 10000 }).catch(async () => {
+        await expect(page.locator('body')).toBeVisible()
       })
     })
 
     test('should display GitVerse branding in header', async ({ page }) => {
       const brand = page.locator('text=GitVerse')
-      await expect(brand.first()).toBeVisible({ timeout: 10000 }).catch(() => {
-        expect(page.locator('body')).toBeVisible()
+      await expect(brand.first()).toBeVisible({ timeout: 10000 }).catch(async () => {
+        await expect(page.locator('body')).toBeVisible()
       })
     })
   })
@@ -43,6 +43,6 @@ test.describe('Search Functionality', () => {
     await page.goto('/login')
     await page.goto('/search')
     await page.locator('button[type="submit"]').click()
-    expect(page.locator('body')).toBeVisible()
+    await expect(page.locator('body')).toBeVisible()
   })
 })

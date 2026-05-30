@@ -20,15 +20,15 @@ test.describe('Dashboard Page Tests', () => {
 
     test('should display GitVerse branding', async ({ page }) => {
       const brand = page.locator('text=GitVerse')
-      await expect(brand.first()).toBeVisible({ timeout: 10000 }).catch(() => {
-        expect(page.locator('body')).toBeVisible()
+      await expect(brand.first()).toBeVisible({ timeout: 10000 }).catch(async () => {
+        await expect(page.locator('body')).toBeVisible()
       })
     })
 
     test('should have navigation elements', async ({ page }) => {
       const nav = page.locator('nav').first()
-      await expect(nav).toBeVisible({ timeout: 10000 }).catch(() => {
-        expect(page.locator('body')).toBeVisible()
+      await expect(nav).toBeVisible({ timeout: 10000 }).catch(async () => {
+        await expect(page.locator('body')).toBeVisible()
       })
     })
   })
@@ -38,8 +38,8 @@ test.describe('Dashboard Page Tests', () => {
       await page.goto('/login')
       await page.goto('/dashboard')
       const recentSection = page.locator('text=/recent/i').first()
-      await expect(recentSection).toBeVisible({ timeout: 10000 }).catch(() => {
-        expect(page.locator('body')).toBeVisible()
+      await expect(recentSection).toBeVisible({ timeout: 10000 }).catch(async () => {
+        await expect(page.locator('body')).toBeVisible()
       })
     })
 

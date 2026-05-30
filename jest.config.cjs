@@ -8,10 +8,10 @@ const createJestConfig = nextJest({
 const customJestConfig = {
   testEnvironment: 'jsdom',
   testMatch: [
-    '<rootDir>/lib/**/__tests__/**/*.test.ts',
-    '<rootDir>/lib/**/__tests__/**/*.test.tsx',
-    '<rootDir>/src/**/__tests__/**/*.test.ts',
-    '<rootDir>/src/**/__tests__/**/*.test.tsx',
+    '**/lib/**/__tests__/**/*.test.ts',
+    '**/lib/**/__tests__/**/*.test.tsx',
+    '**/src/**/__tests__/**/*.test.ts',
+    '**/src/**/__tests__/**/*.test.tsx',
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
