@@ -98,7 +98,7 @@ function createPrismaClient() {
       max: normalizedPoolMax,
     });
 
-    pool.on("error", (err) => {
+    pool.on("error", (err: any) => {
       console.error("Unexpected Neon WebSocket pool error:", err);
     });
 

@@ -299,6 +299,24 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     };
   }, [repository]);
 
+  const handleZoomIn = () => {
+    if (svgRef.current) {
+      d3.select(svgRef.current).transition().call(d3.zoom().scaleBy as any, 1.2);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (svgRef.current) {
+      d3.select(svgRef.current).transition().call(d3.zoom().scaleBy as any, 0.8);
+    }
+  };
+
+  const handleReset = () => {
+    if (svgRef.current) {
+      d3.select(svgRef.current).transition().call(d3.zoom().transform as any, d3.zoomIdentity);
+    }
+  };
+
   return (
     <div className="relative">
       <Card className="glass p-4 sm:p-6 overflow-hidden">

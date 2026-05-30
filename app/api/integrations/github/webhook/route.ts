@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyGitHubWebhookSignature } from "@/lib/utils/githubWebhook";
 import prisma from "@/lib/prisma";
 import crypto from "crypto";
+import { QuotaService } from "@/lib/services/quotaService";
+import { getClientIp } from "@/lib/services/rateLimitService";
 
 export const runtime = "nodejs";
 
-type PullRequestWebhookPayload = {
+type WebhookPayload = {
   action?: string;
   installation?: { id?: number };
   repository?: {
@@ -16,6 +18,12 @@ type PullRequestWebhookPayload = {
     number?: number;
     html_url?: string;
     draft?: boolean;
+  };
+  issue?: {
+    number?: number;
+    title?: string;
+    body?: string;
+    html_url?: string;
   };
   sender?: {
     type?: string;
@@ -32,7 +40,18 @@ function shouldHandlePullRequestAction(action: string | undefined): boolean {
   );
 }
 
+function shouldHandleIssueAction(action: string | undefined): boolean {
+  return action === "opened";
+}
+
 export async function POST(request: NextRequest) {
+  // 1. IP-based Rate Limiter (60 requests per minute per IP)
+  const clientIp = getClientIp(request);
+  const isIpAllowed = await QuotaService.checkWebhookRateLimit(`webhook_ip_${clientIp}`, 60, 60000);
+  if (!isIpAllowed) {
+    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
+  }
+
   const rawBody = await request.text();
 
   const signature = request.headers.get("x-hub-signature-256");
@@ -49,14 +68,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  if (event !== "pull_request") {
+  if (event !== "pull_request" && event !== "issues") {
     return NextResponse.json(
       { ok: true, ignored: true, event },
       { status: 200 },
     );
   }
 
-  let payload: PullRequestWebhookPayload;
+  let payload: WebhookPayload;
   try {
     payload = JSON.parse(rawBody);
   } catch {
@@ -64,19 +83,28 @@ export async function POST(request: NextRequest) {
   }
 
   const action = payload.action;
-  if (!shouldHandlePullRequestAction(action)) {
-    return NextResponse.json(
-      { ok: true, ignored: true, action },
-      { status: 200 },
-    );
-  }
-
-  // Ignore draft PRs until they become ready_for_review
-  if (payload.pull_request?.draft && action !== "ready_for_review") {
-    return NextResponse.json(
-      { ok: true, ignored: true, reason: "draft" },
-      { status: 200 },
-    );
+  
+  if (event === "pull_request") {
+    if (!shouldHandlePullRequestAction(action)) {
+      return NextResponse.json(
+        { ok: true, ignored: true, action },
+        { status: 200 },
+      );
+    }
+    // Ignore draft PRs until they become ready_for_review
+    if (payload.pull_request?.draft && action !== "ready_for_review") {
+      return NextResponse.json(
+        { ok: true, ignored: true, reason: "draft" },
+        { status: 200 },
+      );
+    }
+  } else if (event === "issues") {
+    if (!shouldHandleIssueAction(action)) {
+      return NextResponse.json(
+        { ok: true, ignored: true, action },
+        { status: 200 },
+      );
+    }
   }
 
   // Avoid replying to bots (including ourselves)
@@ -89,7 +117,7 @@ export async function POST(request: NextRequest) {
 
   const owner = payload.repository?.owner?.login;
   const repo = payload.repository?.name;
-  const number = payload.pull_request?.number;
+  const number = payload.pull_request?.number || payload.issue?.number;
   const installationId = payload.installation?.id;
 
   if (!owner || !repo || !number || !installationId) {
@@ -100,6 +128,12 @@ export async function POST(request: NextRequest) {
       },
       { status: 400 },
     );
+  }
+
+  // 2. Installation-based Rate Limiter (30 requests per minute per installation)
+  const isInstAllowed = await QuotaService.checkWebhookRateLimit(`webhook_inst_${installationId}`, 30, 60000);
+  if (!isInstAllowed) {
+    return NextResponse.json({ error: "Too Many Requests for Installation" }, { status: 429 });
   }
 
   // Store webhook event for async processing

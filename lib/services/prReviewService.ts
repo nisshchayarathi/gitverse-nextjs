@@ -200,7 +200,7 @@ export async function reviewPullRequest(params: {
   repo: string;
   number: number;
   githubToken?: string;
-}): Promise<{ review: PRReviewResponse; prTitle: string; prUrl: string }> {
+}): Promise<{ review: PRReviewResponse; prTitle: string; prUrl: string; tokensConsumed?: number }> {
   const github = new GitHubService(params.githubToken);
   const pr = await github.getPullRequest(
     params.owner,
@@ -274,9 +274,12 @@ Diff (subset, may be truncated):\n${diff}
 `;
 
   let raw: string;
+  let tokensConsumed: number = 0;
   try {
     const gemini = new GeminiService();
-    raw = await gemini.chatRaw(prompt);
+    const result = await gemini.chatRaw(prompt);
+    raw = result.text;
+    tokensConsumed = result.tokensConsumed;
   } catch (error: any) {
     console.error("[reviewPullRequest] Gemini API Error:", error?.message || error);
     // Graceful fallback for payload too large or timeouts
@@ -305,7 +308,7 @@ Diff (subset, may be truncated):\n${diff}
     throw new Error("AI response was not valid JSON");
   }
 
-  return { review: parsed, prTitle: pr.title, prUrl: pr.html_url };
+  return { review: parsed, prTitle: pr.title, prUrl: pr.html_url, tokensConsumed };
 }
 
 export function formatPRReviewMarkdown(params: {

@@ -40,23 +40,56 @@ function countLinesReadStream(filePath: string): Promise<number> {
 
 function spawnOutput(
   command: string,
-  options: ExecOptions & { signal?: AbortSignal } = {},
+  args: string[],
+  options: SpawnOptions & { timeout?: number; signal?: AbortSignal } = {},
 ): Promise<{ stdout: string; stderr: string }> {
-  return execPromiseRaw(command, {
-    ...DEFAULT_EXEC_OPTIONS,
-    ...options,
-    signal: options.signal,
-    timeout: options.timeout ?? DEFAULT_GIT_TIMEOUT_MS,
-    env: {
-      ...process.env,
-      ...options.env,
-      // Prevent git from hanging on credential / interactive prompts.
-      GIT_TERMINAL_PROMPT: "0",
-      GCM_INTERACTIVE: "Never",
-      // Avoid fetching large LFS objects during clone/checkout.
-      GIT_LFS_SKIP_SMUDGE: "1",
-    },
-  }) as unknown as Promise<{ stdout: string; stderr: string }>;
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      ...options,
+      env: {
+        ...process.env,
+        ...options.env,
+        // Prevent git from hanging on credential / interactive prompts.
+        GIT_TERMINAL_PROMPT: "0",
+        GCM_INTERACTIVE: "Never",
+        // Avoid fetching large LFS objects during clone/checkout.
+        GIT_LFS_SKIP_SMUDGE: "1",
+      },
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout?.on("data", (data) => (stdout += data));
+    child.stderr?.on("data", (data) => (stderr += data));
+
+    const timeout = options.timeout ?? DEFAULT_GIT_TIMEOUT_MS;
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error(`Command timed out: ${command} ${args.join(" ")}`));
+    }, timeout);
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`Command failed with code ${code}: ${stderr}`));
+      }
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    if (options.signal) {
+      options.signal.addEventListener("abort", () => {
+        child.kill();
+        reject(new Error("Command aborted"));
+      });
+    }
+  });
 }
 
 type ParsedCommitHeader = {

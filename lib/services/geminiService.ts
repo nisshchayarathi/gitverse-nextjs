@@ -151,7 +151,7 @@ export class GeminiService {
   async chatRaw(
     prompt: string,
     history?: Array<{ role: "user" | "assistant"; content: string }>,
-  ): Promise<string> {
+  ): Promise<{ text: string; tokensConsumed: number }> {
     if (!prompt?.trim()) {
       throw new Error("Prompt is required");
     }
@@ -172,11 +172,15 @@ export class GeminiService {
 
         const result = await this.model.generateContent({ contents });
         const response = await result.response;
-        return response.text();
+        const text = response.text();
+        const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
+        return { text, tokensConsumed };
       } else {
         const result = await this.model.generateContent(prompt);
         const response = await result.response;
-        return response.text();
+        const text = response.text();
+        const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
+        return { text, tokensConsumed };
       }
     } catch (error: any) {
       console.error("Gemini chat error:", error);

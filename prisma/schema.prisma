@@ -435,11 +435,38 @@ model WebhookEvent {
   event     String
   action    String?
   payload   Json
-  status    String   @default("pending") // pending, processing, completed, failed
+  status    String   @default("pending") // pending, processing, completed, failed, rate_limited
   error     String?  @db.Text
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([status, createdAt])
   @@map("webhook_events")
+}
+
+model AiQuota {
+  id               String    @id @default(uuid()) @db.Uuid
+  installationId   BigInt    @unique @map("installation_id")
+  requestsUsed     Int       @default(0) @map("requests_used")
+  tokensConsumed   Int       @default(0) @map("tokens_consumed")
+  quotaWindowStart DateTime  @default(now()) @map("quota_window_start")
+  quotaWindowEnd   DateTime  @default(now()) @map("quota_window_end")
+  lastAnalysisAt   DateTime? @map("last_analysis_at")
+  warningPosted    Boolean   @default(false) @map("warning_posted")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([quotaWindowEnd])
+  @@map("ai_quotas")
+}
+
+model RateLimit {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String
+  points    Int      @default(0)
+  expiresAt DateTime @map("expires_at")
+
+  @@index([key])
+  @@index([expiresAt])
+  @@map("rate_limits")
 }

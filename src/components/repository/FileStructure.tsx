@@ -52,7 +52,6 @@ interface RepositoryData {
   name?: string;
   url?: string;
   files?: FileData[];
-  url?: string;
 }
 
 interface FileNode {
@@ -199,8 +198,37 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
   const [selectedCodeContext, setSelectedCodeContext] = useState("");
   const [floatingButtonPos, setFloatingButtonPos] = useState<{ top: number; left: number } | null>(null);
+  const [isExplanationOpen, setIsExplanationOpen] = useState(false);
+  const [explainingFilePath, setExplainingFilePath] = useState<string | null>(null);
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [explanationLoading, setExplanationLoading] = useState(false);
   
   const codeContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleExplainSelect = async (filePath: string) => {
+    if (!repository?.id) return;
+    setExplainingFilePath(filePath);
+    setIsExplanationOpen(true);
+    setExplanationLoading(true);
+    setExplanation(null);
+
+    try {
+      const response = await fetch(buildApiUrl(`/ai/explain-file?repositoryId=${repository.id}&path=${encodeURIComponent(filePath)}`));
+      if (!response.ok) throw new Error("Failed to get explanation");
+      const data = await response.json();
+      setExplanation(data.explanation);
+    } catch (error) {
+      console.error("Explanation error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to get AI explanation for this file.",
+        variant: "destructive",
+      });
+      setIsExplanationOpen(false);
+    } finally {
+      setExplanationLoading(false);
+    }
+  };
 
   // Build file tree from repository files
   const buildFileTree = (files: FileData[]): FileNode => {

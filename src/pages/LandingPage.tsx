@@ -648,7 +648,7 @@ export default function LandingPage() {
                 {features.map((feature, index) => (
                   <div
                     key={feature.title}
-                    ref={(el) => (slideRefs.current[index] = el)}
+                    ref={(el) => { slideRefs.current[index] = el; }}
                     className={`feature-carousel__slide ${
                       index === activeFeatureIndex ? "active" : ""
                     }`}

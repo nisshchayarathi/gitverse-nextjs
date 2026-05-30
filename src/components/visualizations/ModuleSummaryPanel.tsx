@@ -58,7 +58,7 @@ export const ModuleSummaryPanel: React.FC<Props> = ({
       };
 
       const result = await ClientAIProvider.generateModuleSummary(settings.provider, activeKey, context);
-      setSummary(result);
+      setSummary(result.summary);
     } catch (err: any) {
       setError(err.message || "Failed to generate summary");
     } finally {

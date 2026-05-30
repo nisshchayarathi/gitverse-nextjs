@@ -60,7 +60,7 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    await repositoryService.analyzeRepository(job.repositoryId, {
+    await repositoryService.analyzeRepository(job.repositoryId, job.userId, {
       onProgress: async (update) => {
         await analysisJobService.updateProgress({
           jobId: job.id,
