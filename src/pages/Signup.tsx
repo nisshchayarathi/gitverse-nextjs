@@ -12,6 +12,7 @@ import {
   GitBranch,
   Loader2,
   CheckCircle2,
+  Github,
 } from "lucide-react";
 import {
   Button,
@@ -113,6 +114,7 @@ export default function Signup() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isGithubLoading, setIsGithubLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -139,6 +141,34 @@ export default function Signup() {
       });
     } finally {
       setIsGoogleLoading(false);
+    }
+  };
+
+  const handleGithubSignIn = async () => {
+    setIsGithubLoading(true);
+    try {
+      const result = await signIn("github", {
+        callbackUrl: "/dashboard",
+        redirect: false,
+      });
+
+      if (result?.error) {
+        toast({
+          title: "Authentication Failed",
+          description: result.error,
+          variant: "destructive",
+        });
+      } else if (result?.url) {
+        router.push(result.url);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Authentication Failed",
+        description: error.message || "Failed to sign in with GitHub",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGithubLoading(false);
     }
   };
 
@@ -421,7 +451,7 @@ export default function Signup() {
             variant="outline"
             className="w-full"
             onClick={handleGoogleSignIn}
-            disabled={isGoogleLoading || isLoading}
+            disabled={isGoogleLoading || isGithubLoading || isLoading}
           >
             {isGoogleLoading ? (
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -446,6 +476,21 @@ export default function Signup() {
               </svg>
             )}
             Sign up with Google
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full mt-3"
+            onClick={handleGithubSignIn}
+            disabled={isGoogleLoading || isGithubLoading || isLoading}
+          >
+            {isGithubLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+            ) : (
+              <Github className="h-5 w-5 mr-2" />
+            )}
+            Sign up with GitHub
           </Button>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">

@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Mail, Lock, GitBranch, Loader2, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, GitBranch, Loader2, Eye, EyeOff, Github } from "lucide-react";
 import {
   Button,
   Input,
@@ -174,6 +174,51 @@ export default function Login() {
       });
     } finally {
       setIsGoogleLoading(false);
+    }
+  };
+
+  const handleGithubSignIn = async () => {
+    setIsGithubLoading(true);
+    try {
+      const callbackUrl = from.startsWith("/") ? from : "/dashboard";
+      const result = await signIn("github", {
+        callbackUrl,
+        redirect: false,
+      });
+
+      // NextAuth may return a URL that is actually the error page (e.g. /login?error=OAuthSignin).
+      // Treat that as an error and avoid navigating away.
+      const errorFromUrl = (() => {
+        try {
+          if (!result?.url) return null;
+          const asUrl = new URL(result.url, window.location.origin);
+          return asUrl.searchParams.get("error");
+        } catch {
+          return null;
+        }
+      })();
+
+      if (result?.error || errorFromUrl) {
+        const code = result?.error || errorFromUrl || "Default";
+        toast({
+          title: "Authentication Failed",
+          description:
+            code === "OAuthSignin"
+              ? "GitHub sign-in could not be started. Try again, or clear site cookies for localhost."
+              : code,
+          variant: "destructive",
+        });
+      } else if (result?.url) {
+        router.push(result.url);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Authentication Failed",
+        description: error.message || "Failed to sign in with GitHub",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGithubLoading(false);
     }
   };
 
@@ -367,7 +412,7 @@ export default function Login() {
             variant="outline"
             className="w-full flex items-center justify-center transition-transform active:scale-[0.99]"
             onClick={handleGoogleSignIn}
-            disabled={isGoogleLoading || isLoading}
+            disabled={isGoogleLoading || isGithubLoading || isLoading}
           >
             {isGoogleLoading ? (
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -392,6 +437,21 @@ export default function Login() {
               </svg>
             )}
             Sign in with Google
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full mt-3"
+            onClick={handleGithubSignIn}
+            disabled={isGoogleLoading || isGithubLoading || isLoading}
+          >
+            {isGithubLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+            ) : (
+              <Github className="h-5 w-5 mr-2" />
+            )}
+            Sign in with GitHub
           </Button>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">

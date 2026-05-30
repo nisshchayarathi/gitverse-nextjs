@@ -301,6 +301,8 @@ Add these in **Vercel Dashboard → Settings → Environment Variables**:
 | `JWT_SECRET` | ✅ Always | JWT signing secret |
 | `GOOGLE_CLIENT_ID` | ⚡ OAuth | Only if using Google login |
 | `GOOGLE_CLIENT_SECRET` | ⚡ OAuth | Only if using Google login |
+| `GITHUB_CLIENT_ID` | ⚡ OAuth | Only if using GitHub login |
+| `GITHUB_CLIENT_SECRET` | ⚡ OAuth | Only if using GitHub login |
 | `GITHUB_APP_ID` | ⚡ PR Reviews | Only if using GitHub App integration |
 | `GITHUB_APP_PRIVATE_KEY` | ⚡ PR Reviews | Only if using GitHub App integration |
 | `GITHUB_WEBHOOK_SECRET` | ⚡ PR Reviews | Only if using GitHub webhooks |
@@ -340,6 +342,8 @@ firebase apphosting:secrets:set nextauth-url
 firebase apphosting:secrets:set nextauth-secret
 firebase apphosting:secrets:set google-client-id
 firebase apphosting:secrets:set google-client-secret
+firebase apphosting:secrets:set github-client-id
+firebase apphosting:secrets:set github-client-secret
 ```
 
 2. Deploy:
