@@ -2,6 +2,8 @@ import { Metadata } from 'next';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import RepositoryAnalysis from '@/pages/RepositoryAnalysis';
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth-config";
 
 interface PageProps {
   params: { id: string }
@@ -9,21 +11,31 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const id = parseInt(params.id, 10);
-  if (isNaN(id)) {
-    return { title: "Repository" };
+  let repoName = "";
+
+  if (!isNaN(id)) {
+    try {
+      const session = await getServerSession(authOptions);
+      const userId = session?.user ? Number((session.user as any).id) : null;
+      if (userId && !isNaN(userId)) {
+        const repo = await prisma.repository.findFirst({
+          where: { id, userId },
+          select: { name: true },
+        });
+        if (repo) {
+          repoName = repo.name;
+        }
+      }
+    } catch (error) {
+      console.error("Error generating metadata:", error);
+    }
   }
 
-  let repoName = "Repository";
-  try {
-    const repo = await prisma.repository.findUnique({
-      where: { id },
-      select: { name: true },
-    });
-    if (repo) {
-      repoName = repo.name;
-    }
-  } catch (error) {
-    console.error("Error generating metadata:", error);
+  if (!repoName) {
+    repoName = params.id
+      .replace(/-/g, ' ')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://gitverse.dev";

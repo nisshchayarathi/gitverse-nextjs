@@ -29,6 +29,9 @@ export const metadata: Metadata = {
     template: "%s | GitVerse",
   },
   description: "Contribution made easy with repo visualization and PR Mentor",
+  icons: {
+    icon: "/icon.svg",
+  },
   keywords: ["GitHub", "Next.js", "AI Code Analysis", "Open Source", "PR Mentor", "Repository Visualization", "GitVerse"],
   authors: [{ name: "GitVerse Team" }],
   creator: "GitVerse",
