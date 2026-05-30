@@ -8,9 +8,18 @@ interface LanguageData {
   lines: number;
   color: string;
 }
+interface RepositoryLanguage{
+  name:string;
+  percentage: number;
+  lines?:number
+}
+
+interface RepositoryData{
+  languages?: RepositoryLanguage[];
+}
 
 interface LanguageDistributionChartProps {
-  repository?: any;
+  repository?: RepositoryData;
 }
 
 // Generate a vibrant random color
@@ -35,7 +44,7 @@ export function LanguageDistributionChart({
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const languageData: LanguageData[] = (repository?.languages || []).map(
-    (lang: any) => ({
+    (lang: RepositoryLanguage) => ({
       name: lang.name,
       percentage: lang.percentage,
       lines: lang.lines || 0,
@@ -47,7 +56,7 @@ export function LanguageDistributionChart({
     if (!svgRef.current) return;
 
     const languageData: LanguageData[] = (repository?.languages || []).map(
-      (lang: any) => ({
+      (lang: RepositoryLanguage) => ({
         name: lang.name,
         percentage: lang.percentage,
         lines: lang.lines || 0,
@@ -214,6 +223,7 @@ export function LanguageDistributionChart({
           Interactive breakdown of codebase languages
         </p>
       </div>
+      {languageData.length > 0 && (
       <div className="flex items-center justify-center overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
         <svg
           ref={svgRef}
@@ -224,6 +234,13 @@ export function LanguageDistributionChart({
           className="text-foreground max-w-md"
         />
       </div>
+      )}
+      {/* Empty state when languageData is empty */}
+      {languageData.length === 0 && (
+        <div className="text-center py-8 text-muted-foreground text-sm">
+          No language data available for this repository
+        </div>
+      )}
       <div className="mt-4 space-y-2">
         {languageData.length > 0 ? (
           languageData.map((lang) => (

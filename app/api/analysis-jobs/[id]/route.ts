@@ -1,7 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireAuth, isHttpError } from "@/lib/middleware";
+import { requireAuth, isHttpError , sanitizeError } from "@/lib/middleware";
 import { analysisJobService } from "@/lib/services/analysisJobService";
+
+import { shouldThrottleJobKick } from "@/lib/utils/analysisRunner";
+
+
+function kickLocalRunner(request: NextRequest, jobId: string) {
+  if (process.env.NODE_ENV === "production") return;
+
+ if (shouldThrottleJobKick(jobId)) return;  
+  const origin = new URL(request.url).origin;
+  const secret = process.env.ANALYSIS_RUNNER_SECRET;
+
+  void fetch(`${origin}/api/internal/run-analysis`, {
+    method: "POST",
+    headers: secret ? { "x-analysis-runner-secret": secret } : undefined,
+  }).catch(() => {});
+}
+
 
 export async function GET(
   request: NextRequest,
@@ -18,6 +35,10 @@ export async function GET(
 
     if (!job) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+
+    if (job.status === "QUEUED") {
+      kickLocalRunner(request, job.id);
     }
 
     return NextResponse.json({
@@ -40,7 +61,7 @@ export async function GET(
       },
     });
   } catch (error: any) {
-    console.error("Get analysis job error:", error);
+    console.error("Get analysis job error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(

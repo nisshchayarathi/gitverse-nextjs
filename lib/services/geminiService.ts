@@ -10,6 +10,7 @@ export interface AIAnalysisRequest {
     | "suggestions";
   context?: {
     files?: Array<{ path: string; content: string }>;
+    fileTree?: string;
     commits?: Array<{ message: string; author: string; date: string }>;
     languages?: Array<{ name: string; percentage: number }>;
     contributors?: Array<{ name: string; commits: number }>;
@@ -62,6 +63,17 @@ export class GeminiService {
       return response.text();
     } catch (error: any) {
       console.error("Gemini analysis error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
       throw new Error(`AI analysis failed: ${error.message}`);
     }
   }
@@ -76,7 +88,7 @@ export class GeminiService {
       code,
       language,
       analysisType,
-      context
+      context,
     );
 
     try {
@@ -84,8 +96,19 @@ export class GeminiService {
       const response = await result.response;
       return response.text();
     } catch (error: any) {
-      console.error("Gemini code analysis error:", error);
-      throw new Error(`Code analysis failed: ${error.message}`);
+      console.error("Gemini analysis error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
+      throw new Error(`AI analysis failed: ${error.message}`);
     }
   }
 
@@ -98,7 +121,7 @@ export class GeminiService {
     let prompt = this.buildRepositoryChatPrompt(
       question,
       conversationHistory,
-      context
+      context,
     );
 
     try {
@@ -107,6 +130,17 @@ export class GeminiService {
       return response.text();
     } catch (error: any) {
       console.error("Gemini chat error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
       throw new Error(`AI chat failed: ${error.message}`);
     }
   }
@@ -114,17 +148,53 @@ export class GeminiService {
   /**
    * Chat using a pre-built prompt (free-form)
    */
-  async chatRaw(prompt: string): Promise<string> {
+  async chatRaw(
+    prompt: string,
+    history?: Array<{ role: "user" | "assistant"; content: string }>,
+  ): Promise<{ text: string; tokensConsumed: number }> {
     if (!prompt?.trim()) {
       throw new Error("Prompt is required");
     }
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      return response.text();
+      if (history && history.length > 0) {
+        // Cap history to prevent context limit failures
+        const MAX_HISTORY_LENGTH = 10;
+        const recentHistory = history.slice(-MAX_HISTORY_LENGTH);
+
+        const contents = [
+          ...recentHistory.map((msg) => ({
+            role: msg.role === "assistant" ? "model" : "user",
+            parts: [{ text: msg.content }],
+          })),
+          { role: "user", parts: [{ text: prompt }] },
+        ];
+
+        const result = await this.model.generateContent({ contents });
+        const response = await result.response;
+        const text = response.text();
+        const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
+        return { text, tokensConsumed };
+      } else {
+        const result = await this.model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
+        return { text, tokensConsumed };
+      }
     } catch (error: any) {
-      console.error("Gemini raw chat error:", error);
+      console.error("Gemini chat error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
       throw new Error(`AI chat failed: ${error.message}`);
     }
   }
@@ -162,13 +232,12 @@ Provide only the commit messages, one per line.
         .filter((line) => line.trim())
         .slice(0, 3);
     } catch (error: any) {
-      console.error("Commit message suggestion error:", error);
-      return [
-        "feat: implement new features",
-        "fix: resolve bugs and issues",
-        "chore: update dependencies and configuration",
-      ];
-    }
+  console.error("Commit message suggestion error:", error);
+
+  throw new Error(
+    error?.message || "Failed to generate commit message suggestions"
+  );
+}
   }
 
   /**
@@ -176,18 +245,23 @@ Provide only the commit messages, one per line.
    */
   private buildRepositoryAnalysisPrompt(
     type: string,
-    context?: AIAnalysisRequest["context"]
+    context?: AIAnalysisRequest["context"],
   ): string {
     const baseContext = `
 Repository Context:
 - Languages: ${context?.languages?.map((l) => `${l.name} (${l.percentage}%)`).join(", ") || "Unknown"}
 - Contributors: ${context?.contributors?.length || 0}
 - Recent commits: ${context?.commits?.length || 0}
+${context?.fileTree ? `\nFile Structure:\n${context.fileTree}\n` : ""}
 `;
+
+    const scopeNote = (context as any)?.targetDirectory
+      ? `\nImportant: Restrict your analysis to the target directory (${(context as any).targetDirectory}). Only reference files outside this directory if they are immediately required dependencies.\n`
+      : "";
 
     switch (type) {
       case "overview":
-        return `${baseContext}
+        return `${baseContext}${scopeNote}
 
 Provide a comprehensive overview of this repository including:
 1. Primary purpose and functionality
@@ -198,7 +272,7 @@ Provide a comprehensive overview of this repository including:
 Be concise but informative.`;
 
       case "code-quality":
-        return `${baseContext}
+        return `${baseContext}${scopeNote}
 
 Analyze the code quality of this repository:
 1. Code organization and structure
@@ -210,7 +284,7 @@ Analyze the code quality of this repository:
 Provide actionable insights.`;
 
       case "security":
-        return `${baseContext}
+        return `${baseContext}${scopeNote}
 
 Perform a security analysis:
 1. Potential security vulnerabilities
@@ -220,7 +294,7 @@ Perform a security analysis:
 5. Security best practices recommendations`;
 
       case "architecture":
-        return `${baseContext}
+        return `${baseContext}${scopeNote}
 
 Analyze the software architecture:
 1. Overall architecture pattern (MVC, microservices, etc.)
@@ -230,7 +304,7 @@ Analyze the software architecture:
 5. Architectural recommendations`;
 
       case "suggestions":
-        return `${baseContext}
+        return `${baseContext}${scopeNote}
 
 Provide improvement suggestions:
 1. Code refactoring opportunities
@@ -253,7 +327,7 @@ Prioritize by impact and effort.`;
     code: string,
     language: string,
     analysisType: string,
-    context?: string
+    context?: string,
   ): string {
     const basePrompt = `Language: ${language}\n${context ? `Context: ${context}\n` : ""}\n\nCode:\n\`\`\`${language}\n${code}\n\`\`\`\n\n`;
 
@@ -311,7 +385,7 @@ Provide refactored code examples.`;
   private buildRepositoryChatPrompt(
     question: string,
     conversationHistory?: Array<{ role: string; content: string }>,
-    context?: AIRepositoryChatRequest["context"]
+    context?: AIRepositoryChatRequest["context"],
   ): string {
     let prompt =
       "You are an expert code analyst helping developers understand their repository.\n\n";

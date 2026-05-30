@@ -4,11 +4,22 @@ import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
+import { invalidateGeminiAnalysisCacheForRepository } from "./geminiAnalysisCacheService";
+import { FileChangeType } from "@prisma/client";
+
+function yieldIfHighMemory(threshold = 0.7): Promise<void> {
+  const usage = process.memoryUsage();
+  if (usage.heapUsed / usage.heapTotal > threshold) {
+    return new Promise((resolve) => setImmediate(resolve));
+  }
+  return Promise.resolve();
+}
 
 export interface AnalyzeRepositoryInput {
   name: string;
   url: string;
   description?: string;
+  targetDirectory?: string;
   userId: number;
 }
 
@@ -71,7 +82,7 @@ export class RepositoryService {
   async fetchAndStoreReadme(repositoryId: number, userId: number) {
     const repository = await prisma.repository.findFirst({
       where: { id: repositoryId, userId },
-      select: { id: true, url: true },
+      select: { id: true, url: true, targetDirectory: true },
     });
 
     if (!repository) {
@@ -93,7 +104,14 @@ export class RepositoryService {
         noSingleBranch: false,
       });
 
-      const readme = await this.tryReadmeFromRepoPath(tempDir);
+      const scopedPath = repository.targetDirectory
+        ? path.join(tempDir, repository.targetDirectory)
+        : null;
+
+      const readme =
+        (scopedPath
+          ? await this.tryReadmeFromRepoPath(scopedPath)
+          : null) ?? (await this.tryReadmeFromRepoPath(tempDir));
 
       const updated = await prisma.repository.update({
         where: { id: repositoryId },
@@ -125,20 +143,32 @@ export class RepositoryService {
       where: {
         url: input.url,
         userId: input.userId,
+        targetDirectory: input.targetDirectory ?? null,
       },
     });
 
     if (existingRepository) {
-      console.log(`Repository already exists: ${existingRepository.id}`);
 
       return existingRepository;
     }
+
+    const existingRepositoryName = await prisma.repository.findFirst({
+  where: {
+    name: input.name,
+    userId: input.userId,
+  },
+});
+
+if (existingRepositoryName) {
+  throw new Error("Repository with this name already exists");
+}
 
     const repository = await prisma.repository.create({
       data: {
         name: input.name,
         url: input.url,
         description: input.description,
+        targetDirectory: input.targetDirectory ?? null,
         userId: input.userId,
         status: "pending",
       },
@@ -152,10 +182,11 @@ export class RepositoryService {
    */
   async analyzeRepository(
     repositoryId: number,
-    opts?: { onProgress?: RepositoryAnalysisProgressReporter },
+    userId: number,
+    opts?: { onProgress?: RepositoryAnalysisProgressReporter; scope?: string; timeoutMs?: number },
   ) {
-    const repository = await prisma.repository.findUnique({
-      where: { id: repositoryId },
+    const repository = await prisma.repository.findFirst({
+      where: { id: repositoryId, userId },
     });
 
     if (!repository) {
@@ -177,7 +208,20 @@ export class RepositoryService {
       }
     };
 
-    await report({ progressPercent: 1, progressMessage: "Starting" });
+    await report({ progressPercent: 1, progressMessage: "Starting analysis..." });
+
+    const timeoutMs = opts?.timeoutMs ?? 15 * 60 * 1000; // 15 minutes default
+    const controller = new AbortController();
+    const { signal } = controller;
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+
+    const checkAborted = () => {
+      if (signal.aborted) {
+        throw new Error(`Repository analysis timed out after ${timeoutMs / 60000} minutes`);
+      }
+    };
 
     // Create temporary directory for cloning
     const tempDir = path.join(
@@ -189,315 +233,325 @@ export class RepositoryService {
     let gitService: GitService | null = null;
 
     try {
+      checkAborted();
+
       // Clone repository
-      console.log(`Cloning repository ${repository.url} to ${tempDir}`);
       await report({
         progressPercent: 5,
-        progressMessage: "Cloning repository",
+        progressMessage: "Cloning repository...",
       });
-      gitService = await GitService.cloneRepository(repository.url, tempDir);
-
-      // Capture README early (best-effort)
-      await report({ progressPercent: 8, progressMessage: "Reading README" });
-      const readme = await this.tryReadmeFromRepoPath(tempDir);
-      await prisma.repository.update({
-        where: { id: repositoryId },
-        data: {
-          readmePath: readme?.path ?? "README.md",
-          readmeText: readme?.text ?? "doesnt exist",
-          readmeFetchedAt: new Date(),
+      gitService = await GitService.cloneRepository(repository.url, tempDir, {
+        signal,
+        onProgress: (pct, msg) => {
+          const analysisPct = 5 + Math.round((pct / 100) * 3);
+          report({ progressPercent: Math.min(8, analysisPct), progressMessage: msg });
         },
       });
 
-      // Get repository size
+      checkAborted();
+
+      // Read phases: all git/fs operations happen before the write transaction.
+      await report({ progressPercent: 8, progressMessage: "Reading README" });
+      const scopedReadmePath = repository.targetDirectory
+        ? path.join(tempDir, repository.targetDirectory)
+        : null;
+      const readme =
+        (scopedReadmePath
+          ? await this.tryReadmeFromRepoPath(scopedReadmePath)
+          : null) ?? (await this.tryReadmeFromRepoPath(tempDir));
+
+      checkAborted();
+
       await report({
         progressPercent: 10,
-        progressMessage: "Calculating size",
+        progressMessage: "Calculating repository size...",
       });
-      const size = await gitService.getRepositorySize();
+      const [size, branches] = await Promise.all([
+        gitService.getRepositorySize(),
+        gitService.getBranches(),
+      ]);
 
-      // Analyze branches
-      console.log(`Analyzing branches for repository ${repositoryId}`);
-      await report({
-        progressPercent: 15,
-        progressMessage: "Analyzing branches",
-      });
-      const branches = await gitService.getBranches();
+      checkAborted();
+
       const defaultBranch = branches.find((b) => b.isDefault)?.name || "main";
 
-      await prisma.branch.createMany({
-        data: branches.map((branch) => ({
-          name: branch.name,
-          isDefault: branch.isDefault,
-          isProtected: branch.isProtected,
-          commitCount: branch.commitCount,
-          lastCommitAt: branch.lastCommitAt,
-          repositoryId,
-        })),
-        skipDuplicates: true,
-      });
-
-      // Analyze commits from all branches
-      console.log(`Analyzing commits for repository ${repositoryId}`);
       await report({
         progressPercent: 25,
-        progressMessage: "Reading commit history",
+        progressMessage: "Fetching commit history...",
       });
       const commits = await gitService.getCommits("--all", 1000);
-      console.log(`Total commits fetched from git: ${commits.length}`);
 
-      // IMPORTANT: Do not load *all* existing commits for the repo.
-      // On large repos this can be huge and cause OOM/timeouts. We only need to
-      // know which of the commits we just fetched already exist.
-      const existingCommits =
-        commits.length > 0
-          ? await prisma.commit.findMany({
-              where: {
-                repositoryId,
-                hash: { in: commits.map((c) => c.hash) },
-              },
-              select: { hash: true },
-            })
-          : [];
-      const existingHashes = new Set(existingCommits.map((c) => c.hash));
+      checkAborted();
 
-      // Filter out commits that already exist
-      const newCommits = commits.filter(
-        (commit) => !existingHashes.has(commit.hash),
-      );
+      await report({
+        progressPercent: 65,
+        progressMessage: "Scanning files",
+      });
+      const files = await gitService.getFileTree(opts?.scope);
+      checkAborted();
 
-      console.log(
-        `Found ${commits.length} commits, ${newCommits.length} are new, ${existingCommits.length} already exist`,
-      );
-
-      let insertedCount = 0;
-      let failedCount = 0;
-
-      const totalNewCommits = Math.max(1, newCommits.length);
-      let lastCommitProgressUpdateAt = Date.now();
-
-      for (const commit of newCommits) {
-        try {
-          const createdCommit = await prisma.commit.create({
-            data: {
-              hash: commit.hash,
-              shortHash: commit.shortHash,
-              message: commit.message,
-              description: commit.description,
-              authorName: commit.authorName,
-              authorEmail: commit.authorEmail,
-              committedAt: commit.committedAt,
-              branch: commit.branch,
-              parents: commit.parents || [],
-              refs: commit.refs || [],
-              tags: commit.tags || [],
-              additions: commit.additions,
-              deletions: commit.deletions,
-              filesChanged: commit.filesChanged,
-              repositoryId,
-            },
-          });
-
-          insertedCount++;
-
-          // Periodically report progress (every ~2s)
-          if (Date.now() - lastCommitProgressUpdateAt > 2000) {
-            const pct = 25 + Math.round((insertedCount / totalNewCommits) * 35);
-            await report({
-              progressPercent: Math.min(60, pct),
-              progressMessage: `Storing commits (${insertedCount}/${newCommits.length})`,
-            });
-            lastCommitProgressUpdateAt = Date.now();
-          }
-
-          // Store file changes
-          if (commit.fileChanges.length > 0) {
-            await prisma.fileChange.createMany({
-              data: commit.fileChanges.map((change) => ({
-                path: change.path,
-                additions: change.additions,
-                deletions: change.deletions,
-                changeType: change.changeType,
-                commitId: createdCommit.id,
-              })),
-              skipDuplicates: true,
-            });
-          }
-        } catch (error: any) {
-          failedCount++;
-          console.error(
-            `Failed to insert commit ${commit.hash}:`,
-            error.message,
-          );
-          // Continue with next commit
-        }
-      }
-
-      console.log(
-        `Commit insertion complete: ${insertedCount} inserted, ${failedCount} failed`,
-      );
-
-      // Analyze files
-      console.log(`Analyzing file tree for repository ${repositoryId}`);
-      await report({ progressPercent: 65, progressMessage: "Scanning files" });
-      const files = await gitService.getFileTree();
-
-      // Avoid querying existing file paths (can be huge). Just rely on
-      // `skipDuplicates` with the unique constraint (repositoryId, path).
-      if (files.length > 0) {
-        const chunkSize = 500;
-        for (let i = 0; i < files.length; i += chunkSize) {
-          const chunk = files.slice(i, i + chunkSize);
-          await prisma.file.createMany({
-            data: chunk.map((file) => ({
-              path: file.path,
-              name: file.name,
-              extension: file.extension,
-              size: file.size,
-              lines: file.lines,
-              language: file.language,
-              repositoryId,
-            })),
-            skipDuplicates: true,
-          });
-
-          const insertedSoFar = Math.min(files.length, i + chunk.length);
-          await report({
-            progressPercent:
-              65 + Math.round((insertedSoFar / files.length) * 10),
-            progressMessage: `Storing files (${insertedSoFar}/${files.length})`,
-          });
-        }
-        console.log(
-          `File scan complete: processed ${files.length} paths for repository ${repositoryId}`,
-        );
-      } else {
-        console.log(`No files found for repository ${repositoryId}`);
-      }
-
-      // Analyze contributors
-      console.log(`Analyzing contributors for repository ${repositoryId}`);
       await report({
         progressPercent: 80,
-        progressMessage: "Analyzing contributors",
+        progressMessage: "Analyzing contributor activity...",
       });
-      const contributors = await gitService.getContributors();
-      const totalContributions = contributors.reduce(
-        (sum, c) => sum + c.commits,
-        0,
-      );
-
-      if (contributors.length > 0) {
-        await prisma.contributor.createMany({
-          data: contributors.map((contributor) => {
-            const percentage =
-              totalContributions > 0
-                ? (contributor.commits / totalContributions) * 100
-                : 0;
-            return {
-              name: contributor.name,
-              email: contributor.email,
-              commits: contributor.commits,
-              additions: contributor.additions,
-              deletions: contributor.deletions,
-              percentage,
-              firstCommit: contributor.firstCommit,
-              lastCommit: contributor.lastCommit,
-              repositoryId,
-            };
-          }),
-          skipDuplicates: true,
-        });
-      }
-
-      // Detect languages
-      console.log(`Detecting languages for repository ${repositoryId}`);
       await report({
-        progressPercent: 90,
-        progressMessage: "Detecting languages",
+        progressPercent: 85,
+        progressMessage: "Detecting programming languages...",
       });
-      const languages = await gitService.detectLanguages();
 
-      // Languages to ignore (config/data formats, not actual code)
-      const ignoredLanguages = ["JSON", "YAML", "Markdown", "TOML", "CSV"];
+      const [contributors, languages] = await Promise.all([
+        gitService.getContributors(),
+        gitService.detectLanguages(repository.targetDirectory ?? undefined),
+      ]);
 
-      // Filter out ignored languages
-      const filteredLanguages = languages.filter(
-        (lang) => !ignoredLanguages.includes(lang.name),
-      );
+      checkAborted();
 
-      // Recalculate percentages based on remaining languages only
-      const totalBytes = filteredLanguages.reduce(
-        (sum, lang) => sum + lang.bytes,
-        0,
-      );
-      const rawPercentages = filteredLanguages.map((lang) =>
-        totalBytes > 0 ? (lang.bytes / totalBytes) * 100 : 0,
-      );
+      // Write phase: all database writes in a single atomic transaction.
+      // This ensures that a failure mid-way rolls back all changes, preventing
+      // the repository from being stuck in "analyzing" with partial data visible.
+      await prisma.$transaction(async (tx) => {
+        // Delete stale analysis data for a clean slate, then re-insert fresh data.
+        // This avoids the skipDuplicates problem where old rows from a previous
+        // partial run survive alongside new data.
+        await tx.commit.deleteMany({ where: { repositoryId } });
+        await tx.branch.deleteMany({ where: { repositoryId } });
+        await tx.file.deleteMany({ where: { repositoryId } });
+        await tx.contributor.deleteMany({ where: { repositoryId } });
+        await tx.language.deleteMany({ where: { repositoryId } });
 
-      // Round to 2 decimal places
-      const roundedPercentages = rawPercentages.map(
-        (p) => Math.round(p * 100) / 100,
-      );
-
-      // Adjust to ensure sum is exactly 100%
-      const sum = roundedPercentages.reduce((acc, val) => acc + val, 0);
-      if (sum > 0 && sum !== 100) {
-        const diff = 100 - sum;
-        // Add difference to the largest percentage
-        const maxIndex = roundedPercentages.indexOf(
-          Math.max(...roundedPercentages),
-        );
-        roundedPercentages[maxIndex] =
-          Math.round((roundedPercentages[maxIndex] + diff) * 100) / 100;
-      }
-
-      const languagesWithAdjustedPercentage = filteredLanguages.map(
-        (lang, index) => ({
-          ...lang,
-          percentage: roundedPercentages[index],
-        }),
-      );
-
-      if (languagesWithAdjustedPercentage.length > 0) {
-        await prisma.language.createMany({
-          data: languagesWithAdjustedPercentage.map((language) => ({
-            name: language.name,
-            percentage: language.percentage,
-            bytes: language.bytes,
-            lines: language.lines,
-            repositoryId,
-          })),
-          skipDuplicates: true,
+        // Update README
+        await tx.repository.update({
+          where: { id: repositoryId },
+          data: {
+            readmePath: readme?.path ?? "README.md",
+            readmeText: readme?.text ?? "doesnt exist",
+            readmeFetchedAt: new Date(),
+          },
         });
-      }
 
-      // Update repository with final data
-      await prisma.repository.update({
-        where: { id: repositoryId },
-        data: {
-          status: "completed",
-          lastAnalyzedAt: new Date(),
-          defaultBranch,
-          size: size,
-        },
+        // Insert branches
+        if (branches.length > 0) {
+          await tx.branch.createMany({
+            data: branches.map((branch) => ({
+              name: branch.name,
+              isDefault: branch.isDefault,
+              isProtected: branch.isProtected,
+              commitCount: branch.commitCount,
+              lastCommitAt: branch.lastCommitAt,
+              repositoryId,
+            })),
+          });
+        }
+
+        // Insert commits + file changes in chunks
+        if (commits.length > 0) {
+          const commitChunkSize = 100;
+          for (let i = 0; i < commits.length; i += commitChunkSize) {
+            const chunk = commits.slice(i, i + commitChunkSize);
+
+            await tx.commit.createMany({
+              data: chunk.map((commit) => ({
+                hash: commit.hash,
+                shortHash: commit.shortHash,
+                message: commit.message,
+                description: commit.description,
+                authorName: commit.authorName,
+                authorEmail: commit.authorEmail,
+                committedAt: commit.committedAt,
+                branch: commit.branch,
+                parents: commit.parents || [],
+                refs: commit.refs || [],
+                tags: commit.tags || [],
+                additions: commit.additions,
+                deletions: commit.deletions,
+                filesChanged: commit.filesChanged,
+                repositoryId,
+              })),
+            });
+
+            const insertedCommits = await tx.commit.findMany({
+              where: {
+                repositoryId,
+                hash: { in: chunk.map((c: { hash: string }) => c.hash) },
+              },
+              select: { id: true, hash: true },
+            });
+            const commitIdByHash = new Map(
+              insertedCommits.map((c: { hash: string; id: number }) => [c.hash, c.id]),
+            );
+
+            const fileChanges = chunk.flatMap(
+              (commit: {
+                hash: string;
+                fileChanges: Array<{
+                  path: string;
+                  additions: number;
+                  deletions: number;
+                  changeType: "added" | "modified" | "deleted";
+                }>;
+              }) => {
+                const commitId = commitIdByHash.get(commit.hash);
+                if (!commitId || commit.fileChanges.length === 0) return [];
+                return commit.fileChanges.map((change) => ({
+                  path: change.path,
+                  additions: change.additions,
+                  deletions: change.deletions,
+                  changeType: change.changeType.toUpperCase() as FileChangeType,
+                  commitId,
+                }));
+              },
+            );
+
+            if (fileChanges.length > 0) {
+              await tx.fileChange.createMany({ data: fileChanges });
+            }
+          }
+        }
+
+        // Insert files in chunks
+        if (files.length > 0) {
+          const chunkSize = 500;
+          for (let i = 0; i < files.length; i += chunkSize) {
+            const chunk = files.slice(i, i + chunkSize);
+            await tx.file.createMany({
+              data: chunk.map((file) => ({
+                path: file.path,
+                name: file.name,
+                extension: file.extension,
+                size: file.size,
+                lines: file.lines,
+                language: file.language,
+                repositoryId,
+              })),
+            });
+          }
+        }
+
+        // Insert contributors
+        if (contributors.length > 0) {
+          const totalContributions = contributors.reduce(
+            (sum: number, c: { commits: number }) => sum + c.commits, 0,
+          );
+          await tx.contributor.createMany({
+            data: contributors.map((contributor: { commits: number; name: string; email: string; additions: number; deletions: number; firstCommit: Date; lastCommit: Date }) => {
+              const percentage =
+                totalContributions > 0
+                  ? (contributor.commits / totalContributions) * 100
+                  : 0;
+              return {
+                name: contributor.name,
+                email: contributor.email,
+                commits: contributor.commits,
+                additions: contributor.additions,
+                deletions: contributor.deletions,
+                percentage,
+                firstCommit: contributor.firstCommit,
+                lastCommit: contributor.lastCommit,
+                repositoryId,
+              };
+            }),
+          });
+        }
+
+        // Process and insert languages
+        const ignoredLanguages = ["JSON", "YAML", "Markdown", "TOML", "CSV"];
+        const filteredLanguages = languages.filter(
+          (lang: { name: string }) => !ignoredLanguages.includes(lang.name),
+        );
+
+        if (filteredLanguages.length > 0) {
+          const totalBytes = filteredLanguages.reduce(
+            (sum: number, lang: { bytes: number }) => sum + lang.bytes,
+            0,
+          );
+          const rawPercentages = filteredLanguages.map(
+            (lang: { bytes: number }) => (totalBytes > 0 ? (lang.bytes / totalBytes) * 100 : 0),
+          );
+
+          const roundedPercentages = rawPercentages.map(
+            (p: number) => Math.round(p * 100) / 100,
+          );
+
+          const pctSum = roundedPercentages.reduce(
+            (acc: number, val: number) => acc + val, 0,
+          );
+          if (pctSum > 0 && pctSum !== 100 && roundedPercentages.length > 0) {
+            const diff = 100 - pctSum;
+            const maxIndex = roundedPercentages.indexOf(
+              Math.max(...roundedPercentages),
+            );
+            if (maxIndex !== -1) {
+              roundedPercentages[maxIndex] =
+                Math.round((roundedPercentages[maxIndex] + diff) * 100) / 100;
+            }
+          }
+
+          const languagesWithAdjustedPercentage = filteredLanguages.map(
+            (lang: { name: string; bytes: number; lines: number }, index: number) => ({
+              name: lang.name,
+              bytes: lang.bytes,
+              lines: lang.lines,
+              percentage: roundedPercentages[index],
+            }),
+          );
+
+          await tx.language.createMany({
+            data: languagesWithAdjustedPercentage.map(
+              (language: { name: string; percentage: number; bytes: number; lines: number }) => ({
+                name: language.name,
+                percentage: language.percentage,
+                bytes: language.bytes,
+                lines: language.lines,
+                repositoryId,
+              }),
+            ),
+          });
+        }
+
+        // Final status update
+        await tx.repository.update({
+          where: { id: repositoryId },
+          data: {
+            status: "completed",
+            lastAnalyzedAt: new Date(),
+            defaultBranch,
+            size: size,
+          },
+        });
       });
+
+      // Cache invalidation (outside transaction — best-effort, non-critical)
+      try {
+        const headCommit = await prisma.commit.findFirst({
+          where: { repositoryId, branch: defaultBranch },
+          orderBy: { committedAt: "desc" },
+          select: { hash: true },
+        });
+
+        if (headCommit?.hash) {
+          await invalidateGeminiAnalysisCacheForRepository(repositoryId, headCommit.hash);
+        }
+      } catch (error) {
+        console.warn("Gemini cache invalidation failed:", error);
+      }
 
       await report({ progressPercent: 100, progressMessage: "Completed" });
 
-      console.log(`Repository ${repositoryId} analysis completed`);
     } catch (error: any) {
       console.error(`Error analyzing repository ${repositoryId}:`, error);
       await prisma.repository.update({
         where: { id: repositoryId },
         data: { status: "failed" },
       });
-      await report({ progressMessage: "Failed" });
+      await report({ progressMessage: "Analysis failed. Please try again." });
       throw error;
     } finally {
+      clearTimeout(timeoutId);
       // Cleanup cloned repository
       if (gitService) {
         await gitService.cleanup();
+      } else {
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null);
       }
     }
   }
@@ -538,12 +592,11 @@ export class RepositoryService {
     return repository;
   }
 
-  /**
-   * List all repositories for a user
-   */
-  async listRepositories(userId: number) {
+  async listRepositories(userId: number, limit: number = 10, cursor?: number) {
     const repositories = await prisma.repository.findMany({
       where: { userId },
+      take: limit + 1, // Fetch one extra to determine if hasMore
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
         _count: {
           select: {
@@ -558,29 +611,48 @@ export class RepositoryService {
           take: 3,
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" } // Deterministic tie-breaker
+      ],
     });
 
-    return repositories;
+    let nextCursor: number | undefined = undefined;
+    if (repositories.length > limit) {
+      const nextItem = repositories.pop();
+      nextCursor = nextItem?.id;
+    }
+
+    return {
+      data: repositories,
+      nextCursor,
+      hasMore: nextCursor !== undefined,
+    };
   }
 
   /**
    * Delete a repository and all its data
    */
   async deleteRepository(id: number, userId: number) {
-    const repository = await prisma.repository.findFirst({
+    const result = await prisma.repository.deleteMany({
       where: { id, userId },
     });
 
-    if (!repository) {
+    if (result.count === 0) {
       throw new Error("Repository not found");
     }
 
-    await prisma.repository.delete({
-      where: { id },
-    });
-
     return { success: true };
+  }
+  //Explicitly set the status of a repository
+  async setRepositoryStatus(
+    repositoryId: number,
+    status: "pending" | "analyzing" | "completed" | "failed",
+  ): Promise<void> {
+    await prisma.repository.update({
+      where: { id: repositoryId },
+      data: { status },
+    });
   }
 
   /**
@@ -628,6 +700,67 @@ export class RepositoryService {
       status: repository.status,
       lastAnalyzedAt: repository.lastAnalyzedAt,
     };
+  }
+
+  /**
+   * Get aggregate file-level statistics across the full repository history.
+   */
+  async getFileStats(
+    repositoryId: number,
+    userId: number,
+    paths: string[],
+  ) {
+    const repository = await prisma.repository.findFirst({
+      where: { id: repositoryId, userId },
+      select: { id: true },
+    });
+
+    if (!repository) {
+      throw new Error("Repository not found");
+    }
+
+    const uniquePaths = Array.from(
+      new Set(paths.map((path) => path.trim()).filter(Boolean)),
+    );
+
+    if (uniquePaths.length === 0) {
+      return [];
+    }
+
+    const stats = await prisma.fileChange.groupBy({
+      by: ["path"],
+      where: {
+        path: { in: uniquePaths },
+        commit: { repositoryId },
+      },
+      _count: { id: true },
+      _sum: {
+        additions: true,
+        deletions: true,
+      },
+    });
+
+    const statsByPath = new Map(
+      stats.map((stat) => [
+        stat.path,
+        {
+          path: stat.path,
+          commitCount: stat._count.id,
+          additions: stat._sum.additions ?? 0,
+          deletions: stat._sum.deletions ?? 0,
+        },
+      ]),
+    );
+
+    return uniquePaths.map(
+      (path) =>
+        statsByPath.get(path) ?? {
+          path,
+          commitCount: 0,
+          additions: 0,
+          deletions: 0,
+        },
+    );
   }
 }
 

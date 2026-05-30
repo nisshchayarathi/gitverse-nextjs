@@ -9,6 +9,13 @@ const os_1 = __importDefault(require("os"));
 const prisma_1 = __importDefault(require("../lib/prisma"));
 const analysisJobService_1 = require("../lib/services/analysisJobService");
 const repositoryService_1 = require("../lib/services/repositoryService");
+// Catch any rejections that slip through the promise-gap fixes above.
+// Without this, Node 15+ crashes the entire worker on an unhandled rejection.
+process.on("unhandledRejection", (reason) => {
+    console.error("FATAL unhandled rejection — worker will exit:", reason);
+    // Log and exit so the orchestrator can retry the job.
+    process.exit(1);
+});
 const POLL_INTERVAL_MS = 2000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const LOCK_MS = 5 * 60_000;
@@ -139,7 +146,8 @@ async function startAnalysisWorkerLoop(opts) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isMain = typeof require !== "undefined" && require.main === module;
 if (isMain) {
-    startAnalysisWorkerLoop().catch((e) => {
+    const once = !!process.env.WORKER_ONCE;
+    startAnalysisWorkerLoop({ once }).catch((e) => {
         console.error("worker fatal:", e);
         process.exit(1);
     });

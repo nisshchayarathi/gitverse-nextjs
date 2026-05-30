@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
+import { apiError } from "@/lib/api-error";
+import { isValidGitScope } from "@/lib/utils/validators";
 
 export async function POST(
   request: NextRequest,
@@ -12,25 +14,25 @@ export async function POST(
     const id = parseInt(params.id);
 
     if (isNaN(id)) {
-      return NextResponse.json(
-        { error: "Invalid repository ID" },
-        { status: 400 }
-      );
+      return apiError(400, "Invalid repository ID");
     }
 
-    // Verify ownership
     const repository = await repositoryService.getRepository(id, user.userId);
 
     if (!repository) {
-      return NextResponse.json(
-        { error: "Repository not found" },
-        { status: 404 }
-      );
+      return apiError(404, "Repository not found");
+    }
+
+    const { scope } = await request.json();
+
+    if (scope != null && (typeof scope !== "string" || !isValidGitScope(scope))) {
+      return apiError(400, "Invalid scope. Only alphanumeric characters, underscore, dot, slash, and hyphen are allowed.");
     }
 
     const job = await analysisJobService.createRepositoryAnalysisJob({
       repositoryId: id,
       userId: user.userId,
+      scope,
     });
 
     return NextResponse.json(
@@ -38,16 +40,10 @@ export async function POST(
       { status: 202 }
     );
   } catch (error: any) {
-    console.error("Analyze repository error:", error);
+    console.error("Analyze repository error:", sanitizeError(error));
     if (isHttpError(error)) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status }
-      );
+      return apiError(error.status, error.message);
     }
-    return NextResponse.json(
-      { error: "Failed to start analysis" },
-      { status: 500 }
-    );
+    return apiError(500, "Failed to start analysis");
   }
 }

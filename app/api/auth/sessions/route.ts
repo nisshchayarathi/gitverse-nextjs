@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/middleware";
+import { getAuthUser , sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
 
@@ -44,9 +44,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       items: toJsonSafe(sessions),
       nextCursor,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+      },
     });
   } catch (error: any) {
-    console.error("Fetch sessions error:", error);
+    console.error("Fetch sessions error:", sanitizeError(error));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

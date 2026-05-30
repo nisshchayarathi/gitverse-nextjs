@@ -5,7 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.analysisJobService = exports.AnalysisJobService = void 0;
 const prisma_1 = __importDefault(require("../prisma"));
-const DEFAULT_LOCK_MS = 5 * 60 * 1000;
+const client_1 = require("@prisma/client");
+const DEFAULT_LOCK_MS = 10 * 60 * 1000;
 function computeBackoffMs(attempt) {
     // Exponential backoff with cap (10s, 20s, 40s, ... up to 5m)
     const base = 10_000;
@@ -14,17 +15,41 @@ function computeBackoffMs(attempt) {
 }
 class AnalysisJobService {
     async createRepositoryAnalysisJob(params) {
-        return prisma_1.default.analysisJob.create({
-            data: {
+        const existing = await prisma_1.default.analysisJob.findFirst({
+            where: {
                 repositoryId: params.repositoryId,
-                userId: params.userId,
-                type: "repository_analysis",
-                status: "QUEUED",
-                progressPercent: 0,
-                progressMessage: "Queued",
-                maxAttempts: params.maxAttempts ?? 3,
+                status: { in: ["QUEUED", "PROCESSING"] },
             },
         });
+        if (existing)
+            return existing;
+        try {
+            return await prisma_1.default.analysisJob.create({
+                data: {
+                    repositoryId: params.repositoryId,
+                    userId: params.userId,
+                    type: "repository_analysis",
+                    status: "QUEUED",
+                    progressPercent: 0,
+                    progressMessage: "Queued",
+                    maxAttempts: params.maxAttempts ?? 3,
+                },
+            });
+        }
+        catch (error) {
+            if (error instanceof client_1.Prisma.PrismaClientKnownRequestError &&
+                error.code === "P2002") {
+                const activeJob = await prisma_1.default.analysisJob.findFirst({
+                    where: {
+                        repositoryId: params.repositoryId,
+                        status: { in: ["QUEUED", "PROCESSING"] },
+                    },
+                });
+                if (activeJob)
+                    return activeJob;
+            }
+            throw error;
+        }
     }
     async getJob(params) {
         return prisma_1.default.analysisJob.findFirst({
@@ -68,6 +93,22 @@ class AnalysisJobService {
         });
     }
     async markFailed(params) {
+        // Update repository status to failed when retries exhausted
+        try {
+            const job = await prisma_1.default.analysisJob.findUnique({
+                where: { id: params.jobId },
+                select: { repositoryId: true },
+            });
+            if (job?.repositoryId && params.attempts >= params.maxAttempts) {
+                await prisma_1.default.repository.update({
+                    where: { id: job.repositoryId },
+                    data: { status: "failed" },
+                });
+            }
+        }
+        catch {
+            // Non-critical: repo status update must not crash job status update
+        }
         const shouldRetry = params.attempts < params.maxAttempts;
         if (shouldRetry) {
             const delay = computeBackoffMs(params.attempts);
@@ -110,12 +151,19 @@ class AnalysisJobService {
         // 2) re-fetch via Prisma Client (typed + camelCase fields)
         const rows = await prisma_1.default.$queryRaw `
       WITH candidate AS (
-        SELECT id
-        FROM analysis_jobs
-        WHERE next_run_at <= NOW()
-          AND status IN ('QUEUED', 'PROCESSING')
-          AND (lock_expires_at IS NULL OR lock_expires_at < NOW())
-        ORDER BY created_at ASC
+        SELECT a1.id
+        FROM analysis_jobs a1
+        WHERE a1.next_run_at <= NOW()
+          AND a1.status IN ('QUEUED', 'PROCESSING')
+          AND (a1.lock_expires_at IS NULL OR a1.lock_expires_at < NOW())
+          AND NOT EXISTS (
+            SELECT 1 FROM analysis_jobs a2
+            WHERE a2.repository_id = a1.repository_id
+              AND a2.status = 'PROCESSING'
+              AND a2.id != a1.id
+              AND (a2.lock_expires_at IS NULL OR a2.lock_expires_at > NOW())
+          )
+        ORDER BY a1.created_at ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )
@@ -138,6 +186,24 @@ class AnalysisJobService {
         if (!claimedId)
             return null;
         return prisma_1.default.analysisJob.findUnique({ where: { id: claimedId } });
+    }
+    async cleanupStaleJobs() {
+        const stale = await prisma_1.default.analysisJob.updateMany({
+            where: {
+                status: "PROCESSING",
+                lockExpiresAt: { lt: new Date() },
+                updatedAt: { lt: new Date(Date.now() - 60 * 60 * 1000) },
+            },
+            data: {
+                status: "FAILED",
+                error: "Job timed out - no heartbeat received",
+                finishedAt: new Date(),
+                lockedAt: null,
+                lockedBy: null,
+                lockExpiresAt: null,
+            },
+        });
+        return stale.count;
     }
     async heartbeat(params) {
         const lockMs = params.lockMs ?? DEFAULT_LOCK_MS;
