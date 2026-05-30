@@ -1,5 +1,5 @@
 import { GitHubService } from "@/lib/services/githubService";
-import { GeminiService } from "@/lib/services/geminiService";
+import { getGeminiService } from "@/lib/services/geminiService";
 
 export type ReviewSeverity = "critical" | "high" | "medium" | "low";
 export type ReviewCategory =
@@ -276,7 +276,7 @@ Diff (subset, may be truncated):\n${diff}
   let raw: string;
   let tokensConsumed: number = 0;
   try {
-    const gemini = new GeminiService();
+    const gemini = getGeminiService();
     const result = await gemini.chatRaw(prompt);
     raw = result.text;
     tokensConsumed = result.tokensConsumed;
