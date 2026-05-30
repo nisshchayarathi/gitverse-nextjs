@@ -90,10 +90,6 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
       commits: [],
     })) || [];
 
-  // Debug log
-  console.log("[BranchVisualization] Repository:", repository);
-  console.log("[BranchVisualization] Branches:", branches);
-
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();

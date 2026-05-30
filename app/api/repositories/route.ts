@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       userId: user.userId,
     });
 
-    console.log("Repository created:", repository.id);
+
 
     const rawScope = body.scope;
     if (rawScope != null && (typeof rawScope !== "string" || !isValidGitScope(rawScope))) {

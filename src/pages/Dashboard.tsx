@@ -32,6 +32,7 @@ import { toast } from "@/hooks/use-toast";
 import { useRecentRepos } from "@/hooks/useRecentRepos";
 import { isValidGithubUrl } from "@/lib/utils/validators";
 import { RecentReposList } from "@/components/RecentReposList";
+
 interface Repository {
   id: string;
   name: string;
@@ -290,23 +291,13 @@ export default function Dashboard() {
         url: repoUrl.trim(),
       });
 
-      // Check if this is an existing repository
-      const isExisting = repositories.some(
-        (r: any) => r.url === repoUrl.trim(),
-      );
-
       await fetchRepositories();
 
       router.push(`/repo/${response.data.repository.id}`);
 
-      if (isExisting) {
-        console.log("Navigating to existing repository");
-      }
-
       setRepoUrl("");
       setRepoScope("");
     } catch (error: any) {
-
       console.error("Error creating repository:", error);
       const errMsg =
         error.response?.data?.message ||
@@ -321,6 +312,7 @@ export default function Dashboard() {
       setAnalyzing(false);
     }
   };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -371,6 +363,7 @@ export default function Dashboard() {
       </DashboardLayout>
     );
   }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -422,7 +415,6 @@ export default function Dashboard() {
 
         {/* Recent Repositories */}
         <RecentReposList />
-
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
