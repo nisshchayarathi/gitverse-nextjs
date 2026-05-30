@@ -232,12 +232,23 @@ Provide only the commit messages, one per line.
         .filter((line) => line.trim())
         .slice(0, 3);
     } catch (error: any) {
-  console.error("Commit message suggestion error:", error);
+      console.error("Commit message suggestion error:", error);
 
-  throw new Error(
-    error?.message || "Failed to generate commit message suggestions"
-  );
-}
+      // 🔥 FIX: Added the missing rate-limit check right here
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
+      throw new Error(
+        error?.message || "Failed to generate commit message suggestions"
+      );
+    }
   }
 
   /**
