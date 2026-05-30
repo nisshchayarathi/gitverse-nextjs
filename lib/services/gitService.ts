@@ -418,11 +418,31 @@ export class GitService {
    */
   async getBranches(signal?: AbortSignal): Promise<BranchData[]> {
     try {
-      const { stdout: defaultBranch } = await this.spawnGit(
-        ["symbolic-ref", "refs/remotes/origin/HEAD"],
-        { timeout: DEFAULT_GIT_TIMEOUT_MS, signal },
-      );
-      const defaultBranchName = defaultBranch.trim().replace(/^refs\/remotes\/origin\//, "");
+      // Determine the default branch, falling back deterministically when
+      // origin/HEAD is not set (common on shallow / bare clones).
+      let defaultBranchName = "";
+      try {
+        const { stdout: defaultBranchRaw } = await this.spawnGit(
+          ["symbolic-ref", "refs/remotes/origin/HEAD"],
+          { timeout: DEFAULT_GIT_TIMEOUT_MS, signal },
+        );
+        defaultBranchName = defaultBranchRaw.trim().replace(/^refs\/remotes\/origin\//, "");
+      } catch {
+        // origin/HEAD is not set - try well-known defaults
+        for (const candidate of ["main", "master"]) {
+          try {
+            await this.spawnGit(
+              ["rev-parse", "--verify", `refs/remotes/origin/${candidate}`],
+              { timeout: DEFAULT_GIT_TIMEOUT_MS, signal },
+            );
+            defaultBranchName = candidate;
+            break;
+          } catch {
+            // candidate branch doesn't exist, try next
+          }
+        }
+        // If still empty, will fall back to the first discovered branch below
+      }
 
       // Get both local and remote branches
       const { stdout } = await this.spawnGit(
@@ -464,6 +484,11 @@ export class GitService {
           ),
         );
         countResults.push(...batchResults);
+      }
+
+      // Final fallback: if no default branch was detected, use the first discovered branch
+      if (!defaultBranchName && refEntries.length > 0) {
+        defaultBranchName = refEntries[0].name;
       }
 
       const branches: BranchData[] = refEntries.map((entry, i) => {

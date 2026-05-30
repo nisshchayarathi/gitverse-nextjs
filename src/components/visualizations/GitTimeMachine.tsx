@@ -430,11 +430,24 @@ export function GitTimeMachine({ repository }: GitTimeMachineProps) {
             l.source.id === d.id || l.target.id === d.id ? 2.5 : 1
           );
 
-        // Tooltip rendering
+        // Tooltip rendering – use textContent for user-derived strings
+        // to prevent XSS from repository file/dir names.
         if (tooltipRef.current) {
           const tooltip = d3.select(tooltipRef.current);
           const additionText = d3.format("+d")(d.additions || 0);
           const deletionText = d3.format("-d")(d.deletions || 0);
+
+          // Escape HTML entities in user-derived strings
+          const escapeHtml = (str: string) =>
+            str
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+
+          const safeName = escapeHtml(String(d.name ?? ""));
+          const safeId = escapeHtml(String(d.id ?? ""));
 
           let changeMetaHtml = "";
           if (d.status === "added") {
@@ -452,10 +465,10 @@ export function GitTimeMachine({ repository }: GitTimeMachineProps) {
             .style("top", `${event.clientY}px`).html(`
               <div class="space-y-1.5">
                 <div class="flex items-center">
-                  <div class="font-semibold text-xs text-white truncate max-w-[200px]">${d.name}</div>
+                  <div class="font-semibold text-xs text-white truncate max-w-[200px]">${safeName}</div>
                   ${changeMetaHtml}
                 </div>
-                <div class="text-[10px] text-gray-400 font-mono break-all max-w-[250px]">${d.id}</div>
+                <div class="text-[10px] text-gray-400 font-mono break-all max-w-[250px]">${safeId}</div>
                 <div class="text-[10px] text-gray-500 capitalize font-medium">${d.type === "dir" ? "Directory" : "File"}</div>
                 ${
                   d.status && (d.additions > 0 || d.deletions > 0)
@@ -530,7 +543,7 @@ export function GitTimeMachine({ repository }: GitTimeMachineProps) {
 
       // Keep cache synced with current positions
       simNodes.forEach((n: any) => {
-        if (n.x && n.y) {
+        if (n.x != null && n.y != null) {
           coordinateCacheRef.current.set(n.id, { x: n.x, y: n.y });
         }
       });
