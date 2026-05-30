@@ -499,6 +499,8 @@ model ReviewPolicy {
 
   @@index([repositoryId])
   @@map("review_policies")
+}
+
 model AiQuota {
   id               String    @id @default(uuid()) @db.Uuid
   installationId   BigInt    @unique @map("installation_id")
@@ -607,4 +609,3 @@ model AuditLog {
   @@index([repositoryId, createdAt(sort: Desc)])
   @@map("audit_logs")
 }
-
