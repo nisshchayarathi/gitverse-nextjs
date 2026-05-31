@@ -18,6 +18,8 @@ describe("createIpFingerprint", () => {
 
   it("returns unknown for missing client IPs", () => {
     expect(createIpFingerprint("unknown")).toBe("unknown");
+    expect(createIpFingerprint("Unknown")).toBe("unknown");
+    expect(createIpFingerprint(" UNKNOWN ")).toBe("unknown");
     expect(createIpFingerprint("")).toBe("unknown");
   });
 
@@ -30,7 +32,7 @@ describe("createIpFingerprint", () => {
 
     const expected = crypto
       .createHmac("sha256", "configured-secret")
-      .update("203.0.113.10")
+      .update("203.0.113.10") // already lowercase, normalization is a no-op
       .digest("hex")
       .substring(0, 16);
 

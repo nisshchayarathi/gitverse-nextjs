@@ -12,7 +12,8 @@ function getFingerprintSecret(): string | null {
 }
 
 export function createIpFingerprint(ip: string): string {
-  if (!ip || ip === "unknown") {
+  const normalized = ip?.trim().toLowerCase();
+  if (!normalized || normalized === "unknown") {
     return "unknown";
   }
 
@@ -23,7 +24,7 @@ export function createIpFingerprint(ip: string): string {
 
   return crypto
     .createHmac("sha256", secret)
-    .update(ip)
+    .update(normalized)
     .digest("hex")
     .substring(0, FINGERPRINT_LENGTH);
 }
