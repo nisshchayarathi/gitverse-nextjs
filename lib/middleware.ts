@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "./auth";
 import type { JWTPayload } from "./auth";
+import {
+  createAuthFailureResponse,
+  type BearerTokenError,
+} from "./auth-response";
 import prisma from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
 
@@ -8,25 +12,31 @@ export interface AuthenticatedRequest {
   user: JWTPayload;
 }
 
+export interface AuthResolution {
+  user: JWTPayload | null;
+  bearerTokenError: BearerTokenError | null;
+}
+
 /**
  * Resolves the authenticated user from either a JWT bearer token
  * or a NextAuth session cookie.
  * Rejects tokens issued before the user's latest password change.
  */
-export async function getAuthUser(
+export async function getAuthUserDetails(
   request: NextRequest
-): Promise<JWTPayload | null> {
+): Promise<AuthResolution> {
   const authHeader = request.headers.get("authorization");
   let userPayload: JWTPayload | null = null;
+  let bearerTokenError: BearerTokenError | null = null;
 
   // 1) Existing JWT auth (Authorization: Bearer ...)
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.substring(7);
     const payload = verifyToken(token);
 
-    if (payload) {
+    if ("payload" in payload) {
       const dbUser = await prisma.user.findUnique({
-        where: { id: payload.userId },
+        where: { id: payload.payload.userId },
         select: {
           id: true,
           passwordChangedAt: true,
@@ -34,12 +44,12 @@ export async function getAuthUser(
       });
 
       if (!dbUser) {
-        return null;
+        return { user: null, bearerTokenError: null };
       }
 
       const issuedAt =
-        typeof (payload as any).iat === "number"
-          ? (payload as any).iat
+        typeof (payload.payload as any).iat === "number"
+          ? (payload.payload as any).iat
           : null;
 
       if (
@@ -48,10 +58,12 @@ export async function getAuthUser(
           issuedAt * 1000 <=
             dbUser.passwordChangedAt.getTime())
       ) {
-        return null;
+        return { user: null, bearerTokenError: null };
       }
 
-      userPayload = payload;
+      userPayload = payload.payload;
+    } else {
+      bearerTokenError = payload.error;
     }
   }
 
@@ -67,7 +79,7 @@ export async function getAuthUser(
         const userId = Number(token.sub);
 
         if (!Number.isFinite(userId)) {
-          return null;
+          return { user: null, bearerTokenError };
         }
 
         const dbUser = await prisma.user.findUnique({
@@ -80,7 +92,7 @@ export async function getAuthUser(
         });
 
         if (!dbUser) {
-          return null;
+          return { user: null, bearerTokenError };
         }
 
         const issuedAt =
@@ -94,7 +106,7 @@ export async function getAuthUser(
             issuedAt * 1000 <=
               dbUser.passwordChangedAt.getTime())
         ) {
-          return null;
+          return { user: null, bearerTokenError };
         }
 
         // Validate tokenVersion for NextAuth session cookies.
@@ -105,7 +117,7 @@ export async function getAuthUser(
           jwtTokenVersion != null &&
           jwtTokenVersion !== dbUser.tokenVersion
         ) {
-          return null;
+          return { user: null, bearerTokenError };
         }
 
         userPayload = {
@@ -118,7 +130,9 @@ export async function getAuthUser(
     }
   }
 
-  if (!userPayload) return null;
+  if (!userPayload) {
+    return { user: null, bearerTokenError };
+  }
 
   // 3) Verify user existence and token version
   try {
@@ -132,11 +146,11 @@ export async function getAuthUser(
     });
 
     if (!dbUser) {
-      return null;
+      return { user: null, bearerTokenError };
     }
 
     if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
-      return null;
+      return { user: null, bearerTokenError };
     }
 
     const isJwtAuth = !!(
@@ -150,7 +164,7 @@ export async function getAuthUser(
     if (isJwtAuth) {
       // Reject legacy JWTs without tokenVersion
       if (userPayload.tokenVersion == null) {
-        return null;
+        return { user: null, bearerTokenError: null };
       }
 
       // Require exact token version match
@@ -158,7 +172,7 @@ export async function getAuthUser(
         userPayload.tokenVersion !==
         dbUser.tokenVersion
       ) {
-        return null;
+        return { user: null, bearerTokenError: null };
       }
     }
   } catch (error) {
@@ -166,10 +180,18 @@ export async function getAuthUser(
       "Database check failed in auth middleware:",
       error
     );
-    return null;
+    return { user: null, bearerTokenError };
   }
 
-  return userPayload;
+  return { user: userPayload, bearerTokenError: null };
+}
+
+export async function getAuthUser(
+  request: NextRequest
+): Promise<JWTPayload | null> {
+  const result = await getAuthUserDetails(request);
+
+  return result.user;
 }
 
 /**

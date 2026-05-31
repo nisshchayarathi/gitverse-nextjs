@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser , sanitizeError } from "@/lib/middleware";
+import { createAuthFailureResponse } from "@/lib/auth-response";
+import {
+  getAuthUserDetails,
+  sanitizeError,
+} from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
 
@@ -7,10 +11,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getAuthUser(request);
+    const { user, bearerTokenError } = await getAuthUserDetails(request);
 
     if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return createAuthFailureResponse(
+        "Not authenticated",
+        bearerTokenError
+      );
     }
 
     const { searchParams } = new URL(request.url);

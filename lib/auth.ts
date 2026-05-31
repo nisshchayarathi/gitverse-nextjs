@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken'
+import jwt, { TokenExpiredError } from 'jsonwebtoken'
 
 const JWT_SECRET: string = (() => {
   const secret = process.env.JWT_SECRET;
@@ -18,10 +18,18 @@ export function generateToken(payload: JWTPayload): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' })
 }
 
-export function verifyToken(token: string): JWTPayload | null {
+export type TokenVerificationResult =
+  | { payload: JWTPayload }
+  | { error: 'expired' | 'invalid' }
+
+export function verifyToken(token: string): TokenVerificationResult {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload
+    return { payload: jwt.verify(token, JWT_SECRET) as JWTPayload }
   } catch (error) {
-    return null
+    if (error instanceof TokenExpiredError) {
+      return { error: 'expired' }
+    }
+
+    return { error: 'invalid' }
   }
 }
