@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "./auth";
 import type { JWTPayload } from "./auth";
-import {
-  createAuthFailureResponse,
-  type BearerTokenError,
-} from "./auth-response";
+import { type BearerTokenError } from "./auth-response";
 import prisma from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
 
@@ -28,6 +25,14 @@ export async function getAuthUserDetails(
   const authHeader = request.headers.get("authorization");
   let userPayload: JWTPayload | null = null;
   let bearerTokenError: BearerTokenError | null = null;
+  let dbUser:
+    | {
+        id: number;
+        passwordChangedAt: Date | null;
+        tokenVersion: number | null;
+        lockedUntil: Date | null;
+      }
+    | null = null;
 
   // 1) Existing JWT auth (Authorization: Bearer ...)
   if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -35,11 +40,13 @@ export async function getAuthUserDetails(
     const payload = verifyToken(token);
 
     if ("payload" in payload) {
-      const dbUser = await prisma.user.findUnique({
+      dbUser = await prisma.user.findUnique({
         where: { id: payload.payload.userId },
         select: {
           id: true,
           passwordChangedAt: true,
+          tokenVersion: true,
+          lockedUntil: true,
         },
       });
 
@@ -86,12 +93,13 @@ export async function getAuthUserDetails(
         return { user: null, bearerTokenError };
       }
 
-      const dbUser = await prisma.user.findUnique({
+      dbUser = await prisma.user.findUnique({
         where: { id: userId },
         select: {
           id: true,
           passwordChangedAt: true,
           tokenVersion: true,
+          lockedUntil: true,
         },
       });
 
@@ -135,16 +143,6 @@ export async function getAuthUserDetails(
     return { user: null, bearerTokenError };
   }
 
-  // 3) Verify user existence and token version
-  const dbUser = await prisma.user.findUnique({
-    where: { id: userPayload.userId },
-    select: {
-      id: true,
-      tokenVersion: true,
-      lockedUntil: true,
-    },
-  });
-
   if (!dbUser) {
     return { user: null, bearerTokenError };
   }
@@ -158,9 +156,10 @@ export async function getAuthUserDetails(
     authHeader.startsWith("Bearer ")
   );
 
-  // JWT-authenticated users must provide a valid tokenVersion.
-  // This allows logout/password-change invalidation to immediately
-  // revoke previously issued tokens.
+  // JWT access tokens require tokenVersion so logout/password-change can
+  // revoke them immediately. Legacy NextAuth session cookies may not carry
+  // tokenVersion, so we only enforce the match when it is present to preserve
+  // backward compatibility.
   if (isJwtAuth) {
     // Reject legacy JWTs without tokenVersion
     if (userPayload.tokenVersion == null) {
