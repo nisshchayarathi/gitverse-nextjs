@@ -5,5 +5,12 @@
     "app/api/internal/run-analysis/route.ts": {
       "maxDuration": 300
     }
-  }
+  },
+
+  "crons": [
+    {
+      "path": "/api/cron/webhook-recovery",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }

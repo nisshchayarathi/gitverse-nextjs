@@ -380,13 +380,28 @@ export const authOptions: NextAuthOptions = {
         try {
           const fresh = await prisma.user.findUnique({
             where: { id },
-            select: { name: true, email: true, image: true },
+            select: { name: true, email: true, image: true, tokenVersion: true },
           });
 
           if (fresh) {
             session.user.name = fresh.name;
             session.user.email = fresh.email;
             session.user.image = fresh.image ?? undefined;
+
+            // Validate tokenVersion: if the JWT tokenVersion doesn't match
+            // the DB, the session has been invalidated (password change/logout).
+            const jwtTokenVersion = (token as any).tokenVersion as number | undefined;
+            if (
+              jwtTokenVersion != null &&
+              fresh.tokenVersion !== jwtTokenVersion
+            ) {
+              // Return minimal session to signal invalidation
+              return {
+                ...session,
+                user: { id: (session.user as any).id },
+                expires: new Date(0).toISOString(),
+              } as any;
+            }
           }
         } catch {
           // If DB is temporarily unavailable, fall back to the token/session values.
@@ -416,11 +431,37 @@ export const authOptions: NextAuthOptions = {
           (token as any).picture) ||
         ((user as any)?.image as string | undefined);
 
+      // Attach tokenVersion for session invalidation on password change/logout.
+      // On initial sign-in (user object present), fetch from DB.
+      // On subsequent requests, keep the existing tokenVersion from the cookie.
+      let tokenVersion: number | undefined =
+        typeof (token as any).tokenVersion === "number"
+          ? (token as any).tokenVersion
+          : undefined;
+
+      if (user) {
+        const userId = Number((user as any).id);
+        if (Number.isFinite(userId)) {
+          try {
+            const dbUser = await prisma.user.findUnique({
+              where: { id: userId },
+              select: { tokenVersion: true },
+            });
+            if (dbUser) {
+              tokenVersion = dbUser.tokenVersion;
+            }
+          } catch {
+            // If DB is unavailable, keep existing tokenVersion
+          }
+        }
+      }
+
       const safeToken: Record<string, unknown> = {
         sub,
         email: email && email.length <= 320 ? email : undefined,
         name: name && name.length <= 256 ? name : undefined,
         picture: picture && picture.length <= 2048 ? picture : undefined,
+        tokenVersion,
       };
 
       if (process.env.NEXTAUTH_DEBUG === "true") {

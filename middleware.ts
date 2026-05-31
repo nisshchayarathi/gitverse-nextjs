@@ -10,8 +10,8 @@ import { getToken } from "next-auth/jwt";
  * authentication via requireAuth() / getAuthUser() in lib/middleware.ts.
  *
  * Responsibilities:
- *   - Redirect unauthenticated visitors away from protected pages.
- *   - Redirect already-authenticated visitors away from /login and /signup.
+ * - Redirect unauthenticated visitors away from protected pages.
+ * - Redirect already-authenticated visitors away from /login and /signup.
  *
  * Note: Only the NextAuth session cookie is readable in the Edge runtime.
  * Custom JWT Bearer tokens (used exclusively in API calls) are handled
@@ -49,7 +49,13 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedRoute && !isAuthenticated) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    
+    // 🔥 FIX: Include query parameters so deep links aren't destroyed on redirect
+    const callbackPath = request.nextUrl.search
+      ? `${pathname}${request.nextUrl.search}`
+      : pathname;
+      
+    loginUrl.searchParams.set("callbackUrl", callbackPath);
     return NextResponse.redirect(loginUrl);
   }
 
@@ -67,11 +73,12 @@ export const config = {
   matcher: [
     /*
      * Run middleware on every path except:
-     *   _next/static  -- compiled static assets
-     *   _next/image   -- image optimisation
-     *   favicon.ico   -- browser tab icon
-     *   api/          -- API routes use per-handler requireAuth()
+     * _next/static  -- compiled static assets
+     * _next/image   -- image optimisation
+     * favicon.ico   -- browser tab icon
+     * api/          -- API routes use per-handler requireAuth()
+     * public files  -- explicitly ignore common static asset extensions to save Edge compute
      */
-    "/((?!_next/static|_next/image|favicon\.ico|api/).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:[Ss][Vv][Gg]|[Pp][Nn][Gg]|[Jj][Pp][Ee]?[Gg]|[Gg][Ii][Ff]|[Ww][Ee][Bb][Pp]|[Tt][Xx][Tt]|[Xx][Mm][Ll])$|api/).*)",
   ],
 };

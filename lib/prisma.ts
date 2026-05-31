@@ -75,7 +75,7 @@ function createPrismaClient() {
 
   // Connection Pool configuration
   const poolMaxRaw = process.env.PG_POOL_MAX;
-  const defaultPoolMax = process.env.NODE_ENV === "production" ? 2 : 1;
+  const defaultPoolMax = process.env.NODE_ENV === "production" ? 10 : 5;
   const poolMax = poolMaxRaw ? Number(poolMaxRaw) : defaultPoolMax;
   const normalizedPoolMax =
     Number.isFinite(poolMax) && poolMax > 0 ? poolMax : defaultPoolMax;

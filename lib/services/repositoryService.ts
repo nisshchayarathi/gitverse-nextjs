@@ -287,7 +287,7 @@ if (existingRepositoryName) {
         progressPercent: 65,
         progressMessage: "Scanning files",
       });
-      const files = await gitService.getFileTree(opts?.scope);
+      const files = await gitService.getFileTree(opts?.scope || repository.targetDirectory || undefined);
       checkAborted();
 
       await report({
@@ -667,29 +667,27 @@ if (existingRepositoryName) {
       throw new Error("Repository not found");
     }
 
-    const [
-      totalCommits,
-      totalContributors,
-      totalFiles,
-      totalBranches,
-      recentActivity,
-    ] = await Promise.all([
-      prisma.commit.count({ where: { repositoryId: id } }),
-      prisma.contributor.count({ where: { repositoryId: id } }),
-      prisma.file.count({ where: { repositoryId: id } }),
-      prisma.branch.count({ where: { repositoryId: id } }),
-      prisma.commit.findMany({
-        where: { repositoryId: id },
-        orderBy: { committedAt: "desc" },
-        take: 10,
-        select: {
-          shortHash: true,
-          message: true,
-          authorName: true,
-          committedAt: true,
-        },
-      }),
-    ]);
+    // Batch DB queries to avoid connection pool exhaustion under concurrent load.
+    // Counts are cheap and fast; run them together, then fetch the heavier query.
+    const [totalCommits, totalContributors, totalFiles, totalBranches] =
+      await Promise.all([
+        prisma.commit.count({ where: { repositoryId: id } }),
+        prisma.contributor.count({ where: { repositoryId: id } }),
+        prisma.file.count({ where: { repositoryId: id } }),
+        prisma.branch.count({ where: { repositoryId: id } }),
+      ]);
+
+    const recentActivity = await prisma.commit.findMany({
+      where: { repositoryId: id },
+      orderBy: { committedAt: "desc" },
+      take: 10,
+      select: {
+        shortHash: true,
+        message: true,
+        authorName: true,
+        committedAt: true,
+      },
+    });
 
     return {
       totalCommits,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { GeminiService } from "@/lib/services/geminiService";
 import { GitHubService } from "@/lib/services/githubService";
+import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
 import prisma from "@/lib/prisma";
 import axios from "axios";
 
@@ -45,11 +46,7 @@ export async function POST(request: NextRequest) {
     const { owner, repo } = ownerRepo;
 
     // Fetch user's GitHub token if it exists
-    const gitHubAccount = await prisma.gitHubAccount.findUnique({
-      where: { userId: user.userId },
-      select: { accessToken: true },
-    });
-    const token = gitHubAccount?.accessToken;
+    const token = await getDecryptedGitHubToken(user.userId);
 
     let fileContent = "";
     

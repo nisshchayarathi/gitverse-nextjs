@@ -6,18 +6,9 @@ import {
 } from "@/lib/utils/analysisRunner";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { repositoryService } from "@/lib/services/repositoryService";
+import { isRateLimited } from "@/lib/services/rateLimitService";
 
 export const runtime = "nodejs";
-
-const lastRunAtByIp = new Map<string, number>();
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const last = lastRunAtByIp.get(ip) ?? 0;
-  if (now - last < 5000) return true;
-  lastRunAtByIp.set(ip, now);
-  return false;
-}
 
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -36,7 +27,8 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
   }
 
   const ip = getClientIp(request);
-  if (isRateLimited(ip)) {
+  // Use DB-backed rate limiting (5 requests per 5 minutes per IP)
+  if (await isRateLimited(ip, "LOGIN", 5, 5 * 60 * 1000)) {
     return NextResponse.json(
       { error: "Too many requests. Please wait before retrying." },
       { status: 429 },

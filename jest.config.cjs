@@ -17,7 +17,7 @@ const customJestConfig = {
   moduleNameMapper: {
     '^@/lib/(.*)$': '<rootDir>/lib/$1',
     '^@/app/(.*)$': '<rootDir>/app/$1',
-    '^@/(.*)$': '<rootDir>/src/$1',
+    '^@/(?!lib/|app/)(.*)$': '<rootDir>/src/$1',
   },
   testPathIgnorePatterns: [
     '<rootDir>/.next/',

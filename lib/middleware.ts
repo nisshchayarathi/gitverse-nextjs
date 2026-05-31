@@ -75,6 +75,7 @@ export async function getAuthUser(
           select: {
             id: true,
             passwordChangedAt: true,
+            tokenVersion: true,
           },
         });
 
@@ -92,6 +93,17 @@ export async function getAuthUser(
           (issuedAt === null ||
             issuedAt * 1000 <=
               dbUser.passwordChangedAt.getTime())
+        ) {
+          return null;
+        }
+
+        // Validate tokenVersion for NextAuth session cookies.
+        // The JWT callback attaches tokenVersion at sign-in; if it no longer
+        // matches the DB value (after password change or logout), reject.
+        const jwtTokenVersion = (token as any).tokenVersion as number | undefined;
+        if (
+          jwtTokenVersion != null &&
+          jwtTokenVersion !== dbUser.tokenVersion
         ) {
           return null;
         }

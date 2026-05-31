@@ -5,12 +5,14 @@ import { repositoryService } from "@/lib/services/repositoryService";
 import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
 import { getClientIp } from "@/lib/services/rateLimitService";
 import { GitHubService } from "@/lib/services/githubService";
+import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
 import prisma from "@/lib/prisma";
 import axios from "axios";
 import {
   validateContentType,
   AI_REQUEST_LIMITS,
 } from "@/lib/utils/aiRequestValidation";
+import { orgRagIndex } from "@/lib/services/org-rag-index";
 
 // Allowed roles in the conversation history
 const ALLOWED_MESSAGE_ROLES = new Set(["user", "model", "assistant"]);
@@ -21,11 +23,7 @@ async function fetchGitHubFileContent(url: string, filePath: string, userId: num
   if (!ownerRepo) return "";
   const { owner, repo } = ownerRepo;
 
-  const gitHubAccount = await prisma.gitHubAccount.findUnique({
-    where: { userId },
-    select: { accessToken: true },
-  });
-  const token = gitHubAccount?.accessToken;
+  const token = await getDecryptedGitHubToken(userId);
 
   try {
     const headers: Record<string, string> = {
@@ -221,6 +219,20 @@ Do not include any Markdown formatting like \`\`\`json, explanation, or extra ch
             .map(f => `File: ${f.path}\nContent:\n\`\`\`\n${f.content}\n\`\`\`\n`)
             .join("\n");
         }
+        
+        // Add cross-repository context
+        try {
+          const repoUrl = (repository as any).url || "";
+          const parsedUrl = GitHubService.parseGitHubUrl(repoUrl);
+          const repoIdentifier = parsedUrl ? `${parsedUrl.owner}/${parsedUrl.repo}` : repository.name;
+          const crossRepoContext = await orgRagIndex.retrieveCrossRepositoryContext(repoIdentifier, question, 2);
+          if (crossRepoContext.length > 0) {
+            retrievedFilesContent += "\n\n--- CROSS-REPOSITORY CONTEXT ---\n" + crossRepoContext.join("\n\n");
+          }
+        } catch (crossRepoErr) {
+          console.warn("Failed to retrieve cross-repo context:", crossRepoErr);
+        }
+
       } catch (err) {
         console.error("RAG codebase retrieval error:", err);
       }

@@ -6,7 +6,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.analysisJobService = exports.AnalysisJobService = void 0;
 const prisma_1 = __importDefault(require("../prisma"));
 const client_1 = require("@prisma/client");
-const DEFAULT_LOCK_MS = 10 * 60 * 1000;
+const DEFAULT_LOCK_MS = 5 * 60 * 1000;
+function isRetryableError(error) {
+    const message = error?.message?.toLowerCase() || "";
+    return (message.includes("timeout") ||
+        message.includes("network") ||
+        message.includes("rate limit") ||
+        message.includes("fetch failed") ||
+        message.includes("temporarily unavailable"));
+}
 function computeBackoffMs(attempt) {
     // Exponential backoff with cap (10s, 20s, 40s, ... up to 5m)
     const base = 10_000;
@@ -15,41 +23,45 @@ function computeBackoffMs(attempt) {
 }
 class AnalysisJobService {
     async createRepositoryAnalysisJob(params) {
-        const existing = await prisma_1.default.analysisJob.findFirst({
-            where: {
-                repositoryId: params.repositoryId,
-                status: { in: ["QUEUED", "PROCESSING"] },
-            },
-        });
-        if (existing)
-            return existing;
-        try {
-            return await prisma_1.default.analysisJob.create({
-                data: {
+        return prisma_1.default.$transaction(async (tx) => {
+            await tx.$queryRaw `SELECT pg_advisory_xact_lock(${params.repositoryId})`;
+            const existing = await tx.analysisJob.findFirst({
+                where: {
                     repositoryId: params.repositoryId,
-                    userId: params.userId,
-                    type: "repository_analysis",
-                    status: "QUEUED",
-                    progressPercent: 0,
-                    progressMessage: "Queued",
-                    maxAttempts: params.maxAttempts ?? 3,
+                    status: { in: ["QUEUED", "PROCESSING"] },
                 },
             });
-        }
-        catch (error) {
-            if (error instanceof client_1.Prisma.PrismaClientKnownRequestError &&
-                error.code === "P2002") {
-                const activeJob = await prisma_1.default.analysisJob.findFirst({
-                    where: {
+            if (existing)
+                return existing;
+            try {
+                return await tx.analysisJob.create({
+                    data: {
                         repositoryId: params.repositoryId,
-                        status: { in: ["QUEUED", "PROCESSING"] },
+                        userId: params.userId,
+                        type: "repository_analysis",
+                        status: "QUEUED",
+                        progressPercent: 0,
+                        progressMessage: "Queued",
+                        progressDetails: params.scope ? { scope: params.scope } : undefined,
+                        maxAttempts: params.maxAttempts ?? 3,
                     },
                 });
-                if (activeJob)
-                    return activeJob;
             }
-            throw error;
-        }
+            catch (error) {
+                if (error instanceof client_1.Prisma.PrismaClientKnownRequestError &&
+                    error.code === "P2002") {
+                    const activeJob = await tx.analysisJob.findFirst({
+                        where: {
+                            repositoryId: params.repositoryId,
+                            status: { in: ["QUEUED", "PROCESSING"] },
+                        },
+                    });
+                    if (activeJob)
+                        return activeJob;
+                }
+                throw error;
+            }
+        });
     }
     async getJob(params) {
         return prisma_1.default.analysisJob.findFirst({
@@ -61,16 +73,21 @@ class AnalysisJobService {
     }
     async updateProgress(params) {
         const lockExtension = params.extendLockMs ?? DEFAULT_LOCK_MS;
+        const pct = params.update.progressPercent !== undefined
+            ? Math.max(0, Math.min(100, Math.round(params.update.progressPercent)))
+            : undefined;
+        const where = { id: params.jobId };
+        if (params.workerId) {
+            where.lockedBy = params.workerId;
+        }
         await prisma_1.default.analysisJob.update({
-            where: { id: params.jobId },
+            where,
             data: {
-                progressPercent: params.update.progressPercent,
+                progressPercent: pct,
                 progressMessage: params.update.progressMessage,
                 progressDetails: params.update.progressDetails,
-                // Heartbeat: extend lock while we’re actively working
                 ...(params.workerId
                     ? {
-                        lockedBy: params.workerId,
                         lockExpiresAt: new Date(Date.now() + lockExtension),
                     }
                     : {}),
@@ -78,12 +95,16 @@ class AnalysisJobService {
         });
     }
     async markDone(params) {
+        const where = { id: params.jobId };
+        if (params.workerId) {
+            where.lockedBy = params.workerId;
+        }
         await prisma_1.default.analysisJob.update({
-            where: { id: params.jobId },
+            where,
             data: {
                 status: "DONE",
                 progressPercent: 100,
-                progressMessage: "Done",
+                progressMessage: "Analysis complete! ✓",
                 finishedAt: new Date(),
                 error: null,
                 lockedAt: null,
@@ -93,27 +114,16 @@ class AnalysisJobService {
         });
     }
     async markFailed(params) {
-        // Update repository status to failed when retries exhausted
-        try {
-            const job = await prisma_1.default.analysisJob.findUnique({
-                where: { id: params.jobId },
-                select: { repositoryId: true },
-            });
-            if (job?.repositoryId && params.attempts >= params.maxAttempts) {
-                await prisma_1.default.repository.update({
-                    where: { id: job.repositoryId },
-                    data: { status: "failed" },
-                });
-            }
+        const where = { id: params.jobId };
+        if (params.workerId) {
+            where.lockedBy = params.workerId;
         }
-        catch {
-            // Non-critical: repo status update must not crash job status update
-        }
-        const shouldRetry = params.attempts < params.maxAttempts;
+        const shouldRetry = params.attempts < params.maxAttempts &&
+            isRetryableError(params.error);
         if (shouldRetry) {
             const delay = computeBackoffMs(params.attempts);
             await prisma_1.default.analysisJob.update({
-                where: { id: params.jobId },
+                where,
                 data: {
                     status: "QUEUED",
                     nextRunAt: new Date(Date.now() + delay),
@@ -127,11 +137,11 @@ class AnalysisJobService {
             return;
         }
         await prisma_1.default.analysisJob.update({
-            where: { id: params.jobId },
+            where,
             data: {
                 status: "FAILED",
                 finishedAt: new Date(),
-                progressMessage: "Failed",
+                progressMessage: "Analysis failed. Please try again.",
                 error: params.error,
                 lockedAt: null,
                 lockedBy: null,
@@ -176,7 +186,7 @@ class AnalysisJobService {
         attempts = j.attempts + 1,
         started_at = COALESCE(j.started_at, NOW()),
         updated_at = NOW(),
-        progress_message = COALESCE(j.progress_message, 'Processing'),
+        progress_message = COALESCE(j.progress_message, 'Analysis in progress...'),
         progress_percent = COALESCE(j.progress_percent, 0)
       FROM candidate
       WHERE j.id = candidate.id

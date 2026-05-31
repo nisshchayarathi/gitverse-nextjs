@@ -383,6 +383,63 @@ export class GitHubService {
   }
 
   /**
+   * Create a new GitHub Check Run
+   */
+  async createCheckRun(
+    owner: string,
+    repo: string,
+    name: string,
+    head_sha: string,
+    status: "queued" | "in_progress" | "completed" = "in_progress"
+  ): Promise<{ id: number; status: string }> {
+    try {
+      const response = await this.client.post(
+        `/repos/${owner}/${repo}/check-runs`,
+        {
+          name,
+          head_sha,
+          status,
+          started_at: new Date().toISOString(),
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw sanitizeGitHubError(error);
+    }
+  }
+
+  /**
+   * Update an existing GitHub Check Run
+   */
+  async updateCheckRun(
+    owner: string,
+    repo: string,
+    check_run_id: number,
+    status: "queued" | "in_progress" | "completed",
+    conclusion?: "success" | "failure" | "neutral" | "cancelled" | "timed_out" | "action_required" | "skipped",
+    output?: {
+      title: string;
+      summary: string;
+      text?: string;
+    }
+  ): Promise<any> {
+    try {
+      const payload: any = { status };
+      if (conclusion) payload.conclusion = conclusion;
+      if (output) payload.output = output;
+      if (status === "completed") payload.completed_at = new Date().toISOString();
+
+      const response = await this.client.patch(
+        `/repos/${owner}/${repo}/check-runs/${check_run_id}`,
+        payload
+      );
+      return response.data;
+    } catch (error) {
+      throw sanitizeGitHubError(error);
+    }
+  }
+
+  /**
    * Post a comment on a pull request (PR comments are issue comments in GitHub API)
    */
   async postPullRequestComment(
@@ -438,6 +495,50 @@ export class GitHubService {
   }
 
   /**
+   * Post a comment on an issue
+   */
+  async postIssueComment(
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    body: string,
+  ): Promise<{ id: number; html_url: string }> {
+    if (!body?.trim()) {
+      throw new Error("Comment body is required");
+    }
+
+    const response = await this.client.post(
+      `/repos/${owner}/${repo}/issues/${issueNumber}/comments`,
+      { body },
+    );
+    return response.data;
+  }
+
+  /**
+   * Get repository labels
+   */
+  async getRepoLabels(owner: string, repo: string): Promise<Array<{ name: string }>> {
+    const response = await this.client.get(`/repos/${owner}/${repo}/labels`);
+    return response.data;
+  }
+
+  /**
+   * Add labels to an issue
+   */
+  async addIssueLabels(
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    labels: string[],
+  ): Promise<void> {
+    if (!labels || labels.length === 0) return;
+    await this.client.post(
+      `/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
+      { labels },
+    );
+  }
+
+  /**
    * Get repository languages
    */
   async getLanguages(
@@ -464,6 +565,88 @@ export class GitHubService {
     const response = await this.client.get(
       `/repos/${owner}/${repo}/contributors`,
     );
+    return response.data;
+  }
+
+  /**
+   * Fetch file content from repository
+   */
+  async getFileContent(owner: string, repo: string, path: string, ref?: string): Promise<string | null> {
+    try {
+      const url = ref ? `/repos/${owner}/${repo}/contents/${path}?ref=${ref}` : `/repos/${owner}/${repo}/contents/${path}`;
+      const response = await this.client.get(url);
+      if (response.data && response.data.content) {
+        return Buffer.from(response.data.content, "base64").toString("utf-8");
+      }
+      return null;
+    } catch (error: any) {
+      if (error.response && error.response.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new branch
+   */
+  async createBranch(owner: string, repo: string, branch: string, sha: string): Promise<any> {
+    const response = await this.client.post(`/repos/${owner}/${repo}/git/refs`, {
+      ref: `refs/heads/${branch}`,
+      sha,
+    });
+    return response.data;
+  }
+
+  /**
+   * Create a new commit with a single file change
+   */
+  async createCommit(
+    owner: string, 
+    repo: string, 
+    path: string, 
+    message: string, 
+    content: string, 
+    branch: string,
+    sha: string
+  ): Promise<any> {
+    // 1. Get current file (to get its blob SHA)
+    let fileSha: string | undefined;
+    try {
+      const fileRes = await this.client.get(`/repos/${owner}/${repo}/contents/${path}?ref=${branch}`);
+      fileSha = fileRes.data.sha;
+    } catch (e: any) {
+      // If file doesn't exist yet, fileSha is undefined
+    }
+
+    // 2. Update file
+    const response = await this.client.put(`/repos/${owner}/${repo}/contents/${path}`, {
+      message,
+      content: Buffer.from(content).toString("base64"),
+      branch,
+      sha: fileSha
+    });
+    
+    return response.data;
+  }
+
+  /**
+   * Create a Pull Request
+   */
+  async createPullRequest(
+    owner: string, 
+    repo: string, 
+    title: string, 
+    body: string, 
+    head: string, 
+    base: string
+  ): Promise<any> {
+    const response = await this.client.post(`/repos/${owner}/${repo}/pulls`, {
+      title,
+      body,
+      head,
+      base,
+    });
     return response.data;
   }
 
@@ -512,6 +695,37 @@ export class GitHubService {
     }
 
     return null;
+  }
+
+  /**
+   * Create a review comment on a Pull Request (useful for Suggested Changes)
+   */
+  async createPullRequestReviewComment(
+    owner: string,
+    repo: string,
+    pullNumber: number,
+    commitId: string,
+    path: string,
+    body: string,
+    line: number,
+    startLine?: number
+  ): Promise<any> {
+    const payload: any = {
+      body,
+      commit_id: commitId,
+      path,
+      line,
+    };
+    if (startLine && startLine < line) {
+      payload.start_line = startLine;
+      payload.start_side = "RIGHT";
+    }
+
+    const response = await this.client.post(
+      `/repos/${owner}/${repo}/pulls/${pullNumber}/comments`,
+      payload
+    );
+    return response.data;
   }
 
   /**

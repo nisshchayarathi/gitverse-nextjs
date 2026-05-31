@@ -4,10 +4,14 @@ import prisma from "@/lib/prisma";
 import crypto from "crypto";
 import { QuotaService } from "@/lib/services/quotaService";
 import { getClientIp } from "@/lib/services/rateLimitService";
+import { webhookQueue } from "@/lib/services/webhook-queue";
+import { dbHealthService } from "@/lib/services/db-health";
+import { webhookRetryService } from "@/lib/services/webhook-retry";
+
 
 export const runtime = "nodejs";
 
-type PullRequestWebhookPayload = {
+type WebhookPayload = {
   action?: string;
   installation?: { id?: number };
   repository?: {
@@ -18,6 +22,12 @@ type PullRequestWebhookPayload = {
     number?: number;
     html_url?: string;
     draft?: boolean;
+  };
+  issue?: {
+    number?: number;
+    title?: string;
+    body?: string;
+    html_url?: string;
   };
   sender?: {
     type?: string;
@@ -32,6 +42,10 @@ function shouldHandlePullRequestAction(action: string | undefined): boolean {
     action === "synchronize" ||
     action === "ready_for_review"
   );
+}
+
+function shouldHandleIssueAction(action: string | undefined): boolean {
+  return action === "opened";
 }
 
 export async function POST(request: NextRequest) {
@@ -58,14 +72,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  if (event !== "pull_request") {
+  if (event !== "pull_request" && event !== "issues") {
     return NextResponse.json(
       { ok: true, ignored: true, event },
       { status: 200 },
     );
   }
 
-  let payload: PullRequestWebhookPayload;
+  let payload: WebhookPayload;
   try {
     payload = JSON.parse(rawBody);
   } catch {
@@ -73,19 +87,28 @@ export async function POST(request: NextRequest) {
   }
 
   const action = payload.action;
-  if (!shouldHandlePullRequestAction(action)) {
-    return NextResponse.json(
-      { ok: true, ignored: true, action },
-      { status: 200 },
-    );
-  }
-
-  // Ignore draft PRs until they become ready_for_review
-  if (payload.pull_request?.draft && action !== "ready_for_review") {
-    return NextResponse.json(
-      { ok: true, ignored: true, reason: "draft" },
-      { status: 200 },
-    );
+  
+  if (event === "pull_request") {
+    if (!shouldHandlePullRequestAction(action)) {
+      return NextResponse.json(
+        { ok: true, ignored: true, action },
+        { status: 200 },
+      );
+    }
+    // Ignore draft PRs until they become ready_for_review
+    if (payload.pull_request?.draft && action !== "ready_for_review") {
+      return NextResponse.json(
+        { ok: true, ignored: true, reason: "draft" },
+        { status: 200 },
+      );
+    }
+  } else if (event === "issues") {
+    if (!shouldHandleIssueAction(action)) {
+      return NextResponse.json(
+        { ok: true, ignored: true, action },
+        { status: 200 },
+      );
+    }
   }
 
   // Avoid replying to bots (including ourselves)
@@ -98,7 +121,7 @@ export async function POST(request: NextRequest) {
 
   const owner = payload.repository?.owner?.login;
   const repo = payload.repository?.name;
-  const number = payload.pull_request?.number;
+  const number = payload.pull_request?.number || payload.issue?.number;
   const installationId = payload.installation?.id;
 
   if (!owner || !repo || !number || !installationId) {
@@ -128,24 +151,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Trigger internal worker asynchronously
-    const baseUrl = process.env.NEXTAUTH_URL || `http://${request.headers.get("host") || "localhost:3000"}`;
-    const workerUrl = `${baseUrl}/api/internal/worker/webhook`;
-    
-    // Generate auth token for internal worker
-    const internalSecret = process.env.GITHUB_WEBHOOK_SECRET || process.env.JWT_SECRET || "";
-    const internalToken = `Bearer ${crypto.createHash('sha256').update(internalSecret).digest('hex')}`;
+    // Automatically retry any previously failed jobs occasionally
+    // (This is lightweight and ensures dead-letter recovery without a cron)
+    webhookRetryService.requeueFailedJobs().catch(() => {});
 
-    // Non-blocking fetch
-    fetch(workerUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": internalToken,
-      },
-      body: JSON.stringify({ eventId: webhookEvent.id }),
-    }).catch(err => {
-      console.error("Failed to trigger webhook worker:", err);
+    // Trigger internal workers asynchronously via queue manager
+    const baseUrl = process.env.NEXTAUTH_URL || `http://${request.headers.get("host") || "localhost:3000"}`;
+    webhookQueue.triggerWorkers(baseUrl).catch(err => {
+      console.error("[Webhook] Failed to trigger queue workers:", err);
     });
 
     return NextResponse.json(
