@@ -1,12 +1,8 @@
 "use client";
 
 export const dynamic = "force-dynamic";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { isValidGithubUrl } from "@/lib/utils/validators";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { RecentReposList } from "@/components/RecentReposList";
-import { useRecentRepos } from "@/hooks/useRecentRepos";
 import {
   GitBranch,
   TrendingUp,
@@ -27,12 +23,15 @@ import {
   Button,
   Input,
   EmptyState,
+  Skeleton,
 } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
-
+import { useRecentRepos } from "@/hooks/useRecentRepos";
+import { isValidGithubUrl } from "@/lib/utils/validators";
+import { RecentReposList } from "@/components/RecentReposList";
 interface Repository {
   id: string;
   name: string;
@@ -155,29 +154,24 @@ export default function Dashboard() {
       const response = await axios.get(buildApiUrl("/api/repositories?limit=1000"), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // API returns { data: [...], nextCursor, hasMore }
-      const repos = response.data.data || [];
+      // API returns { repositories: [...] }
+      const repos =
+        response.data.data?.repositories || response.data.repositories || [];
       setRepositories(Array.isArray(repos) ? repos : []);
-      setLoading(false);
     } catch (error: any) {
       console.error("Error fetching repositories:", error);
-      
-      const isColdStart = error.response?.data?.error === "DATABASE_COLD_START";
-      if (isColdStart) {
-        toast({
-          title: "Waking up database...",
-          description: "This may take a few seconds.",
-        });
-        setTimeout(fetchRepositories, 3000);
-        return;
-      }
+
+      setRepositories([]);
+
+      const errMsg =
+        error?.response?.data?.message || "Failed to load repositories";
 
       toast({
         title: "Error",
-        description: "Failed to fetch repositories.",
+        description: errMsg,
         variant: "destructive",
       });
-      setRepositories([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -187,9 +181,9 @@ export default function Dashboard() {
     : 0;
   const totalContributors = Array.isArray(repositories)
     ? repositories.reduce(
-      (sum, r: any) => sum + (r._count?.contributors || 0),
-      0
-    )
+        (sum, r: any) => sum + (r._count?.contributors || 0),
+        0,
+      )
     : 0;
   const totalFiles = Array.isArray(repositories)
     ? repositories.reduce((sum, r: any) => sum + (r._count?.files || 0), 0)
@@ -222,6 +216,38 @@ export default function Dashboard() {
     },
   ];
 
+  const recentRepositories = Array.isArray(repositories)
+    ? repositories.slice(0, 3)
+    : [];
+
+  const formatTimeAgo = (date: string) => {
+    const now = new Date();
+    const then = new Date(date);
+    const diffInMinutes = Math.floor(
+      (now.getTime() - then.getTime()) / (1000 * 60),
+    );
+
+    if (diffInMinutes < 1) return "Just now";
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+    return then.toLocaleDateString();
+  };
+
+  const recentActivity = Array.isArray(repositories)
+    ? repositories
+        .filter((r: any) => r.status === "completed")
+        .slice(0, 5)
+        .map((repo: any) => ({
+          action: "Analyzed",
+          repo: repo.name,
+          time: formatTimeAgo(repo.lastAnalyzedAt || repo.createdAt),
+          status: repo.status,
+        }))
+    : [];
+
   const handleAnalyze = async () => {
     if (!repoUrl.trim()) return;
 
@@ -242,6 +268,7 @@ export default function Dashboard() {
       const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
       const cleanParts = cleanUrl.split("/");
       const ownerName = cleanParts[cleanParts.length - 2] || "unknown";
+      const repoName = cleanParts[cleanParts.length - 1] || "unknown";
 
       const response = await axios.post(
         buildApiUrl("/api/repositories"),
@@ -253,7 +280,7 @@ export default function Dashboard() {
         },
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
       // Add to recent repositories locally
@@ -265,7 +292,7 @@ export default function Dashboard() {
 
       // Check if this is an existing repository
       const isExisting = repositories.some(
-        (r: any) => r.url === repoUrl.trim()
+        (r: any) => r.url === repoUrl.trim(),
       );
 
       await fetchRepositories();
@@ -281,14 +308,10 @@ export default function Dashboard() {
     } catch (error: any) {
 
       console.error("Error creating repository:", error);
-      
-      let errMsg = "Failed to analyze repository";
-      if (error.response?.status === 404 || error.response?.data?.error === "NOT_FOUND") {
-        errMsg = "Repository not found. Please ensure the URL is correct and the repository is public.";
-      } else {
-        errMsg = error.response?.data?.message || error.response?.data?.error || error.message || errMsg;
-      }
-
+      const errMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to analyze repository";
       toast({
         title: "Analysis Failed",
         description: errMsg,
@@ -298,91 +321,58 @@ export default function Dashboard() {
       setAnalyzing(false);
     }
   };
-const formatTimeAgo = (date: string | Date | undefined) => {
-  if (!date) return 'Never';
-  const d = new Date(date);
-  const now = new Date();
-  const seconds = Math.floor((now.getTime() - d.getTime()) / 1000);
-  
-  if (seconds < 60) return 'Just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return d.toLocaleDateString();
-};
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          {/* Welcome skeleton */}
+          <div className="space-y-2">
+            <Skeleton className="w-[250px] h-[28px]" />
+            <Skeleton className="w-[400px] h-[18px]" />
+          </div>
 
-const recentActivity = repositories
-  .filter((r: any) => r.lastAnalyzedAt || r.createdAt)
-  .sort((a: any, b: any) => {
-    const aTime = new Date(a.lastAnalyzedAt || a.createdAt).getTime();
-    const bTime = new Date(b.lastAnalyzedAt || b.createdAt).getTime();
-    return bTime - aTime;
-  })
-  .slice(0, 5)
-  .map((r: any) => ({
-    action: 'Analyzed',
-    repo: r.name,
-    time: formatTimeAgo(r.lastAnalyzedAt || r.createdAt),
-  }));
+          {/* Input skeleton */}
+          <div className="p-6 border rounded-lg space-y-3">
+            <Skeleton className="w-full h-10" />
+            <Skeleton className="w-[180px] h-10" />
+          </div>
 
-if (loading) {
-  return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        
-        {/* Welcome skeleton */}
-        <div className="space-y-2">
-          <Skeleton className="h-7 w-64" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-
-        {/* Input skeleton */}
-        <div className="p-6 border rounded-lg space-y-3">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-44" />
-        </div>
-
-        {/* Stats skeleton */}
-        <div className="grid grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="p-4 border rounded-lg space-y-3">
-              <Skeleton className="h-4 w-3/5" />
-              <Skeleton className="h-7 w-2/5" />
-              <Skeleton className="h-3 w-4/5" />
-            </div>
-          ))}
-        </div>
-
-        {/* Cards skeleton */}
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 space-y-3">
-            <Skeleton className="h-5 w-2/5" />
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="p-4 border rounded-lg space-y-2">
-                <Skeleton className="h-4 w-3/10" />
-                <Skeleton className="h-3 w-7/10" />
+          {/* Stats skeleton */}
+          <div className="grid grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-4 border rounded-lg space-y-3">
+                <Skeleton className="w-[60%] h-4" />
+                <Skeleton className="w-[40%] h-7" />
+                <Skeleton className="w-[80%] h-3" />
               </div>
             ))}
           </div>
 
-          <div className="space-y-3">
-            <Skeleton className="h-5 w-1/2" />
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
+          {/* Cards skeleton */}
+          <div className="grid grid-cols-3 gap-6">
+            <div className="col-span-2 space-y-3">
+              <Skeleton className="w-[40%] h-5" />
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="p-4 border rounded-lg space-y-2">
+                  <Skeleton className="w-[30%] h-[18px]" />
+                  <Skeleton className="w-[70%] h-3.5" />
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              <Skeleton className="w-[50%] h-5" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="w-full h-10" />
+              ))}
+            </div>
           </div>
         </div>
-
-      </div>
-    </DashboardLayout>
-  );
-}
+      </DashboardLayout>
+    );
+  }
   return (
     <DashboardLayout>
-    <div className="min-h-screen bg-background"></div>
       <div className="space-y-6">
         {/* Welcome Section */}
         <div>
@@ -427,7 +417,6 @@ if (loading) {
                 onKeyPress={(e) => e.key === "Enter" && handleAnalyze()}
               />
             </div>
-            {/* Shortcut hint would go here */}
           </CardContent>
         </Card>
 
@@ -457,12 +446,12 @@ if (loading) {
                     ) : (
                       <>
                         <p className="text-2xl sm:text-3xl font-heading font-bold break-words">
-                        {stat.value}
+                          {stat.value}
                         </p>
 
                         <p className="text-xs text-accent mt-1 flex items-center gap-1 flex-wrap">
-                        <TrendingUp className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate">{stat.change}</span>
+                          <TrendingUp className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{stat.change}</span>
                         </p>
                       </>
                     )}
@@ -525,11 +514,19 @@ if (loading) {
                 </div>
               ) : repositories.length === 0 ? (
                 <EmptyState
-                 icon={GitBranch}
-                 title="No repositories yet"
-                 description="Start by importing a GitHub repository to explore commits, contributors, code structure, and repository insights."
-                 actionLabel="Analyze Repository"
-                 onAction={() => router.push("/analyze")}
+                  icon={GitBranch}
+                  title="No Repositories Yet"
+                  description="You haven't analyzed any repositories yet. Enter a GitHub URL above to get started!"
+                  actionLabel="Analyze Repository"
+                  onAction={() => {
+                    const input = document.querySelector(
+                      'input[type="url"]',
+                    ) as HTMLInputElement;
+                    if (input) {
+                      input.focus();
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                  }}
                 />
               ) : (
                 <div className="space-y-3">
@@ -577,7 +574,7 @@ if (loading) {
                           <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
                           {formatTimeAgo(
                             (repo as any).lastAnalyzedAt ||
-                            (repo as any).createdAt
+                              (repo as any).createdAt,
                           )}
                         </div>
                       </div>
@@ -630,8 +627,8 @@ if (loading) {
                       </p>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>

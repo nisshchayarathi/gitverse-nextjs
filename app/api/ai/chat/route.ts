@@ -2,52 +2,111 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { getGeminiService } from "@/lib/services/geminiService";
 import { repositoryService } from "@/lib/services/repositoryService";
-import { createRateLimiter } from "@/lib/utils/ipRateLimit";
+import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
+import { getClientIp } from "@/lib/services/rateLimitService";
+import { GitHubService } from "@/lib/services/githubService";
+import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
+import prisma from "@/lib/prisma";
+import axios from "axios";
 import {
   validateContentType,
   AI_REQUEST_LIMITS,
 } from "@/lib/utils/aiRequestValidation";
+import { orgRagIndex } from "@/lib/services/org-rag-index";
 
-// Rate limiter: 20 requests per user per minute across all AI chat calls.
-// Prevents a single authenticated user from burning Gemini quota unchecked.
-const aiChatLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 20 });
+// Allowed roles in the conversation history
+const ALLOWED_MESSAGE_ROLES = new Set(["user", "model", "assistant"]);
 
-// Allowed roles in the conversation history. Rejecting "system" entries from
-// client payloads prevents prompt injection via injected context.
-const ALLOWED_MESSAGE_ROLES = new Set(["user", "model"]);
+// Helper to fetch file content from GitHub
+async function fetchGitHubFileContent(url: string, filePath: string, userId: number): Promise<string> {
+  const ownerRepo = GitHubService.parseGitHubUrl(url);
+  if (!ownerRepo) return "";
+  const { owner, repo } = ownerRepo;
+
+  const token = await getDecryptedGitHubToken(userId);
+
+  try {
+    const headers: Record<string, string> = {
+      Accept: "application/vnd.github.v3+json",
+      "User-Agent": "GitVerse-App",
+    };
+    if (token) {
+      headers["Authorization"] = `token ${token}`;
+    }
+    
+    const response = await axios.get(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`,
+      { headers }
+    );
+    
+    if (response.data && response.data.content) {
+      const encoding = response.data.encoding;
+      if (encoding === "base64") {
+        return Buffer.from(response.data.content, "base64").toString("utf-8");
+      }
+      return response.data.content;
+    }
+  } catch (error) {
+    console.warn(`Failed to fetch file ${filePath} via API, trying raw fallback:`, error);
+  }
+
+  // Raw fallback
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `token ${token}`;
+  }
+
+  for (const branch of ["main", "master"]) {
+    try {
+      const response = await axios.get(
+        `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`,
+        { headers, responseType: "text" }
+      );
+      if (response.data) return response.data;
+    } catch {
+      // Continue to next branch
+    }
+  }
+
+  return "";
+}
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    // Per-user rate limiting
-    if (!aiChatLimiter.check(user.userId)) {
+    const contentTypeError = validateContentType(request);
+    if (contentTypeError) return contentTypeError;
+
+    const body = await request.json();
+    const repositoryId = Number(body.repositoryId);
+    const question = body.question || body.prompt;
+    const conversationHistory = body.conversationHistory || body.messages;
+
+    if (!repositoryId || !question) {
+      return NextResponse.json(
+        { error: "repositoryId and question/prompt are required" },
+        { status: 400 }
+      );
+    }
+
+    // Per-user rate limiting (DB-backed, shared across serverless containers)
+    const allowed = await checkAiRateLimit(
+      String(user.userId), "userId", "chat", 30, 60_000
+    );
+    if (!allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please wait before sending another message." },
         { status: 429 }
       );
     }
 
-    const contentTypeError = validateContentType(request);
-    if (contentTypeError) return contentTypeError;
-
-    const body = await request.json();
-    const { repositoryId, question, conversationHistory } = body;
-
-    // Validate conversationHistory if provided.
-    // Only "user" and "model" roles are accepted to prevent system-role injection.
+    // Validate and standardize conversation history
+    let standardizedHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
     if (conversationHistory !== undefined) {
       if (!Array.isArray(conversationHistory)) {
         return NextResponse.json(
           { error: "conversationHistory must be an array" },
-          { status: 400 }
-        );
-      }
-      if (conversationHistory.length > AI_REQUEST_LIMITS.MAX_CONVERSATION_HISTORY_COUNT) {
-        return NextResponse.json(
-          {
-            error: `Too many conversation history entries (max ${AI_REQUEST_LIMITS.MAX_CONVERSATION_HISTORY_COUNT})`,
-          },
           { status: 400 }
         );
       }
@@ -63,39 +122,16 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(
             {
               error:
-                "Each conversationHistory entry must have role ('user' or 'model') and a non-empty content string",
+                "Each conversationHistory entry must have a valid role ('user', 'model', or 'assistant') and a non-empty content string",
             },
             { status: 400 }
           );
         }
-        if (msg.content.length > AI_REQUEST_LIMITS.MAX_MESSAGE_CONTENT_CHARS) {
-          return NextResponse.json(
-            {
-              error: `Message content too long (max ${AI_REQUEST_LIMITS.MAX_MESSAGE_CONTENT_CHARS} characters)`,
-            },
-            { status: 400 }
-          );
-        }
+        standardizedHistory.push({
+          role: msg.role === "assistant" || msg.role === "model" ? "assistant" : "user",
+          content: msg.content,
+        });
       }
-    }
-
-    // All AI chat requests must supply a repositoryId so the ownership check
-    // below runs for every call. The previous free-form prompt path that
-    // bypassed this check has been removed.
-    if (!repositoryId || !question) {
-      return NextResponse.json(
-        { error: "repositoryId and question are required" },
-        { status: 400 }
-      );
-    }
-
-    if (typeof question === "string" && question.length > AI_REQUEST_LIMITS.MAX_QUESTION_CHARS) {
-      return NextResponse.json(
-        {
-          error: `Question too long (max ${AI_REQUEST_LIMITS.MAX_QUESTION_CHARS} characters)`,
-        },
-        { status: 400 }
-      );
     }
 
     // Ownership check: getRepository returns null if the repository does not
@@ -112,24 +148,122 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const context = {
-      files: repository.files.slice(0, 20).map((f: { path: string }) => f.path),
-      recentCommits: repository.commits
-        .slice(0, 5)
-        .map(
-          (c: { shortHash: string; message: string }) =>
-            `${c.shortHash}: ${c.message}`
-        ),
-      contributors: repository.contributors.map(
-        (c: { name: string }) => c.name
-      ),
-    };
+    // RAG Pipeline: Identify and retrieve relevant files using user's question
+    const files = (repository as any).files || [];
+    let retrievedFilesContent = "";
 
-    const response = await getGeminiService().chatAboutRepository({
-      repositoryId,
-      question,
-      conversationHistory,
-      context,
+    if (files.length > 0) {
+      const filePaths = files.map((f: any) => f.path);
+      const questionLower = question.toLowerCase();
+
+      // Heuristic filtering: find files that mention keywords from the question to narrow candidates
+      const keywords = questionLower
+        .replace(/[^\w\s]/g, "")
+        .split(/\s+/)
+        .filter((w: string) => w.length > 3 && !["what", "how", "where", "why", "who", "show", "tell", "explain", "code", "file", "repo", "repository", "this", "that", "there", "with"].includes(w));
+
+      let candidatePaths = filePaths;
+      if (keywords.length > 0) {
+        candidatePaths = filePaths.filter((path: string) => {
+          const pathLower = path.toLowerCase();
+          return keywords.some((kw: string) => pathLower.includes(kw));
+        });
+      }
+
+      // Keep candidates within a reasonable list size (max 50)
+      if (candidatePaths.length === 0) {
+        candidatePaths = filePaths.slice(0, 50);
+      } else {
+        candidatePaths = candidatePaths.slice(0, 50);
+      }
+
+      try {
+        const gemini = getGeminiService();
+        const fileSelectionPrompt = `
+You are a codebase indexing assistant. Given the following list of file paths in the repository "${repository.name}":
+${candidatePaths.join("\n")}
+
+And the user's question: "${question}"
+
+Select up to 3 files that are most likely to contain the code, logic, or definitions required to answer the user's question.
+Return ONLY a valid JSON array of strings containing the selected file paths, e.g. ["src/auth.ts", "prisma/schema.prisma"].
+Do not include any Markdown formatting like \`\`\`json, explanation, or extra characters. Just the JSON array.
+`;
+        
+        const selectionResult = await gemini.chatRaw(fileSelectionPrompt);
+        let selectedPaths: string[] = [];
+        try {
+          const cleanedJson = selectionResult.text.replace(/```json|```/g, "").trim();
+          selectedPaths = JSON.parse(cleanedJson);
+        } catch {
+          selectedPaths = candidatePaths.slice(0, 2);
+        }
+
+        // Fetch actual file contents
+        const retrievedFiles = [];
+        for (const path of selectedPaths) {
+          if (filePaths.includes(path)) {
+            try {
+              const content = await fetchGitHubFileContent(repository.url, path, user.userId);
+              if (content) {
+                retrievedFiles.push({ path, content: content.substring(0, 6000) }); // Cap each file at 6k characters
+              }
+            } catch (e) {
+              console.warn(`RAG failed to fetch content for ${path}:`, e);
+            }
+          }
+        }
+
+        if (retrievedFiles.length > 0) {
+          retrievedFilesContent = retrievedFiles
+            .map(f => `File: ${f.path}\nContent:\n\`\`\`\n${f.content}\n\`\`\`\n`)
+            .join("\n");
+        }
+        
+        // Add cross-repository context
+        try {
+          const repoUrl = (repository as any).url || "";
+          const parsedUrl = GitHubService.parseGitHubUrl(repoUrl);
+          const repoIdentifier = parsedUrl ? `${parsedUrl.owner}/${parsedUrl.repo}` : repository.name;
+          const crossRepoContext = await orgRagIndex.retrieveCrossRepositoryContext(repoIdentifier, question, 2);
+          if (crossRepoContext.length > 0) {
+            retrievedFilesContent += "\n\n--- CROSS-REPOSITORY CONTEXT ---\n" + crossRepoContext.join("\n\n");
+          }
+        } catch (crossRepoErr) {
+          console.warn("Failed to retrieve cross-repo context:", crossRepoErr);
+        }
+
+      } catch (err) {
+        console.error("RAG codebase retrieval error:", err);
+      }
+    }
+
+    // Construct the fully grounded RAG prompt
+    const enhancedPrompt = `You are an expert developer assistant for the repository "${repository.name}".
+You are answering a user's question about the codebase.
+
+Repository Context:
+- Name: ${repository.name}
+- Description: ${repository.description || "N/A"}
+- Languages: ${repository.languages.map((l: any) => `${l.name} (${l.percentage}%)`).join(", ")}
+- Stats: ${repository.commits?.length || 0} commits, ${repository.contributors?.length || 0} contributors, ${repository.files?.length || 0} files
+
+${retrievedFilesContent ? `===== RETRIEVED CODEBASE CONTEXT =====\n${retrievedFilesContent}\n===== END RETRIEVED CONTEXT =====\n` : ""}
+
+Answer the following user question using the codebase context above. Ground your answer in the provided file contents and repository context.
+If code snippets from the retrieved files are relevant, explain and reference them in detail. If no relevant files are found, answer using the metadata.
+
+User Question: ${question}
+`;
+
+    // Invoke Gemini with history and grounded context
+    const chatResult = await getGeminiService().chatRaw(enhancedPrompt, standardizedHistory);
+    const response = chatResult.text;
+
+    void logAiRequest({
+      userId: user.userId,
+      ip: getClientIp(request),
+      endpoint: "chat",
     });
 
     return NextResponse.json({ response, question });

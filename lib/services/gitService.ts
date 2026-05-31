@@ -1,4 +1,10 @@
-import { spawn, type SpawnOptions } from "child_process";
+import {
+  exec,
+  spawn,
+  type ExecOptions,
+  type SpawnOptions,
+} from "child_process";
+import { promisify } from "util";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { createReadStream } from "fs";
@@ -19,7 +25,9 @@ function countLinesReadStream(filePath: string): Promise<number> {
 
     stream.on("data", (chunk: string) => {
       lines += (remaining + chunk).split("\n").length - 1;
-      remaining = chunk.endsWith("\n") ? "" : chunk.slice(chunk.lastIndexOf("\n") + 1);
+      remaining = chunk.endsWith("\n")
+        ? ""
+        : chunk.slice(chunk.lastIndexOf("\n") + 1);
     });
 
     stream.on("end", () => {
@@ -33,38 +41,54 @@ function countLinesReadStream(filePath: string): Promise<number> {
 function spawnOutput(
   command: string,
   args: string[],
-  options: SpawnOptions & { timeout?: number } = {},
+  options: SpawnOptions & { timeout?: number; signal?: AbortSignal } = {},
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      stdio: ["ignore", "pipe", "pipe"],
+      ...options,
       env: {
         ...process.env,
+        ...options.env,
         // Prevent git from hanging on credential / interactive prompts.
         GIT_TERMINAL_PROMPT: "0",
         GCM_INTERACTIVE: "Never",
         // Avoid fetching large LFS objects during clone/checkout.
         GIT_LFS_SKIP_SMUDGE: "1",
       },
-      timeout: options.timeout ?? DEFAULT_GIT_TIMEOUT_MS,
-      ...options,
     });
 
     let stdout = "";
     let stderr = "";
-    child.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
-    child.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    child.stdout?.on("data", (data) => (stdout += data));
+    child.stderr?.on("data", (data) => (stderr += data));
+
+    const timeout = options.timeout ?? DEFAULT_GIT_TIMEOUT_MS;
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error(`Command timed out: ${command} ${args.join(" ")}`));
+    }, timeout);
 
     child.on("close", (code) => {
+      clearTimeout(timer);
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
-        const msg = stderr.trim().split("\n").pop() || `exit code ${code}`;
-        reject(new Error(msg));
+        reject(new Error(`Command failed with code ${code}: ${stderr}`));
       }
     });
 
-    child.on("error", reject);
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    if (options.signal) {
+      options.signal.addEventListener("abort", () => {
+        child.kill();
+        reject(new Error("Command aborted"));
+      });
+    }
   });
 }
 
@@ -183,9 +207,9 @@ export class GitService {
   private repoPath: string;
   private signal?: AbortSignal;
 
-  constructor(repoPath: string, signal?:AbortSignal) {
+  constructor(repoPath: string, signal?: AbortSignal) {
     this.repoPath = repoPath;
-    this.signal=signal;
+    this.signal = signal;
   }
 
   private spawnGit(
@@ -209,7 +233,7 @@ export class GitService {
       depth?: number;
       noSingleBranch?: boolean;
       onProgress?: (percent: number, message: string) => void;
-      signal?:AbortSignal;
+      signal?: AbortSignal;
     },
   ): Promise<GitService> {
     await fs.mkdir(destination, { recursive: true });
@@ -217,13 +241,21 @@ export class GitService {
     const noSingleBranch = opts?.noSingleBranch ?? true;
 
     const args = [
-      "-c", "credential.interactive=never",
-      "-c", "core.askPass=",
-      "-c", "filter.lfs.required=false",
-      "-c", "filter.lfs.smudge=",
-      "-c", "filter.lfs.process=",
-      "clone", "--no-tags", "--progress",
-      "--depth", String(depth),
+      "-c",
+      "credential.interactive=never",
+      "-c",
+      "core.askPass=",
+      "-c",
+      "filter.lfs.required=false",
+      "-c",
+      "filter.lfs.smudge=",
+      "-c",
+      "filter.lfs.process=",
+      "clone",
+      "--no-tags",
+      "--progress",
+      "--depth",
+      String(depth),
       noSingleBranch ? "--no-single-branch" : "--single-branch",
       url,
       destination,
@@ -266,6 +298,15 @@ export class GitService {
           resolve(new GitService(destination, opts?.signal));
         } else {
           const msg = stderr.trim().split("\n").pop() || `exit code ${code}`;
+
+          if (msg.toLowerCase().includes("rate limit")) {
+            reject(
+              new Error(
+                "GitHub API rate limit exceeded. Please try again later.",
+              ),
+            );
+            return;
+          }
           reject(new Error(`Failed to clone repository: ${msg}`));
         }
       });
@@ -346,10 +387,7 @@ export class GitService {
 
       const branches: BranchData[] = refEntries.map((entry, i) => {
         const result = countResults[i];
-        const commitCount =
-          result.status === "fulfilled"
-            ? result.value
-            : 0;
+        const commitCount = result.status === "fulfilled" ? result.value : 0;
 
         if (result.status === "rejected") {
           console.warn(
@@ -385,10 +423,14 @@ export class GitService {
     const format = "%H|%h|%an|%ae|%aI|%s|%b|%P|%D";
 
     const args = [
-      "-C", this.repoPath,
-      "log", `--format=${format}`,
-      "--shortstat", "--numstat",
-      "-n", String(effectiveLimit),
+      "-C",
+      this.repoPath,
+      "log",
+      `--format=${format}`,
+      "--shortstat",
+      "--numstat",
+      "-n",
+      String(effectiveLimit),
       branch,
     ];
 
@@ -428,8 +470,15 @@ export class GitService {
         if (!currentHeader) return;
 
         const {
-          hash, shortHash, authorName, authorEmail, date,
-          message, description, parentsStr, refsStr,
+          hash,
+          shortHash,
+          authorName,
+          authorEmail,
+          date,
+          message,
+          description,
+          parentsStr,
+          refsStr,
         } = currentHeader;
 
         const parents = parentsStr
@@ -551,11 +600,13 @@ export class GitService {
         stderr += chunk.toString();
       });
 
-
-
       child.on("exit", (code) => {
         if (code !== 0 && commits.length === 0) {
-          reject(new Error(`Failed to get commits: git exited with code ${code}: ${stderr}`));
+          reject(
+            new Error(
+              `Failed to get commits: git exited with code ${code}: ${stderr}`,
+            ),
+          );
         }
       });
     });
@@ -762,12 +813,11 @@ export class GitService {
         language: string | null;
       }[] = [];
       const filePaths = stdout.trim().split("\n").filter(Boolean);
-
       // Process in chunks to avoid blocking the event loop on huge monorepos
       const concurrencyLimit = 50;
       for (let i = 0; i < filePaths.length; i += concurrencyLimit) {
         const batch = filePaths.slice(i, i + concurrencyLimit);
-        
+
         await Promise.all(
           batch.map(async (filePath) => {
             // Skip ignored files
@@ -811,7 +861,7 @@ export class GitService {
               // Skip files that can't be accessed
               return;
             }
-          })
+          }),
         );
       }
 
@@ -834,7 +884,10 @@ export class GitService {
       for (const file of files) {
         if (!file.language) continue;
 
-        const stats = languageStats.get(file.language) || { bytes: 0, lines: 0 };
+        const stats = languageStats.get(file.language) || {
+          bytes: 0,
+          lines: 0,
+        };
         stats.bytes += file.size;
         stats.lines += file.lines;
         languageStats.set(file.language, stats);

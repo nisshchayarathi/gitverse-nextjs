@@ -6,10 +6,10 @@ import { analysisJobService } from "@/lib/services/analysisJobService";
 import { shouldThrottleJobKick } from "@/lib/utils/analysisRunner";
 
 
-function kickLocalRunner(request: NextRequest, jobId: string) {
+async function kickLocalRunner(request: NextRequest, jobId: string) {
   if (process.env.NODE_ENV === "production") return;
 
- if (shouldThrottleJobKick(jobId)) return;  
+ if (await shouldThrottleJobKick(jobId)) return;  
   const origin = new URL(request.url).origin;
   const secret = process.env.ANALYSIS_RUNNER_SECRET;
 
@@ -38,7 +38,7 @@ export async function GET(
     }
 
     if (job.status === "QUEUED") {
-      kickLocalRunner(request, job.id);
+      await kickLocalRunner(request, job.id);
     }
 
     return NextResponse.json({

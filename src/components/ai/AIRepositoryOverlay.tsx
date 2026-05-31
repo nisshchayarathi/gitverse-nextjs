@@ -28,6 +28,7 @@ export interface RepositoryBranch {
 
 interface AIRepositoryOverlayProps {
   repository: {
+    id?: number | string;
     name: string;
     description?: string;
     languages: { name: string; percentage: number }[];
@@ -204,7 +205,11 @@ User Question: ${input}`;
       }
 
       let fullResponse = "";
-      const stream = geminiService.chatStream(contextualPrompt);
+      const stream = geminiService.chatStream(contextualPrompt, {
+        id: repository.id ? Number(repository.id) : undefined,
+        name: repository.name,
+        languages: repository.languages?.map(l => l.name) || [],
+      });
 
       for await (const chunk of stream) {
         fullResponse += chunk;

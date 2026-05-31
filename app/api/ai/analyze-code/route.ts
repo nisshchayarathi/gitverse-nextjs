@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { getGeminiService } from "@/lib/services/geminiService";
-import { createRateLimiter } from "@/lib/utils/ipRateLimit";
+import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
+import { getClientIp } from "@/lib/services/rateLimitService";
 import {
   validateContentType,
   AI_REQUEST_LIMITS,
 } from "@/lib/utils/aiRequestValidation";
 
-const codeAnalysisLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 20 });
-
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    if (!codeAnalysisLimiter.check(String(user.userId))) {
+    const allowed = await checkAiRateLimit(
+      String(user.userId), "userId", "analyze-code", 20, 60_000
+    );
+    if (!allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please wait before retrying." },
         { status: 429 }
@@ -54,6 +56,12 @@ export async function POST(request: NextRequest) {
       language,
       analysisType,
       context,
+    });
+
+    void logAiRequest({
+      userId: user.userId,
+      ip: getClientIp(request),
+      endpoint: "analyze-code",
     });
 
     return NextResponse.json({ analysis, analysisType });

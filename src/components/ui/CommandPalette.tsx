@@ -27,7 +27,7 @@ export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setOpen(open => !open);
+        setOpen(!open);
       }
     };
     document.addEventListener("keydown", down);

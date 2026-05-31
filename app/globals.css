@@ -6,7 +6,7 @@
 
 /* GitVerse Design System
    Colors: Deep Blue #1E3A8A, Slate Gray #475569, Electric Green #10B981
-   Typography: Inter (headings), Source Sans 3 (body), JetBrains Mono (code)
+   Typography is loaded in app/layout.tsx via next/font/google.
 */
 
 @layer base {

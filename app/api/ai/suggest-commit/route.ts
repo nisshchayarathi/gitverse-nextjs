@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { getGeminiService } from "@/lib/services/geminiService";
-import { createRateLimiter } from "@/lib/utils/ipRateLimit";
+import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
+import { getClientIp } from "@/lib/services/rateLimitService";
 import {
   validateContentType,
   AI_REQUEST_LIMITS,
 } from "@/lib/utils/aiRequestValidation";
-
-const commitSuggestionLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 20 });
 
 function validateArrayField(
   items: unknown,
@@ -39,7 +38,10 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    if (!commitSuggestionLimiter.check(String(user.userId))) {
+    const allowed = await checkAiRateLimit(
+      String(user.userId), "userId", "suggest-commit", 20, 60_000
+    );
+    if (!allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please wait before retrying." },
         { status: 429 }
@@ -84,6 +86,12 @@ export async function POST(request: NextRequest) {
       modified: modified || [],
       deleted: deleted || [],
       diff,
+    });
+
+    void logAiRequest({
+      userId: user.userId,
+      ip: getClientIp(request),
+      endpoint: "suggest-commit",
     });
 
     return NextResponse.json({ suggestions });

@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import crypto from "crypto";
-
-const lastKickAtByJobId = new Map<string, number>();
+import prisma from "@/lib/prisma";
 
 const EPHEMERAL_SECRET = !process.env.ANALYSIS_RUNNER_SECRET
   ? crypto.randomBytes(32).toString("hex")
@@ -45,18 +44,30 @@ export function isAnalysisRunnerAuthorized(request: NextRequest): boolean {
   return false;
 }
 
-export function shouldThrottleJobKick(jobId: string): boolean {
-  const now = Date.now();
+/**
+ * DB-backed throttle to prevent rapid job kicks across serverless instances.
+ * Uses the analysisJob table's nextRunAt field to throttle at the DB level.
+ */
+export async function shouldThrottleJobKick(jobId: string): Promise<boolean> {
+  try {
+    const job = await prisma.analysisJob.findUnique({
+      where: { id: jobId },
+      select: { nextRunAt: true, status: true },
+    });
 
-  const lastKickAt = lastKickAtByJobId.get(jobId) ?? 0;
+    if (!job) return true;
 
-  if (now - lastKickAt < 5000) {
-    return true;
+    // If job is already being processed or is not in a kickable state, throttle
+    if (job.status === "PROCESSING") return true;
+
+    // If nextRunAt is in the future, throttle
+    if (job.nextRunAt && job.nextRunAt > new Date()) return true;
+
+    return false;
+  } catch {
+    // If DB check fails, allow the request (fail open)
+    return false;
   }
-
-  lastKickAtByJobId.set(jobId, now);
-
-  return false;
 }
 
 export function registerUnhandledRejectionLogger() {

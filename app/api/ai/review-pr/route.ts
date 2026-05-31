@@ -4,7 +4,7 @@ import {
   parsePullRequestUrl,
   reviewPullRequest,
 } from "@/lib/services/prReviewService";
-import prisma from "@/lib/prisma";
+import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,12 +31,9 @@ export async function POST(request: NextRequest) {
     // Retrieve the GitHub token stored for this user via /api/integrations/github/connect.
     // The token is never accepted from the request body to prevent token laundering,
     // scope probing, and rate limit exhaustion through server-side proxying.
-    const account = await prisma.gitHubAccount.findUnique({
-      where: { userId: user.userId },
-      select: { accessToken: true },
-    });
+    const token = await getDecryptedGitHubToken(user.userId);
 
-    if (!account?.accessToken) {
+    if (!token) {
       return NextResponse.json(
         {
           error:
@@ -50,7 +47,7 @@ export async function POST(request: NextRequest) {
       owner: parsed.owner,
       repo: parsed.repo,
       number: parsed.number,
-      githubToken: account.accessToken,
+      githubToken: token,
     });
 
     return NextResponse.json({

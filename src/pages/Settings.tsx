@@ -699,7 +699,7 @@ export default function Settings() {
                     AI Summary Settings
                   </CardTitle>
                   <CardDescription>
-                    Configure your AI provider to generate module and file summaries. Keys are stored securely in your browser's localStorage.
+                    Configure your AI provider to generate module and file summaries. Keys are stored securely in your browser&apos;s localStorage.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

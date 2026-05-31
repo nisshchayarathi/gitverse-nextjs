@@ -9,11 +9,17 @@ exports.requireAuth = requireAuth;
 exports.requireOwnership = requireOwnership;
 exports.isHttpError = isHttpError;
 exports.sanitizeError = sanitizeError;
-exports.errorResponse = errorResponse;
+exports.badRequestResponse = badRequestResponse;
+exports.getPrismaErrorResponse = getPrismaErrorResponse;
 const server_1 = require("next/server");
 const auth_1 = require("./auth");
+const prisma_1 = __importDefault(require("@/lib/prisma"));
 const jwt_1 = require("next-auth/jwt");
-const prisma_1 = __importDefault(require("./prisma"));
+/**
+ * Resolves the authenticated user from either a JWT bearer token
+ * or a NextAuth session cookie.
+ * Rejects tokens issued before the user's latest password change.
+ */
 async function getAuthUser(request) {
     const authHeader = request.headers.get("authorization");
     let userPayload = null;
@@ -22,6 +28,25 @@ async function getAuthUser(request) {
         const token = authHeader.substring(7);
         const payload = (0, auth_1.verifyToken)(token);
         if (payload) {
+            const dbUser = await prisma_1.default.user.findUnique({
+                where: { id: payload.userId },
+                select: {
+                    id: true,
+                    passwordChangedAt: true,
+                },
+            });
+            if (!dbUser) {
+                return null;
+            }
+            const issuedAt = typeof payload.iat === "number"
+                ? payload.iat
+                : null;
+            if (dbUser.passwordChangedAt &&
+                (issuedAt === null ||
+                    issuedAt * 1000 <=
+                        dbUser.passwordChangedAt.getTime())) {
+                return null;
+            }
             userPayload = payload;
         }
     }
@@ -34,9 +59,32 @@ async function getAuthUser(request) {
             });
             if (token?.sub && token.email) {
                 const userId = Number(token.sub);
-                if (Number.isFinite(userId)) {
-                    userPayload = { userId, email: token.email };
+                if (!Number.isFinite(userId)) {
+                    return null;
                 }
+                const dbUser = await prisma_1.default.user.findUnique({
+                    where: { id: userId },
+                    select: {
+                        id: true,
+                        passwordChangedAt: true,
+                    },
+                });
+                if (!dbUser) {
+                    return null;
+                }
+                const issuedAt = typeof token.iat === "number"
+                    ? token.iat
+                    : null;
+                if (dbUser.passwordChangedAt &&
+                    (issuedAt === null ||
+                        issuedAt * 1000 <=
+                            dbUser.passwordChangedAt.getTime())) {
+                    return null;
+                }
+                userPayload = {
+                    userId,
+                    email: token.email,
+                };
             }
         }
         catch {
@@ -45,14 +93,38 @@ async function getAuthUser(request) {
     }
     if (!userPayload)
         return null;
-    // 3) Verify user existence in database to block deleted users with active JWTs
+    // 3) Verify user existence and token version
     try {
-        const userExists = await prisma_1.default.user.findUnique({
+        const dbUser = await prisma_1.default.user.findUnique({
             where: { id: userPayload.userId },
-            select: { id: true },
+            select: {
+                id: true,
+                tokenVersion: true,
+                lockedUntil: true,
+            },
         });
-        if (!userExists)
+        if (!dbUser) {
             return null;
+        }
+        if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
+            return null;
+        }
+        const isJwtAuth = !!(authHeader &&
+            authHeader.startsWith("Bearer "));
+        // JWT-authenticated users must provide a valid tokenVersion.
+        // This allows logout/password-change invalidation to immediately
+        // revoke previously issued tokens.
+        if (isJwtAuth) {
+            // Reject legacy JWTs without tokenVersion
+            if (userPayload.tokenVersion == null) {
+                return null;
+            }
+            // Require exact token version match
+            if (userPayload.tokenVersion !==
+                dbUser.tokenVersion) {
+                return null;
+            }
+        }
     }
     catch (error) {
         console.error("Database check failed in auth middleware:", error);
@@ -60,6 +132,10 @@ async function getAuthUser(request) {
     }
     return userPayload;
 }
+/**
+ * Ensures the incoming request is authenticated.
+ * Throws an HttpError if authentication fails.
+ */
 async function requireAuth(request) {
     const user = await getAuthUser(request);
     if (!user) {
@@ -67,6 +143,9 @@ async function requireAuth(request) {
     }
     return user;
 }
+/**
+ * Ensures the authenticated user owns the requested resource.
+ */
 async function requireOwnership(request, resourceUserId) {
     const user = await requireAuth(request);
     if (user.userId !== resourceUserId) {
@@ -94,12 +173,26 @@ function sanitizeError(error) {
     }
     try {
         const str = String(error);
-        return str.length > 200 ? str.substring(0, 200) + "..." : str;
+        return str.length > 200
+            ? str.substring(0, 200) + "..."
+            : str;
     }
     catch {
         return "Unknown error";
     }
 }
-function errorResponse(message, status = 400) {
+function badRequestResponse(message, status = 400) {
     return server_1.NextResponse.json({ error: message }, { status });
+}
+function getPrismaErrorResponse(error) {
+    const isColdStartError = error?.code === 'P1001' ||
+        error?.code === 'P2024' ||
+        error?.message?.toLowerCase().includes('timeout') ||
+        error?.message?.toLowerCase().includes('connection pool') ||
+        error?.message?.toLowerCase().includes('connect') ||
+        error?.message?.toLowerCase().includes('fetch failed');
+    if (isColdStartError) {
+        return server_1.NextResponse.json({ error: "DATABASE_COLD_START", message: "Waking up database..." }, { status: 503 });
+    }
+    return null;
 }

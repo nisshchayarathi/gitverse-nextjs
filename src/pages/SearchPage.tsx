@@ -3,6 +3,10 @@
 
 export const dynamic = "force-dynamic";
 
+"use client";
+
+export const dynamic = "force-dynamic";
+import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Grid, List, GitBranch, Clock, Activity } from "lucide-react";
@@ -64,6 +68,10 @@ const repos = response.data.repositories || [];
       setRepositories(Array.isArray(repos) ? repos : []);
     }  
     catch (error) {
+      const repos = response.data.repositories || [];
+      setRepositories(Array.isArray(repos) ? repos : []);
+    }  
+    catch (error: any) {
   console.error("Error fetching repositories:", error);
 
   setRepositories([]);
@@ -72,6 +80,19 @@ const repos = response.data.repositories || [];
     "Failed to load repositories. Please check your connection and try again."
   );
 }
+  const message =
+    error?.response?.data?.message ||
+    "Failed to load repositories. Please check your connection and try again.";
+
+  setError(message);
+
+  toast({
+    title: "Error",
+    description: message,
+    variant: "destructive",
+  });
+}
+
 finally {
       setLoading(false);
     }
@@ -91,11 +112,13 @@ finally {
     if (sortBy === "stars") return (b.stars || 0) - (a.stars || 0);
     if (sortBy === "name") return a.name.localeCompare(b.name);
    return 0; // 'recent' is already sorted
+    return 0; // 'recent' is already sorted
   });
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="px-2 sm:px-0">
           <h1 className="text-2xl sm:text-3xl font-heading font-bold mb-2">
             Browse Repositories
@@ -105,6 +128,7 @@ finally {
           </p>
         </div>
 
+        {/* Search and Filters */}
         <Card className="glass">
           <CardContent className="pt-4 sm:pt-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
@@ -208,6 +232,11 @@ finally {
           </CardContent>
         </Card>
 
+</div>
+          </CardContent>
+        </Card>
+
+        {/* Results Count */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             {sortedRepositories.length}{" "}
@@ -483,6 +512,9 @@ finally {
                         {repo.description || "No description available"}
                       </p>
 
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2 min-h-[24px]">
+                        {repo.description || "No description available"}
+                      </p>
                       <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Activity className="h-4 w-4" />

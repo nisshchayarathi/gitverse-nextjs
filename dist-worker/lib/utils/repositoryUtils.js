@@ -17,6 +17,7 @@ exports.isBugfixBranch = isBugfixBranch;
 exports.isReleaseBranch = isReleaseBranch;
 exports.calculateCodeChurn = calculateCodeChurn;
 exports.normalizeKnownRepoHttpUrl = normalizeKnownRepoHttpUrl;
+exports.normalizeTargetDirectory = normalizeTargetDirectory;
 exports.LANGUAGE_COLORS = {
     TypeScript: '#3178c6',
     JavaScript: '#f1e05a',
@@ -209,4 +210,25 @@ function normalizeKnownRepoHttpUrl(input) {
     if (!owner || !repo)
         return null;
     return `${parsed.protocol}//${parsed.host}/${owner}/${repo}`;
+}
+function normalizeTargetDirectory(input) {
+    if (input == null)
+        return null;
+    const trimmed = String(input).trim();
+    if (!trimmed)
+        return null;
+    // Normalize separators and remove leading/trailing slashes.
+    let dir = trimmed.replace(/\\/g, "/");
+    dir = dir.replace(/^\.\/+/, "").replace(/^\/+/, "").replace(/\/+$/, "");
+    if (!dir)
+        return null;
+    const parts = dir.split("/");
+    for (const part of parts) {
+        if (!part || part === "." || part === "..")
+            return null;
+        // Keep it conservative: directory segments should be URL/path-safe.
+        if (!/^[A-Za-z0-9._-]+$/.test(part))
+            return null;
+    }
+    return parts.join("/");
 }
