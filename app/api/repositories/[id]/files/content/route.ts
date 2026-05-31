@@ -3,7 +3,7 @@ import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import {
   isContentLengthTooLarge,
-  isTextContentTooLarge,
+  MAX_FILE_CONTENT_BYTES,
 } from "@/lib/utils/fileContentLimits";
 
 export async function GET(
@@ -62,14 +62,35 @@ export async function GET(
       );
     }
 
-    const content = await response.text();
-
-    if (isTextContentTooLarge(content)) {
-      return NextResponse.json(
-        { error: "File is too large to preview" },
-        { status: 413 }
-      );
+    if (!response.body) {
+      return NextResponse.json({ error: "Empty response from GitHub" }, { status: 502 });
     }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_FILE_CONTENT_BYTES) {
+        await reader.cancel();
+        return NextResponse.json(
+          { error: "File is too large to preview" },
+          { status: 413 }
+        );
+      }
+      chunks.push(value);
+    }
+
+    const combined = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      combined.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    const content = new TextDecoder().decode(combined);
 
     return NextResponse.json({ content, path: filePath });
   } catch (error: any) {
