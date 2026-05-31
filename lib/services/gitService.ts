@@ -8,6 +8,7 @@ import { promisify } from "util";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { createReadStream } from "fs";
+import * as fsSync from "fs";
 import readline from "readline";
 
 const DEFAULT_GIT_TIMEOUT_MS = 2 * 60 * 1000;
@@ -914,16 +915,29 @@ export class GitService {
    * Get repository size in bytes
    */
   async getRepositorySize(): Promise<number> {
-    try {
-      const { stdout } = await spawnOutput("du", ["-sb", "."], {
-        cwd: this.repoPath,
-        signal: this.signal,
-        timeout: DEFAULT_GIT_TIMEOUT_MS,
-      });
-      return parseInt(stdout.trim().split("\t")[0]);
-    } catch (error: any) {
-      return 0;
-    }
+  try {
+    const getSize = (dirPath: string): number => {
+      let totalSize = 0;
+      const entries = fsSync.readdirSync(dirPath, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dirPath, entry.name);
+        try {
+          if (entry.isSymbolicLink()) continue;
+          if (entry.isDirectory()) {
+            totalSize += getSize(fullPath);
+          } else {
+            totalSize += fsSync.statSync(fullPath).size;
+          }
+        } catch {
+          // skip inaccessible files
+        }
+      }
+      return totalSize;
+    };
+    return getSize(this.repoPath);
+  } catch (error: any) {
+    return 0;
+  }
   }
 
   /**
