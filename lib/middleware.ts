@@ -63,70 +63,71 @@ export async function getAuthUserDetails(
 
       userPayload = payload.payload;
     } else {
-      bearerTokenError = payload.error;
+      return { user: null, bearerTokenError: payload.error };
     }
   }
 
   // 2) NextAuth session cookie (Google OAuth)
   if (!userPayload) {
+    let token;
     try {
-      const token = await getToken({
+      token = await getToken({
         req: request,
         secret: process.env.NEXTAUTH_SECRET,
       });
-
-      if (token?.sub && token.email) {
-        const userId = Number(token.sub);
-
-        if (!Number.isFinite(userId)) {
-          return { user: null, bearerTokenError };
-        }
-
-        const dbUser = await prisma.user.findUnique({
-          where: { id: userId },
-          select: {
-            id: true,
-            passwordChangedAt: true,
-            tokenVersion: true,
-          },
-        });
-
-        if (!dbUser) {
-          return { user: null, bearerTokenError };
-        }
-
-        const issuedAt =
-          typeof token.iat === "number"
-            ? token.iat
-            : null;
-
-        if (
-          dbUser.passwordChangedAt &&
-          (issuedAt === null ||
-            issuedAt * 1000 <=
-              dbUser.passwordChangedAt.getTime())
-        ) {
-          return { user: null, bearerTokenError };
-        }
-
-        // Validate tokenVersion for NextAuth session cookies.
-        // The JWT callback attaches tokenVersion at sign-in; if it no longer
-        // matches the DB value (after password change or logout), reject.
-        const jwtTokenVersion = (token as any).tokenVersion as number | undefined;
-        if (
-          jwtTokenVersion != null &&
-          jwtTokenVersion !== dbUser.tokenVersion
-        ) {
-          return { user: null, bearerTokenError };
-        }
-
-        userPayload = {
-          userId,
-          email: token.email,
-        };
-      }
     } catch {
       // Ignore token retrieval errors
+    }
+
+    if (token?.sub && token.email) {
+      const userId = Number(token.sub);
+
+      if (!Number.isFinite(userId)) {
+        return { user: null, bearerTokenError };
+      }
+
+      const dbUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          passwordChangedAt: true,
+          tokenVersion: true,
+        },
+      });
+
+      if (!dbUser) {
+        return { user: null, bearerTokenError };
+      }
+
+      const issuedAt =
+        typeof token.iat === "number"
+          ? token.iat
+          : null;
+
+      if (
+        dbUser.passwordChangedAt &&
+        (issuedAt === null ||
+          issuedAt * 1000 <=
+            dbUser.passwordChangedAt.getTime())
+      ) {
+        return { user: null, bearerTokenError };
+      }
+
+      // Validate tokenVersion for NextAuth session cookies.
+      // The JWT callback attaches tokenVersion at sign-in; if it no longer
+      // matches the DB value (after password change or logout), reject.
+      const jwtTokenVersion = (token as any).tokenVersion as number | undefined;
+      if (
+        jwtTokenVersion != null &&
+        jwtTokenVersion !== dbUser.tokenVersion
+      ) {
+        return { user: null, bearerTokenError };
+      }
+
+      userPayload = {
+        userId,
+        email: token.email,
+      };
     }
   }
 
@@ -135,52 +136,44 @@ export async function getAuthUserDetails(
   }
 
   // 3) Verify user existence and token version
-  try {
-    const dbUser = await prisma.user.findUnique({
-      where: { id: userPayload.userId },
-      select: {
-        id: true,
-        tokenVersion: true,
-        lockedUntil: true,
-      },
-    });
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userPayload.userId },
+    select: {
+      id: true,
+      tokenVersion: true,
+      lockedUntil: true,
+    },
+  });
 
-    if (!dbUser) {
-      return { user: null, bearerTokenError };
-    }
-
-    if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
-      return { user: null, bearerTokenError };
-    }
-
-    const isJwtAuth = !!(
-      authHeader &&
-      authHeader.startsWith("Bearer ")
-    );
-
-    // JWT-authenticated users must provide a valid tokenVersion.
-    // This allows logout/password-change invalidation to immediately
-    // revoke previously issued tokens.
-    if (isJwtAuth) {
-      // Reject legacy JWTs without tokenVersion
-      if (userPayload.tokenVersion == null) {
-        return { user: null, bearerTokenError: null };
-      }
-
-      // Require exact token version match
-      if (
-        userPayload.tokenVersion !==
-        dbUser.tokenVersion
-      ) {
-        return { user: null, bearerTokenError: null };
-      }
-    }
-  } catch (error) {
-    console.error(
-      "Database check failed in auth middleware:",
-      error
-    );
+  if (!dbUser) {
     return { user: null, bearerTokenError };
+  }
+
+  if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
+    return { user: null, bearerTokenError };
+  }
+
+  const isJwtAuth = !!(
+    authHeader &&
+    authHeader.startsWith("Bearer ")
+  );
+
+  // JWT-authenticated users must provide a valid tokenVersion.
+  // This allows logout/password-change invalidation to immediately
+  // revoke previously issued tokens.
+  if (isJwtAuth) {
+    // Reject legacy JWTs without tokenVersion
+    if (userPayload.tokenVersion == null) {
+      return { user: null, bearerTokenError: null };
+    }
+
+    // Require exact token version match
+    if (
+      userPayload.tokenVersion !==
+      dbUser.tokenVersion
+    ) {
+      return { user: null, bearerTokenError: null };
+    }
   }
 
   return { user: userPayload, bearerTokenError: null };

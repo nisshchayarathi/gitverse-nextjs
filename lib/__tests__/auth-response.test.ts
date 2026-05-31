@@ -4,13 +4,20 @@ jest.mock("next/server", () => {
 
     headers: Headers;
 
-    constructor(status: number, headers?: HeadersInit) {
+    body: unknown;
+
+    constructor(status: number, headers?: HeadersInit, body?: unknown) {
       this.status = status;
       this.headers = new Headers(headers);
+      this.body = body;
+    }
+
+    async json() {
+      return this.body;
     }
 
     static json(body: unknown, init?: { status?: number; headers?: HeadersInit }) {
-      return new MockNextResponse(init?.status ?? 200, init?.headers);
+      return new MockNextResponse(init?.status ?? 200, init?.headers, body);
     }
   }
 
@@ -32,6 +39,7 @@ describe("createAuthFailureResponse", () => {
     expect(response.headers.get("WWW-Authenticate")).toBe(
       'Bearer error="invalid_token", error_description="The access token expired"'
     );
+    expect(response.body).toEqual({ error: "Not authenticated" });
   });
 
   it("adds a generic bearer challenge for invalid tokens", () => {
@@ -44,6 +52,7 @@ describe("createAuthFailureResponse", () => {
     expect(response.headers.get("WWW-Authenticate")).toBe(
       'Bearer error="invalid_token"'
     );
+    expect(response.body).toEqual({ error: "Not authenticated" });
   });
 
   it("omits the bearer challenge when no bearer token failure is known", () => {
@@ -54,5 +63,6 @@ describe("createAuthFailureResponse", () => {
 
     expect(response.status).toBe(401);
     expect(response.headers.get("WWW-Authenticate")).toBeNull();
+    expect(response.body).toEqual({ error: "Not authenticated" });
   });
 });
