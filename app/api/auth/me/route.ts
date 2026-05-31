@@ -1,24 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAuthUser, sanitizeError } from "@/lib/middleware";
+import { createAuthFailureResponse } from "@/lib/auth-response";
+import {
+  getAuthUserDetails,
+  sanitizeError,
+} from "@/lib/middleware";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getAuthUser(request);
+    const { user, bearerTokenError } = await getAuthUserDetails(request);
 
     if (!user) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        {
-          status: 401,
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate, private",
-          },
-        },
+      const response = createAuthFailureResponse(
+        "Not authenticated",
+        bearerTokenError
       );
+
+      response.headers.set(
+        "Cache-Control",
+        "no-store, no-cache, must-revalidate, private"
+      );
+
+      return response;
     }
 
     // Fetch user details

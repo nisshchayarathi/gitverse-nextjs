@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser, sanitizeError } from "@/lib/middleware";
+import { createAuthFailureResponse } from "@/lib/auth-response";
+import {
+  getAuthUserDetails,
+  sanitizeError,
+} from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getAuthUser(request);
+    const { user, bearerTokenError } = await getAuthUserDetails(request);
 
     if (!user) {
-      return NextResponse.json(
-        { error: "Invalid or expired authentication token" },
-        { status: 401 }
+      return createAuthFailureResponse(
+        "Invalid or expired authentication token",
+        bearerTokenError
       );
     }
 
