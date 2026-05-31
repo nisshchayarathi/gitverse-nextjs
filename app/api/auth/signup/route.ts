@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { generateToken } from "@/lib/auth";
 import { logger } from "@/lib/logger";
-import crypto from "crypto";
+import { createIpFingerprint } from "@/lib/utils/ipFingerprint";
 import {
   getClientIp,
   countAttempts,
@@ -130,11 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     const rawIp = getClientIp(request);
-    let ipFingerprint = "unknown";
-    if (rawIp !== "unknown") {
-      const secret = process.env.NEXTAUTH_SECRET || "fallback_secret";
-      ipFingerprint = crypto.createHmac("sha256", secret).update(rawIp).digest("hex").substring(0, 16);
-    }
+    const ipFingerprint = createIpFingerprint(rawIp);
     logger.error({ err: sanitizeError(error), ipFingerprint }, "Signup error");
     return NextResponse.json(
       { error: "Internal server error" },
