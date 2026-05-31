@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
+import {
+  isContentLengthTooLarge,
+  isTextContentTooLarge,
+} from "@/lib/utils/fileContentLimits";
 
 export async function GET(
   request: NextRequest,
@@ -51,7 +55,21 @@ export async function GET(
       return NextResponse.json({ error: `GitHub API error: ${response.statusText}` }, { status: response.status });
     }
 
+    if (isContentLengthTooLarge(response.headers.get("content-length"))) {
+      return NextResponse.json(
+        { error: "File is too large to preview" },
+        { status: 413 }
+      );
+    }
+
     const content = await response.text();
+
+    if (isTextContentTooLarge(content)) {
+      return NextResponse.json(
+        { error: "File is too large to preview" },
+        { status: 413 }
+      );
+    }
 
     return NextResponse.json({ content, path: filePath });
   } catch (error: any) {
