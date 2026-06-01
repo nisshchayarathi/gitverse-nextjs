@@ -28,12 +28,8 @@
       "@/types/*": ["./types/*"],
       "@/services/security/*": ["./services/security/*"],
       "@/services/*": ["./src/services/*", "./services/*"],
-      "@/pages/*": ["./src/pages/*"],
       "@/middleware/*": ["./middleware/*"],
-      "@/components/*": ["./src/components/*"],
-      "@/contexts/*": ["./src/contexts/*"],
-      "@/hooks/*": ["./src/hooks/*"],
-      "@/utils/*": ["./src/utils/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

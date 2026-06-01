@@ -31,30 +31,30 @@ enum DataResidencyRegion {
 }
 
 model User {
-  id                  Int            @id @default(autoincrement())
-  email               String         @unique
-  passwordHash        String?        @map("password_hash") // Optional for OAuth users
-  tokenVersion        Int            @default(0) @map("token_version")
-  name                String
-  emailVerified       DateTime?      @map("email_verified")
-  image               String?        @map("avatar_url")
-  emailNotifications  Boolean        @default(true) @map("email_notifications")
-  pushNotifications   Boolean        @default(false) @map("push_notifications")
-  weeklyDigest        Boolean        @default(true) @map("weekly_digest")
-  lockedUntil         DateTime?      @map("locked_until")
-  failedLoginAttempts Int            @default(0) @map("failed_login_attempts")
-  lastFailedAttemptAt DateTime?      @map("last_failed_attempt_at")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-  passwordChangedAt   DateTime?      @map("password_changed_at")
-  repositories        Repository[]
-  analysisJobs        AnalysisJob[]
-  accounts            Account[]
-  sessions            Session[]
-  githubAccount       GitHubAccount?
-  githubRepos         GitHubRepo[]
-  loginAttempts       LoginAttempt[]
-  aiRequestLogs       AiRequestLog[]
+  id                      Int                  @id @default(autoincrement())
+  email                   String               @unique
+  passwordHash            String?              @map("password_hash") // Optional for OAuth users
+  tokenVersion            Int                  @default(0) @map("token_version")
+  name                    String
+  emailVerified           DateTime?            @map("email_verified")
+  image                   String?              @map("avatar_url")
+  emailNotifications      Boolean              @default(true) @map("email_notifications")
+  pushNotifications       Boolean              @default(false) @map("push_notifications")
+  weeklyDigest            Boolean              @default(true) @map("weekly_digest")
+  lockedUntil             DateTime?            @map("locked_until")
+  failedLoginAttempts     Int                  @default(0) @map("failed_login_attempts")
+  lastFailedAttemptAt     DateTime?            @map("last_failed_attempt_at")
+  createdAt               DateTime             @default(now()) @map("created_at")
+  updatedAt               DateTime             @updatedAt @map("updated_at")
+  passwordChangedAt       DateTime?            @map("password_changed_at")
+  repositories            Repository[]
+  analysisJobs            AnalysisJob[]
+  accounts                Account[]
+  sessions                Session[]
+  githubAccount           GitHubAccount?
+  githubRepos             GitHubRepo[]
+  loginAttempts           LoginAttempt[]
+  aiRequestLogs           AiRequestLog[]
   organizationMemberships OrganizationMember[]
 
   @@map("users")
@@ -178,27 +178,27 @@ model VerificationToken {
 }
 
 model Repository {
-  id                  Int                   @id @default(autoincrement())
+  id                  Int                         @id @default(autoincrement())
   name                String
   url                 String
   description         String?
-  targetDirectory     String?               @map("target_directory")
-  readmePath          String?               @map("readme_path")
-  readmeText          String?               @map("readme_text") @db.Text
-  readmeFetchedAt     DateTime?             @map("readme_fetched_at")
-  defaultBranch       String                @default("main") @map("default_branch")
-  isPrivate           Boolean               @default(false) @map("is_private")
-  inheritedRegion     DataResidencyRegion?  @map("inherited_region")
-  overrideAllowed     Boolean               @default(false) @map("override_allowed")
-  stars               Int                   @default(0)
-  forks               Int                   @default(0)
-  size                Int                   @default(0) // Size in bytes
-  lastAnalyzedAt      DateTime?             @map("last_analyzed_at")
-  status              String                @default("pending") // pending, analyzing, completed, failed
-  userId              Int                   @map("user_id")
-  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt           DateTime              @default(now()) @map("created_at")
-  updatedAt           DateTime              @updatedAt @map("updated_at")
+  targetDirectory     String?                     @map("target_directory")
+  readmePath          String?                     @map("readme_path")
+  readmeText          String?                     @map("readme_text") @db.Text
+  readmeFetchedAt     DateTime?                   @map("readme_fetched_at")
+  defaultBranch       String                      @default("main") @map("default_branch")
+  isPrivate           Boolean                     @default(false) @map("is_private")
+  inheritedRegion     DataResidencyRegion?        @map("inherited_region")
+  overrideAllowed     Boolean                     @default(false) @map("override_allowed")
+  stars               Int                         @default(0)
+  forks               Int                         @default(0)
+  size                Int                         @default(0) // Size in bytes
+  lastAnalyzedAt      DateTime?                   @map("last_analyzed_at")
+  status              String                      @default("pending") // pending, analyzing, completed, failed
+  userId              Int                         @map("user_id")
+  user                User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt           DateTime                    @default(now()) @map("created_at")
+  updatedAt           DateTime                    @updatedAt @map("updated_at")
   branches            Branch[]
   commits             Commit[]
   files               File[]
@@ -444,17 +444,17 @@ model AiRequestLog {
 }
 
 model WebhookEvent {
-  id           String    @id @default(uuid()) @db.Uuid
-  event        String
-  action       String?
-  payload      Json
-  status       String    @default("pending") // pending, processing, completed, failed, rate_limited
-  error        String?   @db.Text
-  retryCount   Int       @default(0) @map("retry_count")
-  maxRetries   Int       @default(3) @map("max_retries")
-  nextRetryAt  DateTime? @map("next_retry_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id          String    @id @default(uuid()) @db.Uuid
+  event       String
+  action      String?
+  payload     Json
+  status      String    @default("pending") // pending, processing, completed, failed, rate_limited
+  error       String?   @db.Text
+  retryCount  Int       @default(0) @map("retry_count")
+  maxRetries  Int       @default(3) @map("max_retries")
+  nextRetryAt DateTime? @map("next_retry_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@index([status, createdAt])
   @@index([status, nextRetryAt])
@@ -486,14 +486,14 @@ model SecuritySandbox {
 }
 
 model ReviewPolicy {
-  id             Int      @id @default(autoincrement())
-  repositoryId   Int      @map("repository_id")
-  name           String
-  description    String?  @db.Text
-  rules          Json     // Array of { rule: string, severity: "critical"|"high"|"medium"|"low" }
-  enabled        Boolean  @default(true)
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id           Int      @id @default(autoincrement())
+  repositoryId Int      @map("repository_id")
+  name         String
+  description  String?  @db.Text
+  rules        Json // Array of { rule: string, severity: "critical"|"high"|"medium"|"low" }
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
@@ -529,84 +529,83 @@ model RateLimit {
 }
 
 model Organization {
-  id          String   @id @default(uuid()) @db.Uuid
-  githubOrgId         BigInt                @unique @map("github_org_id")
+  id                  String              @id @default(uuid()) @db.Uuid
+  githubOrgId         BigInt              @unique @map("github_org_id")
   name                String
-  dataResidencyRegion DataResidencyRegion   @default(US) @map("data_residency_region")
-  complianceMode      String                @default("STANDARD") @map("compliance_mode")
-  createdAt           DateTime              @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  dataResidencyRegion DataResidencyRegion @default(US) @map("data_residency_region")
+  complianceMode      String              @default("STANDARD") @map("compliance_mode")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
 
-  policies    OrganizationPolicy?
-  members     OrganizationMember[]
+  policies     OrganizationPolicy?
+  members      OrganizationMember[]
   repositories RepositoryPolicyAssignment[]
 
   @@map("organizations")
 }
 
 model OrganizationPolicy {
-  id                     String       @id @default(uuid()) @db.Uuid
-  organizationId         String       @unique @map("organization_id") @db.Uuid
-  enforceSecurityReviews Boolean      @default(false) @map("enforce_security_reviews")
-  enforceSecretScanning  Boolean      @default(false) @map("enforce_secret_scanning")
-  blockCriticalSecrets   Boolean      @default(false) @map("block_critical_secrets")
-  blackoutWindowsEnabled Boolean      @default(false) @map("blackout_windows_enabled")
-  policyLockEnabled      Boolean      @default(false) @map("policy_lock_enabled")
-  createdAt              DateTime     @default(now()) @map("created_at")
-  updatedAt              DateTime     @updatedAt @map("updated_at")
+  id                     String   @id @default(uuid()) @db.Uuid
+  organizationId         String   @unique @map("organization_id") @db.Uuid
+  enforceSecurityReviews Boolean  @default(false) @map("enforce_security_reviews")
+  enforceSecretScanning  Boolean  @default(false) @map("enforce_secret_scanning")
+  blockCriticalSecrets   Boolean  @default(false) @map("block_critical_secrets")
+  blackoutWindowsEnabled Boolean  @default(false) @map("blackout_windows_enabled")
+  policyLockEnabled      Boolean  @default(false) @map("policy_lock_enabled")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
 
-  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("organization_policies")
 }
 
 model RepositoryPolicyAssignment {
-  id               String       @id @default(uuid()) @db.Uuid
-  repositoryId     Int          @unique @map("repository_id")
-  organizationId   String       @map("organization_id") @db.Uuid
-  inheritedPolicy  Boolean      @default(true) @map("inherited_policy")
-  
-  enforceSecurityReviews Boolean?     @map("enforce_security_reviews")
-  enforceSecretScanning  Boolean?     @map("enforce_secret_scanning")
-  blockCriticalSecrets   Boolean?     @map("block_critical_secrets")
+  id              String  @id @default(uuid()) @db.Uuid
+  repositoryId    Int     @unique @map("repository_id")
+  organizationId  String  @map("organization_id") @db.Uuid
+  inheritedPolicy Boolean @default(true) @map("inherited_policy")
 
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  enforceSecurityReviews Boolean? @map("enforce_security_reviews")
+  enforceSecretScanning  Boolean? @map("enforce_secret_scanning")
+  blockCriticalSecrets   Boolean? @map("block_critical_secrets")
 
-  repository       Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@map("repository_policy_assignments")
 }
 
 model OrganizationMember {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  userId         Int          @map("user_id")
-  role           String       @default("CONTRIBUTOR") // ORG_ADMIN, REPO_ADMIN, CONTRIBUTOR
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         Int      @map("user_id")
+  role           String   @default("CONTRIBUTOR") // ORG_ADMIN, REPO_ADMIN, CONTRIBUTOR
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, userId])
   @@map("organization_members")
 }
 
 model AuditLog {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String?      @map("organization_id") @db.Uuid
-  repositoryId   Int?         @map("repository_id")
-  userId         Int?         @map("user_id")
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  repositoryId   Int?     @map("repository_id")
+  userId         Int?     @map("user_id")
   action         String
   resource       String
   details        Json
-  createdAt      DateTime     @default(now()) @map("created_at")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([repositoryId, createdAt(sort: Desc)])
   @@map("audit_logs")
 }
-

@@ -142,6 +142,7 @@ class AnalysisJobService {
                 status: "FAILED",
                 finishedAt: new Date(),
                 progressMessage: "Analysis failed. Please try again.",
+                progressPercent: null,
                 error: params.error,
                 lockedAt: null,
                 lockedBy: null,
@@ -207,6 +208,8 @@ class AnalysisJobService {
             data: {
                 status: "FAILED",
                 error: "Job timed out - no heartbeat received",
+                progressMessage: "Job timed out - no heartbeat received",
+                progressPercent: null,
                 finishedAt: new Date(),
                 lockedAt: null,
                 lockedBy: null,

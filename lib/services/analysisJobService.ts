@@ -1,6 +1,7 @@
 import prisma from "../prisma";
 import type { AnalysisJob } from "@prisma/client";
 import { Prisma } from "@prisma/client";
+import { isRetryableError, computeBackoffMs } from "../utils/retry";
 
 export type JobProgressUpdate = {
   progressPercent?: number;
@@ -9,24 +10,6 @@ export type JobProgressUpdate = {
 };
 
 const DEFAULT_LOCK_MS = 5 * 60 * 1000;
-function isRetryableError(error: any): boolean {
-  const message = error?.message?.toLowerCase() || "";
-
-  return (
-    message.includes("timeout") ||
-    message.includes("network") ||
-    message.includes("rate limit") ||
-    message.includes("fetch failed") ||
-    message.includes("temporarily unavailable")
-  );
-}
-
-function computeBackoffMs(attempt: number): number {
-  // Exponential backoff with cap (10s, 20s, 40s, ... up to 5m)
-  const base = 10_000;
-  const max = 5 * 60_000;
-  return Math.min(max, base * Math.pow(2, Math.max(0, attempt - 1)));
-}
 
 export class AnalysisJobService {
   async createRepositoryAnalysisJob(params: {
@@ -180,6 +163,7 @@ export class AnalysisJobService {
         status: "FAILED",
         finishedAt: new Date(),
         progressMessage: "Analysis failed. Please try again.",
+        progressPercent: null,
         error: params.error,
         lockedAt: null,
         lockedBy: null,
@@ -252,6 +236,8 @@ export class AnalysisJobService {
       data: {
         status: "FAILED",
         error: "Job timed out - no heartbeat received",
+        progressMessage: "Job timed out - no heartbeat received",
+        progressPercent: null,
         finishedAt: new Date(),
         lockedAt: null,
         lockedBy: null,
