@@ -35,6 +35,7 @@ describe('src/utils/graphAnalyzer', () => {
     expect(nodes.some((n) => n.id === 'file-src/nested/c.ts')).toBe(true);
     expect(nodes.some((n) => n.id === 'folder-src')).toBe(true);
     expect(nodes.some((n) => n.id === 'folder-src/nested')).toBe(true);
+    expect(links.some((l) => l.isCyclic === true)).toBe(true);
   });
 
   it('handles empty files array', () => {
@@ -51,9 +52,7 @@ describe('src/utils/graphAnalyzer', () => {
     expect(links).toHaveLength(0);
   });
 
-  it('limits files to top 30 by line count', () => {
-    // Note: GraphAnalyzer does not currently limit top 30 in buildDependencyGraph.
-    // Let's adapt this test to check that nodes are built.
+  it('handles large file sets', () => {
     const analyzer = new GraphAnalyzer();
     const files = Array.from({ length: 50 }, (_, i) => ({
       path: `src/file${i}.ts`,
@@ -79,6 +78,8 @@ describe('src/utils/graphAnalyzer', () => {
     const folderIds = nodes.filter((n) => n.type === 'folder').map((n) => n.id);
     expect(folderIds).toContain('folder-a');
     expect(folderIds).toContain('folder-a/b');
+    expect(folderIds).toContain('folder-a/b/c');
+    expect(folderIds).toContain('folder-a/b/c/d');
   });
 
   it('handles files with no dependencies', () => {

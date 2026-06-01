@@ -223,6 +223,43 @@ export class GraphAnalyzer {
       }
     });
 
+    // Safe cycle detection traversal
+    const adj = new Map<string, string[]>();
+    links.forEach(l => {
+      if (!adj.has(l.source)) adj.set(l.source, []);
+      adj.get(l.source)!.push(l.target);
+    });
+
+    const visited = new Set<string>();
+    const recStack = new Set<string>();
+    const cyclicLinks = new Set<string>();
+
+    const dfs = (u: string) => {
+      visited.add(u);
+      recStack.add(u);
+
+      const neighbors = adj.get(u) || [];
+      for (const v of neighbors) {
+        if (recStack.has(v)) {
+          cyclicLinks.add(`${u}->${v}`);
+        } else if (!visited.has(v)) {
+          dfs(v);
+        }
+      }
+
+      recStack.delete(u);
+    };
+
+    for (const u of adj.keys()) {
+      if (!visited.has(u)) {
+        dfs(u);
+      }
+    }
+
+    links.forEach(l => {
+      l.isCyclic = cyclicLinks.has(`${l.source}->${l.target}`);
+    });
+
     return {
       nodes: Array.from(nodesMap.values()),
       links
