@@ -30,6 +30,10 @@ jest.mock("@/lib/services/imageService", () => ({
   validateHttpAvatarUrl: jest.fn(),
 }));
 
+jest.mock("@/lib/utils/withErrorHandler", () => ({
+  withErrorHandler: jest.fn((handler) => handler),
+}));
+
 import { POST } from "../route";
 import { requireAuth } from "@/lib/middleware";
 import {
@@ -85,12 +89,13 @@ describe("POST /api/upload/avatar", () => {
         error: "No file provided",
       });
 
-      const formData = new FormData();
       const request = new NextRequest("http://localhost/api/upload/avatar", {
         method: "POST",
         headers: { "content-type": "multipart/form-data" },
-        body: formData,
       });
+      request.formData = jest.fn().mockResolvedValue({
+        get: () => null,
+      } as any);
 
       const response = await POST(request);
       const data = await response.json();
@@ -109,14 +114,13 @@ describe("POST /api/upload/avatar", () => {
       const file = new File(["test"], "document.pdf", {
         type: "application/pdf",
       });
-      const formData = new FormData();
-      formData.append("file", file);
-
       const request = new NextRequest("http://localhost/api/upload/avatar", {
         method: "POST",
         headers: { "content-type": "multipart/form-data" },
-        body: formData,
       });
+      request.formData = jest.fn().mockResolvedValue({
+        get: () => file,
+      } as any);
 
       const response = await POST(request);
       const data = await response.json();
@@ -131,18 +135,16 @@ describe("POST /api/upload/avatar", () => {
         error: "File too large. Maximum size: 500KB",
       });
 
-      const largeContent = new ArrayBuffer(600 * 1024);
-      const file = new File([largeContent], "large.jpg", {
+      const file = new File([new ArrayBuffer(10)], "large.jpg", {
         type: "image/jpeg",
       });
-      const formData = new FormData();
-      formData.append("file", file);
-
       const request = new NextRequest("http://localhost/api/upload/avatar", {
         method: "POST",
         headers: { "content-type": "multipart/form-data" },
-        body: formData,
       });
+      request.formData = jest.fn().mockResolvedValue({
+        get: () => file,
+      } as any);
 
       const response = await POST(request);
       const data = await response.json();
@@ -156,14 +158,14 @@ describe("POST /api/upload/avatar", () => {
       (validateImageFile as jest.Mock).mockReturnValue({ valid: true });
 
       const file = new File(["test"], "avatar.jpg", { type: "image/jpeg" });
-      const formData = new FormData();
-      formData.append("file", file);
-
+      file.arrayBuffer = jest.fn().mockResolvedValue(new ArrayBuffer(10));
       const request = new NextRequest("http://localhost/api/upload/avatar", {
         method: "POST",
         headers: { "content-type": "multipart/form-data" },
-        body: formData,
       });
+      request.formData = jest.fn().mockResolvedValue({
+        get: () => file,
+      } as any);
 
       const response = await POST(request);
       const data = await response.json();
