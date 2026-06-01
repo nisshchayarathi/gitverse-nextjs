@@ -56,8 +56,8 @@ model User {
   loginAttempts           LoginAttempt[]
   aiRequestLogs           AiRequestLog[]
   organizationMemberships OrganizationMember[]
-  mapAnnotations        MapAnnotation[]
-  annotationActivities  AnnotationActivity[]
+  mapAnnotations          MapAnnotation[]
+  annotationActivities    AnnotationActivity[]
 
   @@map("users")
 }
@@ -108,8 +108,8 @@ model PullRequest {
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
 
-  repo    GitHubRepo @relation(fields: [repoId], references: [id], onDelete: Cascade)
-  reviews PRReview[]
+  repo           GitHubRepo         @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  reviews        PRReview[]
   impactAnalyses PRImpactAnalysis[]
 
   @@unique([repoId, prNumber])
@@ -134,17 +134,18 @@ model PRReview {
 }
 
 model PRImpactAnalysis {
-  id              String      @id @default(uuid()) @db.Uuid
-  pullRequestId   Int         @map("pull_request_id")
-  headSha         String      @map("head_sha")
-  riskScore       Float?      @map("risk_score")
-  impactSummary   String      @map("impact_summary") @db.Text
-  breakingChanges Boolean     @default(false) @map("breaking_changes")
-  aiMetrics       Json?       @map("ai_metrics")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  id              String   @id @default(uuid()) @db.Uuid
+  pullRequestId   Int      @map("pull_request_id")
+  headSha         String   @map("head_sha")
+  riskScore       Float?   @map("risk_score")
+  impactSummary   String   @map("impact_summary") @db.Text
+  breakingChanges Boolean  @default(false) @map("breaking_changes")
+  aiMetrics       Json?    @map("ai_metrics")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  pullRequest     PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+  pullRequest PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+
   @@unique([pullRequestId, headSha])
   @@index([pullRequestId])
   @@map("pr_impact_analyses")
@@ -232,7 +233,7 @@ model Repository {
   mapAnnotations      MapAnnotation[]
   knowledge           RepositoryKnowledge?
   syncJobs            RepositorySyncJob[]
-  lastSynchronizedAt  DateTime?             @map("last_synchronized_at")
+  lastSynchronizedAt  DateTime?                   @map("last_synchronized_at")
 
   @@index([url])
   @@index([userId])
@@ -249,13 +250,12 @@ model RepositorySyncJob {
   completedAt  DateTime? @map("completed_at")
   errorMessage String?   @map("error_message") @db.Text
 
-  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
   @@index([repositoryId, startedAt(sort: Desc)])
   @@index([status])
   @@map("repository_sync_jobs")
 }
-
 
 model AnalysisJob {
   id     String    @id @default(uuid()) @db.Uuid
@@ -652,21 +652,21 @@ model AuditLog {
 }
 
 model MapAnnotation {
-  id              String               @id @default(uuid()) @db.Uuid
-  repositoryId    Int                  @map("repository_id")
-  authorId        Int                  @map("author_id")
-  targetType      String               @map("target_type") // 'node' | 'edge'
-  targetId        String               @map("target_id")
-  content         String               @db.Text
-  annotationType  String               @map("annotation_type") // 'comment' | 'warning' | 'technical-debt' | 'refactor' | 'documentation' | 'issue-link'
-  positionX       Float?               @map("position_x")
-  positionY       Float?               @map("position_y")
-  createdAt       DateTime             @default(now()) @map("created_at")
-  updatedAt       DateTime             @updatedAt @map("updated_at")
+  id             String   @id @default(uuid()) @db.Uuid
+  repositoryId   Int      @map("repository_id")
+  authorId       Int      @map("author_id")
+  targetType     String   @map("target_type") // 'node' | 'edge'
+  targetId       String   @map("target_id")
+  content        String   @db.Text
+  annotationType String   @map("annotation_type") // 'comment' | 'warning' | 'technical-debt' | 'refactor' | 'documentation' | 'issue-link'
+  positionX      Float?   @map("position_x")
+  positionY      Float?   @map("position_y")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  repository      Repository           @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  author          User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  activities      AnnotationActivity[]
+  repository Repository           @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  author     User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  activities AnnotationActivity[]
 
   @@index([repositoryId])
   @@index([targetId])
@@ -674,31 +674,30 @@ model MapAnnotation {
 }
 
 model AnnotationActivity {
-  id              String        @id @default(uuid()) @db.Uuid
-  annotationId    String        @map("annotation_id") @db.Uuid
-  userId          Int           @map("user_id")
-  action          String        // 'created' | 'updated' | 'deleted'
-  details         Json?
-  createdAt       DateTime      @default(now()) @map("created_at")
+  id           String   @id @default(uuid()) @db.Uuid
+  annotationId String   @map("annotation_id") @db.Uuid
+  userId       Int      @map("user_id")
+  action       String // 'created' | 'updated' | 'deleted'
+  details      Json?
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  annotation      MapAnnotation @relation(fields: [annotationId], references: [id], onDelete: Cascade)
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  annotation MapAnnotation @relation(fields: [annotationId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([annotationId, createdAt(sort: Desc)])
   @@map("annotation_activities")
 }
 
 model RepositoryKnowledge {
-  id                   Int        @id @default(autoincrement())
-  repositoryId         Int        @unique @map("repository_id")
-  glossary             Json?
-  onboardingNotes      Json?      @map("onboarding_notes")
+  id                     Int      @id @default(autoincrement())
+  repositoryId           Int      @unique @map("repository_id")
+  glossary               Json?
+  onboardingNotes        Json?    @map("onboarding_notes")
   architecturePrinciples Json?    @map("architecture_principles")
-  projectDescription   String?    @map("project_description") @db.Text
-  updatedAt            DateTime   @updatedAt @map("updated_at")
+  projectDescription     String?  @map("project_description") @db.Text
+  updatedAt              DateTime @updatedAt @map("updated_at")
 
-  repository           Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
   @@map("repository_knowledge")
 }
-
