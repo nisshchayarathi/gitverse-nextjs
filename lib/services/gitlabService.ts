@@ -28,6 +28,30 @@ export interface GitLabUser {
   avatar_url: string
 }
 
+export interface GitLabBranch {
+  name: string
+  merged: boolean
+  protected: boolean
+  default: boolean
+  web_url: string
+}
+
+export interface GitLabCommit {
+  id: string
+  short_id: string
+  title: string
+  author_name: string
+  author_email: string
+  created_at: string
+  web_url: string
+}
+
+export interface GitLabContributor {
+  name: string
+  email: string
+  commits: number
+}
+
 export class GitLabService {
   private client: AxiosInstance
   private token?: string
@@ -50,7 +74,7 @@ export class GitLabService {
       throw new Error('GitLab token required for authentication')
     }
 
-    const response = await this.client.get('/user')
+    const response = await this.client.get<GitLabUser>('/user')
     return response.data
   }
 
@@ -58,7 +82,7 @@ export class GitLabService {
    * Get project by ID
    */
   async getProject(projectId: string): Promise<GitLabProject> {
-    const response = await this.client.get(`/projects/${encodeURIComponent(projectId)}`)
+    const response = await this.client.get<GitLabProject>(`/projects/${encodeURIComponent(projectId)}`)
     return response.data
   }
 
@@ -71,7 +95,7 @@ export class GitLabService {
     per_page?: number
     page?: number
   }): Promise<GitLabProject[]> {
-    const response = await this.client.get('/projects', {
+    const response = await this.client.get<GitLabProject[]>('/projects', {
       params: {
         owned: params?.owned ?? true,
         membership: params?.membership ?? true,
@@ -86,8 +110,8 @@ export class GitLabService {
   /**
    * Get project branches
    */
-  async getBranches(projectId: string): Promise<any[]> {
-    const response = await this.client.get(
+ async getBranches(projectId: string): Promise<GitLabBranch[]> {
+    const response = await this.client.get<GitLabBranch[]>(
       `/projects/${encodeURIComponent(projectId)}/repository/branches`
     )
     return response.data
@@ -103,8 +127,8 @@ export class GitLabService {
       per_page?: number
       page?: number
     }
-  ): Promise<any[]> {
-    const response = await this.client.get(
+  ): Promise<GitLabCommit[]> {
+    const response = await this.client.get<GitLabCommit[]>(
       `/projects/${encodeURIComponent(projectId)}/repository/commits`,
       {
         params: {
@@ -121,8 +145,8 @@ export class GitLabService {
   /**
    * Get project contributors
    */
-  async getContributors(projectId: string): Promise<any[]> {
-    const response = await this.client.get(
+  async getContributors(projectId: string): Promise<GitLabContributor[]> {
+    const response = await this.client.get<GitLabContributor[]>(
       `/projects/${encodeURIComponent(projectId)}/repository/contributors`
     )
     return response.data
