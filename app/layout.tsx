@@ -1,24 +1,13 @@
 import "@/lib/env";
 import { ReactNode } from "react";
 import { Metadata } from "next";
-import { Inter, Source_Sans_3 } from "next/font/google";
+const inter = { variable: "font-sans" };
+const sourceSans = { variable: "font-sans" };
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const sourceSans = Source_Sans_3({
-  subsets: ["latin"],
-  variable: "--font-source-sans",
-  display: "swap",
-});
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://gitverse.dev";
 
