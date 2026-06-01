@@ -7,6 +7,14 @@ import { IncidentReport } from "@/types/incident-response";
 
 export async function POST(req: NextRequest) {
   try {
+    const webhookSecret = process.env.INCIDENT_WEBHOOK_SECRET;
+    if (webhookSecret) {
+      const headerSecret = req.headers.get("x-webhook-secret");
+      if (!headerSecret || headerSecret !== webhookSecret) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    }
+
     const payload = await req.json();
     
     // In a real scenario, we'd determine source via headers (e.g., x-sentry-trace, x-datadog-trace-id)
@@ -21,10 +29,11 @@ export async function POST(req: NextRequest) {
     const ingestionService = getIncidentIngestionService();
     const incident = ingestionService.processWebhook(source, payload);
 
-    // Hardcoding for MVP, normally these would come from query params, URL params, or DB lookups 
-    // mapped from the incident project
     const url = new URL(req.url);
     const installationId = parseInt(url.searchParams.get("installationId") || "1", 10);
+    if (isNaN(installationId)) {
+      return NextResponse.json({ error: "Invalid installationId" }, { status: 400 });
+    }
     const owner = url.searchParams.get("owner") || "owner";
     const repo = url.searchParams.get("repo") || "repo";
 
