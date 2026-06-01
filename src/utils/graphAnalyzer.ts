@@ -223,41 +223,72 @@ export class GraphAnalyzer {
       }
     });
 
-    // Safe cycle detection traversal
+    // Safe cycle detection using Tarjan's Strongly Connected Components (SCC) algorithm.
+    // This correctly identifies all nodes and edges belonging to any cycle.
     const adj = new Map<string, string[]>();
+    const allNodes = new Set<string>();
     links.forEach(l => {
+      allNodes.add(l.source);
+      allNodes.add(l.target);
       if (!adj.has(l.source)) adj.set(l.source, []);
       adj.get(l.source)!.push(l.target);
     });
 
-    const visited = new Set<string>();
-    const recStack = new Set<string>();
-    const cyclicLinks = new Set<string>();
+    const indexMap = new Map<string, number>();
+    const lowlinkMap = new Map<string, number>();
+    const onStack = new Set<string>();
+    const stack: string[] = [];
+    let index = 0;
 
-    const dfs = (u: string) => {
-      visited.add(u);
-      recStack.add(u);
+    const componentIds = new Map<string, number>();
+    const componentSizes = new Map<number, number>();
+    let componentCounter = 0;
+
+    const strongconnect = (u: string) => {
+      indexMap.set(u, index);
+      lowlinkMap.set(u, index);
+      index++;
+      stack.push(u);
+      onStack.add(u);
 
       const neighbors = adj.get(u) || [];
       for (const v of neighbors) {
-        if (recStack.has(v)) {
-          cyclicLinks.add(`${u}->${v}`);
-        } else if (!visited.has(v)) {
-          dfs(v);
+        if (!indexMap.has(v)) {
+          strongconnect(v);
+          lowlinkMap.set(u, Math.min(lowlinkMap.get(u)!, lowlinkMap.get(v)!));
+        } else if (onStack.has(v)) {
+          lowlinkMap.set(u, Math.min(lowlinkMap.get(u)!, indexMap.get(v)!));
         }
       }
 
-      recStack.delete(u);
+      if (lowlinkMap.get(u) === indexMap.get(u)) {
+        const componentId = componentCounter++;
+        let size = 0;
+        let w: string;
+        do {
+          w = stack.pop()!;
+          onStack.delete(w);
+          componentIds.set(w, componentId);
+          size++;
+        } while (w !== u);
+        componentSizes.set(componentId, size);
+      }
     };
 
-    for (const u of adj.keys()) {
-      if (!visited.has(u)) {
-        dfs(u);
+    for (const u of allNodes) {
+      if (!indexMap.has(u)) {
+        strongconnect(u);
       }
     }
 
     links.forEach(l => {
-      l.isCyclic = cyclicLinks.has(`${l.source}->${l.target}`);
+      if (l.source === l.target) {
+        l.isCyclic = true;
+      } else {
+        const sComp = componentIds.get(l.source);
+        const tComp = componentIds.get(l.target);
+        l.isCyclic = sComp !== undefined && sComp === tComp && (componentSizes.get(sComp) || 0) > 1;
+      }
     });
 
     return {
