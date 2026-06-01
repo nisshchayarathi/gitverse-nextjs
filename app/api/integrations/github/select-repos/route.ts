@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
-import { GitHubRateLimitError } from "@/lib/services/githubService";
+import {
+  describeGitHubError,
+  isGitHubError,
+} from "@/lib/utils/githubResilience";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
     const body = await request.json();
+
     const repoFullNames = Array.isArray(body?.repoFullNames)
       ? Array.from(
           new Set(
@@ -89,12 +93,24 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ repos: toJsonSafe(repos) }, { status: 200 });
   } catch (error: any) {
+    // sanitizeError + the GitHub resilience layer guarantee provider tokens and
+    // Authorization headers are never written to logs.
     console.error("GitHub select repos error:", sanitizeError(error));
 
-    if (error instanceof GitHubRateLimitError) {
+    // GitHub provider errors -> consistent, actionable messages that distinguish
+    // rate limits, temporary outages, and authentication issues. Checked before
+    // isHttpError because some typed GitHub errors also carry a `status`.
+    if (isGitHubError(error)) {
+      const described = describeGitHubError(error);
       return NextResponse.json(
-        { error: error.message, retryAfter: error.retryAfterSeconds },
-        { status: 429 },
+        {
+          error: described.message,
+          code: described.code,
+          ...(described.retryAfter != null
+            ? { retryAfter: described.retryAfter }
+            : {}),
+        },
+        { status: described.status },
       );
     }
 
