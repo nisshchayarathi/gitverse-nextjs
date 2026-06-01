@@ -134,6 +134,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.email}`,
       };
 
+      localStorage.removeItem("gitverse_token");
+      sessionStorage.removeItem("gitverse_token");
       const storage = rememberMe ? localStorage : sessionStorage;
       storage.setItem("gitverse_token", data.token);
       setUser(newUser);
@@ -172,6 +174,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.email}`,
       };
 
+      localStorage.removeItem("gitverse_token");
+      sessionStorage.removeItem("gitverse_token");
       localStorage.setItem("gitverse_token", data.token);
       setUser(newUser);
     } catch (error) {
