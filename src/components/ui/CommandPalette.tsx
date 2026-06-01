@@ -21,12 +21,17 @@ export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
   const router = useRouter();
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
-  }, []);
+useEffect(() => {
+  const savedTheme = localStorage.getItem("theme");
+
+  const resolvedTheme =
+    savedTheme === "light" || savedTheme === "dark"
+      ? savedTheme
+      : "light";
+
+  setTheme(resolvedTheme);
+  localStorage.setItem("theme", resolvedTheme);
+}, []);
 
   const toggleTheme = () => {
     const newTheme = theme === "light" ? "dark" : "light";

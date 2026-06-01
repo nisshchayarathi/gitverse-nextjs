@@ -305,7 +305,7 @@ User Question: ${input}`;
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 bg-gradient-to-r from-primary to-accent text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 z-50 group"
+className="fixed right-6 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-r from-primary to-accent text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 z-50 group"
         aria-label="Open AI Assistant"
       >
         <Sparkles className="w-6 h-6" />
