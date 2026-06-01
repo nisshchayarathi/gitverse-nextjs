@@ -29,6 +29,12 @@ export async function GET(request: NextRequest) {
     // Fetch one extra item to determine if there is a next page
     const sessions = await prisma.session.findMany({
       where: { userId: user.userId },
+      select: {
+        id: true,
+        expires: true,
+        createdAt: true,
+        updatedAt: true,
+      },
       take: limit + 1,
       skip: cursor ? 1 : 0,
       cursor: cursor ? { id: cursor } : undefined,
