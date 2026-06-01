@@ -1,6 +1,5 @@
 import { GitHubService } from "@/lib/services/githubService";
-import { GeminiService } from "@/lib/services/geminiService";
-import { getActivePoliciesForRepository, buildPolicyPromptSection } from "@/lib/services/reviewPolicyService";
+import { getGeminiService } from "@/lib/services/geminiService";
 
 export type ReviewSeverity = "critical" | "high" | "medium" | "low";
 export type ReviewCategory =
@@ -312,7 +311,10 @@ ${impactContext}
 Diff (subset, may be truncated):\n${diff}
 `;
 
-    const gemini = new GeminiService();
+  let raw: string;
+  let tokensConsumed: number = 0;
+  try {
+    const gemini = getGeminiService();
     const result = await gemini.chatRaw(prompt);
     const parsed = safeParseReviewJson(result.text);
     if (!parsed) {
