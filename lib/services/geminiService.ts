@@ -73,20 +73,8 @@ export class GeminiService {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       return response.text();
-    } catch (error: any) {
-      console.error("Gemini analysis error:", error);
-
-      const message = error?.message?.toLowerCase() || "";
-
-      if (
-        message.includes("quota") ||
-        message.includes("rate limit") ||
-        message.includes("429")
-      ) {
-        throw new Error("Gemini API quota exceeded. Please try again later.");
-      }
-
-      throw new Error(`AI analysis failed: ${error.message}`);
+    } catch (error) {
+      this.handleGeminiError(error, "AI analysis");
     }
   }
 
@@ -107,20 +95,8 @@ export class GeminiService {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       return response.text();
-    } catch (error: any) {
-      console.error("Gemini analysis error:", error);
-
-      const message = error?.message?.toLowerCase() || "";
-
-      if (
-        message.includes("quota") ||
-        message.includes("rate limit") ||
-        message.includes("429")
-      ) {
-        throw new Error("Gemini API quota exceeded. Please try again later.");
-      }
-
-      throw new Error(`AI analysis failed: ${error.message}`);
+    } catch (error) {
+      this.handleGeminiError(error, "AI analysis");
     }
   }
 
@@ -140,20 +116,8 @@ export class GeminiService {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       return response.text();
-    } catch (error: any) {
-      console.error("Gemini chat error:", error);
-
-      const message = error?.message?.toLowerCase() || "";
-
-      if (
-        message.includes("quota") ||
-        message.includes("rate limit") ||
-        message.includes("429")
-      ) {
-        throw new Error("Gemini API quota exceeded. Please try again later.");
-      }
-
-      throw new Error(`AI chat failed: ${error.message}`);
+    } catch (error) {
+      this.handleGeminiError(error, "AI chat");
     }
   }
 
@@ -194,20 +158,8 @@ export class GeminiService {
         const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
         return { text, tokensConsumed };
       }
-    } catch (error: any) {
-      console.error("Gemini chat error:", error);
-
-      const message = error?.message?.toLowerCase() || "";
-
-      if (
-        message.includes("quota") ||
-        message.includes("rate limit") ||
-        message.includes("429")
-      ) {
-        throw new Error("Gemini API quota exceeded. Please try again later.");
-      }
-
-      throw new Error(`AI chat failed: ${error.message}`);
+    } catch (error) {
+      this.handleGeminiError(error, "AI chat");
     }
   }
 
@@ -243,13 +195,50 @@ Provide only the commit messages, one per line.
         .split("\n")
         .filter((line) => line.trim())
         .slice(0, 3);
-    } catch (error: any) {
-  console.error("Commit message suggestion error:", error);
+    } catch (error) {
+      this.handleGeminiError(error, "Commit message suggestion");
+    }
+  }
 
-  throw new Error(
-    error?.message || "Failed to generate commit message suggestions"
-  );
-}
+  /**
+   * Centralized helper method to handle Gemini API errors.
+   * Centralized error handling avoids DRY violations by unifying error logs
+   * and error parsing logic, ensuring user-friendly errors and consistent rate-limit checking
+   * across all Gemini API methods.
+   *
+   * @param error The unknown error caught in catch block.
+   * @param context The descriptive context string (e.g. "AI analysis").
+   * @throws A quota-exceeded error if rate-limited, otherwise a formatted context error.
+   */
+  private handleGeminiError(error: unknown, context: string): never {
+    // Determine the proper log prefix based on context to match original error logs
+    const logContext =
+      context === "AI analysis"
+        ? "Gemini analysis"
+        : context === "AI chat"
+        ? "Gemini chat"
+        : context;
+
+    console.error(`${logContext} error:`, error);
+
+    // Prevent undefined error messages by checking error instanceof Error and providing a fallback.
+    const message =
+      error instanceof Error
+        ? error.message || "Unknown Gemini API error"
+        : "Unknown Gemini API error";
+
+    // How quota/rate-limit detection works:
+    // It checks if the error message (case-insensitive) contains "quota", "rate limit", or "429".
+    const lowerMessage = message.toLowerCase();
+    if (
+      lowerMessage.includes("quota") ||
+      lowerMessage.includes("rate limit") ||
+      lowerMessage.includes("429")
+    ) {
+      throw new Error("Gemini API quota exceeded. Please try again later.");
+    }
+
+    throw new Error(`${context} failed: ${message}`);
   }
 
   /**
