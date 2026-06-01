@@ -28,6 +28,7 @@ export default function Login() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
 
   const RepoGraph = ({
     className,
@@ -201,7 +202,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       toast({
         title: "Success!",
         description: "Welcome back to GitVerse",
@@ -324,8 +325,13 @@ export default function Login() {
               className="flex items-center justify-between text-sm animate-fade-in-up"
               style={{ animationDelay: "170ms" }}
             >
-              <label className="flex items-center cursor-pointer">
-                <input type="checkbox" className="mr-2 rounded border-input" />
+              <label className="flex items-center cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="mr-2 rounded border-input cursor-pointer"
+                />
                 <span className="text-muted-foreground">Remember me</span>
               </label>
               <span
