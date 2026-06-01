@@ -13,6 +13,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
+import { normalizeKnownRepoHttpUrl } from "@/lib/utils/repositoryUtils";
+
 
 export function RecentReposList() {
   const router = useRouter();
@@ -63,9 +65,11 @@ export function RecentReposList() {
       });
 
       const userRepos = response.data.repositories || [];
-      const existingRepo = userRepos.find(
-        (r: any) => r.url.toLowerCase().trim() === repo.url.toLowerCase().trim()
-      );
+      const existingRepo = userRepos.find((r: any) => {
+        const normalizedR = normalizeKnownRepoHttpUrl(r.url) || r.url;
+        const normalizedRepo = normalizeKnownRepoHttpUrl(repo.url) || repo.url;
+        return normalizedR.toLowerCase().trim() === normalizedRepo.toLowerCase().trim();
+      });
 
       if (existingRepo) {
         // Navigate straight to the visualization page
@@ -77,11 +81,13 @@ export function RecentReposList() {
           description: `Adding ${repo.name} to your dashboard...`,
         });
 
+        const normalizedUrl = normalizeKnownRepoHttpUrl(repo.url) || repo.url;
+
         const createResponse = await axios.post(
           buildApiUrl("/api/repositories"),
           {
             name: repo.name,
-            url: repo.url,
+            url: normalizedUrl,
             description: `Imported from recently viewed: ${repo.url}`,
           },
           {

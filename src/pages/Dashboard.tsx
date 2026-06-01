@@ -32,6 +32,8 @@ import { toast } from "@/hooks/use-toast";
 import { useRecentRepos } from "@/hooks/useRecentRepos";
 import { isValidGithubUrl } from "@/lib/utils/validators";
 import { RecentReposList } from "@/components/RecentReposList";
+import { normalizeKnownRepoHttpUrl } from "@/lib/utils/repositoryUtils";
+
 interface Repository {
   id: string;
   name: string;
@@ -99,13 +101,14 @@ export default function Dashboard() {
   // Trigger auto-analysis when analyzeUrl query parameter is provided
   useEffect(() => {
     if (analyzeUrl) {
-      setRepoUrl(analyzeUrl);
+      const normalizedUrl = normalizeKnownRepoHttpUrl(analyzeUrl) || analyzeUrl.trim();
+      setRepoUrl(normalizedUrl);
       
       const triggerAutoAnalyze = async () => {
         setAnalyzing(true);
         try {
           const token = localStorage.getItem("gitverse_token");
-          const cleanUrl = analyzeUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
+          const cleanUrl = normalizedUrl.replace(/\/$/, "").replace(/\.git$/, "");
           const urlParts = cleanUrl.split("/");
           const name = urlParts[urlParts.length - 1] || "repository";
           const owner = urlParts[urlParts.length - 2] || "unknown";
@@ -114,15 +117,15 @@ export default function Dashboard() {
           addRepo({
             owner,
             name,
-            url: analyzeUrl.trim(),
+            url: normalizedUrl,
           });
 
           const response = await axios.post(
             buildApiUrl("/api/repositories"),
             {
               name,
-              url: analyzeUrl.trim(),
-              description: `Repository from direct analysis: ${analyzeUrl}`,
+              url: normalizedUrl,
+              description: `Repository from direct analysis: ${normalizedUrl}`,
             },
             {
               headers: { Authorization: `Bearer ${token}` },
@@ -263,9 +266,10 @@ export default function Dashboard() {
     setAnalyzing(true);
     try {
       const token = localStorage.getItem("gitverse_token");
+      const normalizedUrl = normalizeKnownRepoHttpUrl(repoUrl) || repoUrl.trim();
 
       // Extract owner and name for recent storage
-      const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
+      const cleanUrl = normalizedUrl.replace(/\/$/, "").replace(/\.git$/, "");
       const cleanParts = cleanUrl.split("/");
       const ownerName = cleanParts[cleanParts.length - 2] || "unknown";
       const repoName = cleanParts[cleanParts.length - 1] || "unknown";
@@ -274,7 +278,7 @@ export default function Dashboard() {
         buildApiUrl("/api/repositories"),
         {
           name: repoName,
-          url: repoUrl.trim(),
+          url: normalizedUrl,
           description: `Repository from ${repoUrl}`,
           scope: repoScope.trim() || undefined,
         },
@@ -287,13 +291,15 @@ export default function Dashboard() {
       addRepo({
         owner: ownerName,
         name: repoName,
-        url: repoUrl.trim(),
+        url: normalizedUrl,
       });
 
-      // Check if this is an existing repository
-      const isExisting = repositories.some(
-        (r: any) => r.url === repoUrl.trim(),
-      );
+      // Check if this is an existing repository using normalized URLs
+      const isExisting = repositories.some((r: any) => {
+        const normalizedR = normalizeKnownRepoHttpUrl(r.url) || r.url;
+        const normalizedInput = normalizeKnownRepoHttpUrl(repoUrl) || repoUrl;
+        return normalizedR.toLowerCase().trim() === normalizedInput.toLowerCase().trim();
+      });
 
       await fetchRepositories();
 

@@ -4,31 +4,10 @@ import prisma from "@/lib/prisma";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
-import { normalizeTargetDirectory } from "@/lib/utils/repositoryUtils";
-
-function normalizeKnownRepoHttpUrl(input: string): string | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(input);
-  } catch {
-    return null;
-  }
-
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-
-  const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
-  const supportedHosts = new Set(["github.com", "gitlab.com", "bitbucket.org"]);
-  if (!supportedHosts.has(host)) return input;
-
-  const parts = parsed.pathname.split("/").filter(Boolean);
-  if (parts.length < 2) return null;
-
-  const owner = parts[0];
-  const repo = parts[1].replace(/\.git$/, "");
-  if (!owner || !repo) return null;
-
-  return `${parsed.protocol}//${parsed.host}/${owner}/${repo}`;
-}
+import { 
+  normalizeKnownRepoHttpUrl,
+  normalizeTargetDirectory 
+} from "@/lib/utils/repositoryUtils";
 
 function kickLocalRunner(request: NextRequest) {
   if (process.env.NODE_ENV === "production") return;

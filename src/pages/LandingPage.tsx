@@ -16,6 +16,7 @@ import {
 import { RecentReposList } from "@/components/RecentReposList";
 import { useRecentRepos } from "@/hooks/useRecentRepos";
 import { isValidGithubUrl } from "@/lib/utils/validators";
+import { normalizeKnownRepoHttpUrl } from "@/lib/utils/repositoryUtils";
 import { Navbar, Footer } from "@/components/layout";
 import {
   Button,
@@ -148,7 +149,8 @@ export default function LandingPage() {
     }
 
     // Extract repository owner and name from the URL
-    const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
+    const normalizedUrl = normalizeKnownRepoHttpUrl(repoUrl) || repoUrl.trim();
+    const cleanUrl = normalizedUrl.replace(/\/$/, "").replace(/\.git$/, "");
     const urlParts = cleanUrl.split("/");
     const name = urlParts[urlParts.length - 1] || "";
     const owner = urlParts[urlParts.length - 2] || "";
@@ -157,14 +159,14 @@ export default function LandingPage() {
       addRepo({
         owner,
         name,
-        url: repoUrl.trim(),
+        url: normalizedUrl,
       });
     }
 
     // Demo-only CTA: keep it as UI (no navigation / no analysis).
     setIsLoading(true);
     setTimeout(() => {
-      addRepo({ name, owner, url: cleanUrl });
+      addRepo({ name, owner, url: normalizedUrl });
       setIsLoading(false);
     }, 1500);
   };

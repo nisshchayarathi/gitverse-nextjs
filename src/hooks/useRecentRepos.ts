@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { normalizeKnownRepoHttpUrl } from "@/lib/utils/repositoryUtils";
+
 
 export interface RecentRepository {
   owner: string;
@@ -29,15 +31,19 @@ export function useRecentRepos() {
   // Adds a repository to the top, removes duplicates, and limits length to 5
   const addRepo = useCallback((newRepo: Omit<RecentRepository, "analyzedAt">) => {
     setRepos((prevRepos) => {
+      const normalizedUrl = normalizeKnownRepoHttpUrl(newRepo.url) || newRepo.url.trim();
       const repoToAdd: RecentRepository = {
         ...newRepo,
+        url: normalizedUrl,
         analyzedAt: Date.now(),
       };
 
-      // Exclude duplicate entries matching URL (case-insensitive, trimmed)
-      const filtered = prevRepos.filter(
-        (r) => r.url.toLowerCase().trim() !== repoToAdd.url.toLowerCase().trim()
-      );
+      // Exclude duplicate entries matching URL (case-insensitive, trimmed, normalized)
+      const filtered = prevRepos.filter((r) => {
+        const normR = normalizeKnownRepoHttpUrl(r.url) || r.url;
+        const normToAdd = normalizeKnownRepoHttpUrl(repoToAdd.url) || repoToAdd.url;
+        return normR.toLowerCase().trim() !== normToAdd.toLowerCase().trim();
+      });
 
       // Prepend the new one and limit the size to a maximum of 5 items
       const updated = [repoToAdd, ...filtered].slice(0, 5);
