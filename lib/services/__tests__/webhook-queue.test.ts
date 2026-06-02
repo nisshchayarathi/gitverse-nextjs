@@ -15,7 +15,7 @@ jest.mock("../../prisma", () => ({
 jest.mock("@/services/security/safe-http-client", () => ({
   SafeHttpClient: {
     fetch: jest.fn(() => Promise.resolve({} as any)),
-  }
+  },
 }));
 
 import { SafeHttpClient } from "@/services/security/safe-http-client";
