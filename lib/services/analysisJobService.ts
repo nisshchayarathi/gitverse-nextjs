@@ -187,20 +187,16 @@ export class AnalysisJobService {
     // 1) claim the job via raw SQL and return only the id
     // 2) re-fetch via Prisma Client (typed + camelCase fields)
     const rows = await prisma.$queryRaw<{ id: string }[]>`
-      WITH candidate AS (
-        SELECT a1.id
-        FROM analysis_jobs a1
-        WHERE a1.next_run_at <= NOW()
-          AND a1.status IN ('QUEUED', 'PROCESSING')
-          AND (a1.lock_expires_at IS NULL OR a1.lock_expires_at < NOW())
-          AND NOT EXISTS (
-            SELECT 1 FROM analysis_jobs a2
-            WHERE a2.repository_id = a1.repository_id
-              AND a2.status = 'PROCESSING'
-              AND a2.id != a1.id
-              AND (a2.lock_expires_at IS NULL OR a2.lock_expires_at > NOW())
-          )
-        ORDER BY a1.created_at ASC
+      // Atomic job claiming prevents multiple workers from processing
+// the same job concurrently. SKIP LOCKED ensures already-claimed
+// rows are ignored by competing workers.
+    WITH candidate AS (
+        SELECT id
+        FROM analysis_jobs
+        WHERE next_run_at <= NOW()
+          AND status = 'QUEUED'
+          AND (lock_expires_at IS NULL OR lock_expires_at < NOW())
+        ORDER BY created_at ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
       )
