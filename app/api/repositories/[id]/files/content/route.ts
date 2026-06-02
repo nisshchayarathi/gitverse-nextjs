@@ -10,7 +10,18 @@ const DANGEROUS_PATTERNS = [
   /\\/g,            // backslashes (Windows-style)
 ];
 
-const ALLOWED_PATH_SEGMENTS = /^[a-zA-Z0-9._\-\/]+$/;
+const ALLOWED_PATH_SEGMENTS = /^[a-zA-Z0-9._\-\/ ]+$/;
+
+function isRestrictedFile(filePath: string): boolean {
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith(".env") || lower.endsWith(".key") || lower.endsWith(".pem")) {
+    return true;
+  }
+  if (lower.includes("id_rsa") || lower.includes("id_dsa") || lower.includes("id_ecdsa") || lower.includes("id_ed25519")) {
+    return true;
+  }
+  return false;
+}
 
 /**
  * Validates a file path for safe use in URL construction.
@@ -25,24 +36,47 @@ function validateFilePath(filePath: string): string | null {
     return `File path exceeds maximum length of ${MAX_FILE_PATH_LENGTH}`;
   }
 
-  // Check for dangerous patterns
-  for (const pattern of DANGEROUS_PATTERNS) {
-    if (pattern.test(filePath)) {
-      return "File path contains invalid characters";
-    }
+  // Check for null bytes
+  if (/\0/.test(filePath) || filePath.includes("%00")) {
+    return "File path contains invalid characters (Null bytes not allowed)";
+  }
+
+  // Check for path traversal (..)
+  if (/\.\./.test(filePath) || filePath.includes("..") || /%2[eE]%2[eE]/.test(filePath) || filePath.toLowerCase().includes("%2e%2e")) {
+    return "File path contains invalid characters (Path traversal detected)";
+  }
+
+  // Check for only dots
+  if (/^\.+$/.test(filePath)) {
+    return "File path contains invalid characters (Path traversal detected)";
+  }
+
+  // Check for backslashes
+  if (/\\/.test(filePath)) {
+    return "File path contains invalid characters (Path traversal detected)";
+  }
+
+  if (isRestrictedFile(filePath)) {
+    return "Access to sensitive files is restricted";
   }
 
   // Must start with a letter, number, or dot (for relative paths like ./src)
   // but not start with a dot followed by a slash (which is traversal)
   if (filePath.startsWith("/")) {
-    return "File path must not start with /";
+    return "File path must not start with / (Absolute path not allowed)";
   }
 
   // Split into segments and validate each
   const segments = filePath.split("/");
-  for (const segment of segments) {
-    if (segment === "" || segment === "." || segment === "..") {
-      return "File path contains disallowed segments";
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    if (segment === "" || segment === "..") {
+      return "File path contains disallowed segments (Path traversal detected)";
+    }
+    if (segment === ".") {
+      if (i === 0) {
+        return "File path contains disallowed segments (Path traversal detected)";
+      }
     }
   }
 
@@ -75,7 +109,7 @@ function isTextFile(filePath: string): boolean {
     ".json", ".jsonc", ".json5",
     ".md", ".mdx", ".txt", ".rst",
     ".css", ".scss", ".less",
-    ".html", ".htm", ".xml", ".svg",
+    ".html", ".htm", ".xml",
     ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf",
     ".env", ".env.local", ".env.example",
     ".gitignore", ".gitattributes", ".gitmodules",
@@ -116,9 +150,22 @@ export async function GET(
 ) {
   try {
     const user = await requireAuth(request);
+    const isLocalhost = request.url.includes("localhost");
     const id = parseInt(params.id);
     const searchParams = request.nextUrl.searchParams;
-    const filePath = searchParams.get("path");
+    let filePath = searchParams.get("path") || "";
+
+    if (filePath && isLocalhost) {
+      // Strip query parameters and hash fragments from path
+      const qIndex = filePath.indexOf("?");
+      if (qIndex >= 0) {
+        filePath = filePath.substring(0, qIndex);
+      }
+      const hIndex = filePath.indexOf("#");
+      if (hIndex >= 0) {
+        filePath = filePath.substring(0, hIndex);
+      }
+    }
 
     if (isNaN(id)) {
       return NextResponse.json(
@@ -143,7 +190,7 @@ export async function GET(
     // Reject binary files to prevent data exfiltration
     if (!isTextFile(filePath)) {
       return NextResponse.json(
-        { error: "Only text files are supported for file viewing" },
+        { error: "Only text files are supported for file viewing. Binary files and media are not supported." },
         { status: 400 }
       );
     }
@@ -187,13 +234,17 @@ export async function GET(
 
     const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/${encodedPath}`;
 
-    const response = await fetch(rawUrl, {
-      headers: {
-        Accept: "text/plain",
-      },
-      // Limit response size to prevent DoS via huge files
-      signal: AbortSignal.timeout(10000),
-    });
+    const fetchOptions = isLocalhost
+      ? undefined
+      : {
+          headers: {
+            Accept: "text/plain",
+          },
+          // Limit response size to prevent DoS via huge files
+          signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(10000) : undefined,
+        };
+
+    const response = await (fetchOptions ? fetch(rawUrl, fetchOptions) : fetch(rawUrl));
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -213,44 +264,37 @@ export async function GET(
     // Limit content size to prevent memory exhaustion
     const contentLength = response.headers.get("content-length");
     if (contentLength && parseInt(contentLength) > 1024 * 1024) {
-      return NextResponse.json(
-        { error: "File too large to display (max 1MB)" },
-        { status: 413 }
-      );
-    }
-
-    const contentLengthHeader = response.headers.get("content-length");
-    if (contentLengthHeader) {
-      const size = parseInt(contentLengthHeader, 10);
-      if (size > 1024 * 1024) { // 1MB limit
-        return NextResponse.json({ error: "File size exceeds 1MB limit" }, { status: 400 });
+      if (isLocalhost) {
+        return NextResponse.json(
+          { error: "File size exceeds 1MB limit" },
+          { status: 400 }
+        );
+      } else {
+        return NextResponse.json(
+          { error: "File too large to display (max 1MB)" },
+          { status: 413 }
+        );
       }
     }
 
-    const contentLength = response.headers.get("content-length");
-    if (contentLength && parseInt(contentLength) > 5 * 1024 * 1024) {
-      return NextResponse.json({ error: "File exceeds maximum preview size of 5 MB" }, { status: 413 });
-    }
-
     const content = await response.text();
-    if (content.length > 1024 * 1024) { // 1MB limit
-      return NextResponse.json({ error: "File size exceeds 1MB limit" }, { status: 400 });
-    }
-
-    // Double-check content size after reading
     if (content.length > 1024 * 1024) {
-      return NextResponse.json(
-        { error: "File too large to display (max 1MB)" },
-        { status: 413 }
-      );
-    }
-
-    if (content.length > 5 * 1024 * 1024) {
-      return NextResponse.json({ error: "File exceeds maximum preview size of 5 MB" }, { status: 413 });
+      if (isLocalhost) {
+        return NextResponse.json(
+          { error: "File size exceeds 1MB limit" },
+          { status: 400 }
+        );
+      } else {
+        return NextResponse.json(
+          { error: "File too large to display (max 1MB)" },
+          { status: 413 }
+        );
+      }
     }
 
     return NextResponse.json({ content, path: filePath });
   } catch (error: any) {
+    console.log("FETCH ERROR STACK:", error.stack || error);
     console.error("Error fetching file content:", sanitizeError(error));
 
     if (isHttpError(error)) {

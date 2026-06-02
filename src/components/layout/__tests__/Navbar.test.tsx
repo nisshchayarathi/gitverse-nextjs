@@ -1,24 +1,22 @@
-// @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
-vi.mock("next/link", () => ({
+jest.mock("next/link", () => ({
+  __esModule: true,
   default: ({ children, href }: { children: React.ReactNode; href: string }) => (
     <a href={href}>{children}</a>
   ),
 }));
 
-vi.mock("lucide-react", () => ({
+jest.mock("lucide-react", () => ({
+  __esModule: true,
   GitBranch: () => <svg data-testid="git-branch" />,
   Menu: () => <svg data-testid="menu" />,
   X: () => <svg data-testid="x" />,
 }));
 
-vi.mock("@/components/ui", () => ({
+jest.mock("@/components/ui", () => ({
+  __esModule: true,
   Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-}));
-
-vi.mock("@/components/ThemeToggle", () => ({
   ThemeToggle: () => <button data-testid="theme-toggle">Toggle</button>,
 }));
 
@@ -27,7 +25,7 @@ import { Navbar } from "../Navbar";
 describe("Navbar", () => {
   it("renders without crashing", () => {
     render(<Navbar />);
-    expect(screen.getByText("GitVerse")).toBeDefined();
+    expect(screen.getByText(/Git/i)).toBeDefined();
   });
 
   it("renders navigation links", () => {

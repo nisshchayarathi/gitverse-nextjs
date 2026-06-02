@@ -19,8 +19,6 @@ jest.mock("@/services/security/safe-http-client", () => ({
   },
 }));
 
-import { SafeHttpClient } from "@/services/security/safe-http-client";
-
 describe("WebhookQueueService", () => {
   const queue = new WebhookQueueService();
 

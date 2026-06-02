@@ -491,7 +491,7 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
         expect.stringContaining("src/folder%20name%20with%20spaces/index.js")
       );
 
-      fetchSpy.mockRestore();
+      fetchSpy.mockClear();
     });
 
     it("Scenario 8.2: double encoding bypass verification", async () => {

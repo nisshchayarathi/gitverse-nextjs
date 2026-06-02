@@ -18,6 +18,11 @@ function base64UrlDecodeToString(input: string): string {
 }
 
 function getSecret(): string {
+  if (process.env.GITHUB_APP_STATE_SECRET === "" && process.env.NEXTAUTH_SECRET === "") {
+    throw new Error(
+      "GITHUB_APP_STATE_SECRET (or NEXTAUTH_SECRET) is required for GitHub App install state",
+    );
+  }
   const secret = (
     process.env.GITHUB_APP_STATE_SECRET ||
     getNextAuthSecret()
