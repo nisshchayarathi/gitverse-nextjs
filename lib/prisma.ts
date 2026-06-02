@@ -75,7 +75,8 @@ function createPrismaClient() {
 
   // Connection Pool configuration
   const poolMaxRaw = process.env.PG_POOL_MAX;
-  const defaultPoolMax = process.env.NODE_ENV === "production" ? 10 : 5;
+  // Reduce default production pool max to 2 to prevent exhaustion in serverless scaling
+  const defaultPoolMax = process.env.NODE_ENV === "production" ? 2 : 5;
   const poolMax = poolMaxRaw ? Number(poolMaxRaw) : defaultPoolMax;
   const normalizedPoolMax =
     Number.isFinite(poolMax) && poolMax > 0 ? poolMax : defaultPoolMax;
@@ -138,18 +139,35 @@ function createPrismaClient() {
 
 type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: ExtendedPrismaClient | undefined;
-};
+// Follow Next.js best practices for Prisma Client instantiation while retaining lazy loading
+// for build-time static analysis where DATABASE_URL might not be present.
+
+declare const globalThis: {
+  prismaGlobal: ExtendedPrismaClient | undefined;
+} & typeof global;
 
 export function getPrisma(): ExtendedPrismaClient {
-  if (!globalForPrisma.prisma) {
-    globalForPrisma.prisma = createPrismaClient();
+  if (!globalThis.prismaGlobal) {
+    globalThis.prismaGlobal = createPrismaClient();
   }
-
-  return globalForPrisma.prisma;
+  return globalThis.prismaGlobal;
 }
 
+if (process.env.NODE_ENV !== 'production') {
+  // Ensure the variable is declared so that the getter can use it
+  if (!globalThis.prismaGlobal) {
+    try {
+      // In dev, we try to initialize immediately, but catch if DB URL is missing
+      // to not break tooling.
+      globalThis.prismaGlobal = createPrismaClient();
+    } catch (e) {
+      // Ignore build time errors
+    }
+  }
+}
+
+// Retain the Proxy so that existing code doing `import prisma from './prisma'`
+// can immediately call `prisma.user.findMany()` without changing to `getPrisma().user.findMany()`
 const prisma = new Proxy({} as ExtendedPrismaClient, {
   get(_target, prop) {
     const client = getPrisma() as unknown as Record<PropertyKey, unknown>;

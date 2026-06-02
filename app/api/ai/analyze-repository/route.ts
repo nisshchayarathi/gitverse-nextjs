@@ -19,11 +19,12 @@ export async function POST(request: NextRequest) {
     if (contentTypeError) return contentTypeError;
 
     const body = await request.json();
-    const { repositoryId, type } = body;
+    const { type } = body;
+    const repositoryId = Number(body.repositoryId);
 
-    if (!repositoryId || !type) {
+    if (!body.repositoryId || isNaN(repositoryId) || !type) {
       return NextResponse.json(
-        { error: "Repository ID and analysis type are required" },
+        { error: "Valid Repository ID and analysis type are required" },
         { status: 400 }
       );
     }

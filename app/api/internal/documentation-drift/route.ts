@@ -35,10 +35,8 @@ async function handleDriftDetection(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   } else {
-    // Only allow Vercel cron if no secret configured
-    const userAgent = request.headers.get("user-agent") || "";
-    if (process.env.NODE_ENV === "production" && !userAgent.includes("vercel-cron")) {
-      return NextResponse.json({ error: "Unauthorized - Vercel Cron only" }, { status: 401 });
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json({ error: "Unauthorized - ANALYSIS_RUNNER_SECRET not configured" }, { status: 401 });
     }
   }
 

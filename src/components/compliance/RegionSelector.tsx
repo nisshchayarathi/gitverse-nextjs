@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { toast } from "@/hooks/use-toast";
 
 export default function RegionSelector() {
   const [region, setRegion] = useState("US");
@@ -11,7 +12,10 @@ export default function RegionSelector() {
     // Mock update API call
     setTimeout(() => {
       setIsUpdating(false);
-      alert(`Region updated to ${region}`);
+      toast({
+        title: "Region updated",
+        description: `Data residency region set to ${region}.`,
+      });
     }, 1000);
   };
 

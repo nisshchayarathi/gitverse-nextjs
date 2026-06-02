@@ -1,3 +1,4 @@
+import { SafeHttpClient } from "@/services/security/safe-http-client";
 import { WebhookQueueService } from "../webhook-queue";
 import prisma from "../../prisma";
 

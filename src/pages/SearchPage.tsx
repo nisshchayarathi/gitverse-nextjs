@@ -20,6 +20,14 @@ import {
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
+
+
 interface Repository {
   id: string;
   name: string;
@@ -159,21 +167,39 @@ finally {
     </Button>
   </div>
 
-  <select
-    value={sortBy}
-    onChange={(e) => setSortBy(e.target.value as any)}
-    className="px-3 py-2 rounded-md border border-input bg-background text-sm min-w-[110px]"
-    aria-label="Sort repositories"
-  >
-    <option value="recent">Recent</option>
-    <option value="stars">Most Stars</option>
-    <option value="name">Name</option>
-  </select>
+ <DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button
+  variant="outline"
+  size="sm"
+  aria-label="Sort repositories"
+>
+  {sortBy === "recent"
+    ? "Recent"
+    : sortBy === "stars"
+    ? "Most Stars"
+    : "Name"}
+</Button>
+  </DropdownMenuTrigger>
+
+  <DropdownMenuContent align="end">
+    <DropdownMenuItem onClick={() => setSortBy("recent")}>
+      Recent
+    </DropdownMenuItem>
+
+    <DropdownMenuItem onClick={() => setSortBy("stars")}>
+      Most Stars
+    </DropdownMenuItem>
+
+    <DropdownMenuItem onClick={() => setSortBy("name")}>
+      Name
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
 </div>
 </div>
           </CardContent>
         </Card>
-
         {/* Results Count */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">

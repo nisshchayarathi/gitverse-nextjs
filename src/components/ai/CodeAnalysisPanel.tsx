@@ -328,7 +328,7 @@ export function CodeAnalysisPanel() {
     </button>
   </div>
 ) : (
-            <div className="space-y-4 max-h-[600px] overflow-y-auto">
+            <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar">
               {results.map((result, index) => {
                 const option = analysisOptions.find(
                   (opt) => opt.type === result.type

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { GitBranch, Menu, X } from 'lucide-react'
-import { Button } from '@/components/ui'
-import { ThemeToggle } from '@/components/ThemeToggle'
+import { Button, ThemeToggle } from '@/components/ui'
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -82,7 +81,10 @@ export const Navbar: React.FC = () => {
                 </a>
               ))}
               <div className="flex flex-col gap-3 pt-4 border-t border-border/50">
-                <div className="flex justify-start"><ThemeToggle /></div>
+                <div className="flex items-center justify-between px-2 mb-1">
+                  <span className="text-sm font-medium text-muted-foreground">Theme</span>
+                  <ThemeToggle />
+                </div>
                 <Button className="bg-gradient-primary" asChild>
                   <Link href="/login">Sign In</Link>
                 </Button>

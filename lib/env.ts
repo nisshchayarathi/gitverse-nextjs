@@ -1,7 +1,5 @@
 const requiredEnvVars = [
   "DATABASE_URL",
-  "JWT_SECRET",
-  "NEXTAUTH_SECRET",
   "NEXTAUTH_URL",
   "GEMINI_API_KEY",
   "INTERNAL_WORKER_SECRET",
@@ -12,7 +10,8 @@ function shouldSkipEnvValidation() {
   return (
     process.env.NODE_ENV === "test" ||
     process.env.CI === "true" ||
-    process.env.GITHUB_ACTIONS === "true"
+    process.env.GITHUB_ACTIONS === "true" ||
+    process.env.NEXT_PHASE === "phase-production-build"
   );
 }
 

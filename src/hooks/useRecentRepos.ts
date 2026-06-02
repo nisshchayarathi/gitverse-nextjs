@@ -15,16 +15,33 @@ export function useRecentRepos() {
 
   // Safely initialize from localStorage only after mounting on the client
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+  const controller = new AbortController();
+  let isMounted = true;
+
+  try {
+    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+
+    if (!controller.signal.aborted && isMounted) {
       if (stored) {
         setRepos(JSON.parse(stored));
       }
-    } catch (error) {
-      console.error("Failed to load recent repositories from localStorage", error);
+      setIsLoaded(true);
     }
-    setIsLoaded(true);
-  }, []);
+  } catch (error) {
+    if (!controller.signal.aborted && isMounted) {
+      console.error(
+        "Failed to load recent repositories from localStorage",
+        error
+      );
+      setIsLoaded(true);
+    }
+  }
+
+  return () => {
+    isMounted = false;
+    controller.abort();
+  };
+}, []);
 
   // Adds a repository to the top, removes duplicates, and limits length to 5
   const addRepo = useCallback((newRepo: Omit<RecentRepository, "analyzedAt">) => {

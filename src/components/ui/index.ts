@@ -1,4 +1,5 @@
 export { Button } from './Button'
+export { ThemeToggle } from './ThemeToggle'
 export { Input } from './Input'
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from './Card'
 export { Modal } from './Modal'

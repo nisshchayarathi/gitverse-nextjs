@@ -18,6 +18,7 @@ jest.mock("../githubService", () => ({
       post: jest.fn(),
       put: jest.fn(),
     },
+    getRepository: jest.fn(),
   },
 }));
 
@@ -61,11 +62,12 @@ describe("Incident Response Pipeline", () => {
       expect(correlation.likelyPrNumber).toBe(421);
       expect(correlation.confidenceScore).toBe(91);
 
-      const rollbackSvc = getRollbackPrService();
-      const { githubService } = require("../githubService");
-      
-      githubService.client.post.mockResolvedValueOnce({ data: { html_url: "http://github.com/pr/1", number: 1 } });
-      githubService.client.put.mockResolvedValueOnce({});
+       const rollbackSvc = getRollbackPrService();
+       const { githubService } = require("../githubService");
+       
+       githubService.getRepository.mockResolvedValueOnce({ default_branch: "main" });
+       githubService.client.post.mockResolvedValueOnce({ data: { html_url: "http://github.com/pr/1", number: 1 } });
+       githubService.client.put.mockResolvedValueOnce({});
 
       const result = await rollbackSvc.executeRollback(1, "owner", "repo", incident as any, correlation);
       
@@ -122,6 +124,7 @@ describe("Incident Response Pipeline", () => {
     it("should generate a PR with a well-formatted body", async () => {
       const rollbackSvc = getRollbackPrService();
       const { githubService } = require("../githubService");
+      githubService.getRepository.mockResolvedValueOnce({ default_branch: "main" });
       githubService.client.post.mockResolvedValueOnce({ data: { html_url: "url" } });
 
       const result = await rollbackSvc.executeRollback(1, "o", "r", { id: "1", source: "generic", severity: "high", title: "Err" } as any, {
@@ -141,6 +144,7 @@ describe("Incident Response Pipeline", () => {
       process.env.AUTO_ROLLBACK_ENABLED = "true";
       
       const { githubService } = require("../githubService");
+      githubService.getRepository.mockResolvedValueOnce({ default_branch: "main" });
       githubService.client.post.mockResolvedValueOnce({ data: { html_url: "http://github.com/pr/1", number: 10 } });
       githubService.client.put.mockResolvedValueOnce({});
 

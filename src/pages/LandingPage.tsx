@@ -8,6 +8,8 @@ import {
   Code,
   Sparkles,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Check,
   Link2,
   MessageSquare,
@@ -237,6 +239,14 @@ export default function LandingPage() {
       });
     }
   }, [activeFeatureIndex]);
+
+  const goPrev = () => {
+    setActiveFeatureIndex((i) => (i - 1 + totalFeatures) % totalFeatures);
+  };
+
+  const goNext = () => {
+    setActiveFeatureIndex((i) => (i + 1) % totalFeatures);
+  };
 
   const howItWorks = [
     {
@@ -643,6 +653,13 @@ export default function LandingPage() {
             onTouchEnd={() => setIsCarouselPaused(false)}
             onTouchCancel={() => setIsCarouselPaused(false)}
           >
+            <button
+              className="feature-carousel__nav feature-carousel__nav--left"
+              aria-label="Previous feature"
+              onClick={goPrev}
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
             <div className="feature-carousel__viewport">
               <div className="feature-carousel__track">
                 {features.map((feature, index) => (
@@ -651,8 +668,28 @@ export default function LandingPage() {
                     ref={(el) => { slideRefs.current[index] = el; }}
                     className={`feature-carousel__slide ${
                       index === activeFeatureIndex ? "active" : ""
-                    }`}
-                    aria-hidden={index !== activeFeatureIndex}
+                    } cursor-pointer`}
+                    aria-current={index === activeFeatureIndex ? "true" : undefined}
+                    aria-label={`${feature.title} (${index + 1} of ${totalFeatures})`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setActiveFeatureIndex(index);
+                      const el = slideRefs.current[index];
+                      if (el && typeof el.scrollIntoView === 'function') {
+                        el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setActiveFeatureIndex(index);
+                        const el = slideRefs.current[index];
+                        if (el && typeof el.scrollIntoView === 'function') {
+                          el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        }
+                      }
+                    }}
                   >
                     <Card className="glass feature-card group w-full">
                       <CardHeader>
@@ -673,6 +710,13 @@ export default function LandingPage() {
                 ))}
               </div>
             </div>
+            <button
+              className="feature-carousel__nav feature-carousel__nav--right"
+              aria-label="Next feature"
+              onClick={goNext}
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
 
             <div className="feature-carousel__controls" aria-label="Feature navigation">
               <div className="flex items-center justify-center gap-2">

@@ -5,6 +5,9 @@ import { Card } from "@/components/ui";
 import { geminiService, ChatMessage } from "@/services/gemini";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 
 interface AIChatInterfaceProps {
   repositoryContext?: {
@@ -17,6 +20,110 @@ interface AIChatInterfaceProps {
       files: number;
     };
   };
+}
+
+const mentorMarkdownSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    code: [...(defaultSchema.attributes?.code || []), "className"],
+    span: [...(defaultSchema.attributes?.span || []), "className"],
+  },
+};
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to copy code:", error);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="absolute top-2 right-2 p-1 rounded bg-white/10 hover:bg-white/20 transition-colors"
+      title="Copy code"
+      aria-label="Copy code to clipboard"
+    >
+      {copied ? (
+        <Check className="h-4 w-4 text-green-400" />
+      ) : (
+        <Copy className="h-4 w-4 text-white/70" />
+      )}
+    </button>
+  );
+}
+
+function ChatMarkdown({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[[rehypeSanitize, mentorMarkdownSchema]]}
+      components={{
+        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+        a: ({ href, children, ...props }) => (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent underline underline-offset-4"
+            {...props}
+          >
+            {children}
+          </a>
+        ),
+        ul: ({ children }) => (
+          <ul className="list-disc pl-5 space-y-1 my-2">{children}</ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="list-decimal pl-5 space-y-1 my-2">{children}</ol>
+        ),
+        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+        pre: ({ children }) => <>{children}</>,
+        code: ({ className, children, ...props }) => {
+          const text = String(children ?? "");
+          const isBlock =
+            (typeof className === "string" &&
+              className.includes("language-")) ||
+            text.includes("\n");
+
+          if (!isBlock) {
+            return (
+              <code
+                className="rounded bg-black/30 px-1 py-0.5 text-[0.9em]"
+                {...props}
+              >
+                {children}
+              </code>
+            );
+          }
+
+          return (
+            <div className="relative">
+              <CopyButton text={text} />
+
+              <pre className="my-2 overflow-x-auto rounded-lg bg-black/40 p-3 border border-white/10">
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              </pre>
+            </div>
+          );
+        },
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
 }
 
 export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
@@ -142,71 +249,10 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
     }
   };
 
-  const formatMessage = (content: string) => {
-    // Simple markdown-like formatting
-    return content.split("\n").map((line, i) => {
-      // Code blocks
-      if (line.startsWith("```")) {
-        return (
-          <div key={i} className="text-xs text-primary">
-            ───────
-          </div>
-        );
-      }
-      // Bold text
-      if (line.includes("**")) {
-        const parts = line.split("**");
-        return (
-          <p key={i} className="mb-2">
-            {parts.map((part, j) =>
-              j % 2 === 0 ? part : <strong key={j}>{part}</strong>
-            )}
-          </p>
-        );
-      }
-      // Code inline
-      if (line.includes("`")) {
-        const parts = line.split("`");
-        return (
-          <p key={i} className="mb-2">
-            {parts.map((part, j) =>
-              j % 2 === 0 ? (
-                part
-              ) : (
-                <code
-                  key={j}
-                  className="bg-primary/10 px-1 py-0.5 rounded text-sm"
-                >
-                  {part}
-                </code>
-              )
-            )}
-          </p>
-        );
-      }
-      // Bullet points
-      if (line.trim().startsWith("-") || line.trim().startsWith("•")) {
-        return (
-          <li key={i} className="ml-4 mb-1">
-            {line.trim().substring(1).trim()}
-          </li>
-        );
-      }
-      // Regular text
-      return line.trim() ? (
-        <p key={i} className="mb-2">
-          {line}
-        </p>
-      ) : (
-        <br key={i} />
-      );
-    });
-  };
-
   return (
     <div className="flex flex-col h-full">
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
         {messages.map((message, index) => (
           <div
             key={index}
@@ -239,7 +285,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
                 </button>
               </div>
               <div className="text-sm leading-relaxed">
-                {formatMessage(message.content)}
+                <ChatMarkdown content={message.content} />
               </div>
               <div className="text-xs text-muted-foreground mt-2">
                 {message.timestamp.toLocaleTimeString([], {
@@ -267,7 +313,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
                 AI Assistant
               </div>
               <div className="text-sm leading-relaxed">
-                {formatMessage(streamingMessage)}
+                <ChatMarkdown content={streamingMessage} />
               </div>
               <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />

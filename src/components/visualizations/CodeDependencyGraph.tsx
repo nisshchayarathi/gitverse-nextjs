@@ -3,6 +3,7 @@ import * as htmlToImage from "html-to-image";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
+import { GraphFilteringService } from "@/services/graphFilteringService";
 import { MapControls } from "./MapControls";
 import { toast } from "sonner";
 import { annotationService, MapAnnotation } from "@/services/annotationService";
@@ -54,15 +55,20 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     expandedNodes, toggleExpand, collapseAll, focusNode, setFocus, clearFocus, goBack, canGoBack
   } = useGraphDrilldown();
   
-  const graphData = useMemo(() => {
+  const completeGraph = useMemo(() => {
     const analyzer = new GraphAnalyzer();
-    return analyzer.buildDependencyGraph(repository?.files || [], {
+    return analyzer.buildDependencyGraph(repository?.files || []);
+  }, [repository?.files]);
+
+  const graphData = useMemo(() => {
+    const filterService = new GraphFilteringService();
+    return filterService.applyFilters(completeGraph.nodes, completeGraph.links, {
       expandedNodes,
       hiddenDirectories: filters.hiddenDirectories,
       hiddenFileTypes: filters.hiddenFileTypes,
       visibleDomains: filters.visibleDomains
     });
-  }, [repository?.files, expandedNodes, filters]);
+  }, [completeGraph, expandedNodes, filters]);
 
   const exportGraph = async (format: "png" | "svg") => {
     if (!exportRef.current) return;

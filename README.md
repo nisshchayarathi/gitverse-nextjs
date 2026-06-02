@@ -1,8 +1,23 @@
-# GitVerse
+<div align="center">
 
-Turn any GitHub repo into an interactive map of its architecture, modules, and risks.
+# GitVerse 🗺️
 
-GitVerse is built for the moment you open a new codebase and ask: “Where do I start?”
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
+[![Node.js](https://img.shields.io/badge/Node.js-22.x-339933?style=flat-square&logo=node.js)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Deploy on Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)](https://vercel.com)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://github.com/nisshchayarathi/gitverse-nextjs/pulls)
+
+> **Paste a repo. Understand it in minutes.**
+
+GitVerse turns any GitHub repository into an interactive visual map of its architecture, modules, and risk hotspots — so you always know where to start.
+
+Whether you're a new contributor facing an unfamiliar codebase, or a maintainer trying to communicate structure to your team, GitVerse gives you the full picture instantly.
+
+</div>
 
 ## Pitch
 
@@ -234,8 +249,7 @@ Environment Variables:**
 | Variable | Required | Description | Example |
 |---|---|---|---|
 | `DATABASE_URL` |  Yes | PostgreSQL connection string (Neon recommended) | `postgresql://user:pass@host/db` |
-| `JWT_SECRET` | No (if `NEXTAUTH_SECRET` is set) | Secret key for JWT signing (fallback for `NEXTAUTH_SECRET`) | `openssl rand -base64 32` |
-| `GEMINI_API_KEY` |  Yes | Google Gemini API key | Get from [Google AI Studio](https://aistudio.google.com) |
+| `JWT_SECRET` | Yes | Secret key for JWT signing | `openssl rand -base64 32` |
 | `NEXTAUTH_URL` |  Yes | Your deployed Vercel URL | `https://your-app.vercel.app` |
 | `NEXTAUTH_SECRET` |  Yes | NextAuth session signing secret | `openssl rand -base64 32` |
 | `GOOGLE_CLIENT_ID` |  No (required for OAuth) | Google OAuth client ID | From Google Cloud Console |
@@ -357,7 +371,7 @@ firebase deploy
 Required:
 
 - `DATABASE_URL` - PostgreSQL connection string
-- `JWT_SECRET` - JWT secret key
+- `JWT_SECRET` - JWT signing secret. The app will crash on startup without it.
 - `GEMINI_API_KEY` - Google Gemini API key
 
 OAuth (Google / NextAuth):
@@ -370,7 +384,6 @@ OAuth (Google / NextAuth):
 
 Optional:
 
-- `JWT_SECRET` - JWT signing secret (fallback/alternate secret configuration)
 - `NEXT_PUBLIC_API_URL` - API URL for client-side (defaults to current domain)
 
 ## 🤝 Contributing
@@ -385,6 +398,24 @@ Optional:
 
 A huge thank you to all contributors who have helped improve GitVerse ❤️
 Your efforts make this project stronger, more reliable, and more impactful for the community.
+
+<p align="center">
+  <a href="https://github.com/nisshchayarathi/gitverse-nextjs/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=nisshchayarathi/gitverse-nextjs" alt="Contributors"/>
+  </a>
+</p>
+
+## ⭐ Project Support
+
+<p align="center">
+  <a href="https://github.com/nisshchayarathi/gitverse-nextjs/stargazers">
+    <img src="https://img.shields.io/github/stars/nisshchayarathi/gitverse-nextjs?style=social" alt="Stars">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/nisshchayarathi/gitverse-nextjs/network/members">
+    <img src="https://img.shields.io/github/forks/nisshchayarathi/gitverse-nextjs?style=social" alt="Forks">
+  </a>
+</p>
 
 ## 📄 License
 

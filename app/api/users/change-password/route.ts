@@ -15,14 +15,14 @@ export async function POST(request: NextRequest) {
 
     if (!newPassword) {
       return NextResponse.json(
-        { message: "New password is required" },
+        { error: "New password is required" },
         { status: 400 }
       );
     }
 
     if (newPassword.length < 8) {
       return NextResponse.json(
-        { message: "Password must be at least 8 characters" },
+        { error: "Password must be at least 8 characters" },
         { status: 400 }
       );
     }
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     if (!userDetails) {
       return NextResponse.json(
-        { message: "User not found" },
+        { error: "User not found" },
         { status: 404 }
       );
     }
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     if (passwordHash) {
       if (!currentPassword) {
         return NextResponse.json(
-          { message: "Current password is required" },
+          { error: "Current password is required" },
           { status: 400 }
         );
       }
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
       if (!isPasswordValid) {
         return NextResponse.json(
-          { message: "Current password is incorrect" },
+          { error: "Current password is incorrect" },
           { status: 401 }
         );
       }
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json(
-      { message: "Failed to change password" },
+      { error: "Failed to change password" },
       { status: 500 }
     );
   }

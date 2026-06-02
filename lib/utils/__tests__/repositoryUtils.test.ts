@@ -27,9 +27,19 @@ describe('repositoryUtils', () => {
   describe('formatFileSize', () => {
     it('formats bytes size correctly', () => {
       expect(formatFileSize(0)).toBe('0 B');
+      expect(formatFileSize(-1)).toBe('0 B');
+      expect(formatFileSize(0.5)).toBe('0 B');
+      expect(formatFileSize(Number.NaN)).toBe('0 B');
+      expect(formatFileSize(Number.POSITIVE_INFINITY)).toBe('0 B');
       expect(formatFileSize(500)).toBe('500 B');
       expect(formatFileSize(1024)).toBe('1 KB');
       expect(formatFileSize(1024 * 1024 * 1.5)).toBe('1.5 MB');
+    });
+
+    it('formats petabyte and larger values with valid units', () => {
+      expect(formatFileSize(1024 ** 5)).toBe('1 PB');
+      expect(formatFileSize(1024 ** 6)).toBe('1 EB');
+      expect(formatFileSize(1024 ** 7)).toBe('1024 EB');
     });
   });
 

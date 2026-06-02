@@ -3,6 +3,9 @@ import { CodeDependencyGraph } from '@/components/visualizations/CodeDependencyG
 import { LanguageDistributionChart } from '@/components/visualizations/LanguageDistributionChart'
 import { CodeMetrics } from './CodeMetrics'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { useState } from 'react'
+import { toast } from '@/hooks/use-toast'
+import axios from 'axios'
 
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -23,6 +26,10 @@ interface FileTypeStat {
 }
 
 interface RepositoryData {
+  id?: number;
+  name?: string;
+  url?: string;
+  description?: string;
   languages: LanguageStat[];
   files: FileTypeStat[];
   commits: any[];
@@ -38,6 +45,7 @@ interface RepositoryInsightsProps {
 export function RepositoryInsights({
   repository,
 }: RepositoryInsightsProps) {
+  const [isGeneratingMd, setIsGeneratingMd] = useState(false);
 
   const downloadPNG = async () => {
     const element = document.getElementById("repo-analysis");
@@ -75,6 +83,54 @@ export function RepositoryInsights({
     pdf.save("repository-analysis.pdf");
   };
 
+  const generateArchitectureMarkdown = async () => {
+    if (!repository?.id) return;
+
+    setIsGeneratingMd(true);
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      const response = await axios.post(
+        `/api/repositories/${repository.id}/generate-architecture`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: "text",
+        }
+      );
+
+      const blob = new Blob([response.data], { type: "text/markdown;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      const sanitizedName = (repository.name || "")
+        .trim()
+        .replace(/[\/\\?%*:|"<>]/g, "-")
+        .replace(/-{2,}/g, "-")
+        .replace(/^-|-$/g, "") || "repository";
+      link.download = `${sanitizedName}-ARCHITECTURE.md`;
+      document.body.appendChild(link);
+      link.click();
+
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Success",
+        description: "ARCHITECTURE.md Downloaded successfully!"
+      });
+    } catch (error: any) {
+      console.error("MD Generation Error", error);
+      toast({
+        title: "Export failed",
+        description: error.response?.data?.error || "Failed to generate architecture document.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingMd(false);
+    }
+  };
+
   return (
     <div id="repo-analysis" className="space-y-6">
 
@@ -93,6 +149,14 @@ export function RepositoryInsights({
 
         {/* Export Buttons */}
         <div className="flex gap-2">
+
+          <button
+            onClick={generateArchitectureMarkdown}
+            disabled={isGeneratingMd || !repository?.id}
+            className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-50 flex items-center gap-2"
+          >
+            {isGeneratingMd ? "Generating..." : "Export ARCHITECTURE.md"}
+          </button>
 
           <button
             onClick={downloadPNG}

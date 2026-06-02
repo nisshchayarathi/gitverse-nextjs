@@ -4,10 +4,25 @@ import { getDeploymentAnalysisService } from "@/lib/services/deployment-analysis
 import { getIncidentCorrelationService } from "@/lib/services/incident-correlation";
 import { getRollbackPrService } from "@/lib/services/rollback-pr";
 import { IncidentReport } from "@/types/incident-response";
+import {
+  parseIncidentTarget,
+  verifyIncidentWebhookSignature,
+} from "@/lib/utils/incidentWebhook";
 
 export async function POST(req: NextRequest) {
   try {
-    const payload = await req.json();
+    const rawBody = await req.text();
+    const isAuthorized = verifyIncidentWebhookSignature({
+      rawBody,
+      signatureHeader: req.headers.get("x-incident-signature-256"),
+      webhookSecret: process.env.INCIDENT_WEBHOOK_SECRET,
+    });
+
+    if (!isAuthorized) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const payload = JSON.parse(rawBody);
     
     // In a real scenario, we'd determine source via headers (e.g., x-sentry-trace, x-datadog-trace-id)
     const sourceHeader = req.headers.get("x-incident-source") || "generic";
@@ -21,12 +36,17 @@ export async function POST(req: NextRequest) {
     const ingestionService = getIncidentIngestionService();
     const incident = ingestionService.processWebhook(source, payload);
 
-    // Hardcoding for MVP, normally these would come from query params, URL params, or DB lookups 
-    // mapped from the incident project
     const url = new URL(req.url);
-    const installationId = parseInt(url.searchParams.get("installationId") || "1", 10);
-    const owner = url.searchParams.get("owner") || "owner";
-    const repo = url.searchParams.get("repo") || "repo";
+    const target = parseIncidentTarget(url.searchParams);
+
+    if (!target) {
+      return NextResponse.json(
+        { error: "installationId, owner, and repo are required" },
+        { status: 400 }
+      );
+    }
+
+    const { installationId, owner, repo } = target;
 
     // 2. Fetch context
     const deploymentService = getDeploymentAnalysisService();

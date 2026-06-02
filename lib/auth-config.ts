@@ -258,10 +258,13 @@ if ((googleClientId || googleClientSecret) && !isGoogleConfigured) {
   );
 }
 
-const nextAuthSecret = process.env.NEXTAUTH_SECRET;
-if (!nextAuthSecret) {
-  throw new Error(
-    "NEXTAUTH_SECRET environment variable is required. Generate one with: openssl rand -base64 32"
+// NextAuth secret is resolved lazily at runtime
+
+if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
+  console.warn(
+    "[auth][warning] NEXTAUTH_URL environment variable is not set in production. " +
+    "This will likely cause Google OAuth 'redirect_uri_mismatch' errors because the " +
+    "callback URL cannot be reliably inferred. Please set NEXTAUTH_URL to your exact production domain (e.g., https://yourdomain.com)."
   );
 }
 
@@ -544,5 +547,5 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 7 * 24 * 60 * 60, // 7 days
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  // secret is injected lazily at route level
 };

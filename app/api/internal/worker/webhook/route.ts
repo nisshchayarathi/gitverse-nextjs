@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { isInternalWorkerAuthorized } from "@/lib/utils/internalAuth";
 import { GitHubAppService } from "@/lib/services/githubAppService";
 import { GitHubService } from "@/lib/services/githubService";
 import {

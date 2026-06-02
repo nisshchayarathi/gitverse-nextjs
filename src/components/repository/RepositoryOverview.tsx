@@ -1,5 +1,5 @@
-import { useState, Children, isValidElement } from "react";
-import { FavoriteButton } from "./FavoriteButton";
+"use client";
+
 import {
   GitBranch,
   Star,

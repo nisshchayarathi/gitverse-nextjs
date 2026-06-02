@@ -79,22 +79,11 @@ export async function DELETE(
       );
     }
 
-    const repository = await repositoryService.getRepository(id, user.userId);
-
-    if (!repository) {
-      return NextResponse.json(
-        { error: "Repository not found" },
-        { status: 404, headers: securityHeaders }
-      );
-    }
-
-    await prisma.repository.delete({
-      where: { id },
-    });
+    await repositoryService.deleteRepository(id, user.userId);
 
     return NextResponse.json(
       { message: "Repository deleted successfully" },
-      { status: 200, headers: securityHeaders }
+      { headers: securityHeaders }
     );
   } catch (error: any) {
     console.error("Delete repository error:", sanitizeError(error));
@@ -113,8 +102,8 @@ export async function DELETE(
 
     if (error.message === "Repository not found") {
       return NextResponse.json(
-        { error: error.message },
-        { status: 404, headers: securityHeaders }
+        { error: "Repository not found or you don't have permission to delete it" },
+        { status: 403, headers: securityHeaders }
       );
     }
 

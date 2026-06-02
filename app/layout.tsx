@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
 import { Toaster } from "@/components/ui/toaster";
+import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import "./globals.css";
 
 const inter = Inter({
@@ -87,6 +88,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </main>
 
               <Toaster />
+              <ScrollToTop />
             </AuthProvider>
           </NextAuthProvider>
         </ThemeProvider>

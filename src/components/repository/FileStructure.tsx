@@ -22,6 +22,7 @@ import {
   Modal,
   Skeleton,
 } from "@/components/ui";
+import { ContributionReadinessCard } from "@/components/repository/ContributionReadinessCard";
 import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -197,12 +198,17 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
   // AI Explanation State
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
   const [selectedCodeContext, setSelectedCodeContext] = useState("");
-  const [floatingButtonPos, setFloatingButtonPos] = useState<{ top: number; left: number } | null>(null);
+  const [floatingButtonPos, setFloatingButtonPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const [isExplanationOpen, setIsExplanationOpen] = useState(false);
-  const [explainingFilePath, setExplainingFilePath] = useState<string | null>(null);
+  const [explainingFilePath, setExplainingFilePath] = useState<string | null>(
+    null
+  );
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explanationLoading, setExplanationLoading] = useState(false);
-  
+
   const codeContainerRef = useRef<HTMLDivElement>(null);
 
   const handleExplainSelect = async (filePath: string) => {
@@ -213,7 +219,13 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
     setExplanation(null);
 
     try {
-      const response = await fetch(buildApiUrl(`/ai/explain-file?repositoryId=${repository.id}&path=${encodeURIComponent(filePath)}`));
+      const response = await fetch(
+        buildApiUrl(
+          `/ai/explain-file?repositoryId=${repository.id}&path=${encodeURIComponent(
+            filePath
+          )}`
+        )
+      );
       if (!response.ok) throw new Error("Failed to get explanation");
       const data = await response.json();
       setExplanation(data.explanation);
@@ -256,7 +268,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
             type: isLast ? "file" : "folder",
             path,
             size: isLast ? file.size : undefined,
-            fileData: isLast ? file : undefined, // Store the actual file object for files
+            fileData: isLast ? file : undefined,
             children: isLast ? undefined : [],
           };
           current.children.push(existing);
@@ -270,7 +282,6 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
   };
 
   const files = useMemo(() => repository?.files || [], [repository?.files]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const fileTree = useMemo(() => buildFileTree(files), [files, repository?.name]);
 
   useEffect(() => {
@@ -344,11 +355,15 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
               ? localStorage.getItem("gitverse_token")
               : null;
           const response = await fetch(
-            buildApiUrl(`/api/repositories/${repository.id}/files/content?path=${encodeURIComponent(selectedFile.path)}`),
+            buildApiUrl(
+              `/api/repositories/${repository.id}/files/content?path=${encodeURIComponent(
+                selectedFile.path
+              )}`
+            ),
             {
               headers: {
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              }
+              },
             }
           );
           if (!response.ok) throw new Error("Failed to fetch file content");
@@ -379,22 +394,23 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
 
   const handleMouseUp = (e: React.MouseEvent) => {
     if (activeTab !== "code") return;
-    
-    // Slight delay to allow selection to register
+
     setTimeout(() => {
       const selection = window.getSelection();
       const text = selection?.toString().trim();
-      
-      if (text && text.length > 0 && codeContainerRef.current?.contains(selection?.anchorNode || null)) {
-        // Calculate position for floating button
+
+      if (
+        text &&
+        text.length > 0 &&
+        codeContainerRef.current?.contains(selection?.anchorNode || null)
+      ) {
         const range = selection?.getRangeAt(0);
         const rect = range?.getBoundingClientRect();
-        
+
         if (rect) {
-          // Position relative to viewport, but we'll need to adjust based on scrolling if needed
           setFloatingButtonPos({
-            top: rect.top - 45, // 45px above the selection
-            left: rect.left + (rect.width / 2) - 60, // Centered horizontally
+            top: rect.top - 45,
+            left: rect.left + rect.width / 2 - 60,
           });
           setSelectedCodeContext(text);
         }
@@ -405,7 +421,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
   };
 
   const handleExplainWithAI = () => {
-    setFloatingButtonPos(null); // Hide button
+    setFloatingButtonPos(null);
     setIsAIPanelOpen(true);
   };
 
@@ -420,9 +436,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
     );
   };
 
-  const selectedFileStats = selectedFile
-    ? getFileStats(selectedFile.path)
-    : null;
+  const selectedFileStats = selectedFile ? getFileStats(selectedFile.path) : null;
   const selectedFileTotalChanges = selectedFileStats
     ? selectedFileStats.additions + selectedFileStats.deletions
     : 0;
@@ -441,7 +455,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
           <CardDescription>*Click on a file for more info*</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="border border-border/50 rounded-lg p-4 bg-background/50 max-h-[600px] overflow-y-auto">
+          <div className="border border-border/50 rounded-lg p-4 bg-background/50 max-h-[600px] overflow-y-auto custom-scrollbar">
             <FileTreeNode
               node={fileTree}
               onFileSelect={handleFileSelect}
@@ -451,24 +465,21 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
         </CardContent>
       </Card>
 
-      {/* File Detail Modal */}
       {selectedFile && (
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
           onClick={() => setSelectedFile(null)}
         >
           <Card
-            className="glass max-w-[90vw] w-full lg:max-w-5xl h-[90vh] flex flex-col animate-fade-in-up relative"
+            className="glass max-w-[90vw] w-full lg:max-w-5xl h-[90vh] flex flex-col animate-fade-in-up relative overflow-y-auto custom-scrollbar"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
-              // Hide floating button if clicked outside
               const target = e.target as HTMLElement;
-              if (!target.closest('#floating-ai-btn')) {
+              if (!target.closest("#floating-ai-btn")) {
                 setFloatingButtonPos(null);
               }
             }}
           >
-            {/* Header section (fixed) */}
             <div className="p-6 border-b border-border/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
               <div className="flex-1 min-w-0 pr-12">
                 <div className="flex items-start gap-4">
@@ -486,7 +497,6 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                 </div>
               </div>
 
-              {/* Close button */}
               <button
                 onClick={() => setSelectedFile(null)}
                 className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-lg transition-all"
@@ -494,7 +504,6 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                 <X className="h-5 w-5" />
               </button>
 
-              {/* Tabs */}
               <div className="flex bg-white/5 rounded-lg p-1 shrink-0 w-full md:w-auto">
                 <button
                   onClick={() => setActiveTab("analytics")}
@@ -521,12 +530,9 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
               </div>
             </div>
 
-            {/* Scrollable content area */}
             <div className="flex-1 overflow-y-auto p-6" onMouseUp={handleMouseUp}>
               {activeTab === "analytics" ? (
-                /* ------------------- ANALYTICS TAB ------------------- */
                 <div className="space-y-8 animate-in fade-in duration-300">
-                  {/* File Type and Extension */}
                   {selectedFile.extension && (
                     <div className="flex items-center gap-2">
                       <span className="px-3 py-1 rounded-full bg-primary/20 text-primary text-sm font-medium">
@@ -539,7 +545,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                       )}
                     </div>
                   )}
-                  {/* Main Stats Grid */}
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-white/5 rounded-lg p-4 border border-white/10">
                       <div className="flex items-center gap-2 mb-2 text-blue-400">
@@ -580,9 +586,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     </div>
                   </div>
 
-                  {/* Code Changes Stats */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Changes History */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold flex items-center gap-2">
                         <GitCommit className="h-5 w-5 text-primary" />
@@ -591,35 +595,54 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                       <div className="space-y-3">
                         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm text-muted-foreground uppercase tracking-wide">Lines Added</p>
+                            <p className="text-sm text-muted-foreground uppercase tracking-wide">
+                              Lines Added
+                            </p>
                             <p className="text-2xl font-bold text-green-400">
                               +{fileStatsLoading ? "..." : selectedFileStats?.additions.toLocaleString() || 0}
                             </p>
                           </div>
-                          <p className="text-xs text-muted-foreground">Total additions across all commits</p>
+                          <p className="text-xs text-muted-foreground">
+                            Total additions across all commits
+                          </p>
                         </div>
                         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm text-muted-foreground uppercase tracking-wide">Lines Deleted</p>
+                            <p className="text-sm text-muted-foreground uppercase tracking-wide">
+                              Lines Deleted
+                            </p>
                             <p className="text-2xl font-bold text-red-400">
                               -{fileStatsLoading ? "..." : selectedFileStats?.deletions.toLocaleString() || 0}
                             </p>
                           </div>
-                          <p className="text-xs text-muted-foreground">Total deletions across all commits</p>
+                          <p className="text-xs text-muted-foreground">
+                            Total deletions across all commits
+                          </p>
                         </div>
                         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm text-muted-foreground uppercase tracking-wide">Net Change</p>
-                            <p className={`text-2xl font-bold ${selectedFileNetChange >= 0 ? "text-green-400" : "text-red-400"}`}>
-                              {fileStatsLoading ? "..." : `${selectedFileNetChange >= 0 ? "+" : ""}${selectedFileNetChange.toLocaleString()}`}
+                            <p className="text-sm text-muted-foreground uppercase tracking-wide">
+                              Net Change
+                            </p>
+                            <p
+                              className={`text-2xl font-bold ${
+                                selectedFileNetChange >= 0
+                                  ? "text-green-400"
+                                  : "text-red-400"
+                              }`}
+                            >
+                              {fileStatsLoading
+                                ? "..."
+                                : `${selectedFileNetChange >= 0 ? "+" : ""}${selectedFileNetChange.toLocaleString()}`}
                             </p>
                           </div>
-                          <p className="text-xs text-muted-foreground">Net additions minus deletions</p>
+                          <p className="text-xs text-muted-foreground">
+                            Net additions minus deletions
+                          </p>
                         </div>
                       </div>
                     </div>
 
-                    {/* File Metrics */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold flex items-center gap-2">
                         <BarChart3 className="h-5 w-5 text-primary" />
@@ -627,35 +650,59 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                       </h3>
                       <div className="space-y-3">
                         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                          <p className="text-sm text-muted-foreground uppercase tracking-wide mb-2">Changes per Commit</p>
+                          <p className="text-sm text-muted-foreground uppercase tracking-wide mb-2">
+                            Changes per Commit
+                          </p>
                           <p className="text-2xl font-bold">
                             {!fileStatsLoading && selectedFileStats?.commitCount
-                              ? Math.round(selectedFileTotalChanges / selectedFileStats.commitCount) : 0}
+                              ? Math.round(selectedFileTotalChanges / selectedFileStats.commitCount)
+                              : 0}
                           </p>
-                          <p className="text-xs text-muted-foreground">Average lines changed per commit</p>
+                          <p className="text-xs text-muted-foreground">
+                            Average lines changed per commit
+                          </p>
                         </div>
                         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                          <p className="text-sm text-muted-foreground uppercase tracking-wide mb-2">Churn Ratio</p>
+                          <p className="text-sm text-muted-foreground uppercase tracking-wide mb-2">
+                            Churn Ratio
+                          </p>
                           <p className="text-2xl font-bold">
                             {!fileStatsLoading && selectedFileTotalChanges > 0
-                              ? (((selectedFileStats?.deletions || 0) / selectedFileTotalChanges) * 100).toFixed(1) : 0}%
+                              ? (((selectedFileStats?.deletions || 0) / selectedFileTotalChanges) * 100).toFixed(1)
+                              : "0"}
+                            %
                           </p>
-                          <p className="text-xs text-muted-foreground">Percentage of deletions vs additions</p>
+                          <p className="text-xs text-muted-foreground">
+                            Percentage of deletions vs additions
+                          </p>
                         </div>
                         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                          <p className="text-sm text-muted-foreground uppercase tracking-wide mb-2">Created Date</p>
+                          <p className="text-sm text-muted-foreground uppercase tracking-wide mb-2">
+                            Created Date
+                          </p>
                           <p className="text-sm font-semibold">
                             {selectedFile.createdAt
-                              ? new Date(selectedFile.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+                              ? new Date(selectedFile.createdAt).toLocaleDateString(
+                                  "en-US",
+                                  { year: "numeric", month: "short", day: "numeric" }
+                                )
                               : "Unknown"}
                           </p>
-                          <p className="text-xs text-muted-foreground">First added to repository</p>
+                          <p className="text-xs text-muted-foreground">
+                            First added to repository
+                          </p>
                         </div>
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Change Summary */}
+
+                  <div className="mb-8">
+                    <ContributionReadinessCard
+                      file={selectedFile}
+                      repository={repository}
+                    />
+                  </div>
+
                   <div className="bg-gradient-to-r from-primary/10 to-transparent rounded-lg p-6 border border-white/10">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <Clock className="h-5 w-5 text-primary" />
@@ -663,19 +710,31 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                       <div>
-                        <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">Total Modifications</p>
+                        <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">
+                          Total Modifications
+                        </p>
                         <p className="text-lg font-semibold">
-                          {fileStatsLoading ? "..." : selectedFileStats?.commitCount.toLocaleString() || 0} {selectedFileStats?.commitCount === 1 ? "commit" : "commits"}
+                          {fileStatsLoading
+                            ? "..."
+                            : selectedFileStats?.commitCount.toLocaleString() || 0}{" "}
+                          {selectedFileStats?.commitCount === 1 ? "commit" : "commits"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">Impact</p>
+                        <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">
+                          Impact
+                        </p>
                         <p className="text-lg font-semibold">
-                          {fileStatsLoading ? "..." : selectedFileTotalChanges.toLocaleString()} changes
+                          {fileStatsLoading
+                            ? "..."
+                            : selectedFileTotalChanges.toLocaleString()}{" "}
+                          changes
                         </p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">Current Size</p>
+                        <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">
+                          Current Size
+                        </p>
                         <p className="text-lg font-semibold">
                           {selectedFile.lines?.toLocaleString() || 0} lines
                         </p>
@@ -684,8 +743,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                   </div>
                 </div>
               ) : (
-                /* ------------------- CODE VIEWER TAB ------------------- */
-                <div 
+                <div
                   ref={codeContainerRef}
                   className="animate-in fade-in duration-300 relative rounded-lg border border-border/50 bg-[#1E1E1E] overflow-hidden"
                 >
@@ -704,7 +762,11 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                         </span>
                       </div>
                       <SyntaxHighlighter
-                        language={selectedFile.language?.toLowerCase() || selectedFile.extension || "text"}
+                        language={
+                          selectedFile.language?.toLowerCase() ||
+                          selectedFile.extension ||
+                          "text"
+                        }
                         style={vscDarkPlus}
                         showLineNumbers={true}
                         customStyle={{
@@ -728,17 +790,16 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                 </div>
               )}
             </div>
-            
-            {/* Floating AI Button (absolute positioned based on selection) */}
+
             {floatingButtonPos && activeTab === "code" && (
               <button
                 id="floating-ai-btn"
                 onClick={handleExplainWithAI}
                 style={{
-                  position: 'fixed',
+                  position: "fixed",
                   top: `${floatingButtonPos.top}px`,
                   left: `${floatingButtonPos.left}px`,
-                  zIndex: 100, // Ensure it's above everything
+                  zIndex: 100,
                 }}
                 className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg shadow-lg hover:shadow-xl hover:bg-primary/90 transition-all duration-200 animate-in zoom-in-95 font-medium text-sm border border-primary/20 backdrop-blur-md"
               >
@@ -747,19 +808,21 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
               </button>
             )}
 
-            {/* AI Explanation Panel */}
             <AIExplanationPanel
               isOpen={isAIPanelOpen}
               onClose={() => setIsAIPanelOpen(false)}
               selectedCode={selectedCodeContext}
-              language={selectedFile.language?.toLowerCase() || selectedFile.extension || "typescript"}
+              language={
+                selectedFile.language?.toLowerCase() ||
+                selectedFile.extension ||
+                "typescript"
+              }
               fileContext={`File: ${selectedFile.path}`}
             />
           </Card>
         </div>
       )}
 
-      {/* AI Explanation Modal */}
       <Modal
         isOpen={isExplanationOpen}
         onClose={() => setIsExplanationOpen(false)}

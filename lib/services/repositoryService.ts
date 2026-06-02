@@ -6,10 +6,16 @@ import * as crypto from "crypto";
 import * as fs from "fs/promises";
 import { invalidateGeminiAnalysisCacheForRepository } from "./geminiAnalysisCacheService";
 import { FileChangeType } from "@prisma/client";
-import { gitverseConfigParser, ParsedRepositoryKnowledge } from "../parsers/gitverseConfigParser";
-import { repositoryKnowledgeService } from "./repositoryKnowledgeService";
+import { repoSyncLimiter } from "../utils/concurrencyLimiter";
+import { withDbRetry } from "../utils/dbRetry";
 
-function yieldIfHighMemory(threshold = 0.7): Promise<void> {
+function yieldIfHighMemory(threshold?: number): Promise<void> {
+  if (threshold === undefined) {
+    const envThreshold = process.env.GITVERSE_MEM_YIELD_THRESHOLD;
+    threshold = envThreshold ? parseFloat(envThreshold) : 0.7;
+    if (isNaN(threshold)) threshold = 0.7;
+  }
+
   const usage = process.memoryUsage();
   if (usage.heapUsed / usage.heapTotal > threshold) {
     return new Promise((resolve) => setImmediate(resolve));
@@ -336,14 +342,14 @@ if (existingRepositoryName) {
         // Delete stale analysis data for a clean slate, then re-insert fresh data.
         // This avoids the skipDuplicates problem where old rows from a previous
         // partial run survive alongside new data.
-        await tx.commit.deleteMany({ where: { repositoryId } });
-        await tx.branch.deleteMany({ where: { repositoryId } });
-        await tx.file.deleteMany({ where: { repositoryId } });
-        await tx.contributor.deleteMany({ where: { repositoryId } });
-        await tx.language.deleteMany({ where: { repositoryId } });
+        await prisma.commit.deleteMany({ where: { repositoryId } });
+        await prisma.branch.deleteMany({ where: { repositoryId } });
+        await prisma.file.deleteMany({ where: { repositoryId } });
+        await prisma.contributor.deleteMany({ where: { repositoryId } });
+        await prisma.language.deleteMany({ where: { repositoryId } });
 
         // Update README
-        await tx.repository.update({
+        await prisma.repository.update({
           where: { id: repositoryId },
           data: {
             readmePath: readme?.path ?? "README.md",
@@ -354,7 +360,7 @@ if (existingRepositoryName) {
 
         // Insert branches
         if (branches.length > 0) {
-          await tx.branch.createMany({
+          await prisma.branch.createMany({
             data: branches.map((branch) => ({
               name: branch.name,
               isDefault: branch.isDefault,
@@ -372,7 +378,7 @@ if (existingRepositoryName) {
           for (let i = 0; i < commits.length; i += commitChunkSize) {
             const chunk = commits.slice(i, i + commitChunkSize);
 
-            await tx.commit.createMany({
+            await prisma.commit.createMany({
               data: chunk.map((commit) => ({
                 hash: commit.hash,
                 shortHash: commit.shortHash,
@@ -392,7 +398,7 @@ if (existingRepositoryName) {
               })),
             });
 
-            const insertedCommits = await tx.commit.findMany({
+            const insertedCommits = await prisma.commit.findMany({
               where: {
                 repositoryId,
                 hash: { in: chunk.map((c: { hash: string }) => c.hash) },
@@ -426,7 +432,7 @@ if (existingRepositoryName) {
             );
 
             if (fileChanges.length > 0) {
-              await tx.fileChange.createMany({ data: fileChanges });
+              await prisma.fileChange.createMany({ data: fileChanges });
             }
           }
         }
@@ -436,7 +442,7 @@ if (existingRepositoryName) {
           const chunkSize = 500;
           for (let i = 0; i < files.length; i += chunkSize) {
             const chunk = files.slice(i, i + chunkSize);
-            await tx.file.createMany({
+            await prisma.file.createMany({
               data: chunk.map((file) => ({
                 path: file.path,
                 name: file.name,
@@ -455,7 +461,7 @@ if (existingRepositoryName) {
           const totalContributions = contributors.reduce(
             (sum: number, c: { commits: number }) => sum + c.commits, 0,
           );
-          await tx.contributor.createMany({
+          await prisma.contributor.createMany({
             data: contributors.map((contributor: { commits: number; name: string; email: string; additions: number; deletions: number; firstCommit: Date; lastCommit: Date }) => {
               const percentage =
                 totalContributions > 0
@@ -518,7 +524,7 @@ if (existingRepositoryName) {
             }),
           );
 
-          await tx.language.createMany({
+          await prisma.language.createMany({
             data: languagesWithAdjustedPercentage.map(
               (language: { name: string; percentage: number; bytes: number; lines: number }) => ({
                 name: language.name,
@@ -532,7 +538,7 @@ if (existingRepositoryName) {
         }
 
         // Final status update
-        await tx.repository.update({
+        await prisma.repository.update({
           where: { id: repositoryId },
           data: {
             status: "completed",
@@ -592,8 +598,8 @@ if (existingRepositoryName) {
   async getRepository(id: number, userId: number) {
     const repository = await prisma.repository.findFirst({
       where: {
-        id,
-        userId,
+        id: Number(id),
+        userId: Number(userId),
       },
       include: {
         branches: {

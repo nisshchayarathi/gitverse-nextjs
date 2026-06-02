@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 let lastCleanupAt = 0;
-export type AttemptType = "LOGIN" | "SIGNUP" | "CHANGE_PASSWORD" | "DELETE_ACCOUNT";
+export type AttemptType = "LOGIN" | "SIGNUP" | "CHANGE_PASSWORD" | "DELETE_ACCOUNT" | "REPOSITORY_ANALYSIS";
 
 const RETENTION_DAYS = 7;
 

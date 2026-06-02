@@ -3,6 +3,7 @@ import {
   normalizeTargetDirectory,
 } from "@/lib/utils/repositoryUtils";
 import { NextRequest, NextResponse } from "next/server";
+import { countAttempts, recordAttempt } from "@/lib/services/rateLimitService";
 import {
   isHttpError,
   requireAuth,
@@ -67,6 +68,17 @@ function normalizeGitHubRepoUrl(input: string): string | null {
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+
+    const attemptsCount = await countAttempts(
+      String(user.userId),
+      "REPOSITORY_ANALYSIS",
+      24 * 60 * 60 * 1000
+    );
+
+    if (attemptsCount >= 5) {
+      return apiError("Analysis rate limit exceeded. Please try again later.", 429);
+    }
+
     const body = await request.json();
     const { name, url, description, targetDirectory } = body;
 
@@ -149,6 +161,13 @@ export async function POST(request: NextRequest) {
 
     kickLocalRunner(request);
     kickProductionWorker();
+
+    await recordAttempt({
+      key: String(user.userId),
+      type: "REPOSITORY_ANALYSIS",
+      success: true,
+      userId: user.userId,
+    });
 
     return apiSuccess(
       {

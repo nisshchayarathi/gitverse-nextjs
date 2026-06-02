@@ -1,47 +1,69 @@
-"use client";
+'use client'
 
-import * as React from "react";
-import {
-  ThemeProvider as NextThemesProvider,
-  useTheme as useNextThemes,
-} from "next-themes";
+import React, { createContext, useContext, useEffect, useState } from 'react'
 
-type ThemeContextValue = {
-  theme: string | undefined;
-  resolvedTheme: string | undefined;
-  setTheme: (theme: string) => void;
-  toggleTheme: () => void;
-};
+type Theme = 'light' | 'dark'
 
-const ThemeContext = React.createContext<ThemeContextValue | null>(null);
-
-function ThemeContextBridge({ children }: { children: React.ReactNode }) {
-  const { theme, resolvedTheme, systemTheme, setTheme } = useNextThemes();
-
-  const toggleTheme = React.useCallback(() => {
-    const current = resolvedTheme || theme || systemTheme;
-    setTheme(current === "dark" ? "light" : "dark");
-  }, [resolvedTheme, systemTheme, theme, setTheme]);
-
-  const value = React.useMemo(
-    () => ({
-      theme,
-      resolvedTheme,
-      setTheme,
-      toggleTheme,
-    }),
-    [resolvedTheme, setTheme, theme, toggleTheme],
-  );
-
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+interface ThemeContextType {
+  theme: Theme
+  setTheme: (theme: Theme) => void
+  toggleTheme: () => void
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
+
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [theme, setThemeState] = useState<Theme>('light')
+
+  useEffect(() => {
+    let activeTheme: Theme = 'light'
+    try {
+      const saved = localStorage.getItem('theme') as Theme | null
+      if (saved === 'light' || saved === 'dark') {
+        activeTheme = saved
+      } else {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        activeTheme = prefersDark ? 'dark' : 'light'
+      }
+    } catch (e) {
+      console.warn('Failed to access localStorage for theme:', e)
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      activeTheme = prefersDark ? 'dark' : 'light'
+    }
+    setThemeState(activeTheme)
+    
+    const root = document.documentElement
+    if (activeTheme === 'dark') {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
+  }, [])
+
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme)
+    try {
+      localStorage.setItem('theme', newTheme)
+    } catch (e) {
+      console.error('Failed to save theme to localStorage:', e)
+    }
+    const root = document.documentElement
+    if (newTheme === 'dark') {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
+  }
+
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light')
+  }
+
   return (
-    <NextThemesProvider attribute="class" defaultTheme="system" enableSystem>
-      <ThemeContextBridge>{children}</ThemeContextBridge>
-    </NextThemesProvider>
-  );
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  )
 }
 
 export function useTheme() {
