@@ -11,13 +11,15 @@ function shouldSkipEnvValidation() {
     process.env.NODE_ENV === "test" ||
     process.env.CI === "true" ||
     process.env.GITHUB_ACTIONS === "true" ||
-    process.env.NEXT_PHASE === "phase-production-build"
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.PLAYWRIGHT_TEST === "true" ||
+    process.env.PLAYWRIGHT === "true"
   );
 }
 
 function validateEnv() {
   if (shouldSkipEnvValidation()) {
-    console.log("⚠️ Skipping environment validation in test/CI environment");
+    console.log("Skipping environment validation in test/CI environment");
 
     return;
   }

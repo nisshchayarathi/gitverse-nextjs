@@ -1,25 +1,12 @@
 import "@/lib/env";
 import { ReactNode } from "react";
 import { Metadata } from "next";
-import { Inter, Source_Sans_3 } from "next/font/google";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const sourceSans = Source_Sans_3({
-  subsets: ["latin"],
-  variable: "--font-source-sans",
-  display: "swap",
-});
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://gitverse.dev";
 
@@ -72,7 +59,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${sourceSans.variable}`}>
+      <body className="font-sans antialiased">
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-black focus:text-white focus:px-4 focus:py-2 focus:rounded"
