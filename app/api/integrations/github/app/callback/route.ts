@@ -1,4 +1,4 @@
-import { sanitizeError } from "@/lib/middleware";
+import { sanitizeError, requireAuth } from "@/lib/middleware"; // 1. Added requireAuth import here
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { GitHubAppService } from "@/lib/services/githubAppService";
@@ -17,24 +17,30 @@ function getPublicOrigin(request: NextRequest): string {
 
   if (proto && host) return `${proto}://${host}`;
 
-  // Fallback: Next's computed origin.
   return request.nextUrl.origin;
 }
 
 export async function GET(request: NextRequest) {
-  const url = new URL(request.url);
-  const installationIdRaw = url.searchParams.get("installation_id");
-  const setupAction = (url.searchParams.get("setup_action") || "").trim();
-  const state = (url.searchParams.get("state") || "").trim();
-
-  // Cloud Run may expose multiple *.run.app hostnames for the same service.
-  // Our UI stores auth in localStorage, so switching origins loses the token.
-  // Prefer a single canonical origin for post-install redirect.
   const canonicalOrigin = (process.env.NEXTAUTH_URL || "").trim();
   const redirectUrl = new URL(
     "/contribute",
     canonicalOrigin || getPublicOrigin(request),
   );
+
+  try {
+    // 2. FORCE server-side authentication right at the start
+    await requireAuth(request); 
+  } catch (authError) {
+    // If not authenticated, redirect instantly with an error reason
+    redirectUrl.searchParams.set("install", "error");
+    redirectUrl.searchParams.set("reason", "unauthorized");
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  const url = new URL(request.url);
+  const installationIdRaw = url.searchParams.get("installation_id");
+  const setupAction = (url.searchParams.get("setup_action") || "").trim();
+  const state = (url.searchParams.get("state") || "").trim();
 
   if (!installationIdRaw || !Number.isFinite(Number(installationIdRaw))) {
     redirectUrl.searchParams.set("install", "error");
@@ -60,7 +66,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // 15 minute max age
   if (Date.now() - ts > 15 * 60 * 1000) {
     redirectUrl.searchParams.set("install", "error");
     redirectUrl.searchParams.set("reason", "expired_state");
@@ -74,7 +79,6 @@ export async function GET(request: NextRequest) {
 
     const github = new GitHubService(installationToken);
 
-    // Fetch all repos for this installation (best-effort pagination).
     const all: { id: number; full_name: string }[] = [];
     for (let page = 1; page <= 10; page++) {
       const { repositories } = await github.listInstallationRepositories({
@@ -88,8 +92,6 @@ export async function GET(request: NextRequest) {
       if (repositories.length < 100) break;
     }
 
-    // IMPORTANT: avoid interactive transactions here.
-    // Neon/low pool sizes can cause Prisma to time out acquiring a transaction connection (P2028).
     if (all.length > 0) {
       const rows = all.map((r) => ({
         userId,
@@ -98,14 +100,11 @@ export async function GET(request: NextRequest) {
         installationId: BigInt(installationId),
       }));
 
-      // Insert new rows (ignore duplicates on (userId, repoFullName)).
       await prisma.gitHubRepo.createMany({
         data: rows,
         skipDuplicates: true,
       });
 
-      // Update installationId for any existing rows for these repos.
-      // Batch to keep query sizes reasonable.
       const chunkSize = 200;
       for (let i = 0; i < all.length; i += chunkSize) {
         const chunk = all.slice(i, i + chunkSize).map((r) => r.full_name);
