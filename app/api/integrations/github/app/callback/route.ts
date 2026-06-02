@@ -1,4 +1,4 @@
-import { sanitizeError, requireAuth } from "@/lib/middleware";
+import { isHttpError, sanitizeError, requireAuth } from "@/lib/middleware";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { GitHubAppService } from "@/lib/services/githubAppService";
@@ -33,8 +33,14 @@ export async function GET(request: NextRequest) {
     // FORCE server-side authentication and capture user identity
     authenticatedUser = await requireAuth(request);
   } catch (authError) {
+    console.error("GitHub App auth check failed:", sanitizeError(authError));
     redirectUrl.searchParams.set("install", "error");
-    redirectUrl.searchParams.set("reason", "unauthorized");
+    redirectUrl.searchParams.set(
+      "reason",
+      isHttpError(authError) && authError.status === 401
+        ? "unauthorized"
+        : "auth_check_failed",
+    );
     return NextResponse.redirect(redirectUrl);
   }
 
