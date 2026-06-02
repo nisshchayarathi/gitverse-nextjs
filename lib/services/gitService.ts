@@ -223,6 +223,38 @@ export class GitService {
     });
   }
 
+  private async getDirectorySize(directoryPath: string): Promise<number> {
+    let entries;
+    try {
+      entries = await fs.readdir(directoryPath, { withFileTypes: true });
+    } catch {
+      return 0;
+    }
+
+    const sizes = await Promise.all(
+      entries.map(async (entry) => {
+        try {
+          const entryPath = path.join(directoryPath, entry.name);
+
+          if (entry.isDirectory()) {
+            return this.getDirectorySize(entryPath);
+          }
+
+          if (entry.isFile() || entry.isSymbolicLink()) {
+            const stats = await fs.lstat(entryPath);
+            return stats.size;
+          }
+
+          return 0;
+        } catch {
+          return 0;
+        }
+      }),
+    );
+
+    return sizes.reduce((total, size) => total + size, 0);
+  }
+
   /**
    * Clone a repository to a temporary directory
    */
@@ -915,12 +947,7 @@ export class GitService {
    */
   async getRepositorySize(): Promise<number> {
     try {
-      const { stdout } = await spawnOutput("du", ["-sb", "."], {
-        cwd: this.repoPath,
-        signal: this.signal,
-        timeout: DEFAULT_GIT_TIMEOUT_MS,
-      });
-      return parseInt(stdout.trim().split("\t")[0]);
+      return await this.getDirectorySize(this.repoPath);
     } catch (error: any) {
       return 0;
     }
