@@ -7,12 +7,31 @@ import type { AnalysisJob } from "@prisma/client";
 
 // Catch any rejections that slip through the promise-gap fixes above.
 // Without this, Node 15+ crashes the entire worker on an unhandled rejection.
-process.on("unhandledRejection", (reason) => {
-  console.error("FATAL unhandled rejection — worker will exit:", reason);
-  // Log and exit so the orchestrator can retry the job.
-  process.exit(1);
-});
+let shuttingDown = false;
 
+async function gracefulShutdown(
+  exitCode: number,
+  reason?: unknown
+): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  if (reason) {
+    console.error("Worker shutdown reason:", reason);
+  }
+
+  try {
+    await prisma.$disconnect();
+  } catch (err) {
+    console.error("Failed to disconnect Prisma:", err);
+  }
+
+  process.exit(exitCode);
+}
+
+process.on("unhandledRejection", (reason) => {
+  void gracefulShutdown(1, reason);
+});
 const POLL_INTERVAL_MS = 2000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const LOCK_MS = 5 * 60_000;
@@ -94,8 +113,16 @@ async function runJob(
       throw new Error(`Unsupported job type: ${job.type}`);
     }
 
-    const details = job.progressDetails as any;
-    const scope = details?.scope;
+    const details =
+      typeof job.progressDetails === "object" &&
+        job.progressDetails !== null
+        ? job.progressDetails
+        : {};
+
+    const scope =
+      "scope" in details
+        ? (details as { scope?: string }).scope
+        : undefined;
 
     await repositoryService.analyzeRepository(job.repositoryId, job.userId, {
       scope,
@@ -108,19 +135,41 @@ async function runJob(
       jobId: job.id,
       workerId: params.workerId,
     });
-  } catch (err: any) {
-    const message = err?.message ? String(err.message) : String(err);
-    console.error(`Job ${job.id} failed:`, err);
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : String(err);
+    console.error(
+      `Job ${job.id} failed:`,
+      err instanceof Error
+        ? {
+          name: err.name,
+          message: err.message,
+          stack: err.stack,
+        }
+        : err
+    );
 
-    await analysisJobService.markFailed({
-      jobId: job.id,
-      workerId: params.workerId,
-      error: message,
-      attempts: job.attempts,
-      maxAttempts: job.maxAttempts,
-    });
+    try {
+      await analysisJobService.markFailed({
+        jobId: job.id,
+        workerId: params.workerId,
+        error: message,
+        attempts: job.attempts,
+        maxAttempts: job.maxAttempts,
+      });
+    } catch (markFailedError) {
+      console.error(
+        `Failed to mark job ${job.id} as failed:`,
+        markFailedError
+      );
+    }
   } finally {
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    if (heartbeatTimer !== null) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
   }
 }
 
@@ -142,15 +191,8 @@ export async function startAnalysisWorkerLoop(opts?: {
   let stopping = false;
 
   const shutdown = async (signal: string) => {
-    if (stopping) return;
     stopping = true;
-    console.log(`received ${signal}, shutting down...`);
-    try {
-      await prisma.$disconnect();
-    } catch {
-      // ignore
-    }
-    process.exit(0);
+    await gracefulShutdown(0, signal);
   };
 
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
