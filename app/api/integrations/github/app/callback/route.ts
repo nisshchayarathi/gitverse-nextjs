@@ -1,4 +1,4 @@
-import { sanitizeError, requireAuth } from "@/lib/middleware"; // 1. Added requireAuth import here
+import { sanitizeError, requireAuth } from "@/lib/middleware";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { GitHubAppService } from "@/lib/services/githubAppService";
@@ -27,11 +27,12 @@ export async function GET(request: NextRequest) {
     canonicalOrigin || getPublicOrigin(request),
   );
 
+  let authenticatedUser: any;
+
   try {
-    // 2. FORCE server-side authentication right at the start
-    await requireAuth(request); 
+    // FORCE server-side authentication and capture user identity
+    authenticatedUser = await requireAuth(request);
   } catch (authError) {
-    // If not authenticated, redirect instantly with an error reason
     redirectUrl.searchParams.set("install", "error");
     redirectUrl.searchParams.set("reason", "unauthorized");
     return NextResponse.redirect(redirectUrl);
@@ -66,6 +67,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
+  // CRITICAL: Prevent session-fixation / cryptographic state hijacking
+  if (Number(authenticatedUser.userId) !== userId) {
+    redirectUrl.searchParams.set("install", "error");
+    redirectUrl.searchParams.set("reason", "forbidden_user_mismatch");
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // 15 minute max age
   if (Date.now() - ts > 15 * 60 * 1000) {
     redirectUrl.searchParams.set("install", "error");
     redirectUrl.searchParams.set("reason", "expired_state");
