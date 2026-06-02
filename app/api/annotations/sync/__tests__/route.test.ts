@@ -69,6 +69,16 @@ describe("GET /api/annotations/sync", () => {
     expect(addClient).not.toHaveBeenCalled();
   });
 
+  it("rejects missing repository IDs before opening the stream", async () => {
+    const response = await GET(createRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Missing repositoryId");
+    expect(prisma.repository.findFirst).not.toHaveBeenCalled();
+    expect(addClient).not.toHaveBeenCalled();
+  });
+
   it("rejects repositories that do not belong to the authenticated user", async () => {
     (prisma.repository.findFirst as jest.Mock).mockResolvedValue(null);
 
