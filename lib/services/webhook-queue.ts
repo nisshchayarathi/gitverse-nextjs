@@ -30,11 +30,26 @@ export class WebhookQueueService {
         return { activeWorkers, pendingJobs, isThrottled: false };
       }
 
-      // Fetch oldest pending jobs up to available capacity
-      const nextJobs = await prisma.webhookEvent.findMany({
-        where: { status: "pending" },
-        orderBy: { createdAt: "asc" },
-        take: availableCapacity,
+      // ATOMIC RESERVATION: Fetch and reserve jobs in a single transaction
+      // This prevents multiple dispatchers from claiming the same jobs
+      const nextJobs = await prisma.$transaction(async (tx) => {
+        const jobs = await tx.webhookEvent.findMany({
+          where: { status: "pending" },
+          orderBy: { createdAt: "asc" },
+          take: availableCapacity,
+        });
+
+        if (jobs.length > 0) {
+          // Atomically mark these jobs as being dispatched
+          // We use a "reserved" status internally to prevent race conditions during dispatch
+          const jobIds = jobs.map(j => j.id);
+          await tx.webhookEvent.updateMany({
+            where: { id: { in: jobIds } },
+            data: { status: "processing" },  // Mark as processing immediately upon reservation
+          });
+        }
+
+        return jobs;
       });
 
       if (nextJobs.length === 0) {

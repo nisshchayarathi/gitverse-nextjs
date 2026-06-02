@@ -50,26 +50,47 @@ async function handlePost(request: NextRequest) {
     return NextResponse.json({ error: "eventId is required" }, { status: 400 });
   }
 
-  const webhookEvent = await prisma.webhookEvent.findUnique({
-    where: { id: eventId },
+  // ATOMIC LOCK: Prevent race condition in webhook processing
+  // Use database advisory lock to ensure only one worker processes this event
+  const webhookEvent = await prisma.$transaction(async (tx) => {
+    // Generate consistent lock ID from eventId (take first 16 chars, convert to BigInt)
+    const lockId = BigInt(eventId.replace(/-/g, '').substring(0, 16), 16) % BigInt(2147483647);
+    
+    // Acquire exclusive lock - blocks other transactions until this one completes
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(${lockId})`;
+    
+    const event = await tx.webhookEvent.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      throw new Error("Event not found");
+    }
+
+    if (event.status !== "pending") {
+      // Another worker already claimed this event - return early
+      return { ...event, _alreadyClaimed: true };
+    }
+
+    // Update atomically within transaction - no race condition possible
+    const updated = await tx.webhookEvent.update({
+      where: { id: eventId },
+      data: { status: "processing" },
+    });
+
+    return { ...updated, _alreadyClaimed: false };
   });
 
   if (!webhookEvent) {
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
 
-  if (webhookEvent.status !== "pending") {
+  if (webhookEvent._alreadyClaimed) {
     return NextResponse.json(
       { ok: true, ignored: true, reason: "already_processed" },
       { status: 200 }
     );
   }
-
-  // Mark as processing
-  await prisma.webhookEvent.update({
-    where: { id: eventId },
-    data: { status: "processing" },
-  });
 
   const timeoutEstimator = new TimeoutEstimatorService();
   
@@ -395,8 +416,13 @@ async function handlePost(request: NextRequest) {
       error,
     });
 
-    await prisma.webhookEvent.update({
-      where: { id: eventId },
+    // Use optimistic locking: only update if still in "processing" state
+    // This prevents overwriting a successful "completed" status from another worker
+    const updateResult = await prisma.webhookEvent.updateMany({
+      where: { 
+        id: eventId,
+        status: "processing"  // Only update if still processing
+      },
       data: {
         status: retryDecision.shouldRetry ? "pending" : "failed",
         error: String(error?.message || error),
@@ -404,6 +430,13 @@ async function handlePost(request: NextRequest) {
         nextRetryAt: retryDecision.nextRetryAt,
       },
     });
+
+    // If update succeeded, we owned the lock. If it didn't, another worker already completed it.
+    if (updateResult.count === 0) {
+      console.warn(
+        `[Worker] Event ${eventId} status already changed (likely completed by concurrent worker). Skipping error update.`
+      );
+    }
 
     return NextResponse.json(
       { error: "Failed to process event", details: errorDetails },
