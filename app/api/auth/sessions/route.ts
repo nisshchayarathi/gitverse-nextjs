@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser , sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
+import { SAFE_SESSION_SELECT } from "@/lib/utils/sessionResponse";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
     // Fetch one extra item to determine if there is a next page
     const sessions = await prisma.session.findMany({
       where: { userId: user.userId },
+      select: SAFE_SESSION_SELECT,
       take: limit + 1,
       skip: cursor ? 1 : 0,
       cursor: cursor ? { id: cursor } : undefined,

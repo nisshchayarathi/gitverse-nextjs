@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
 import { GitHubRateLimitError } from "@/lib/services/githubService";
@@ -9,9 +9,14 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth(request);
     const body = await request.json();
     const repoFullNames = Array.isArray(body?.repoFullNames)
-      ? (body.repoFullNames as unknown[])
-          .filter((r) => typeof r === "string")
-          .map((r) => r.trim())
+      ? Array.from(
+          new Set(
+            (body.repoFullNames as unknown[])
+              .filter((r): r is string => typeof r === "string")
+              .map((r) => r.trim())
+              .filter(Boolean),
+          ),
+        )
       : [];
 
     if (repoFullNames.length === 0) {
@@ -21,26 +26,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upsert selected repos as enabled.
+    const selectableRepos = await prisma.gitHubRepo.findMany({
+      where: {
+        userId: user.userId,
+        repoFullName: { in: repoFullNames },
+        installationId: { not: null },
+      },
+      select: { repoFullName: true },
+    });
+
+    const selectableRepoNames = new Set(
+      selectableRepos.map((repo) => repo.repoFullName),
+    );
+    const unavailableRepoFullNames = repoFullNames.filter(
+      (repoFullName) => !selectableRepoNames.has(repoFullName),
+    );
+
+    if (unavailableRepoFullNames.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Selected repositories must be installed through the GitHub App first",
+          unavailableRepoFullNames,
+        },
+        { status: 400 },
+      );
+    }
+
+    // Enable only repos already discovered through the user's GitHub App installation.
     await prisma.$transaction(async (tx) => {
-      for (const fullName of repoFullNames) {
-        await tx.gitHubRepo.upsert({
-          where: {
-            userId_repoFullName: {
-              userId: user.userId,
-              repoFullName: fullName,
-            },
-          },
-          create: {
-            userId: user.userId,
-            repoFullName: fullName,
-            enabled: true,
-          },
-          update: {
-            enabled: true,
-          },
-        });
-      }
+      await tx.gitHubRepo.updateMany({
+        where: {
+          userId: user.userId,
+          repoFullName: { in: repoFullNames },
+          installationId: { not: null },
+        },
+        data: { enabled: true },
+      });
 
       // Optionally disable repos not selected (keeps history but turns off automation).
       await tx.gitHubRepo.updateMany({
@@ -68,11 +90,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ repos: toJsonSafe(repos) }, { status: 200 });
   } catch (error: any) {
     console.error("GitHub select repos error:", sanitizeError(error));
-    
+
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(
         { error: error.message, retryAfter: error.retryAfterSeconds },
-        { status: 429 }
+        { status: 429 },
       );
     }
 

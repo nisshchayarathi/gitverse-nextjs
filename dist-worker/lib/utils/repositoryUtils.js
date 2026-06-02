@@ -16,6 +16,8 @@ exports.isFeatureBranch = isFeatureBranch;
 exports.isBugfixBranch = isBugfixBranch;
 exports.isReleaseBranch = isReleaseBranch;
 exports.calculateCodeChurn = calculateCodeChurn;
+exports.normalizeKnownRepoHttpUrl = normalizeKnownRepoHttpUrl;
+exports.normalizeTargetDirectory = normalizeTargetDirectory;
 exports.LANGUAGE_COLORS = {
     TypeScript: '#3178c6',
     JavaScript: '#f1e05a',
@@ -185,4 +187,48 @@ function calculateCodeChurn(commits) {
     return Array.from(churnByDate.entries())
         .map(([date, churn]) => ({ date, churn }))
         .sort((a, b) => a.date.localeCompare(b.date));
+}
+function normalizeKnownRepoHttpUrl(input) {
+    let parsed;
+    try {
+        parsed = new URL(input);
+    }
+    catch {
+        return null;
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+        return null;
+    const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    const supportedHosts = new Set(["github.com", "gitlab.com", "bitbucket.org"]);
+    if (!supportedHosts.has(host))
+        return input;
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    if (parts.length < 2)
+        return null;
+    const owner = parts[0];
+    const repo = parts[1].replace(/\.git$/, "");
+    if (!owner || !repo)
+        return null;
+    return `${parsed.protocol}//${parsed.host}/${owner}/${repo}`;
+}
+function normalizeTargetDirectory(input) {
+    if (input == null)
+        return null;
+    const trimmed = String(input).trim();
+    if (!trimmed)
+        return null;
+    // Normalize separators and remove leading/trailing slashes.
+    let dir = trimmed.replace(/\\/g, "/");
+    dir = dir.replace(/^\.\/+/, "").replace(/^\/+/, "").replace(/\/+$/, "");
+    if (!dir)
+        return null;
+    const parts = dir.split("/");
+    for (const part of parts) {
+        if (!part || part === "." || part === "..")
+            return null;
+        // Keep it conservative: directory segments should be URL/path-safe.
+        if (!/^[A-Za-z0-9._-]+$/.test(part))
+            return null;
+    }
+    return parts.join("/");
 }

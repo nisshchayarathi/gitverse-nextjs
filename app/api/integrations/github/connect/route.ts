@@ -3,6 +3,8 @@ import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { GitHubService } from "@/lib/services/githubService";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
+import { encryptToken } from "@/lib/utils/tokenEncryption";
+import { RedactSensitiveFields } from "@/services/security/redact-sensitive-fields";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,18 +22,22 @@ export async function POST(request: NextRequest) {
     const github = new GitHubService(token);
     const me = await github.getAuthenticatedUser();
 
+    const encryptedToken = encryptToken(token);
+
     const account = await prisma.gitHubAccount.upsert({
       where: { userId: user.userId },
       create: {
         userId: user.userId,
         githubUserId: BigInt(me.id),
         username: me.login,
-        accessToken: token,
+        accessToken: encryptedToken,
+        tokenEncrypted: true,
       },
       update: {
         githubUserId: BigInt(me.id),
         username: me.login,
-        accessToken: token,
+        accessToken: encryptedToken,
+        tokenEncrypted: true,
       },
       select: {
         id: true,
@@ -43,7 +49,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ account: toJsonSafe(account) }, { status: 200 });
+    return NextResponse.json(
+      RedactSensitiveFields.redact({ account: toJsonSafe(account) }),
+      { status: 200 },
+    );
   } catch (error: any) {
     console.error("GitHub connect error:", sanitizeError(error));
     if (isHttpError(error)) {

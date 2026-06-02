@@ -1,49 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import {
+  isAnalysisRunnerAuthorized,
+  registerUnhandledRejectionLogger,
+} from "@/lib/utils/analysisRunner";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { repositoryService } from "@/lib/services/repositoryService";
+import { isRateLimited } from "@/lib/services/rateLimitService";
 
 export const runtime = "nodejs";
 
-function isAuthorized(request: NextRequest): boolean {
-  const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
-
-  // If a secret is configured, require it for non-GET requests.
-  // (Vercel Cron triggers are GET-only and cannot send custom headers.)
-  if (configuredSecret && request.method !== "GET") {
-    const headerSecret = request.headers.get("x-analysis-runner-secret");
-    const url = new URL(request.url);
-    const querySecret = url.searchParams.get("secret");
-
-    return headerSecret === configuredSecret || querySecret === configuredSecret;
+function getClientIp(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const ip = forwarded.split(",")[0]?.trim();
+    if (ip && ip !== "unknown") return ip;
   }
-
-  // Vercel Cron: triggers are plain HTTP GETs to your `path`.
-  // Per Vercel docs, cron-triggered functions contain `vercel-cron/1.0` as the User-Agent.
-  // Note: User-Agent can be spoofed, but this is the strongest option that works with
-  // `vercel.json` crons (which don't support custom headers).
-  const ua = (request.headers.get("user-agent") || "").toLowerCase();
-  const isVercelCron =
-    process.env.VERCEL === "1" &&
-    process.env.VERCEL_ENV === "production" &&
-    ua.includes("vercel-cron/");
-  if (request.method === "GET" && isVercelCron) return true;
-
-  // In dev, allow calling without a secret.
-  if (!configuredSecret) {
-    return process.env.NODE_ENV !== "production";
-  }
-
-  const headerSecret = request.headers.get("x-analysis-runner-secret");
-  const url = new URL(request.url);
-  const querySecret = url.searchParams.get("secret");
-
-  return headerSecret === configuredSecret || querySecret === configuredSecret;
+  return request.headers.get("x-real-ip") || request.ip || "unknown";
 }
 
 async function runOnce(request: NextRequest): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
+  registerUnhandledRejectionLogger();
+
+  if (!isAnalysisRunnerAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const ip = getClientIp(request);
+  // Use DB-backed rate limiting (5 requests per 5 minutes per IP)
+  if (await isRateLimited(ip, "LOGIN", 5, 5 * 60 * 1000)) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait before retrying." },
+      { status: 429 },
+    );
   }
 
   const workerId = `serverless:${process.env.VERCEL_REGION || "local"}:${crypto.randomBytes(6).toString("hex")}`;
@@ -63,7 +52,7 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    await repositoryService.analyzeRepository(job.repositoryId, {
+    await repositoryService.analyzeRepository(job.repositoryId, job.userId, {
       onProgress: async (update) => {
         await analysisJobService.updateProgress({
           jobId: job.id,
@@ -87,17 +76,18 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       maxAttempts: job.maxAttempts,
     });
 
+    const sanitizedMessage =
+      process.env.NODE_ENV === "production"
+        ? "Analysis failed"
+        : message;
+
     return NextResponse.json(
-      { ok: false, jobId: job.id, status: "FAILED", error: message },
+      { ok: false, jobId: job.id, status: "FAILED", error: sanitizedMessage },
       { status: 500 },
     );
   }
 }
 
 export async function POST(request: NextRequest) {
-  return runOnce(request);
-}
-
-export async function GET(request: NextRequest) {
   return runOnce(request);
 }

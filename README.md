@@ -1,8 +1,23 @@
-# GitVerse
+<div align="center">
 
-Turn any GitHub repo into an interactive map of its architecture, modules, and risks.
+# GitVerse 🗺️
 
-GitVerse is built for the moment you open a new codebase and ask: “Where do I start?”
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
+[![Node.js](https://img.shields.io/badge/Node.js-22.x-339933?style=flat-square&logo=node.js)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Deploy on Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)](https://vercel.com)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://github.com/nisshchayarathi/gitverse-nextjs/pulls)
+
+> **Paste a repo. Understand it in minutes.**
+
+GitVerse turns any GitHub repository into an interactive visual map of its architecture, modules, and risk hotspots — so you always know where to start.
+
+Whether you're a new contributor facing an unfamiliar codebase, or a maintainer trying to communicate structure to your team, GitVerse gives you the full picture instantly.
+
+</div>
 
 ## Pitch
 
@@ -41,6 +56,10 @@ Paste a repo → GitVerse builds a visual map + AI onboarding so contributors ca
 - Ask AI questions about files, folders, and architecture
 - Generate analysis jobs and track progress
 
+## Supported Node Version
+
+This project officially supports **Node.js 22.x** (as specified in [package.json](package.json)).
+
 ## Quickstart (local dev)
 
 ```bash
@@ -53,6 +72,16 @@ npm run dev
 ```
 
 Open http://localhost:3000
+
+### Database Seeding
+
+To populate your local database with realistic mock data for testing UI components without manually creating records, run:
+
+```bash
+npm run db:seed
+```
+
+> **Note:** This command will clear existing data in your local database before generating the new interconnected records (users, repositories, commits, etc.).
 
 ## Contribution-first onboarding (the hackathon angle)
 
@@ -139,6 +168,7 @@ gitverse-nextjs/
 - `npm run prisma:generate` - Generate Prisma client
 - `npm run prisma:migrate` - Run database migrations
 - `npm run prisma:studio` - Open Prisma Studio
+- `npm run db:seed` - Seed the database with mock data
 
 ## 🔧 API Routes
 
@@ -211,10 +241,95 @@ const loadMore = async () => {
 
 ### Vercel (Recommended)
 
+#### Environment Variables Checklist
+
+Before deploying, add these in **Vercel Dashboard → Project → Settings → 
+Environment Variables:**
+
+| Variable | Required | Description | Example |
+|---|---|---|---|
+| `DATABASE_URL` |  Yes | PostgreSQL connection string (Neon recommended) | `postgresql://user:pass@host/db` |
+| `JWT_SECRET` | Yes | Secret key for JWT signing | `openssl rand -base64 32` |
+| `NEXTAUTH_URL` |  Yes | Your deployed Vercel URL | `https://your-app.vercel.app` |
+| `NEXTAUTH_SECRET` |  Yes | NextAuth session signing secret | `openssl rand -base64 32` |
+| `GOOGLE_CLIENT_ID` |  No (required for OAuth) | Google OAuth client ID | From Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` |  No (required for OAuth) | Google OAuth client secret | From Google Cloud Console |
+| `NEXT_PUBLIC_API_URL` |  Optional | API URL for client-side calls | Defaults to current domain |
+
+#### 🚀 Deployment Steps:
+
+1. Push your code to GitHub.
+2. Import the project in the [Vercel dashboard](https://vercel.com/new).
+3. Under **Settings → Environment Variables**, add every variable listed in the [Environment Variables](#-environment-variables) section below. Vercel automatically makes them available at build time and runtime.
+   - For `NEXTAUTH_URL`, set the value to your Vercel deployment URL (e.g. `https://gitverse.vercel.app`). In local development, set it to `http://localhost:3000` in your `.env.local` to avoid missing-URL warnings.
+   - Mark sensitive secrets (e.g. `JWT_SECRET`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_SECRET`, `GEMINI_API_KEY`) as **Sensitive** in Vercel so they are never exposed in logs.
+4. Click **Deploy**.
+
+> **Tip:** Vercel re-deploys automatically on every push to `main`. If you update an environment variable in the dashboard, trigger a redeploy from **Deployments → Redeploy** for the new value to take effect.
+1. Push your code to GitHub
+2. Go to [vercel.com](https://vercel.com) then **Import Project**
+3. Select your GitHub repository
+4. Add all required environment variables from the checklist above
+5. Click **Deploy**
+6. In Google Cloud Console, add your Vercel URL as an OAuth redirect URI
+
+#### 🔧 Troubleshooting
+
+**Build failing on Vercel?**
+- Ensure all required environment variables are set
+- Check build logs under **Vercel Dashboard → Deployments → Build Logs**
+
+**Database connection errors?**
+- Verify `DATABASE_URL` is a valid PostgreSQL connection string
+- If using Neon, make sure the database is not paused
+- Neon free tier pauses after inactivity — wake it up from the Neon dashboard
+
+**Google OAuth not working?**
+- Ensure `NEXTAUTH_URL` exactly matches your Vercel deployment URL
+- Add `https://your-app.vercel.app/api/auth/callback/google` 
+  to **Authorized Redirect URIs** in Google Cloud Console
+- Check `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are correctly copied
+
+**AI analysis not working?**
+- Verify `GEMINI_API_KEY` is valid and has not exceeded quota
+- Check [Google AI Studio](https://aistudio.google.com) for API usage limits
+
+**Environment variables not updating?**
+- After changing env vars in Vercel dashboard, trigger a **Redeploy** manually
+- Vercel does not auto-redeploy when env vars change
 1. Push your code to GitHub
 2. Import project in Vercel
 3. Add environment variables in Vercel dashboard
 4. Deploy!
+
+#### ✅ Vercel Environment Variables Checklist
+
+Add these in **Vercel Dashboard → Settings → Environment Variables**:
+
+| Variable | Required | When needed |
+|---|---|---|
+| `DATABASE_URL` | ✅ Always | PostgreSQL connection string (use NeonDB pooler URL) |
+| `NEXTAUTH_SECRET` | ✅ Always | Session encryption — generate with `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | ✅ Always | Your production domain e.g. `https://your-app.vercel.app` |
+| `GEMINI_API_KEY` | ✅ Always | Google Gemini AI — get from [aistudio.google.com](https://aistudio.google.com) |
+| `JWT_SECRET` | ✅ Always | JWT signing secret |
+| `GOOGLE_CLIENT_ID` | ⚡ OAuth | Only if using Google login |
+| `GOOGLE_CLIENT_SECRET` | ⚡ OAuth | Only if using Google login |
+| `GITHUB_APP_ID` | ⚡ PR Reviews | Only if using GitHub App integration |
+| `GITHUB_APP_PRIVATE_KEY` | ⚡ PR Reviews | Only if using GitHub App integration |
+| `GITHUB_WEBHOOK_SECRET` | ⚡ PR Reviews | Only if using GitHub webhooks |
+| `ANALYSIS_RUNNER_SECRET` | ⚡ Cron | Required for scheduled analysis jobs on Vercel |
+| `GITVERSE_ANALYSIS_BACKEND` | ⚡ Cron | URL of your analysis worker backend |
+| `SMTP_HOST` | ⚡ Email | Only if using password reset emails |
+| `SMTP_USER` | ⚡ Email | Only if using password reset emails |
+| `SMTP_PASS` | ⚡ Email | Only if using password reset emails |
+
+#### ⚠️ Common Vercel Deployment Mistakes
+
+- **Wrong DATABASE_URL** — Use the **pooler** URL from NeonDB for Vercel (not direct connection)
+- **Missing NEXTAUTH_URL** — Must be set to your exact production domain
+- **GITHUB_APP_PRIVATE_KEY format** — Paste with literal `\n` between lines, wrapped in quotes
+- **ANALYSIS_RUNNER_SECRET not set** - Required in production; `/api/internal/run-analysis` rejects requests with 401 until the secret is configured
 
 ### Docker
 
@@ -256,15 +371,16 @@ firebase deploy
 Required:
 
 - `DATABASE_URL` - PostgreSQL connection string
-- `JWT_SECRET` - JWT secret key
+- `JWT_SECRET` - JWT signing secret. The app will crash on startup without it.
 - `GEMINI_API_KEY` - Google Gemini API key
 
 OAuth (Google / NextAuth):
 
 - `NEXTAUTH_URL` - Deployed base URL (e.g. `https://<your-domain>`)
 - `NEXTAUTH_SECRET` - Session/JWT signing secret (generate with `openssl rand -base64 32`)
-- `GOOGLE_CLIENT_ID` - Google OAuth client id
-- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+- `GOOGLE_CLIENT_ID` - Google OAuth client id (required only if Google sign-in is enabled)
+- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret (required only if Google sign-in is enabled)
+
 
 Optional:
 
@@ -277,6 +393,29 @@ Optional:
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+## 💖 Contributors & Thanks
+
+A huge thank you to all contributors who have helped improve GitVerse ❤️
+Your efforts make this project stronger, more reliable, and more impactful for the community.
+
+<p align="center">
+  <a href="https://github.com/nisshchayarathi/gitverse-nextjs/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=nisshchayarathi/gitverse-nextjs" alt="Contributors"/>
+  </a>
+</p>
+
+## ⭐ Project Support
+
+<p align="center">
+  <a href="https://github.com/nisshchayarathi/gitverse-nextjs/stargazers">
+    <img src="https://img.shields.io/github/stars/nisshchayarathi/gitverse-nextjs?style=social" alt="Stars">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/nisshchayarathi/gitverse-nextjs/network/members">
+    <img src="https://img.shields.io/github/forks/nisshchayarathi/gitverse-nextjs?style=social" alt="Forks">
+  </a>
+</p>
 
 ## 📄 License
 

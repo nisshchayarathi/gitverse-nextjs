@@ -205,8 +205,8 @@ CREATE TABLE verification_tokens (
 
 ### For Production:
 
-1. Update `NEXTAUTH_URL` to production domain
-2. Add production URLs to Google OAuth settings
+1. **Explicitly Set `NEXTAUTH_URL`**: Update this environment variable to your exact production URL without a trailing slash. NextAuth relies on this variable to construct the callback URL to prevent `redirect_uri_mismatch` errors.
+2. Add production URLs to Google OAuth settings (must exactly match `NEXTAUTH_URL`/api/auth/callback/google)
 3. Set all environment variables in hosting platform
 4. Run migration in production database
 5. Deploy application

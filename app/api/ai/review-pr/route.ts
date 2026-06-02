@@ -1,24 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth , sanitizeError } from "@/lib/middleware";
+import { requireAuth, sanitizeError, isHttpError } from "@/lib/middleware";
 import {
   parsePullRequestUrl,
   reviewPullRequest,
 } from "@/lib/services/prReviewService";
+import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAuth(request);
+    const user = await requireAuth(request);
 
     const body = await request.json();
     const prUrl = body?.prUrl as string | undefined;
-    const token = body?.token as string | undefined;
 
     if (!prUrl) {
       return NextResponse.json({ error: "prUrl is required" }, { status: 400 });
-    }
-
-    if (!token) {
-      return NextResponse.json({ error: "token is required" }, { status: 400 });
     }
 
     const parsed = parsePullRequestUrl(prUrl);
@@ -31,6 +27,22 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    // Retrieve the GitHub token stored for this user via /api/integrations/github/connect.
+    // The token is never accepted from the request body to prevent token laundering,
+    // scope probing, and rate limit exhaustion through server-side proxying.
+    const token = await getDecryptedGitHubToken(user.userId);
+
+    if (!token) {
+      return NextResponse.json(
+        {
+          error:
+            "GitHub account not connected. Connect your GitHub account in Settings before using PR review.",
+        },
+        { status: 400 },
+      );
+    }
+
     const result = await reviewPullRequest({
       owner: parsed.owner,
       repo: parsed.repo,
@@ -44,16 +56,21 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("PR review error:", sanitizeError(error));
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { error: "Malformed JSON body" },
+        { status: 400 },
+      );
+    }
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
-      {
-        error: "Failed to review PR",
-      },
+      { error: "Failed to review PR" },
       { status: 500 },
     );
   }
-
-  return NextResponse.json(
-    { error: "Failed to review PR", details: "Unexpected fallthrough" },
-    { status: 500 },
-  );
 }

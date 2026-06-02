@@ -3,16 +3,24 @@ import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 export interface AIAnalysisRequest {
   repositoryId: number;
   type:
-    | "overview"
-    | "code-quality"
-    | "security"
-    | "architecture"
-    | "suggestions";
+  | "overview"
+  | "code-quality"
+  | "security"
+  | "architecture"
+  | "suggestions"
+  | "architecture-document";
   context?: {
     files?: Array<{ path: string; content: string }>;
+    fileTree?: string;
     commits?: Array<{ message: string; author: string; date: string }>;
     languages?: Array<{ name: string; percentage: number }>;
     contributors?: Array<{ name: string; commits: number }>;
+    knowledge?: {
+      projectDescription?: string;
+      glossary?: Record<string, string>;
+      onboardingNotes?: string[];
+      architecturePrinciples?: string[];
+    };
   };
 }
 
@@ -31,6 +39,12 @@ export interface AIRepositoryChatRequest {
     files?: string[];
     recentCommits?: string[];
     contributors?: string[];
+    knowledge?: {
+      projectDescription?: string;
+      glossary?: Record<string, string>;
+      onboardingNotes?: string[];
+      architecturePrinciples?: string[];
+    };
   };
 }
 
@@ -39,11 +53,11 @@ export class GeminiService {
   private model: GenerativeModel;
 
   constructor(apiKey?: string) {
-    const key = apiKey || process.env.GEMINI_API_KEY;
-    if (!key) {
-      throw new Error("GEMINI_API_KEY is required");
+    const key = apiKey || process.env.GEMINI_API_KEY || "dummy-key-for-build";
+    if (!key || key === "dummy-key-for-build") {
+      // Defer throwing to runtime if possible, or warn. For now, use a dummy key during init.
     }
-
+    
     this.client = new GoogleGenerativeAI(key);
     this.model = this.client.getGenerativeModel({ model: "gemini-2.5-flash" });
   }
@@ -62,6 +76,17 @@ export class GeminiService {
       return response.text();
     } catch (error: any) {
       console.error("Gemini analysis error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
       throw new Error(`AI analysis failed: ${error.message}`);
     }
   }
@@ -76,7 +101,7 @@ export class GeminiService {
       code,
       language,
       analysisType,
-      context
+      context,
     );
 
     try {
@@ -84,8 +109,19 @@ export class GeminiService {
       const response = await result.response;
       return response.text();
     } catch (error: any) {
-      console.error("Gemini code analysis error:", error);
-      throw new Error(`Code analysis failed: ${error.message}`);
+      console.error("Gemini analysis error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
+      throw new Error(`AI analysis failed: ${error.message}`);
     }
   }
 
@@ -98,7 +134,7 @@ export class GeminiService {
     let prompt = this.buildRepositoryChatPrompt(
       question,
       conversationHistory,
-      context
+      context,
     );
 
     try {
@@ -107,6 +143,17 @@ export class GeminiService {
       return response.text();
     } catch (error: any) {
       console.error("Gemini chat error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
       throw new Error(`AI chat failed: ${error.message}`);
     }
   }
@@ -114,17 +161,53 @@ export class GeminiService {
   /**
    * Chat using a pre-built prompt (free-form)
    */
-  async chatRaw(prompt: string): Promise<string> {
+  async chatRaw(
+    prompt: string,
+    history?: Array<{ role: "user" | "assistant"; content: string }>,
+  ): Promise<{ text: string; tokensConsumed: number }> {
     if (!prompt?.trim()) {
       throw new Error("Prompt is required");
     }
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      return response.text();
+      if (history && history.length > 0) {
+        // Cap history to prevent context limit failures
+        const MAX_HISTORY_LENGTH = 10;
+        const recentHistory = history.slice(-MAX_HISTORY_LENGTH);
+
+        const contents = [
+          ...recentHistory.map((msg) => ({
+            role: msg.role === "assistant" ? "model" : "user",
+            parts: [{ text: msg.content }],
+          })),
+          { role: "user", parts: [{ text: prompt }] },
+        ];
+
+        const result = await this.model.generateContent({ contents });
+        const response = await result.response;
+        const text = response.text();
+        const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
+        return { text, tokensConsumed };
+      } else {
+        const result = await this.model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
+        return { text, tokensConsumed };
+      }
     } catch (error: any) {
-      console.error("Gemini raw chat error:", error);
+      console.error("Gemini chat error:", error);
+
+      const message = error?.message?.toLowerCase() || "";
+
+      if (
+        message.includes("quota") ||
+        message.includes("rate limit") ||
+        message.includes("429")
+      ) {
+        throw new Error("Gemini API quota exceeded. Please try again later.");
+      }
+
       throw new Error(`AI chat failed: ${error.message}`);
     }
   }
@@ -163,11 +246,10 @@ Provide only the commit messages, one per line.
         .slice(0, 3);
     } catch (error: any) {
       console.error("Commit message suggestion error:", error);
-      return [
-        "feat: implement new features",
-        "fix: resolve bugs and issues",
-        "chore: update dependencies and configuration",
-      ];
+
+      throw new Error(
+        error?.message || "Failed to generate commit message suggestions"
+      );
     }
   }
 
@@ -176,18 +258,44 @@ Provide only the commit messages, one per line.
    */
   private buildRepositoryAnalysisPrompt(
     type: string,
-    context?: AIAnalysisRequest["context"]
+    context?: AIAnalysisRequest["context"],
   ): string {
     const baseContext = `
 Repository Context:
 - Languages: ${context?.languages?.map((l) => `${l.name} (${l.percentage}%)`).join(", ") || "Unknown"}
 - Contributors: ${context?.contributors?.length || 0}
 - Recent commits: ${context?.commits?.length || 0}
-`;
+${context?.fileTree ? `\nFile Structure:\n${context.fileTree}\n` : ""}`;
+
+    let knowledgeContext = "";
+    if (context?.knowledge) {
+      knowledgeContext += `\nMaintainer Context (Highest Priority):\n`;
+      if (context.knowledge.projectDescription) {
+        knowledgeContext += `Project Description: ${context.knowledge.projectDescription}\n`;
+      }
+      if (context.knowledge.architecturePrinciples?.length) {
+        knowledgeContext += `Architecture Principles:\n- ${context.knowledge.architecturePrinciples.join('\n- ')}\n`;
+      }
+      if (context.knowledge.glossary && Object.keys(context.knowledge.glossary).length > 0) {
+        knowledgeContext += `Glossary:\n`;
+        Object.entries(context.knowledge.glossary).forEach(([k, v]) => {
+          knowledgeContext += `- ${k}: ${v}\n`;
+        });
+      }
+      if (context.knowledge.onboardingNotes?.length) {
+        knowledgeContext += `Onboarding Notes:\n- ${context.knowledge.onboardingNotes.join('\n- ')}\n`;
+      }
+    }
+    
+    const scopeNote = (context as any)?.targetDirectory
+      ? `\nImportant: Restrict your analysis to the target directory (${(context as any).targetDirectory}). Only reference files outside this directory if they are immediately required dependencies.\n`
+      : "";
+
+    const fullContext = `${knowledgeContext}${baseContext}${scopeNote}`;
 
     switch (type) {
       case "overview":
-        return `${baseContext}
+        return `${fullContext}
 
 Provide a comprehensive overview of this repository including:
 1. Primary purpose and functionality
@@ -198,7 +306,7 @@ Provide a comprehensive overview of this repository including:
 Be concise but informative.`;
 
       case "code-quality":
-        return `${baseContext}
+        return `${fullContext}
 
 Analyze the code quality of this repository:
 1. Code organization and structure
@@ -210,7 +318,7 @@ Analyze the code quality of this repository:
 Provide actionable insights.`;
 
       case "security":
-        return `${baseContext}
+        return `${fullContext}
 
 Perform a security analysis:
 1. Potential security vulnerabilities
@@ -220,7 +328,7 @@ Perform a security analysis:
 5. Security best practices recommendations`;
 
       case "architecture":
-        return `${baseContext}
+        return `${fullContext}
 
 Analyze the software architecture:
 1. Overall architecture pattern (MVC, microservices, etc.)
@@ -230,7 +338,7 @@ Analyze the software architecture:
 5. Architectural recommendations`;
 
       case "suggestions":
-        return `${baseContext}
+        return `${fullContext}
 
 Provide improvement suggestions:
 1. Code refactoring opportunities
@@ -241,8 +349,31 @@ Provide improvement suggestions:
 
 Prioritize by impact and effort.`;
 
+      case "architecture-document":
+        return `${baseContext}${scopeNote}
+
+You are an expert software architect analyzing an established codebase. Based on the provided repository context, generate a comprehensive ARCHITECTURE.md file. Use Markdown formatting. Ensure your response is strictly the Markdown content.
+
+# Architecture Overview
+[Provide a high level summary of the application's core functionality and its primary architectural pattern.]
+
+## Core Modules
+[Based on the file structure, identify 3-5 of the most crucial modules/components. Describe their primary responsibilities.]
+
+## Dependencies
+[Identify primary external dependencies, runtimes, and frameworks based on the context. Explain their role within the stack.]
+
+## Data Flow
+[Conceptually map how data traverses the application between the recognized components.]
+
+## Risks
+[List potential technical debt, scalability bottlenecks, or security concerns given the tech stack and complexity.]
+
+## Contributor Notes
+[Provide guidelines, gotchas, or important notes for new developers joining the codebase.]`;
+
       default:
-        return `${baseContext}\n\nAnalyze this repository and provide insights.`;
+        return `${fullContext}\n\nAnalyze this repository and provide insights.`;
     }
   }
 
@@ -253,7 +384,7 @@ Prioritize by impact and effort.`;
     code: string,
     language: string,
     analysisType: string,
-    context?: string
+    context?: string,
   ): string {
     const basePrompt = `Language: ${language}\n${context ? `Context: ${context}\n` : ""}\n\nCode:\n\`\`\`${language}\n${code}\n\`\`\`\n\n`;
 
@@ -311,7 +442,7 @@ Provide refactored code examples.`;
   private buildRepositoryChatPrompt(
     question: string,
     conversationHistory?: Array<{ role: string; content: string }>,
-    context?: AIRepositoryChatRequest["context"]
+    context?: AIRepositoryChatRequest["context"],
   ): string {
     let prompt =
       "You are an expert code analyst helping developers understand their repository.\n\n";
@@ -326,6 +457,24 @@ Provide refactored code examples.`;
       }
       if (context.contributors?.length) {
         prompt += `Contributors: ${context.contributors.slice(0, 5).join(", ")}\n`;
+      }
+      if (context.knowledge) {
+        prompt += `\nMaintainer Context (Highest Priority):\n`;
+        if (context.knowledge.projectDescription) {
+          prompt += `Project Description: ${context.knowledge.projectDescription}\n`;
+        }
+        if (context.knowledge.architecturePrinciples?.length) {
+          prompt += `Architecture Principles:\n- ${context.knowledge.architecturePrinciples.join('\n- ')}\n`;
+        }
+        if (context.knowledge.glossary && Object.keys(context.knowledge.glossary).length > 0) {
+          prompt += `Glossary:\n`;
+          Object.entries(context.knowledge.glossary).forEach(([k, v]) => {
+            prompt += `- ${k}: ${v}\n`;
+          });
+        }
+        if (context.knowledge.onboardingNotes?.length) {
+          prompt += `Onboarding Notes:\n- ${context.knowledge.onboardingNotes.join('\n- ')}\n`;
+        }
       }
       prompt += "\n";
     }

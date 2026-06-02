@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parsePullRequestUrl = parsePullRequestUrl;
 exports.reviewPullRequest = reviewPullRequest;
@@ -70,12 +103,41 @@ function safeParseReviewJson(text) {
         return null;
     return { summary, overallScore, issues, praise };
 }
+function shouldIgnoreFile(filename) {
+    const lower = filename.toLowerCase();
+    if (lower.includes("package-lock.json") ||
+        lower.includes("yarn.lock") ||
+        lower.includes("pnpm-lock.yaml") ||
+        lower.includes("bun.lockb")) {
+        return true;
+    }
+    if (lower.startsWith("dist/") ||
+        lower.startsWith("build/") ||
+        lower.startsWith("out/") ||
+        lower.includes("/.next/") ||
+        lower.includes("node_modules/") ||
+        lower.includes("vendor/")) {
+        return true;
+    }
+    if (lower.endsWith(".min.js") ||
+        lower.endsWith(".min.css") ||
+        lower.endsWith(".svg") ||
+        lower.endsWith(".png") ||
+        lower.endsWith(".jpg") ||
+        lower.endsWith(".csv") ||
+        lower.endsWith(".pdf") ||
+        lower.endsWith(".map")) {
+        return true;
+    }
+    return false;
+}
 function buildDiffForPrompt(files) {
     const maxFiles = 25;
     const maxChars = 60_000;
     const maxPatchCharsPerFile = 4_000;
-    const selected = files.slice(0, maxFiles);
-    const stats = selected
+    const validFiles = files.filter((f) => !shouldIgnoreFile(f.filename));
+    const selected = validFiles.slice(0, maxFiles);
+    const stats = files
         .map((f) => `- ${f.filename} (${f.status}) +${f.additions}/-${f.deletions} (~${f.changes})`)
         .join("\n");
     let diff = "";
@@ -119,6 +181,12 @@ async function reviewPullRequest(params) {
         deletions: f.deletions,
         changes: f.changes,
     })));
+    const { crossRepoImpactService } = await Promise.resolve().then(() => __importStar(require("./cross-repo-impact")));
+    const modifiedFileNames = prFiles.map(f => f.filename);
+    const impactReport = crossRepoImpactService.analyzeImpact(`${params.owner}/${params.repo}`, modifiedFileNames);
+    const impactContext = impactReport.potentiallyAffectedRepositories.length > 0
+        ? `\nCross-Repository Impact Risk: ${impactReport.risk}\nReason: ${impactReport.reason}\nPotentially Affected Downstream Repositories: ${impactReport.potentiallyAffectedRepositories.join(", ")}\n`
+        : "";
     if (!diff) {
         throw new Error("PR diff is unavailable (no patch content returned). GitHub may omit patch content for very large changes.");
     }
@@ -161,16 +229,44 @@ PR Title: ${pr.title}
 PR Author: ${pr.user?.login || "unknown"}
 Base: ${pr.base?.ref || "?"}  Head: ${pr.head?.ref || "?"}
 Changed files (subset):\n${stats}
-
+${impactContext}
 Diff (subset, may be truncated):\n${diff}
 `;
-    const gemini = new geminiService_1.GeminiService();
-    const raw = await gemini.chatRaw(prompt);
+    let raw;
+    let tokensConsumed = 0;
+    try {
+        const gemini = new geminiService_1.GeminiService();
+        const result = await gemini.chatRaw(prompt);
+        raw = result.text;
+        tokensConsumed = result.tokensConsumed;
+    }
+    catch (error) {
+        console.error("[reviewPullRequest] Gemini API Error:", error?.message || error);
+        // Graceful fallback for payload too large or timeouts
+        return {
+            review: {
+                summary: "The pull request diff was too large or complex for the AI to analyze fully, or the AI service timed out. Please review the changes manually.",
+                overallScore: 50,
+                issues: [{
+                        title: "PR Diff Too Large / Analysis Timeout",
+                        severity: "medium",
+                        category: "maintainability",
+                        file: null,
+                        line: null,
+                        explanation: "The AI service encountered an error processing the size or complexity of this PR.",
+                        suggestion: "Consider breaking this PR into smaller, more focused changes, or rely on manual code review."
+                    }],
+                praise: []
+            },
+            prTitle: pr.title,
+            prUrl: pr.html_url
+        };
+    }
     const parsed = safeParseReviewJson(raw);
     if (!parsed) {
         throw new Error("AI response was not valid JSON");
     }
-    return { review: parsed, prTitle: pr.title, prUrl: pr.html_url };
+    return { review: parsed, prTitle: pr.title, prUrl: pr.html_url, tokensConsumed };
 }
 function formatPRReviewMarkdown(params) {
     const { review, prUrl } = params;

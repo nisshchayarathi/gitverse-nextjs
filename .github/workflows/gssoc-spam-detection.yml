@@ -1,0 +1,257 @@
+name: GSSoC — PR Spam Detection
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Runs when a PR is opened, edited, or reopened.
+# Detects spam / invalid / AI-slop PRs and:
+# • Labels them with gssoc:spam / gssoc:invalid / gssoc:ai-slop
+# • Posts a warning comment explaining what is wrong
+# • Legitimate PRs get a welcome comment with contribution tips
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  spam-detection:
+    name: GSSoC PR Spam & Quality Check
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Run spam detection checks
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const pr      = context.payload.pull_request;
+            const prNum   = pr.number;
+            const author  = pr.user.login;
+            const title   = pr.title   || '';
+            const body    = pr.body    || '';
+            const additions    = pr.additions    || 0;
+            const deletions    = pr.deletions    || 0;
+            const changedFiles = pr.changed_files || 0;
+            const totalChanges = additions + deletions;
+
+            // ── Ensure all GSSoC labels exist ─────────────────────────────
+            const requiredLabels = [
+              { name: 'gssoc:spam',     color: 'ee0701', description: 'GSSoC: Spam contribution' },
+              { name: 'gssoc:invalid',  color: 'ee0701', description: 'GSSoC: Invalid contribution' },
+              { name: 'gssoc:ai-slop',  color: 'b60205', description: 'GSSoC: AI-generated low-quality contribution' },
+              { name: 'gssoc:approved', color: '0e8a16', description: 'GSSoC: Approved and scored contribution' },
+              { name: "GSSoC'26",       color: '0e8a16', description: 'Part of GirlScript Summer of Code 2026' },
+            ];
+
+            for (const label of requiredLabels) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name: label.name });
+              } catch (e) {
+                if (e.status === 404) {
+                  await github.rest.issues.createLabel({ owner, repo, ...label });
+                }
+              }
+            }
+
+            // ── Get existing PR labels ────────────────────────────────────
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner, repo, issue_number: prNum,
+            });
+            const existingLabelNames = currentLabels.map(l => l.name);
+
+            // ── Already flagged? Skip re-processing ───────────────────────
+            const alreadyFlagged = ['gssoc:spam', 'gssoc:invalid', 'gssoc:ai-slop']
+              .some(l => existingLabelNames.includes(l));
+            if (alreadyFlagged) {
+              console.log(`⏭️ PR #${prNum} already flagged, skipping.`);
+              return;
+            }
+
+            // ═════════════════════════════════════════════════════════════
+            // SPAM / INVALID DETECTION RULES
+            // ═════════════════════════════════════════════════════════════
+            const issues = [];
+
+            // ── Rule 1: Empty or useless PR body ─────────────────────────
+            const meaningfulBody = body.replace(/<!--[\s\S]*?-->/g, '').trim();
+            if (meaningfulBody.length < 30) {
+              issues.push({
+                type: 'gssoc:invalid',
+                reason: '📝 **Empty or missing description** — Your PR has no meaningful description. Please explain *what* you changed and *why*.',
+              });
+            }
+
+            // ── Rule 2: Clickbait / generic titles ───────────────────────
+            const spamTitles = [
+              /^fix(ed|es)?$/i,
+              /^update(d|s)?$/i,
+              /^change(d|s)?$/i,
+              /^edit(ed|s)?$/i,
+              /^improve(d|s|ment)?$/i,
+              /^minor fix(es)?$/i,
+              /^bug fix(es)?$/i,
+              /^minor change(s)?$/i,
+              /^test(ing)?$/i,
+              /^added? (some )?changes?$/i,
+              /^hello world?$/i,
+              /^my (first )?(pr|contribution|change)$/i,
+            ];
+            if (spamTitles.some(rx => rx.test(title.trim()))) {
+              issues.push({
+                type: 'gssoc:spam',
+                reason: `🏷️ **Generic or meaningless PR title**: \`${title}\` — Please use a descriptive title like \`fix: resolve login crash on mobile\` or \`feat: add dark mode toggle\`.`,
+              });
+            }
+
+            // ── Rule 3: Tiny/trivial changes (whitespace only PRs) ────────
+            if (totalChanges > 0 && totalChanges <= 3 && changedFiles === 1) {
+              issues.push({
+                type: 'gssoc:spam',
+                reason: `📏 **Trivially small change** — Only **${totalChanges} line(s)** changed in 1 file. Changes this small are almost never meaningful contributions. Make sure your PR solves a real issue.`,
+              });
+            }
+
+            // ── Rule 4: Only README / docs with no issue linked ───────────
+            const prFiles = [];
+            try {
+              const { data: files } = await github.rest.pulls.listFiles({
+                owner, repo, pull_number: prNum,
+              });
+              prFiles.push(...files.map(f => f.filename.toLowerCase()));
+            } catch (e) {
+              console.log('Could not fetch PR files:', e.message);
+            }
+
+            const onlyReadme = prFiles.length > 0 &&
+              prFiles.every(f => f.includes('readme') || f.endsWith('.md') || f.endsWith('.txt'));
+            const hasLinkedIssue = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#\d+/i.test(body);
+
+            if (onlyReadme && !hasLinkedIssue) {
+              issues.push({
+                type: 'gssoc:invalid',
+                reason: `📄 **README/docs-only PR with no linked issue** — This PR only touches documentation files and doesn't reference any issue. If this is intentional, please link the relevant issue using \`closes #<issue-number>\` in your PR description.`,
+              });
+            }
+
+            // ── Rule 5: No linked issue at all ────────────────────────────
+            if (!hasLinkedIssue) {
+              issues.push({
+                type: 'gssoc:invalid',
+                reason: `🔗 **No linked issue** — Every PR must be linked to an open issue. Add \`closes #<issue-number>\` or \`fixes #<issue-number>\` in your description so maintainers know what this PR resolves.`,
+              });
+            }
+
+            // ── Rule 6: AI-slop pattern detection ────────────────────────
+            const aiSlopPatterns = [
+              /as an ai (language model|assistant)/i,
+              /i (am|'m) an? (ai|language model|assistant)/i,
+              /certainly[,!]? here('s| is)/i,
+              /sure[,!]? (here('s| is)|i('ll| will))/i,
+              /of course[,!]? here/i,
+              /this (code|solution|implementation) (uses?|leverages?|employs?) (advanced |cutting-edge )?(ai|machine learning|neural)/i,
+              /optimized (for|to) (improve )?performance using/i,
+              /please (let me know|feel free) if you (need|have|want)/i,
+              /hope this helps/i,
+              /happy to (help|assist|clarify)/i,
+            ];
+            const combinedText = `${title} ${body}`;
+            if (aiSlopPatterns.some(rx => rx.test(combinedText))) {
+              issues.push({
+                type: 'gssoc:ai-slop',
+                reason: `🤖 **AI-generated content detected** — Your PR title or description appears to contain AI-generated text. GSSoC requires genuine human understanding and effort. Please write your own description and ensure you understand the changes you're submitting.`,
+              });
+            }
+
+            // ── Rule 7: Duplicate word spam in title ─────────────────────
+            const titleWords = title.toLowerCase().split(/\s+/).filter(Boolean);
+            const wordFreq   = {};
+            for (const w of titleWords) { wordFreq[w] = (wordFreq[w] || 0) + 1; }
+            const hasDuplicateSpam = Object.values(wordFreq).some(count => count >= 3);
+            if (hasDuplicateSpam) {
+              issues.push({
+                type: 'gssoc:spam',
+                reason: `🔁 **Repetitive/spam title** — Your PR title contains repeated words which looks like spam. Please write a clear, concise title.`,
+              });
+            }
+
+            // ═════════════════════════════════════════════════════════════
+            // APPLY LABELS & POST COMMENT
+            // ═════════════════════════════════════════════════════════════
+
+            if (issues.length > 0) {
+              // Pick the most severe label (ai-slop > spam > invalid)
+              const priority = ['gssoc:ai-slop', 'gssoc:spam', 'gssoc:invalid'];
+              let labelToApply = 'gssoc:invalid';
+              for (const p of priority) {
+                if (issues.some(i => i.type === p)) { labelToApply = p; break; }
+              }
+
+              // Apply the label
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number: prNum, labels: [labelToApply],
+              });
+              console.log(`🚩 Applied ${labelToApply} to PR #${prNum}`);
+
+              // Build comment
+              const reasonList = issues.map(i => `- ${i.reason}`).join('\n');
+              const commentBody = [
+                `## ⚠️ GSSoC Quality Check Failed — PR #${prNum}`,
+                ``,
+                `Hi @${author}! 👋 Your PR has been flagged by our automated GSSoC quality check.`,
+                ``,
+                `### Issues found:`,
+                ``,
+                reasonList,
+                ``,
+                `---`,
+                `### ✅ How to fix this`,
+                ``,
+                `1. Read the issues listed above carefully`,
+                `2. Edit your PR title and description to address them`,
+                `3. Make sure your PR is linked to an open issue using \`closes #<issue-number>\``,
+                `4. Make sure your changes are meaningful and solve a real problem`,
+                ``,
+                `Once you've fixed these, a maintainer will review and remove the flag. If you believe this is a mistake, please comment below. 🙏`,
+                ``,
+                `_GSSoC'26 automation · Maintainer: [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: prNum, body: commentBody,
+              });
+              console.log(`💬 Spam warning comment posted on PR #${prNum}`);
+
+            } else {
+              // ── All checks passed — post a welcome comment ────────────
+              if (!existingLabelNames.includes('gssoc:approved')) {
+                await github.rest.issues.addLabels({
+                  owner, repo, issue_number: prNum, labels: ["GSSoC'26"],
+                });
+              }
+
+              const welcomeBody = [
+                `## 🎉 Thanks for your contribution, @${author}!`,
+                ``,
+                `Your PR has passed our automated GSSoC quality checks. Here's a quick summary:`,
+                ``,
+                `| Check | Status |`,
+                `|-------|--------|`,
+                `| PR description | ✅ Provided |`,
+                `| PR title | ✅ Meaningful |`,
+                `| Linked issue | ✅ Found |`,
+                `| Change size | ✅ Looks good (${totalChanges} lines across ${changedFiles} file(s)) |`,
+                ``,
+                `A maintainer will review your PR soon. Please be patient and available for feedback. 💪`,
+                ``,
+                `_GSSoC'26 automation · Maintainer: [@nisshchayarathi](https://github.com/nisshchayarathi)_`,
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: prNum, body: welcomeBody,
+              });
+              console.log(`✅ Welcome comment posted on PR #${prNum}`);
+            }
