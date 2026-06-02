@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DocumentationDriftService } from "@/lib/services/documentation-drift";
 import prisma from "@/lib/prisma";
-import crypto from "crypto";
+import {
+  isBearerTokenAuthorized,
+  isSecretHeaderAuthorized,
+} from "@/lib/utils/internalEndpointAuth";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 minutes max for Vercel
-
-function timingSafeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) {
-    crypto.timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return crypto.timingSafeEqual(bufA, bufB);
-}
 
 export async function GET(request: NextRequest) {
   return handleDriftDetection(request);
@@ -25,21 +18,17 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleDriftDetection(request: NextRequest) {
-  // 1. Authenticate Request - only accept secret via header (not query param)
-  // to prevent credential leakage in access logs and browser history.
-  const headerSecret = request.headers.get("x-analysis-runner-secret");
-  const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
+  const isInternalRequest = isSecretHeaderAuthorized({
+    providedSecret: request.headers.get("x-analysis-runner-secret"),
+    configuredSecret: process.env.ANALYSIS_RUNNER_SECRET,
+  });
+  const isCronRequest = isBearerTokenAuthorized({
+    authorizationHeader: request.headers.get("authorization"),
+    configuredSecret: process.env.CRON_SECRET,
+  });
 
-  if (configuredSecret) {
-    if (!headerSecret || !timingSafeCompare(headerSecret, configuredSecret)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  } else {
-    // Only allow Vercel cron if no secret configured
-    const userAgent = request.headers.get("user-agent") || "";
-    if (process.env.NODE_ENV === "production" && !userAgent.includes("vercel-cron")) {
-      return NextResponse.json({ error: "Unauthorized - Vercel Cron only" }, { status: 401 });
-    }
+  if (!isInternalRequest && !isCronRequest) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // 2. Select an active repository to scan
