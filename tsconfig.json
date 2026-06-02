@@ -21,11 +21,13 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
       "@/lib/*": ["./lib/*"],
       "@/app/*": ["./app/*"],
       "@/types/*": ["./types/*"],
       "@/services/security/*": ["./services/security/*"],
+      "@/services/*": ["./src/services/*", "./services/*"],
       "@/middleware/*": ["./middleware/*"],
       "@/*": ["./src/*"]
     }

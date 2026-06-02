@@ -1,60 +1,19 @@
 import axios, { AxiosError, AxiosInstance, isAxiosError } from "axios";
-import { computeBackoffMs } from "@/lib/utils/retry";
+import {
+  attachGitHubResilience,
+  sanitizeGitHubError,
+} from "@/lib/utils/githubResilience";
 
-export class GitHubRateLimitError extends Error {
-  retryAfterSeconds: number;
-  constructor(retryAfterSeconds: number) {
-    super(`GitHub API rate limit reached. Please retry after ${retryAfterSeconds} seconds.`);
-    this.name = "GitHubRateLimitError";
-    this.retryAfterSeconds = retryAfterSeconds;
-  }
-}
-
-function sanitizeGitHubHeaders(headers: any): any {
-  if (headers == null) {
-    return headers;
-  }
-
-  if (Array.isArray(headers)) {
-    return headers.map((value) => sanitizeGitHubHeaders(value));
-  }
-
-  if (typeof headers !== "object") {
-    return headers;
-  }
-
-  const source =
-    typeof (headers as any).toJSON === "function" ? (headers as any).toJSON() : headers;
-
-  if (source == null || typeof source !== "object") {
-    return source;
-  }
-
-  const sanitized: Record<string, any> = Array.isArray(source) ? [] : {};
-
-  for (const [key, value] of Object.entries(source)) {
-    if (key.toLowerCase() === "authorization") {
-      sanitized[key] = "[REDACTED]";
-    } else if (value != null && typeof value === "object") {
-      sanitized[key] = sanitizeGitHubHeaders(value);
-    } else {
-      sanitized[key] = value;
-    }
-  }
-
-  return sanitized;
-}
-
-export function sanitizeGitHubError(error: any) {
-  if (isAxiosError(error) && error.config) {
-    const safeConfig = {
-      ...error.config,
-      headers: sanitizeGitHubHeaders(error.config.headers),
-    };
-    error.config = safeConfig as any;
-  }
-  return error;
-}
+// Re-exported for backward compatibility — the canonical implementations now
+// live in the centralized, reusable resilience layer.
+export {
+  GitHubRateLimitError,
+  GitHubAuthError,
+  GitHubProviderError,
+  sanitizeGitHubError,
+  sanitizeGitHubHeaders,
+  describeGitHubError,
+} from "@/lib/utils/githubResilience";
 
 export interface GitHubRepository {
   id: number;
@@ -157,51 +116,10 @@ export class GitHubService {
       },
     });
 
-    this.client.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        if (!isAxiosError(error) || !error.config) {
-          throw sanitizeGitHubError(error);
-        }
-
-        const status = error.response?.status;
-        const config = error.config as any;
-
-        if (status === 429 || status === 403) {
-          const rateLimitRemaining = error.response?.headers?.["x-ratelimit-remaining"];
-          if (status === 429 || rateLimitRemaining === "0") {
-            const retryAfterHeader = error.response?.headers?.["retry-after"];
-            const resetHeader = error.response?.headers?.["x-ratelimit-reset"];
-            let retrySeconds = 60;
-
-            if (retryAfterHeader) {
-              retrySeconds = parseInt(retryAfterHeader, 10);
-            } else if (resetHeader) {
-              const resetTime = parseInt(resetHeader, 10) * 1000;
-              retrySeconds = Math.max(1, Math.ceil((resetTime - Date.now()) / 1000));
-            }
-            throw new GitHubRateLimitError(retrySeconds);
-          }
-        }
-
-        const retryStatusCodes = [502, 503, 504];
-        if (
-          (status && retryStatusCodes.includes(status)) ||
-          error.code === "ECONNABORTED" ||
-          !error.response
-        ) {
-          config.retryCount = config.retryCount || 0;
-          if (config.retryCount < 3) {
-            config.retryCount += 1;
-            const backoff = computeBackoffMs(config.retryCount - 1) + Math.random() * 1000;
-            await new Promise((resolve) => setTimeout(resolve, backoff));
-            return this.client(config);
-          }
-        }
-
-        throw sanitizeGitHubError(error);
-      }
-    );
+    // Centralized resilience: rate-limit detection + Retry-After, bounded
+    // exponential backoff for transient failures, fail-fast on non-retryable
+    // errors, and credential redaction. Shared by every GitHub integration.
+    attachGitHubResilience(this.client);
   }
 
   /**
@@ -365,7 +283,7 @@ export class GitHubService {
 
       const items: GitHubPullRequestFile[] = response.data;
       if (!Array.isArray(items) || items.length === 0) break;
-      
+
       for (const item of items) {
         all.push(item);
         if (item.patch) {
@@ -375,7 +293,9 @@ export class GitHubService {
 
       if (items.length < perPage) break;
       if (currentPatchChars >= maxTotalPatchChars) {
-        console.warn(`[getPullRequestFiles] Halting pagination early: patch size limit exceeded (${currentPatchChars} chars)`);
+        console.warn(
+          `[getPullRequestFiles] Halting pagination early: patch size limit exceeded (${currentPatchChars} chars)`,
+        );
         break;
       }
     }
@@ -391,7 +311,7 @@ export class GitHubService {
     repo: string,
     name: string,
     head_sha: string,
-    status: "queued" | "in_progress" | "completed" = "in_progress"
+    status: "queued" | "in_progress" | "completed" = "in_progress",
   ): Promise<{ id: number; status: string }> {
     try {
       const response = await this.client.post(
@@ -401,7 +321,7 @@ export class GitHubService {
           head_sha,
           status,
           started_at: new Date().toISOString(),
-        }
+        },
       );
       return response.data;
     } catch (error) {
@@ -417,22 +337,30 @@ export class GitHubService {
     repo: string,
     check_run_id: number,
     status: "queued" | "in_progress" | "completed",
-    conclusion?: "success" | "failure" | "neutral" | "cancelled" | "timed_out" | "action_required" | "skipped",
+    conclusion?:
+      | "success"
+      | "failure"
+      | "neutral"
+      | "cancelled"
+      | "timed_out"
+      | "action_required"
+      | "skipped",
     output?: {
       title: string;
       summary: string;
       text?: string;
-    }
+    },
   ): Promise<any> {
     try {
       const payload: any = { status };
       if (conclusion) payload.conclusion = conclusion;
       if (output) payload.output = output;
-      if (status === "completed") payload.completed_at = new Date().toISOString();
+      if (status === "completed")
+        payload.completed_at = new Date().toISOString();
 
       const response = await this.client.patch(
         `/repos/${owner}/${repo}/check-runs/${check_run_id}`,
-        payload
+        payload,
       );
       return response.data;
     } catch (error) {
@@ -548,7 +476,10 @@ export class GitHubService {
   /**
    * Get repository labels
    */
-  async getRepoLabels(owner: string, repo: string): Promise<Array<{ name: string }>> {
+  async getRepoLabels(
+    owner: string,
+    repo: string,
+  ): Promise<Array<{ name: string }>> {
     const response = await this.client.get(`/repos/${owner}/${repo}/labels`);
     return response.data;
   }
@@ -602,9 +533,16 @@ export class GitHubService {
   /**
    * Fetch file content from repository
    */
-  async getFileContent(owner: string, repo: string, path: string, ref?: string): Promise<string | null> {
+  async getFileContent(
+    owner: string,
+    repo: string,
+    path: string,
+    ref?: string,
+  ): Promise<string | null> {
     try {
-      const url = ref ? `/repos/${owner}/${repo}/contents/${path}?ref=${ref}` : `/repos/${owner}/${repo}/contents/${path}`;
+      const url = ref
+        ? `/repos/${owner}/${repo}/contents/${path}?ref=${ref}`
+        : `/repos/${owner}/${repo}/contents/${path}`;
       const response = await this.client.get(url);
       if (response.data && response.data.content) {
         return Buffer.from(response.data.content, "base64").toString("utf-8");
@@ -621,11 +559,19 @@ export class GitHubService {
   /**
    * Create a new branch
    */
-  async createBranch(owner: string, repo: string, branch: string, sha: string): Promise<any> {
-    const response = await this.client.post(`/repos/${owner}/${repo}/git/refs`, {
-      ref: `refs/heads/${branch}`,
-      sha,
-    });
+  async createBranch(
+    owner: string,
+    repo: string,
+    branch: string,
+    sha: string,
+  ): Promise<any> {
+    const response = await this.client.post(
+      `/repos/${owner}/${repo}/git/refs`,
+      {
+        ref: `refs/heads/${branch}`,
+        sha,
+      },
+    );
     return response.data;
   }
 
@@ -633,31 +579,36 @@ export class GitHubService {
    * Create a new commit with a single file change
    */
   async createCommit(
-    owner: string, 
-    repo: string, 
-    path: string, 
-    message: string, 
-    content: string, 
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    content: string,
     branch: string,
-    sha: string
+    sha: string,
   ): Promise<any> {
     // 1. Get current file (to get its blob SHA)
     let fileSha: string | undefined;
     try {
-      const fileRes = await this.client.get(`/repos/${owner}/${repo}/contents/${path}?ref=${branch}`);
+      const fileRes = await this.client.get(
+        `/repos/${owner}/${repo}/contents/${path}?ref=${branch}`,
+      );
       fileSha = fileRes.data.sha;
     } catch (e: any) {
       // If file doesn't exist yet, fileSha is undefined
     }
 
     // 2. Update file
-    const response = await this.client.put(`/repos/${owner}/${repo}/contents/${path}`, {
-      message,
-      content: Buffer.from(content).toString("base64"),
-      branch,
-      sha: fileSha
-    });
-    
+    const response = await this.client.put(
+      `/repos/${owner}/${repo}/contents/${path}`,
+      {
+        message,
+        content: Buffer.from(content).toString("base64"),
+        branch,
+        sha: fileSha,
+      },
+    );
+
     return response.data;
   }
 
@@ -665,12 +616,12 @@ export class GitHubService {
    * Create a Pull Request
    */
   async createPullRequest(
-    owner: string, 
-    repo: string, 
-    title: string, 
-    body: string, 
-    head: string, 
-    base: string
+    owner: string,
+    repo: string,
+    title: string,
+    body: string,
+    head: string,
+    base: string,
   ): Promise<any> {
     const response = await this.client.post(`/repos/${owner}/${repo}/pulls`, {
       title,
@@ -739,7 +690,7 @@ export class GitHubService {
     path: string,
     body: string,
     line: number,
-    startLine?: number
+    startLine?: number,
   ): Promise<any> {
     const payload: any = {
       body,
@@ -754,7 +705,7 @@ export class GitHubService {
 
     const response = await this.client.post(
       `/repos/${owner}/${repo}/pulls/${pullNumber}/comments`,
-      payload
+      payload,
     );
     return response.data;
   }
