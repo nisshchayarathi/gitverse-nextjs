@@ -32,6 +32,7 @@ test.describe('Repository URL Validation', () => {
       await page.goto(`/repo/${id}`)
       await page.waitForURL(/login/)
       await expect(page).not.toHaveURL(/error/)
+      await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 10000 })
     }
   })
 
@@ -39,6 +40,7 @@ test.describe('Repository URL Validation', () => {
     await page.goto('/repo/test-name_with-dashes')
     await page.waitForURL(/login/)
     await expect(page).toHaveURL(/test-name_with-dashes/)
+    await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 10000 })
   })
 })
 
@@ -47,5 +49,6 @@ test.describe('Page Meta Information', () => {
     await page.goto('/repo/my-test-repo')
     await page.waitForURL(/login/)
     expect(page).toBeDefined()
+    await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 10000 })
   })
 })

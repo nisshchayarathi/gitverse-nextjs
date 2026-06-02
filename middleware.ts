@@ -40,7 +40,10 @@ export async function middleware(request: NextRequest) {
     token = null;
   }
 
-  const isAuthenticated = !!token;
+  const isPlaywright = process.env.PLAYWRIGHT === 'true';
+  const hasMockAuthCookie = request.cookies.get("playwright_mock_auth")?.value === "true";
+
+  const isAuthenticated = !!token || (isPlaywright && hasMockAuthCookie);
 
   // Pages that require a valid session.
   const isProtectedRoute =

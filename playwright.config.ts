@@ -32,6 +32,8 @@ export default defineConfig({
     timeout: 120000,
     env: {
       PLAYWRIGHT: 'true',
+      NEXTAUTH_URL: 'http://localhost:3000',
+      NEXTAUTH_SECRET: 'development-nextauth-secret',
     },
   },
 })

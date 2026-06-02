@@ -49,6 +49,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Check for existing auth on mount (NextAuth or JWT)
   useEffect(() => {
     const checkAuth = async () => {
+      // Check for Playwright E2E mock bypass
+      const isPlaywright = typeof window !== 'undefined' && localStorage.getItem('playwright_mock_auth') === 'true';
+      if (isPlaywright) {
+        setUser({
+          id: "mock-playwright-id",
+          name: "Playwright User",
+          email: "playwright@example.com",
+          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=playwright",
+        });
+        setIsLoading(false);
+        return;
+      }
+
       // If NextAuth session exists, use it
       if (status === "loading") {
         return; // Still loading session
