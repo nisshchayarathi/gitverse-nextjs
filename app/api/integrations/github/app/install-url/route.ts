@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { createSignedState } from "@/lib/utils/signedState";
+import crypto from "crypto";
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name];
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
     const state = createSignedState({
       userId: user.userId,
       ts: Date.now(),
-      nonce: Math.random().toString(36).slice(2),
+      nonce: crypto.randomBytes(16).toString("hex"),
     });
 
     const url = `https://github.com/apps/${encodeURIComponent(
