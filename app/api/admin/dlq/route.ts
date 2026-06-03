@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAdmin, sanitizeError } from "@/lib/middleware";
 
 export async function GET(request: NextRequest) {
   try {
-    // Basic admin check (could be expanded)
-    await requireAuth(request);
+    await requireAdmin(request);
 
     const { searchParams } = new URL(request.url);
     const take = Number(searchParams.get("take")) || 50;
@@ -19,13 +18,22 @@ export async function GET(request: NextRequest) {
         skip,
       }),
       prisma.webhookEvent.count({
-        where: { status: "dlq" }
-      })
+        where: { status: "dlq" },
+      }),
     ]);
 
     return NextResponse.json({ events, total }, { status: 200 });
-  } catch (error: any) {
-    console.error("DLQ fetch error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+    console.error("DLQ fetch error:", sanitizeError(error));
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

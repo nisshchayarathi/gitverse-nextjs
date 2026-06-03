@@ -17,7 +17,7 @@ export interface AuthenticatedRequest {
  * Uses secure token validation with tokenVersion verification.
  */
 export async function getAuthUser(
-  request: NextRequest
+  request: NextRequest,
 ): Promise<JWTPayload | null> {
   const authHeader = request.headers.get("authorization");
   let userPayload: JWTPayload | null = null;
@@ -26,10 +26,10 @@ export async function getAuthUser(
   // Uses verifyTokenWithUserValidation for proper tokenVersion checking
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.substring(7);
-    
+
     try {
       const payload = await verifyTokenWithUserValidation(token);
-      
+
       if (payload) {
         // Additional security check: verify user still exists
         const dbUser = await prisma.user.findUnique({
@@ -95,16 +95,12 @@ export async function getAuthUser(
           return null;
         }
 
-        const issuedAt =
-          typeof token.iat === "number"
-            ? token.iat
-            : null;
+        const issuedAt = typeof token.iat === "number" ? token.iat : null;
 
         if (
           dbUser.passwordChangedAt &&
           (issuedAt === null ||
-            issuedAt * 1000 <=
-              dbUser.passwordChangedAt.getTime())
+            issuedAt * 1000 <= dbUser.passwordChangedAt.getTime())
         ) {
           return null;
         }
@@ -112,7 +108,9 @@ export async function getAuthUser(
         // Validate tokenVersion for NextAuth session cookies.
         // The JWT callback attaches tokenVersion at sign-in; if it no longer
         // matches the DB value (after password change or logout), reject.
-        const jwtTokenVersion = (token as any).tokenVersion as number | undefined;
+        const jwtTokenVersion = (token as any).tokenVersion as
+          | number
+          | undefined;
         if (
           jwtTokenVersion != null &&
           jwtTokenVersion !== dbUser.tokenVersion
@@ -151,10 +149,7 @@ export async function getAuthUser(
       return null;
     }
   } catch (error) {
-    console.error(
-      "Database check failed in auth middleware:",
-      error
-    );
+    console.error("Database check failed in auth middleware:", error);
     return null;
   }
 
@@ -165,9 +160,7 @@ export async function getAuthUser(
  * Ensures the incoming request is authenticated.
  * Throws an HttpError if authentication fails.
  */
-export async function requireAuth(
-  request: NextRequest
-): Promise<JWTPayload> {
+export async function requireAuth(request: NextRequest): Promise<JWTPayload> {
   const user = await getAuthUser(request);
 
   if (!user) {
@@ -178,11 +171,34 @@ export async function requireAuth(
 }
 
 /**
+ * Ensures the incoming request is made by an admin user.
+ * Admin emails are controlled via the ADMIN_EMAILS environment variable
+ * (comma-separated list). Throws HttpError 403 if the user is not an admin.
+ */
+export async function requireAdmin(request: NextRequest): Promise<JWTPayload> {
+  const user = await requireAuth(request);
+
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (
+    adminEmails.length === 0 ||
+    !adminEmails.includes(user.email.toLowerCase())
+  ) {
+    throw new HttpError(403, "Forbidden");
+  }
+
+  return user;
+}
+
+/**
  * Ensures the authenticated user owns the requested resource.
  */
 export async function requireOwnership(
   request: NextRequest,
-  resourceUserId: number
+  resourceUserId: number,
 ): Promise<JWTPayload> {
   const user = await requireAuth(request);
 
@@ -202,9 +218,7 @@ export class HttpError extends Error {
   }
 }
 
-export function isHttpError(
-  error: unknown
-): error is HttpError {
+export function isHttpError(error: unknown): error is HttpError {
   return (
     typeof error === "object" &&
     error !== null &&
@@ -221,31 +235,32 @@ export function sanitizeError(error: unknown): string {
   try {
     const str = String(error);
 
-    return str.length > 200
-      ? str.substring(0, 200) + "..."
-      : str;
+    return str.length > 200 ? str.substring(0, 200) + "..." : str;
   } catch {
     return "Unknown error";
   }
 }
 
-export function badRequestResponse(message: string, status: number = 400): NextResponse {
+export function badRequestResponse(
+  message: string,
+  status: number = 400,
+): NextResponse {
   return NextResponse.json({ error: message }, { status });
 }
 
 export function getPrismaErrorResponse(error: any): NextResponse | null {
   const isColdStartError =
-    error?.code === 'P1001' ||
-    error?.code === 'P2024' ||
-    error?.message?.toLowerCase().includes('timeout') ||
-    error?.message?.toLowerCase().includes('connection pool') ||
-    error?.message?.toLowerCase().includes('connect') ||
-    error?.message?.toLowerCase().includes('fetch failed');
+    error?.code === "P1001" ||
+    error?.code === "P2024" ||
+    error?.message?.toLowerCase().includes("timeout") ||
+    error?.message?.toLowerCase().includes("connection pool") ||
+    error?.message?.toLowerCase().includes("connect") ||
+    error?.message?.toLowerCase().includes("fetch failed");
 
   if (isColdStartError) {
     return NextResponse.json(
       { error: "DATABASE_COLD_START", message: "Waking up database..." },
-      { status: 503 }
+      { status: 503 },
     );
   }
 

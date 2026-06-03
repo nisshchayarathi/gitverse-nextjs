@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAdmin, sanitizeError } from "@/lib/middleware";
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
   try {
-    await requireAuth(request);
+    await requireAdmin(request);
 
     const eventId = params.id;
     if (!eventId) {
-      return NextResponse.json({ error: "Event ID is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Event ID is required" },
+        { status: 400 },
+      );
     }
 
     const event = await prisma.webhookEvent.findUnique({
-      where: { id: eventId }
+      where: { id: eventId },
     });
 
     if (!event) {
@@ -20,7 +26,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     if (event.status !== "dlq") {
-      return NextResponse.json({ error: "Event is not in DLQ" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Event is not in DLQ" },
+        { status: 400 },
+      );
     }
 
     const updated = await prisma.webhookEvent.update({
@@ -29,13 +38,25 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         status: "pending",
         retryCount: 0,
         nextRetryAt: null,
-        error: null
-      }
+        error: null,
+      },
     });
 
-    return NextResponse.json({ success: true, event: updated }, { status: 200 });
-  } catch (error: any) {
-    console.error("DLQ replay error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { success: true, event: updated },
+      { status: 200 },
+    );
+  } catch (error: unknown) {
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+    console.error("DLQ replay error:", sanitizeError(error));
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
