@@ -11,6 +11,7 @@ jest.mock("@/lib/utils/analysisRunner", () => ({
 
 jest.mock("@/lib/services/analysisJobService", () => ({
   analysisJobService: {
+    reclaimOrphanedJobs: jest.fn(),
     claimNextJob: jest.fn(),
     updateProgress: jest.fn(),
     markDone: jest.fn(),
@@ -56,6 +57,7 @@ describe("POST /api/internal/run-analysis", () => {
   });
 
   it("returns 500 when ANALYSIS_RUNNER_SECRET is not configured", async () => {
+    process.env.NODE_ENV = "production";
     delete process.env.ANALYSIS_RUNNER_SECRET;
 
     const request = new NextRequest(
