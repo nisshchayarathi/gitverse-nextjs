@@ -166,7 +166,6 @@ export default function LandingPage() {
     // Demo-only CTA: keep it as UI (no navigation / no analysis).
     setIsLoading(true);
     setTimeout(() => {
-      addRepo({ name, owner, url: cleanUrl });
       setIsLoading(false);
     }, 1500);
   };

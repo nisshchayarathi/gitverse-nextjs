@@ -1,20 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DocumentationDriftService } from "@/lib/services/documentation-drift";
+import { isAnalysisRunnerTokenValid } from "@/lib/utils/internalAuth";
 import prisma from "@/lib/prisma";
-import crypto from "crypto";
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // 5 minutes max for Vercel
-
-function timingSafeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) {
-    crypto.timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return crypto.timingSafeEqual(bufA, bufB);
-}
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   return handleDriftDetection(request);
@@ -25,32 +15,31 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleDriftDetection(request: NextRequest) {
-  // 1. Authenticate Request - only accept secret via header (not query param)
-  // to prevent credential leakage in access logs and browser history.
-  const headerSecret = request.headers.get("x-analysis-runner-secret");
-  const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET;
-
-  if (configuredSecret) {
-    if (!headerSecret || !timingSafeCompare(headerSecret, configuredSecret)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  } else {
+  if (!process.env.ANALYSIS_RUNNER_SECRET) {
     if (process.env.NODE_ENV === "production") {
-      return NextResponse.json({ error: "Unauthorized - ANALYSIS_RUNNER_SECRET not configured" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized - ANALYSIS_RUNNER_SECRET not configured" },
+        { status: 500 }
+      );
     }
+    return NextResponse.json(
+      { error: "Unauthorized - ANALYSIS_RUNNER_SECRET not configured" },
+      { status: 401 }
+    );
   }
 
-  // 2. Select an active repository to scan
-  // For simplicity, we just select one enabled repo that hasn't been scanned for drift recently.
-  // In a real app, we might add a lastDriftScanAt field to GitHubRepo or Repository.
-  // We'll just randomly select one or pick the most recently active.
+  const headerSecret = request.headers.get("x-analysis-runner-secret");
+  if (!isAnalysisRunnerTokenValid(headerSecret)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const repoToScan = await prisma.gitHubRepo.findFirst({
     where: {
       enabled: true,
       installationId: { not: null },
     },
     orderBy: {
-      updatedAt: "asc" // Poor man's round-robin
+      updatedAt: "asc"
     },
     include: {
       user: true
@@ -61,7 +50,6 @@ async function handleDriftDetection(request: NextRequest) {
     return NextResponse.json({ ok: true, message: "No eligible repositories found for drift detection." });
   }
 
-  // We need the internal Repository record to query its files
   const internalRepo = await prisma.repository.findFirst({
     where: {
       url: {
@@ -86,8 +74,7 @@ async function handleDriftDetection(request: NextRequest) {
   try {
     const driftService = new DocumentationDriftService();
     const result = await driftService.runDriftDetection(context);
-    
-    // Update the repository so it goes to the end of the line for the next run
+
     await prisma.gitHubRepo.update({
       where: { id: repoToScan.id },
       data: { updatedAt: new Date() }
@@ -98,8 +85,8 @@ async function handleDriftDetection(request: NextRequest) {
       console.log(`[DocumentationDriftJob] Created PR: ${result.prUrl}`);
     }
 
-    return NextResponse.json({ 
-      ok: true, 
+    return NextResponse.json({
+      ok: true,
       repository: repoToScan.repoFullName,
       ...result
     });

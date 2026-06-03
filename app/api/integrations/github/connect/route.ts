@@ -3,11 +3,22 @@ import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { GitHubService } from "@/lib/services/githubService";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
-import { encryptToken } from "@/lib/utils/tokenEncryption";
+import { encryptToken, validateEncryptionConfig } from "@/lib/utils/tokenEncryption";
 import { RedactSensitiveFields } from "@/services/security/redact-sensitive-fields";
 
 export async function POST(request: NextRequest) {
   try {
+    const encryptionCheck = validateEncryptionConfig();
+    if (!encryptionCheck.valid) {
+      return NextResponse.json(
+        {
+          error: "ENCRYPTION_UNAVAILABLE",
+          message: "Token encryption is not configured. Contact the administrator.",
+        },
+        { status: 503 },
+      );
+    }
+
     const user = await requireAuth(request);
     const body = await request.json();
     const token = (body?.token as string | undefined)?.trim();

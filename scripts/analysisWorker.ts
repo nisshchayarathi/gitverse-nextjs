@@ -1,15 +1,15 @@
 import "dotenv/config";
 import os from "os";
-import prisma from "../lib/prisma";
+import prisma, { disconnectPrisma } from "../lib/prisma";
 import { analysisJobService } from "../lib/services/analysisJobService";
 import { repositoryService } from "../lib/services/repositoryService";
 import type { AnalysisJob } from "@prisma/client";
 
 // Catch any rejections that slip through the promise-gap fixes above.
 // Without this, Node 15+ crashes the entire worker on an unhandled rejection.
-process.on("unhandledRejection", (reason) => {
+process.on("unhandledRejection", async (reason) => {
   console.error("FATAL unhandled rejection — worker will exit:", reason);
-  // Log and exit so the orchestrator can retry the job.
+  await disconnectPrisma();
   process.exit(1);
 });
 
@@ -145,19 +145,18 @@ export async function startAnalysisWorkerLoop(opts?: {
     if (stopping) return;
     stopping = true;
     console.log(`received ${signal}, shutting down...`);
-    try {
-      await prisma.$disconnect();
-    } catch {
-      // ignore
-    }
+    await disconnectPrisma();
     process.exit(0);
   };
 
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.on("SIGQUIT", () => void shutdown("SIGQUIT"));
+  process.on("SIGHUP", () => void shutdown("SIGHUP"));
 
   while (!stopping) {
     try {
+      await analysisJobService.reclaimOrphanedJobs();
       const job = await analysisJobService.claimNextJob({
         workerId,
         lockMs,
@@ -190,8 +189,9 @@ const isMain =
   typeof require !== "undefined" && (require as any).main === module;
 if (isMain) {
   const once = !!process.env.WORKER_ONCE;
-  startAnalysisWorkerLoop({ once }).catch((e) => {
+  startAnalysisWorkerLoop({ once }).catch(async (e) => {
     console.error("worker fatal:", e);
+    await disconnectPrisma();
     process.exit(1);
   });
 }

@@ -103,6 +103,8 @@ function createPrismaClient() {
       console.error("Unexpected Neon WebSocket pool error:", err);
     });
 
+    registerPool(pool as any, "neon-ws");
+
     const adapter = new PrismaNeon(pool as any);
     return withRetry(new PrismaClient({
       adapter,
@@ -128,6 +130,8 @@ function createPrismaClient() {
   pool.on("error", (err) => {
     console.error("Unexpected pg TCP pool error:", err);
   });
+
+  registerPool(pool, "pg");
 
   const adapter = new PrismaPg(pool);
 
@@ -177,3 +181,94 @@ const prisma = new Proxy({} as ExtendedPrismaClient, {
 
 export default prisma;
 export { prisma };
+
+// --- Connection pool lifecycle management ---
+
+export interface PoolMetrics {
+  adapter: string;
+  totalConnections: number;
+  idleConnections: number;
+  waitingClients: number;
+}
+
+const pools: Array<{ pool: PgPool | NeonPool; adapter: string }> = [];
+
+function registerPool(pool: PgPool | NeonPool, adapter: string): void {
+  pools.push({ pool, adapter });
+}
+
+export function getPoolMetrics(): PoolMetrics[] {
+  return pools.map(({ pool, adapter }) => ({
+    adapter,
+    totalConnections: (pool as any).totalCount ?? 0,
+    idleConnections: (pool as any).idleCount ?? 0,
+    waitingClients: (pool as any).waitingCount ?? 0,
+  }));
+}
+
+let disconnectInProgress = false;
+
+const defaultDisconnectTimeoutMs = 10_000;
+
+export async function disconnectPrisma(
+  options?: { timeoutMs?: number }
+): Promise<void> {
+  if (disconnectInProgress) return;
+  disconnectInProgress = true;
+
+  const client = globalThis.prismaGlobal;
+  if (client) {
+    globalThis.prismaGlobal = undefined;
+    try {
+      const timeoutMs = options?.timeoutMs ?? defaultDisconnectTimeoutMs;
+      const disconnect = client.$disconnect();
+      const timer = timeoutMs > 0
+        ? new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("disconnect timed out")), timeoutMs)
+          )
+        : null;
+      await (timer ? Promise.race([disconnect, timer]) : disconnect);
+    } catch (err: any) {
+      const isTimeout = err?.message === "disconnect timed out";
+      console.warn(
+        isTimeout
+          ? "[Prisma] disconnect timed out — forcing cleanup"
+          : `[Prisma] disconnect error: ${err?.message ?? err}`
+      );
+    }
+  }
+  disconnectInProgress = false;
+}
+
+export interface PoolHealth {
+  healthy: boolean;
+  activePools: number;
+  totalConnections: number;
+  idleConnections: number;
+  waitingClients: number;
+  metrics: PoolMetrics[];
+}
+
+export function getPoolHealth(): PoolHealth {
+  const metrics = getPoolMetrics();
+  const totalConnections = metrics.reduce((s, m) => s + m.totalConnections, 0);
+  const idleConnections = metrics.reduce((s, m) => s + m.idleConnections, 0);
+  const waitingClients = metrics.reduce((s, m) => s + m.waitingClients, 0);
+
+  return {
+    healthy: waitingClients === 0 || idleConnections > 0,
+    activePools: metrics.length,
+    totalConnections,
+    idleConnections,
+    waitingClients,
+    metrics,
+  };
+}
+
+// Safety net: when the process exits naturally (event loop drains), disconnect
+// Note: this does NOT fire on process.exit() — callers must await disconnectPrisma() first.
+process.once("beforeExit", async () => {
+  if (globalThis.prismaGlobal) {
+    await disconnectPrisma();
+  }
+});

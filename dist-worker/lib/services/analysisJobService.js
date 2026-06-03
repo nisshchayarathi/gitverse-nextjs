@@ -22,6 +22,57 @@ function computeBackoffMs(attempt) {
     return Math.min(max, base * Math.pow(2, Math.max(0, attempt - 1)));
 }
 class AnalysisJobService {
+    async reclaimOrphanedJobs() {
+        const result = await prisma_1.default.analysisJob.updateMany({
+            where: {
+                status: "PROCESSING",
+                lockExpiresAt: { lt: new Date() },
+            },
+            data: {
+                status: "QUEUED",
+                lockedAt: null,
+                lockedBy: null,
+                lockExpiresAt: null,
+                nextRunAt: new Date(),
+                progressMessage: "Reclaimed after lock expiration",
+            },
+        });
+        return result.count;
+    }
+    async countOrphanedJobs(params) {
+        const where = {
+            status: "PROCESSING",
+            lockExpiresAt: { lt: new Date() },
+        };
+        if (params?.userId)
+            where.userId = params.userId;
+        return prisma_1.default.analysisJob.count({ where });
+    }
+    async getAnalysisStats(params) {
+        const [total, processing, queued, done, failed, stuck] = await Promise.all([
+            prisma_1.default.analysisJob.count({ where: { userId: params.userId } }),
+            prisma_1.default.analysisJob.count({
+                where: { userId: params.userId, status: "PROCESSING" },
+            }),
+            prisma_1.default.analysisJob.count({
+                where: { userId: params.userId, status: "QUEUED" },
+            }),
+            prisma_1.default.analysisJob.count({
+                where: { userId: params.userId, status: "DONE" },
+            }),
+            prisma_1.default.analysisJob.count({
+                where: { userId: params.userId, status: "FAILED" },
+            }),
+            prisma_1.default.analysisJob.count({
+                where: {
+                    userId: params.userId,
+                    status: "PROCESSING",
+                    lockExpiresAt: { lt: new Date() },
+                },
+            }),
+        ]);
+        return { total, processing, queued, done, failed, stuck };
+    }
     async createRepositoryAnalysisJob(params) {
         return prisma_1.default.$transaction(async (tx) => {
             await tx.$queryRaw `SELECT pg_advisory_xact_lock(${params.repositoryId})`;
@@ -152,6 +203,7 @@ class AnalysisJobService {
     }
     async claimNextJob(params) {
         const lockMs = params.lockMs ?? DEFAULT_LOCK_MS;
+        await this.reclaimOrphanedJobs();
         // IMPORTANT:
         // Using `RETURNING j.*` returns snake_case DB column names (e.g. repository_id),
         // which does not match Prisma's camelCase field names (repositoryId) when read
@@ -198,12 +250,14 @@ class AnalysisJobService {
             return null;
         return prisma_1.default.analysisJob.findUnique({ where: { id: claimedId } });
     }
-    async cleanupStaleJobs() {
+    async cleanupStaleJobs(gracePeriodMs) {
+        if (gracePeriodMs === undefined)
+            gracePeriodMs = 10 * 60 * 1000;
         const stale = await prisma_1.default.analysisJob.updateMany({
             where: {
                 status: "PROCESSING",
                 lockExpiresAt: { lt: new Date() },
-                updatedAt: { lt: new Date(Date.now() - 60 * 60 * 1000) },
+                updatedAt: { lt: new Date(Date.now() - gracePeriodMs) },
             },
             data: {
                 status: "FAILED",

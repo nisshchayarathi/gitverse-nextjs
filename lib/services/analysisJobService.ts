@@ -12,6 +12,67 @@ export type JobProgressUpdate = {
 const DEFAULT_LOCK_MS = 5 * 60 * 1000;
 
 export class AnalysisJobService {
+  async reclaimOrphanedJobs(): Promise<number> {
+    const result = await prisma.analysisJob.updateMany({
+      where: {
+        status: "PROCESSING",
+        lockExpiresAt: { lt: new Date() },
+      },
+      data: {
+        status: "QUEUED",
+        lockedAt: null,
+        lockedBy: null,
+        lockExpiresAt: null,
+        nextRunAt: new Date(),
+        progressMessage: "Reclaimed after lock expiration",
+      },
+    });
+    return result.count;
+  }
+
+  async countOrphanedJobs(params?: { userId?: number }): Promise<number> {
+    const where: any = {
+      status: "PROCESSING",
+      lockExpiresAt: { lt: new Date() },
+    };
+    if (params?.userId) where.userId = params.userId;
+    return prisma.analysisJob.count({ where });
+  }
+
+  async getAnalysisStats(params: { userId: number }): Promise<{
+    total: number;
+    processing: number;
+    queued: number;
+    done: number;
+    failed: number;
+    stuck: number;
+  }> {
+    const [total, processing, queued, done, failed, stuck] =
+      await Promise.all([
+        prisma.analysisJob.count({ where: { userId: params.userId } }),
+        prisma.analysisJob.count({
+          where: { userId: params.userId, status: "PROCESSING" },
+        }),
+        prisma.analysisJob.count({
+          where: { userId: params.userId, status: "QUEUED" },
+        }),
+        prisma.analysisJob.count({
+          where: { userId: params.userId, status: "DONE" },
+        }),
+        prisma.analysisJob.count({
+          where: { userId: params.userId, status: "FAILED" },
+        }),
+        prisma.analysisJob.count({
+          where: {
+            userId: params.userId,
+            status: "PROCESSING",
+            lockExpiresAt: { lt: new Date() },
+          },
+        }),
+      ]);
+    return { total, processing, queued, done, failed, stuck };
+  }
+
   async createRepositoryAnalysisJob(params: {
     repositoryId: number;
     userId: number;
@@ -178,60 +239,66 @@ export class AnalysisJobService {
   }): Promise<AnalysisJob | null> {
     const lockMs = params.lockMs ?? DEFAULT_LOCK_MS;
 
-    // IMPORTANT:
-    // Using `RETURNING j.*` returns snake_case DB column names (e.g. repository_id),
-    // which does not match Prisma's camelCase field names (repositoryId) when read
-    // in JS. That led to `job.repositoryId === undefined` and downstream failures.
+    await this.reclaimOrphanedJobs();
+
+    // The claim must be atomic: a worker can only observe a job as available
+    // while no other transaction holds the matching row lock. The CTE below
+    // uses `FOR UPDATE SKIP LOCKED` so concurrent workers each pick a
+    // distinct row instead of contending on the same one, and the whole
+    // claim + re-fetch runs inside a $transaction so the row lock acquired
+    // by the CTE is held until we have read the freshly updated record.
     //
-    // To keep atomic claiming behavior while returning correct field names, we:
-    // 1) claim the job via raw SQL and return only the id
-    // 2) re-fetch via Prisma Client (typed + camelCase fields)
-    const rows = await prisma.$queryRaw<{ id: string }[]>`
-      WITH candidate AS (
-        SELECT a1.id
-        FROM analysis_jobs a1
-        WHERE a1.next_run_at <= NOW()
-          AND a1.status IN ('QUEUED', 'PROCESSING')
-          AND (a1.lock_expires_at IS NULL OR a1.lock_expires_at < NOW())
-          AND NOT EXISTS (
-            SELECT 1 FROM analysis_jobs a2
-            WHERE a2.repository_id = a1.repository_id
-              AND a2.status = 'PROCESSING'
-              AND a2.id != a1.id
-              AND (a2.lock_expires_at IS NULL OR a2.lock_expires_at > NOW())
-          )
-        ORDER BY a1.created_at ASC
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED
-      )
-      UPDATE analysis_jobs j
-      SET
-        status = 'PROCESSING',
-        locked_at = NOW(),
-        locked_by = ${params.workerId},
-        lock_expires_at = NOW() + (${lockMs}::int * INTERVAL '1 millisecond'),
-        attempts = j.attempts + 1,
-        started_at = COALESCE(j.started_at, NOW()),
-        updated_at = NOW(),
-        progress_message = COALESCE(j.progress_message, 'Analysis in progress...'),
-        progress_percent = COALESCE(j.progress_percent, 0)
-      FROM candidate
-      WHERE j.id = candidate.id
-      RETURNING j.id
-    `;
+    // `RETURNING j.*` returns snake_case column names (e.g. repository_id)
+    // which would arrive in JS as the wrong shape, so we return only the id
+    // here and re-fetch via Prisma for typed, camelCase fields.
+    return prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<{ id: string }[]>`
+        WITH candidate AS (
+          SELECT a1.id
+          FROM analysis_jobs a1
+          WHERE a1.next_run_at <= NOW()
+            AND a1.status IN ('QUEUED', 'PROCESSING')
+            AND (a1.lock_expires_at IS NULL OR a1.lock_expires_at < NOW())
+            AND NOT EXISTS (
+              SELECT 1 FROM analysis_jobs a2
+              WHERE a2.repository_id = a1.repository_id
+                AND a2.status = 'PROCESSING'
+                AND a2.id != a1.id
+                AND (a2.lock_expires_at IS NULL OR a2.lock_expires_at > NOW())
+            )
+          ORDER BY a1.created_at ASC
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED
+        )
+        UPDATE analysis_jobs j
+        SET
+          status = 'PROCESSING',
+          locked_at = NOW(),
+          locked_by = ${params.workerId},
+          lock_expires_at = NOW() + (${lockMs}::int * INTERVAL '1 millisecond'),
+          attempts = j.attempts + 1,
+          started_at = COALESCE(j.started_at, NOW()),
+          updated_at = NOW(),
+          progress_message = COALESCE(j.progress_message, 'Analysis in progress...'),
+          progress_percent = COALESCE(j.progress_percent, 0)
+        FROM candidate
+        WHERE j.id = candidate.id
+        RETURNING j.id
+      `;
 
-    const claimedId = rows[0]?.id;
-    if (!claimedId) return null;
+      const claimedId = rows[0]?.id;
+      if (!claimedId) return null;
 
-    return prisma.analysisJob.findUnique({ where: { id: claimedId } });
+      return tx.analysisJob.findUnique({ where: { id: claimedId } });
+    });
   }
 
-  async cleanupStaleJobs(): Promise<number> {
+  async cleanupStaleJobs(gracePeriodMs: number = 10 * 60 * 1000): Promise<number> {
     const stale = await prisma.analysisJob.updateMany({
       where: {
         status: "PROCESSING",
         lockExpiresAt: { lt: new Date() },
-        updatedAt: { lt: new Date(Date.now() - 60 * 60 * 1000) },
+        updatedAt: { lt: new Date(Date.now() - gracePeriodMs) },
       },
       data: {
         status: "FAILED",

@@ -356,6 +356,35 @@ export class GitService {
   }
 
   /**
+   * Get the remote repository size in bytes (via GitHub API if applicable).
+   */
+  static async getRemoteRepositorySize(url: string): Promise<number | null> {
+    try {
+      const cleanUrl = url.trim().replace(/\/$/, "").replace(/\.git$/, "");
+      const parts = cleanUrl.split("/");
+      const repo = parts[parts.length - 1];
+      const owner = parts[parts.length - 2];
+
+      if (!owner || !repo) return null;
+      if (!cleanUrl.includes("github.com")) return null;
+
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+        headers: {
+          "User-Agent": "GitVerse-App",
+        },
+      });
+      if (res.status === 200) {
+        const data = await res.json();
+        // GitHub API returns size in KB
+        return data.size * 1024;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get all branches in the repository
    */
   async getBranches(): Promise<BranchData[]> {

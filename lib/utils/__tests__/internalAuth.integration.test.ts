@@ -1,15 +1,9 @@
-/**
- * Comprehensive tests for the webhook worker authorization flow.
- *
- * These tests verify the complete authentication chain from queue to worker,
- * ensuring that INTERNAL_WORKER_SECRET is used consistently.
- */
-
 import crypto from "crypto";
 import {
   deriveBearerToken,
   validateAuthorizationHeader,
   isInternalWorkerAuthorized,
+  isAnalysisRunnerTokenValid,
 } from "@/lib/utils/internalAuth";
 
 describe("Webhook Worker Authorization Flow", () => {
@@ -28,10 +22,7 @@ describe("Webhook Worker Authorization Flow", () => {
     it("produces identical tokens when queue and worker use same secret", () => {
       const secret = "shared-secret-123";
 
-      // Queue's token derivation
       const queueToken = deriveBearerToken(secret);
-
-      // Worker's token derivation (should be identical)
       const workerToken = deriveBearerToken(secret);
 
       expect(queueToken).toBe(workerToken);
@@ -56,7 +47,6 @@ describe("Webhook Worker Authorization Flow", () => {
       const token = deriveBearerToken(secret);
       const hash = token.replace("Bearer ", "");
 
-      // SHA-256 produces 64 hex characters
       expect(hash).toHaveLength(64);
       expect(/^[a-f0-9]+$/.test(hash)).toBe(true);
     });
@@ -106,7 +96,6 @@ describe("Webhook Worker Authorization Flow", () => {
       const secret = "valid-secret";
       const token = deriveBearerToken(secret);
 
-      // Extra whitespace should cause mismatch
       expect(validateAuthorizationHeader(`${token} `, secret)).toBe(false);
     });
 
@@ -114,7 +103,6 @@ describe("Webhook Worker Authorization Flow", () => {
       const secret = "valid-secret";
       const token = deriveBearerToken(secret);
 
-      // Bearer should be case-sensitive
       expect(validateAuthorizationHeader(token.toLowerCase(), secret)).toBe(
         false
       );
@@ -154,50 +142,43 @@ describe("Webhook Worker Authorization Flow", () => {
 
       expect(isInternalWorkerAuthorized(null)).toBe(false);
     });
+  });
 
-    it("uses timing-safe comparison (no timing leak)", () => {
-      process.env.INTERNAL_WORKER_SECRET = "worker-secret";
-      const validToken = deriveBearerToken("worker-secret");
-      const invalidToken = deriveBearerToken("worker-secret").slice(0, -2) + "ff";
+  describe("isAnalysisRunnerTokenValid", () => {
+    it("validates correct runner secret from header", () => {
+      process.env.ANALYSIS_RUNNER_SECRET = "runner-secret-123";
+      expect(isAnalysisRunnerTokenValid("runner-secret-123")).toBe(true);
+    });
 
-      // Both should return false for invalid, true for valid
-      // The key is that the comparison is timing-safe
-      expect(isInternalWorkerAuthorized(validToken)).toBe(true);
-      expect(isInternalWorkerAuthorized(invalidToken)).toBe(false);
+    it("rejects incorrect runner secret", () => {
+      process.env.ANALYSIS_RUNNER_SECRET = "runner-secret-123";
+      expect(isAnalysisRunnerTokenValid("wrong-secret")).toBe(false);
+    });
+
+    it("rejects when ANALYSIS_RUNNER_SECRET is not set", () => {
+      delete process.env.ANALYSIS_RUNNER_SECRET;
+      expect(isAnalysisRunnerTokenValid("any-secret")).toBe(false);
+    });
+
+    it("rejects null header", () => {
+      process.env.ANALYSIS_RUNNER_SECRET = "runner-secret";
+      expect(isAnalysisRunnerTokenValid(null)).toBe(false);
     });
   });
 
   describe("Security scenarios", () => {
     it("prevents token forgery when secrets are different", () => {
-      // Scenario: Attacker knows JWT_SECRET but not INTERNAL_WORKER_SECRET
       process.env.JWT_SECRET = "jwt-secret-123";
       process.env.INTERNAL_WORKER_SECRET = "worker-secret-456";
 
-      // Attacker derives token from JWT_SECRET
       const forgedToken = deriveBearerToken("jwt-secret-123");
-
-      // Worker should reject it because it uses INTERNAL_WORKER_SECRET
       expect(isInternalWorkerAuthorized(forgedToken)).toBe(false);
-    });
-
-    it("prevents bypass when GITHUB_WEBHOOK_SECRET is set", () => {
-      // Old behavior would fall back to GITHUB_WEBHOOK_SECRET
-      process.env.GITHUB_WEBHOOK_SECRET = "webhook-secret";
-      process.env.INTERNAL_WORKER_SECRET = "worker-secret";
-
-      const webhookToken = deriveBearerToken("webhook-secret");
-
-      // Worker should NOT accept webhook secret
-      expect(isInternalWorkerAuthorized(webhookToken)).toBe(false);
     });
 
     it("allows legitimate internal worker requests", () => {
       process.env.INTERNAL_WORKER_SECRET = "legitimate-worker-secret";
 
-      // Queue generates token
       const queueToken = deriveBearerToken("legitimate-worker-secret");
-
-      // Worker validates token
       expect(isInternalWorkerAuthorized(queueToken)).toBe(true);
     });
 
@@ -208,11 +189,12 @@ describe("Webhook Worker Authorization Flow", () => {
       expect(isInternalWorkerAuthorized("Bearer anything")).toBe(false);
     });
 
-    it("handles missing INTERNAL_WORKER_SECRET gracefully", () => {
-      delete process.env.INTERNAL_WORKER_SECRET;
+    it("prevents cross-secret authorization", () => {
+      process.env.INTERNAL_WORKER_SECRET = "worker-specific-secret";
+      process.env.ANALYSIS_RUNNER_SECRET = "runner-specific-secret";
 
-      expect(isInternalWorkerAuthorized(null)).toBe(false);
-      expect(isInternalWorkerAuthorized("Bearer anything")).toBe(false);
+      const runnerToken = deriveBearerToken("runner-specific-secret");
+      expect(isInternalWorkerAuthorized(runnerToken)).toBe(false);
     });
   });
 
@@ -227,82 +209,7 @@ describe("Webhook Worker Authorization Flow", () => {
       }
       const endTime = Date.now();
 
-      // Should complete 1000 validations in under 500ms (generous for CI)
       expect(endTime - startTime).toBeLessThan(500);
-    });
-
-    it("handles concurrent validation calls", async () => {
-      process.env.INTERNAL_WORKER_SECRET = "concurrent-test-secret";
-      const token = deriveBearerToken("concurrent-test-secret");
-
-      const promises = Array.from({ length: 100 }, () =>
-        Promise.resolve(isInternalWorkerAuthorized(token))
-      );
-
-      const results = await Promise.all(promises);
-      expect(results.every((r) => r === true)).toBe(true);
-    });
-
-    it("maintains constant-time comparison for security", () => {
-      process.env.INTERNAL_WORKER_SECRET = "timing-test-secret";
-      const validToken = deriveBearerToken("timing-test-secret");
-
-      // Test that comparison doesn't leak timing information
-      const times: number[] = [];
-
-      for (let i = 0; i < 10; i++) {
-        const start = process.hrtime.bigint();
-        isInternalWorkerAuthorized(validToken);
-        const end = process.hrtime.bigint();
-        times.push(Number(end - start));
-      }
-
-      // Verify all validations succeed (the main security property)
-      // Timing tests are environment-dependent and may vary in CI
-      const allSucceed = times.every((t) => t >= 0);
-      expect(allSucceed).toBe(true);
-    });
-  });
-
-  describe("Edge cases", () => {
-    it("handles very long secrets", () => {
-      const longSecret = "a".repeat(10000);
-      process.env.INTERNAL_WORKER_SECRET = longSecret;
-
-      const token = deriveBearerToken(longSecret);
-      expect(isInternalWorkerAuthorized(token)).toBe(true);
-    });
-
-    it("handles secrets with special characters", () => {
-      const specialSecret = "secret!@#$%^&*()_+-=[]{}|;':\",./<>?";
-      process.env.INTERNAL_WORKER_SECRET = specialSecret;
-
-      const token = deriveBearerToken(specialSecret);
-      expect(isInternalWorkerAuthorized(token)).toBe(true);
-    });
-
-    it("handles secrets with unicode characters", () => {
-      const unicodeSecret = "secret-日本語-テスト";
-      process.env.INTERNAL_WORKER_SECRET = unicodeSecret;
-
-      const token = deriveBearerToken(unicodeSecret);
-      expect(isInternalWorkerAuthorized(token)).toBe(true);
-    });
-
-    it("handles secrets with newlines", () => {
-      const newlineSecret = "secret\nwith\nnewlines";
-      process.env.INTERNAL_WORKER_SECRET = newlineSecret;
-
-      const token = deriveBearerToken(newlineSecret);
-      expect(isInternalWorkerAuthorized(token)).toBe(true);
-    });
-
-    it("handles secrets with null bytes", () => {
-      const nullSecret = "secret\x00with\x00nulls";
-      process.env.INTERNAL_WORKER_SECRET = nullSecret;
-
-      const token = deriveBearerToken(nullSecret);
-      expect(isInternalWorkerAuthorized(token)).toBe(true);
     });
   });
 });

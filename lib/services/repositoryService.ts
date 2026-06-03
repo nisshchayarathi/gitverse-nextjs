@@ -106,6 +106,13 @@ export class RepositoryService {
     let gitService: GitService | null = null;
 
     try {
+      // Check repository size before cloning
+      const MAX_REPO_SIZE = 500 * 1024 * 1024; // 500 MB limit
+      const remoteSize = await GitService.getRemoteRepositorySize(repository.url);
+      if (remoteSize !== null && remoteSize > MAX_REPO_SIZE) {
+        throw new Error(`Repository exceeds maximum allowed size of 500MB (${(remoteSize / 1024 / 1024).toFixed(2)}MB).`);
+      }
+
       // For README we don't need all branches; keep it lightweight.
       gitService = await GitService.cloneRepository(repository.url, tempDir, {
         depth: 1,
@@ -242,6 +249,13 @@ if (existingRepositoryName) {
 
     try {
       checkAborted();
+
+      // Check repository size before cloning to prevent disk exhaustion DoS
+      const MAX_REPO_SIZE = 500 * 1024 * 1024; // 500 MB limit
+      const remoteSize = await GitService.getRemoteRepositorySize(repository.url);
+      if (remoteSize !== null && remoteSize > MAX_REPO_SIZE) {
+        throw new Error(`Repository exceeds maximum allowed size of 500MB (${(remoteSize / 1024 / 1024).toFixed(2)}MB).`);
+      }
 
       // Clone repository
       await report({

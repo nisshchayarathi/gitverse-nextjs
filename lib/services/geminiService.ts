@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import { getGeminiAnalysisCache, setGeminiAnalysisCache, hashGeminiPromptSeed } from "./geminiAnalysisCacheService";
 
 export interface AIAnalysisRequest {
   repositoryId: number;
@@ -29,6 +30,8 @@ export interface AICodeAnalysisRequest {
   language: string;
   analysisType: "explain" | "improve" | "bugs" | "document" | "refactor";
   context?: string;
+  repositoryId?: number;
+  commitHash?: string;
 }
 
 export interface AIRepositoryChatRequest {
@@ -95,7 +98,7 @@ export class GeminiService {
    * Analyze code snippet
    */
   async analyzeCode(request: AICodeAnalysisRequest): Promise<string> {
-    const { code, language, analysisType, context } = request;
+    const { code, language, analysisType, context, repositoryId, commitHash } = request;
 
     let prompt = this.buildCodeAnalysisPrompt(
       code,
@@ -103,11 +106,38 @@ export class GeminiService {
       analysisType,
       context,
     );
+    
+    // Check cache if we have repository context
+    let promptHash: string | undefined;
+    if (repositoryId && commitHash) {
+      promptHash = hashGeminiPromptSeed({ code, language, analysisType, context });
+      const cached = await getGeminiAnalysisCache({
+        repositoryId,
+        commitHash,
+        analysisType: `code-${analysisType}`,
+        promptHash,
+      });
+      if (cached.hit && cached.result) {
+        return cached.result;
+      }
+    }
 
     try {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
-      return response.text();
+      const text = response.text();
+      
+      // Save to cache
+      if (repositoryId && commitHash && promptHash) {
+        await setGeminiAnalysisCache({
+          repositoryId,
+          commitHash,
+          analysisType: `code-${analysisType}`,
+          promptHash,
+        }, text, { model: "gemini-2.5-flash" });
+      }
+      
+      return text;
     } catch (error: any) {
       console.error("Gemini analysis error:", error);
 

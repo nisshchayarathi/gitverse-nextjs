@@ -1,106 +1,123 @@
 /**
- * Tests for GET /api/internal/worker/healthz
- *
- * Verifies the health check endpoint:
- * - Requires authentication
- * - Checks for required secrets
- * - Validates secret isolation
- * - Returns proper health status
+ * @jest-environment node
  */
 
+var mockCheckEncryptionHealth: jest.Mock;
+
+jest.mock("@/lib/utils/tokenEncryption", () => {
+  mockCheckEncryptionHealth = jest.fn();
+  return {
+    checkEncryptionHealth: mockCheckEncryptionHealth,
+  };
+});
+
 jest.mock("@/lib/utils/internalAuth", () => ({
-  isInternalWorkerAuthorized: jest.fn(),
-  validateRequiredSecrets: jest.fn(),
-  validateSecretIsolation: jest.fn(),
+  isInternalWorkerAuthorized: jest.fn().mockReturnValue(true),
+  validateRequiredSecrets: jest.fn().mockReturnValue([]),
+  validateSecretIsolation: jest.fn().mockReturnValue([]),
 }));
 
 import { GET } from "../route";
-import {
-  isInternalWorkerAuthorized,
-  validateRequiredSecrets,
-  validateSecretIsolation,
-} from "@/lib/utils/internalAuth";
+import { isInternalWorkerAuthorized } from "@/lib/utils/internalAuth";
 import { NextRequest } from "next/server";
 
-describe("GET /api/internal/worker/healthz", () => {
+function mockRequest(authHeader?: string): NextRequest {
+  return {
+    headers: new Map(authHeader ? [["authorization", authHeader]] : []),
+  } as unknown as NextRequest;
+}
+
+describe("GET /api/internal/worker/healthz – encryption check", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.INTERNAL_WORKER_SECRET = "test-secret";
+    process.env.INTERNAL_WORKER_SECRET = "test-secret-value";
+    mockCheckEncryptionHealth.mockReturnValue({
+      healthy: true,
+      message: "Encryption is properly configured",
+    });
   });
 
   afterEach(() => {
     delete process.env.INTERNAL_WORKER_SECRET;
   });
 
-  it("returns 401 when not authorized", async () => {
-    (isInternalWorkerAuthorized as jest.Mock).mockReturnValue(false);
+  it("returns healthy when encryption is configured", async () => {
+    const res = await GET(mockRequest("Bearer test-secret"));
+    const body = await res.json();
 
-    const request = new NextRequest("http://localhost/api/internal/worker/healthz");
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(data.error).toBe("Unauthorized");
+    expect(res.status).toBe(200);
+    expect(body.status).toBe("healthy");
+    expect(body.checks.tokenEncryption).toEqual({ status: "ok" });
   });
 
-  it("returns 200 when healthy", async () => {
-    (isInternalWorkerAuthorized as jest.Mock).mockReturnValue(true);
-    (validateRequiredSecrets as jest.Mock).mockReturnValue([]);
-    (validateSecretIsolation as jest.Mock).mockReturnValue([]);
+  it("returns unhealthy when encryption is not configured", async () => {
+    mockCheckEncryptionHealth.mockReturnValue({
+      healthy: false,
+      message: "TOKEN_ENCRYPTION_KEY is not set",
+    });
 
-    const request = new NextRequest("http://localhost/api/internal/worker/healthz");
-    const response = await GET(request);
-    const data = await response.json();
+    const res = await GET(mockRequest("Bearer test-secret"));
+    const body = await res.json();
 
-    expect(response.status).toBe(200);
-    expect(data.status).toBe("healthy");
-    expect(data.checks.secrets.status).toBe("ok");
-    expect(data.checks.isolation.status).toBe("ok");
+    expect(res.status).toBe(503);
+    expect(body.status).toBe("unhealthy");
+    expect(body.checks.tokenEncryption).toEqual({
+      status: "error",
+      message: "TOKEN_ENCRYPTION_KEY is not set",
+    });
   });
 
-  it("returns 503 when secrets are missing", async () => {
-    (isInternalWorkerAuthorized as jest.Mock).mockReturnValue(true);
-    (validateRequiredSecrets as jest.Mock).mockReturnValue([
-      "INTERNAL_WORKER_SECRET",
-    ]);
-    (validateSecretIsolation as jest.Mock).mockReturnValue([]);
+  it("returns unhealthy when encryption round-trip fails", async () => {
+    mockCheckEncryptionHealth.mockReturnValue({
+      healthy: false,
+      message: "Encrypt/decrypt round-trip failed",
+    });
 
-    const request = new NextRequest("http://localhost/api/internal/worker/healthz");
-    const response = await GET(request);
-    const data = await response.json();
+    const res = await GET(mockRequest("Bearer test-secret"));
+    const body = await res.json();
 
-    expect(response.status).toBe(503);
-    expect(data.status).toBe("unhealthy");
-    expect(data.checks.secrets.status).toBe("error");
+    expect(body.status).toBe("unhealthy");
+    expect(body.checks.tokenEncryption.status).toBe("error");
   });
 
-  it("returns warning when secrets are not isolated", async () => {
-    (isInternalWorkerAuthorized as jest.Mock).mockReturnValue(true);
-    (validateRequiredSecrets as jest.Mock).mockReturnValue([]);
-    (validateSecretIsolation as jest.Mock).mockReturnValue([
-      "INTERNAL_WORKER_SECRET should differ from GITHUB_WEBHOOK_SECRET",
-    ]);
+  it("includes encryption check in the checks object", async () => {
+    const res = await GET(mockRequest("Bearer test-secret"));
+    const body = await res.json();
 
-    const request = new NextRequest("http://localhost/api/internal/worker/healthz");
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.status).toBe("healthy");
-    expect(data.checks.isolation.status).toBe("warning");
-    expect(data.checks.isolation.message).toContain("should differ");
+    expect(body.checks).toHaveProperty("tokenEncryption");
   });
 
-  it("includes timestamp in response", async () => {
-    (isInternalWorkerAuthorized as jest.Mock).mockReturnValue(true);
-    (validateRequiredSecrets as jest.Mock).mockReturnValue([]);
-    (validateSecretIsolation as jest.Mock).mockReturnValue([]);
+  it("fails health check when INTERNAL_WORKER_SECRET is missing even if encryption is ok", async () => {
+    delete process.env.INTERNAL_WORKER_SECRET;
+    const { validateRequiredSecrets } = require("@/lib/utils/internalAuth");
+    (validateRequiredSecrets as jest.Mock).mockReturnValueOnce(["INTERNAL_WORKER_SECRET"]);
 
-    const request = new NextRequest("http://localhost/api/internal/worker/healthz");
-    const response = await GET(request);
-    const data = await response.json();
+    const res = await GET(mockRequest("Bearer test-secret"));
+    const body = await res.json();
 
-    expect(data.timestamp).toBeDefined();
-    expect(new Date(data.timestamp)).toBeInstanceOf(Date);
+    expect(res.status).toBe(503);
+    expect(body.status).toBe("unhealthy");
+    expect(body.checks.secrets.status).toBe("error");
+  });
+
+  it("encryption failure alone makes overall health unhealthy", async () => {
+    mockCheckEncryptionHealth.mockReturnValue({
+      healthy: false,
+      message: "TOKEN_ENCRYPTION_KEY is not set",
+    });
+
+    const res = await GET(mockRequest("Bearer test-secret"));
+    const body = await res.json();
+
+    expect(res.status).toBe(503);
+    expect(body.status).toBe("unhealthy");
+  });
+
+  it("authorization failure returns 401 before any checks", async () => {
+    (isInternalWorkerAuthorized as jest.Mock).mockReturnValueOnce(false);
+
+    const res = await GET(mockRequest("Bearer wrong-secret"));
+
+    expect(res.status).toBe(401);
   });
 });

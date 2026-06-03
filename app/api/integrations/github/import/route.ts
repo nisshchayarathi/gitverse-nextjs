@@ -5,15 +5,14 @@ import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
 import { logger } from "@/lib/logger";
-import { getEphemeralSecret } from "@/lib/utils/analysisRunner";
-
 function kickLocalRunner(request: NextRequest) {
   if (process.env.NODE_ENV === "production") return;
   const origin = new URL(request.url).origin;
-  const secret = process.env.ANALYSIS_RUNNER_SECRET || getEphemeralSecret();
+  const secret = process.env.ANALYSIS_RUNNER_SECRET;
+  if (!secret) return;
   void fetch(`${origin}/api/internal/run-analysis`, {
     method: "POST",
-    headers: secret ? { "x-analysis-runner-secret": secret } : undefined,
+    headers: { "x-analysis-runner-secret": secret },
   }).catch(() => {
     // Best-effort only.
   });

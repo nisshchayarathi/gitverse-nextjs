@@ -6,6 +6,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
+import { FocusRingManager } from "@/components/ui/FocusRingManager";
 import "./globals.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://gitverse.dev";
@@ -70,6 +71,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ThemeProvider>
           <NextAuthProvider>
             <AuthProvider>
+              <FocusRingManager />
               <main id="main-content">
                 {children}
               </main>

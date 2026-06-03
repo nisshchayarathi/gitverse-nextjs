@@ -318,7 +318,7 @@ Add these in **Vercel Dashboard → Settings → Environment Variables**:
 | `GITHUB_APP_ID` | ⚡ PR Reviews | Only if using GitHub App integration |
 | `GITHUB_APP_PRIVATE_KEY` | ⚡ PR Reviews | Only if using GitHub App integration |
 | `GITHUB_WEBHOOK_SECRET` | ⚡ PR Reviews | Only if using GitHub webhooks |
-| `ANALYSIS_RUNNER_SECRET` | ⚡ Cron | Required for scheduled analysis jobs on Vercel |
+| `ANALYSIS_RUNNER_SECRET` | ✅ Always | Required in production. Protects `/api/internal/run-analysis`. Generate with `openssl rand -hex 32`. Must NOT be passed via query string. |
 | `GITVERSE_ANALYSIS_BACKEND` | ⚡ Cron | URL of your analysis worker backend |
 | `SMTP_HOST` | ⚡ Email | Only if using password reset emails |
 | `SMTP_USER` | ⚡ Email | Only if using password reset emails |
@@ -329,7 +329,7 @@ Add these in **Vercel Dashboard → Settings → Environment Variables**:
 - **Wrong DATABASE_URL** — Use the **pooler** URL from NeonDB for Vercel (not direct connection)
 - **Missing NEXTAUTH_URL** — Must be set to your exact production domain
 - **GITHUB_APP_PRIVATE_KEY format** — Paste with literal `\n` between lines, wrapped in quotes
-- **ANALYSIS_RUNNER_SECRET not set** - Required in production; `/api/internal/run-analysis` rejects requests with 401 until the secret is configured
+- **ANALYSIS_RUNNER_SECRET not set** - Required in production; `/api/internal/run-analysis` rejects requests with 500 until the secret is configured. Generate with `openssl rand -hex 32`. Never pass the secret via query string.
 
 ### Docker
 

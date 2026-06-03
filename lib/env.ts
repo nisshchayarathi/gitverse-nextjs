@@ -6,20 +6,42 @@ const requiredEnvVars = [
   "TOKEN_ENCRYPTION_KEY",
 ] as const;
 
+function getEnvValidationSkipReasons() {
+  const reasons: string[] = [];
+
+  if (process.env.NODE_ENV === "test") {
+    reasons.push("NODE_ENV=test");
+  }
+  if (process.env.CI === "true") {
+    reasons.push("CI=true");
+  }
+  if (process.env.GITHUB_ACTIONS === "true") {
+    reasons.push("GITHUB_ACTIONS=true");
+  }
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    reasons.push("NEXT_PHASE=phase-production-build");
+  }
+  if (process.env.PLAYWRIGHT_TEST === "true") {
+    reasons.push("PLAYWRIGHT_TEST=true");
+  }
+  if (process.env.PLAYWRIGHT === "true") {
+    reasons.push("PLAYWRIGHT=true");
+  }
+
+  return reasons;
+}
+
 function shouldSkipEnvValidation() {
-  return (
-    process.env.NODE_ENV === "test" ||
-    process.env.CI === "true" ||
-    process.env.GITHUB_ACTIONS === "true" ||
-    process.env.NEXT_PHASE === "phase-production-build" ||
-    process.env.PLAYWRIGHT_TEST === "true" ||
-    process.env.PLAYWRIGHT === "true"
-  );
+  return getEnvValidationSkipReasons().length > 0;
 }
 
 function validateEnv() {
-  if (shouldSkipEnvValidation()) {
-    console.log("Skipping environment validation in test/CI environment");
+  const skipReasons = getEnvValidationSkipReasons();
+
+  if (skipReasons.length > 0) {
+    console.log(
+      `⚠️ Skipping environment validation: ${skipReasons.join(" | ")}`
+    );
 
     return;
   }
