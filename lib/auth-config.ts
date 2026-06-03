@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
@@ -208,6 +209,15 @@ const googleTokenVerifier = isGoogleConfigured
   ? new OAuth2Client({ clientId: googleClientId! })
   : null;
 
+const githubClientId = process.env.GITHUB_ID;
+const githubClientSecret = process.env.GITHUB_SECRET;
+
+const isGithubConfigured =
+  !!githubClientId &&
+  !!githubClientSecret &&
+  !looksLikePlaceholder(githubClientId) &&
+  !looksLikePlaceholder(githubClientSecret);
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -255,6 +265,12 @@ if ((googleClientId || googleClientSecret) && !isGoogleConfigured) {
   // Intentionally do not log secrets.
   console.warn(
     "[auth] Google OAuth is not fully configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to real values (not placeholders), then restart the dev server."
+  );
+}
+
+if ((githubClientId || githubClientSecret) && !isGithubConfigured) {
+  console.warn(
+    "[auth] GitHub OAuth is not fully configured. Set GITHUB_ID and GITHUB_SECRET to real values (not placeholders), then restart the dev server."
   );
 }
 
@@ -313,6 +329,20 @@ export const authOptions: NextAuthOptions = {
           }),
         ]
       : []),
+    ...(isGithubConfigured
+      ? [
+          GitHubProvider({
+            clientId: githubClientId!,
+            clientSecret: githubClientSecret!,
+            authorization: {
+              params: {
+                scope: "read:user user:email repo",
+              },
+            },
+            allowDangerousEmailAccountLinking: true,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -332,17 +362,17 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid email or password");
         }
 
-        // Security: never allow password login for Google-only accounts.
-        // A "Google-only" account has no local passwordHash, but does have a linked Google provider account.
+        // Security: never allow password login for OAuth-only accounts.
+        // An OAuth-only account has no local passwordHash, but does have a linked provider account.
         if (!user.passwordHash) {
-          const hasGoogleAccount =
+          const hasOAuthAccount =
             (await prisma.account.count({
-              where: { userId: user.id, provider: "google" },
+              where: { userId: user.id },
             })) > 0;
 
-          if (hasGoogleAccount) {
+          if (hasOAuthAccount) {
             throw new Error(
-              "Email already exists. Please sign in with Google."
+              "Email already exists. Please sign in with your linked social account."
             );
           }
 

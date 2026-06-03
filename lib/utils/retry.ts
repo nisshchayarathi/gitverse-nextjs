@@ -206,7 +206,8 @@ function extractAllErrorMessages(error: unknown): string[] {
 
     if (obj instanceof Error) {
       if (obj.message) messages.push(obj.message);
-      if (obj.cause) collect(obj.cause, depth + 1);
+      const cause = (obj as any).cause;
+      if (cause) collect(cause, depth + 1);
       return;
     }
 

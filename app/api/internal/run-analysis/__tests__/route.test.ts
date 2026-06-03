@@ -1,5 +1,9 @@
 import { NextRequest } from "next/server";
 
+const undici = require("undici");
+(global as any).Request = undici.Request;
+(global as any).Response = undici.Response;
+
 jest.mock("@/lib/utils/analysisRunner", () => ({
   isAnalysisRunnerAuthorized: jest.fn(),
   registerUnhandledRejectionLogger: jest.fn(),

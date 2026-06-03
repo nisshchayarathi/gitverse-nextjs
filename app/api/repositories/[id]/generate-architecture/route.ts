@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
-import { getGeminiService } from "@/lib/services/geminiService";
+import { analysisJobService } from "@/lib/services/analysisJobService";
+import { analysisWorkerTriggerService } from "@/lib/services/analysisWorkerTriggerService";
+import prisma from "@/lib/prisma";
 
 export async function POST(
     request: NextRequest,
@@ -10,7 +12,6 @@ export async function POST(
     try {
         const user = await requireAuth(request);
 
-        // Strict ID validation: only digits allowed
         if (!/^\d+$/.test(params.id)) {
             return NextResponse.json({ error: "Invalid repository ID format" }, { status: 400 });
         }
@@ -22,38 +23,21 @@ export async function POST(
             return NextResponse.json({ error: "Repository not found" }, { status: 404 });
         }
 
-        // Limit files to avoid huge context payloads for prompt
-        const flatFiles = repository.files || [];
-        const contextFiles = flatFiles.slice(0, 100).map((f: any) => ({
-            path: f.path || f,
-            content: "" // We omit content to save tokens on architecture overview
-        }));
-
-        const geminiService = getGeminiService();
-
-        let aiResponse = await geminiService.analyzeRepository({
+        // Create the background job for architecture generation
+        const job = await analysisJobService.createArchitectureGenerationJob({
             repositoryId: id,
-            type: "architecture-document",
-            context: {
-                fileTree: contextFiles.map((f: any) => f.path).join("\n"),
-                commits: (repository.commits || []).slice(0, 50),
-                languages: (repository.languages || []).slice(0, 20),
-                contributors: (repository.contributors || []).slice(0, 20)
-            }
+            userId: user.userId,
         });
 
-        // Remove any markdown code fences (```markdown, ```md, or ```) from the start/end
-        aiResponse = aiResponse
-            .replace(/^[\s\n]*```(?:markdown|md)?[\s\n]*/i, "")
-            .replace(/[\s\n]*```[\s\n]*$/i, "")
-            .trim();
+        // Trigger worker asynchronously
+        analysisWorkerTriggerService.triggerAnalysisWorker().catch((err) => {
+            console.error("Failed to trigger background architecture generation worker:", err);
+        });
 
-        return new NextResponse(aiResponse, {
-            status: 200,
-            headers: {
-                "Content-Type": "text/markdown",
-                "Cache-Control": "no-store",
-            },
+        return NextResponse.json({
+            jobId: job.id,
+            status: job.status,
+            message: "Architecture generation started"
         });
 
     } catch (error: any) {
@@ -64,7 +48,39 @@ export async function POST(
         }
 
         return NextResponse.json(
-            { error: "Failed to generate architecture document" },
+            { error: "Failed to start architecture generation" },
+            { status: 500 }
+        );
+    }
+}
+
+export async function GET(
+    request: NextRequest,
+    { params }: { params: { id: string } }
+) {
+    try {
+        const user = await requireAuth(request);
+        const id = parseInt(params.id);
+
+        const knowledge = await prisma.repositoryKnowledge.findUnique({
+            where: { repositoryId: id }
+        });
+
+        if (!knowledge || !knowledge.projectDescription) {
+            return NextResponse.json({ error: "Architecture document not found or still generating" }, { status: 404 });
+        }
+
+        return new NextResponse(knowledge.projectDescription, {
+            status: 200,
+            headers: {
+                "Content-Type": "text/markdown",
+                "Cache-Control": "no-store",
+            },
+        });
+    } catch (error: any) {
+        console.error("Error fetching architecture doc:", sanitizeError(error));
+        return NextResponse.json(
+            { error: "Failed to fetch architecture document" },
             { status: 500 }
         );
     }

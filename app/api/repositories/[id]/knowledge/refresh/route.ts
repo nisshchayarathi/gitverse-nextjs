@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { GitService } from "@/lib/services/gitService";
+import { getGithubAccessToken } from "@/lib/services/githubAuthService";
 import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
@@ -37,7 +38,12 @@ export async function POST(
     let parsedKnowledge;
 
     try {
-      gitService = await GitService.cloneRepository(repository.url, tempDir, { depth: 1, noSingleBranch: false });
+      const token = await getGithubAccessToken(user.userId);
+      gitService = await GitService.cloneRepository(repository.url, tempDir, { 
+        depth: 1, 
+        noSingleBranch: false,
+        accessToken: token
+      });
       
       let knowledgeJson = undefined;
       let knowledgeMd = undefined;

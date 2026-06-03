@@ -63,14 +63,18 @@ describe('signedState', () => {
   it('fails verification if GITHUB_APP_STATE_SECRET is not configured', () => {
     const prevSecret = process.env.GITHUB_APP_STATE_SECRET;
     const prevNextAuthSecret = process.env.NEXTAUTH_SECRET;
+    const prevNodeEnv = process.env.NODE_ENV;
+    
     try {
       process.env.GITHUB_APP_STATE_SECRET = '';
       process.env.NEXTAUTH_SECRET = '';
-
+      process.env.NODE_ENV = 'production';
+      
       expect(() => createSignedState({ a: 1 })).toThrow();
     } finally {
       process.env.GITHUB_APP_STATE_SECRET = prevSecret;
       process.env.NEXTAUTH_SECRET = prevNextAuthSecret;
+      process.env.NODE_ENV = prevNodeEnv;
     }
   });
 });

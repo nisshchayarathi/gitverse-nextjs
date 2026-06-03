@@ -3,7 +3,6 @@ import { verifyGitHubWebhookSignature } from "@/lib/utils/githubWebhook";
 import { GithubWebhookVerifier } from "@/lib/services/githubWebhookVerifier";
 import prisma from "@/lib/prisma";
 import crypto from "crypto";
-import { QuotaService } from "@/lib/services/quotaService";
 import { getClientIp } from "@/lib/services/rateLimitService";
 import { SafeHttpClient } from "@/services/security/safe-http-client";
 import { webhookQueue } from "@/lib/services/webhook-queue";
@@ -50,12 +49,8 @@ function shouldHandleIssueAction(action: string | undefined): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  // 1. IP-based Rate Limiter (60 requests per minute per IP)
-  const clientIp = getClientIp(request);
-  const isIpAllowed = await QuotaService.checkWebhookRateLimit(`webhook_ip_${clientIp}`, 60, 60000);
-  if (!isIpAllowed) {
-    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
-  }
+  // Note: Rate limiting is deferred to background processing or handled by in-memory limits
+  // to avoid exhausting the Prisma database connection pool synchronously.
 
   const rawBody = await request.text();
 
@@ -137,41 +132,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 2. Installation-based Rate Limiter (30 requests per minute per installation)
-  const isInstAllowed = await QuotaService.checkWebhookRateLimit(`webhook_inst_${installationId}`, 30, 60000);
-  if (!isInstAllowed) {
-    return NextResponse.json({ error: "Too Many Requests for Installation" }, { status: 429 });
-  }
-
-  // Store webhook event for async processing
+  // Store webhook event for async processing in-memory to prevent pool exhaustion
   try {
-    const webhookEvent = await prisma.webhookEvent.create({
-      data: {
-        event: event || "unknown",
-        action: action,
-        payload: payload as any,
-        status: "pending",
-      },
-    });
+    const baseUrl = process.env.NEXTAUTH_URL || `http://${request.headers.get("host") || "localhost:3000"}`;
+    webhookQueue.enqueueWebhook(payload, event || "unknown", action, baseUrl);
 
     // Automatically retry any previously failed jobs occasionally
-    // (This is lightweight and ensures dead-letter recovery without a cron)
     webhookRetryService.requeueFailedJobs().catch(() => {});
 
-    // Trigger internal workers asynchronously via queue manager
-    const baseUrl = process.env.NEXTAUTH_URL || `http://${request.headers.get("host") || "localhost:3000"}`;
-    webhookQueue.triggerWorkers(baseUrl).catch((err: any) => {
-      console.error("[Webhook] Failed to trigger queue workers:", err);
-    });
-
     return NextResponse.json(
-      { ok: true, message: "Webhook accepted for processing", eventId: webhookEvent.id },
+      { ok: true, message: "Webhook accepted and queued for processing" },
       { status: 202 }
     );
   } catch (error) {
-    console.error("Error persisting webhook event:", error);
+    console.error("Error queueing webhook event:", error);
     return NextResponse.json(
-      { error: "Failed to persist webhook event" },
+      { error: "Failed to queue webhook event" },
       { status: 500 }
     );
   }

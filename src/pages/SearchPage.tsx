@@ -66,8 +66,8 @@ export default function SearchPage() {
       const response = await axios.get(buildApiUrl("/api/repositories"), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // API returns { repositories: [...] }
-      const repos = response.data.repositories || [];
+      // API returns { data: { repositories: [...] } } via apiSuccess wrapper
+      const repos = response.data.data?.repositories || [];
       setRepositories(Array.isArray(repos) ? repos : []);
     }  
     catch (error: any) {

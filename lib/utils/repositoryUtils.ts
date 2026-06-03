@@ -258,7 +258,7 @@ export function normalizeKnownRepoHttpUrl(input: string): string | null {
 
   const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
   const supportedHosts = new Set(["github.com", "gitlab.com", "bitbucket.org"]);
-  if (!supportedHosts.has(host)) return input;
+  if (!supportedHosts.has(host)) return null;
 
   const parts = parsed.pathname.split("/").filter(Boolean);
   if (parts.length < 2) return null;

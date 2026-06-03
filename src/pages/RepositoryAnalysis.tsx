@@ -210,6 +210,13 @@ export default function RepositoryAnalysis() {
     } catch (err: any) {
       console.error("Error fetching repository:", err);
 
+      const status = err.response?.status;
+      if (status === 401) {
+        setError("Your session has expired. Please log in again to view your repository analysis.");
+        setLoading(false);
+        return;
+      }
+
       const isColdStart = err.response?.data?.error === "DATABASE_COLD_START";
       
       if (isColdStart) {
@@ -270,6 +277,20 @@ export default function RepositoryAnalysis() {
     } catch (err: any) {
       console.error("Error fetching analysis job:", err);
       
+      const status = err.response?.status;
+      if (status === 401) {
+        const msg = "Your session has expired. The analysis is continuing securely in the background and will be available in your dashboard when you log back in.";
+        setError(msg);
+        setIsAnalyzing(false);
+        pollingStartedAt.current = null;
+        toast({
+          title: "Session Expired",
+          description: msg,
+          variant: "default",
+        });
+        return;
+      }
+
       const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "Failed to connect to the analysis service.";
       
       // 1. Surface inline error state
@@ -281,7 +302,7 @@ export default function RepositoryAnalysis() {
       // 3. Show a one-time toast notification
       toast({
         title: "Error checking analysis status",
-        description: err.response?.data?.error || err.response?.data?.message || err.message || "Failed to connect to the analysis service.",
+        description: errorMessage,
         variant: "destructive",
       });
     }

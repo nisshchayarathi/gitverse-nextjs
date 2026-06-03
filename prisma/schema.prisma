@@ -233,6 +233,7 @@ model Repository {
   mapAnnotations      MapAnnotation[]
   knowledge           RepositoryKnowledge?
   syncJobs            RepositorySyncJob[]
+  architectureChunks  RepositoryArchitectureChunk[]
   lastSynchronizedAt  DateTime?                   @map("last_synchronized_at")
 
   @@index([url])
@@ -240,6 +241,21 @@ model Repository {
   @@index([userId, url, targetDirectory])
   @@map("repositories")
 }
+
+model RepositoryArchitectureChunk {
+  id           Int        @id @default(autoincrement())
+  repositoryId Int        @map("repository_id")
+  chunkPath    String     @map("chunk_path")
+  summary      String     @db.Text
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, chunkPath])
+  @@index([repositoryId])
+  @@map("repository_architecture_chunks")
+}
+
 
 model RepositorySyncJob {
   id           String    @id @default(uuid()) @db.Uuid

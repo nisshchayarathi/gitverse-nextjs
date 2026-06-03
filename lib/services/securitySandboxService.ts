@@ -5,6 +5,7 @@ import * as path from "path";
 import * as os from "os";
 import prisma from "@/lib/prisma";
 import crypto from "crypto";
+import { validateSafeUrl } from "@/lib/utils/ssrfValidator";
 import { GitHubService } from "./githubService";
 
 const execFileAsync = promisify(execFile);
@@ -251,6 +252,11 @@ export async function runSecuritySandbox(params: {
 }): Promise<SandboxRunResult> {
   if (!isSandboxEnabled()) {
     throw new Error("Security sandbox is not enabled. Set SECURITY_SANDBOX_ENABLED=true");
+  }
+
+  const isSafeUrl = await validateSafeUrl(params.repositoryUrl);
+  if (!isSafeUrl) {
+    throw new Error("Security sandbox aborted: Repository URL resolves to an untrusted or private network address.");
   }
 
   // Create sandbox record

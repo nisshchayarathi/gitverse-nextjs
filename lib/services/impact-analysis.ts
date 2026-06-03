@@ -49,7 +49,10 @@ export class ImpactAnalysisService {
       // 2. Clone repository shallowly to get the dependency structure
       // Note: This clones the default branch, which is sufficient for mapping existing dependencies
       const repoUrl = `https://github.com/${owner}/${repo}.git`;
-      gitService = await GitService.cloneRepository(repoUrl, tempDir, { depth: 1 });
+      gitService = await GitService.cloneRepository(repoUrl, tempDir, { 
+        depth: 1,
+        accessToken: githubToken
+      });
 
       // 3. Build graph
       const graph = await this.graphService.buildGraph(tempDir);

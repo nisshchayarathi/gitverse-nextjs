@@ -85,15 +85,27 @@ async function runOnce(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    await repositoryService.analyzeRepository(job.repositoryId, job.userId, {
-      onProgress: async (update) => {
-        await analysisJobService.updateProgress({
-          jobId: job.id,
-          workerId,
-          update,
-        });
-      },
-    });
+    if (job.type === "architecture_generation") {
+      await repositoryService.generateArchitectureIteratively(job.repositoryId, job.userId, {
+        onProgress: async (update) => {
+          await analysisJobService.updateProgress({
+            jobId: job.id,
+            workerId,
+            update,
+          });
+        },
+      });
+    } else {
+      await repositoryService.analyzeRepository(job.repositoryId, job.userId, {
+        onProgress: async (update) => {
+          await analysisJobService.updateProgress({
+            jobId: job.id,
+            workerId,
+            update,
+          });
+        },
+      });
+    }
 
     await analysisJobService.markDone({ jobId: job.id, workerId });
 

@@ -9,6 +9,7 @@ import axios from 'axios'
 
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { Loader2 } from "lucide-react";
 
 interface LanguageStat {
   name: string;
@@ -46,6 +47,8 @@ export function RepositoryInsights({
   repository,
 }: RepositoryInsightsProps) {
   const [isGeneratingMd, setIsGeneratingMd] = useState(false);
+  const [progressMessage, setProgressMessage] = useState("");
+  const [progressPercent, setProgressPercent] = useState(0);
 
   const downloadPNG = async () => {
     const element = document.getElementById("repo-analysis");
@@ -86,47 +89,101 @@ export function RepositoryInsights({
   const generateArchitectureMarkdown = async () => {
     if (!repository?.id) return;
 
+    const totalFiles = repository.files?.reduce((acc, curr) => acc + curr.count, 0) || 0;
+    if (totalFiles > 200) {
+      if (!window.confirm(`This repository has ${totalFiles} files. Generating the architecture document will process in chunks and may take several minutes. Do you want to continue?`)) {
+        return;
+      }
+    }
+
     setIsGeneratingMd(true);
+    setProgressMessage("Starting generation...");
+    setProgressPercent(0);
+
     try {
       const token = localStorage.getItem("gitverse_token");
-      const response = await axios.post(
+      
+      // 1. Queue the background job
+      const postResponse = await axios.post(
         `/api/repositories/${repository.id}/generate-architecture`,
         {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: "text",
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
+      
+      const jobId = postResponse.data.jobId;
 
-      const blob = new Blob([response.data], { type: "text/markdown;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      // 2. Poll for job completion
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await axios.get(`/api/analysis-jobs/${jobId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          const job = statusRes.data;
+          
+          if (job.status === "FAILED") {
+            clearInterval(pollInterval);
+            setIsGeneratingMd(false);
+            toast({
+              title: "Export failed",
+              description: job.error || "Failed to generate architecture document.",
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          if (job.status === "DONE") {
+            clearInterval(pollInterval);
+            
+            // 3. Download the finished document
+            setProgressMessage("Downloading document...");
+            const getResponse = await axios.get(
+              `/api/repositories/${repository.id}/generate-architecture`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: "text",
+              }
+            );
 
-      link.href = url;
-      const sanitizedName = (repository.name || "")
-        .trim()
-        .replace(/[\/\\?%*:|"<>]/g, "-")
-        .replace(/-{2,}/g, "-")
-        .replace(/^-|-$/g, "") || "repository";
-      link.download = `${sanitizedName}-ARCHITECTURE.md`;
-      document.body.appendChild(link);
-      link.click();
+            const blob = new Blob([getResponse.data], { type: "text/markdown;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
 
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+            link.href = url;
+            const sanitizedName = (repository.name || "")
+              .trim()
+              .replace(/[\/\\?%*:|"<>]/g, "-")
+              .replace(/-{2,}/g, "-")
+              .replace(/^-|-$/g, "") || "repository";
+            link.download = `${sanitizedName}-ARCHITECTURE.md`;
+            document.body.appendChild(link);
+            link.click();
 
-      toast({
-        title: "Success",
-        description: "ARCHITECTURE.md Downloaded successfully!"
-      });
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            setIsGeneratingMd(false);
+            toast({
+              title: "Success",
+              description: "ARCHITECTURE.md Downloaded successfully!"
+            });
+          } else {
+            // Update progress
+            setProgressMessage(job.progressMessage || "Processing...");
+            setProgressPercent(job.progressPercent || 0);
+          }
+        } catch (pollErr) {
+          console.error("Error polling job", pollErr);
+        }
+      }, 3000);
+
     } catch (error: any) {
       console.error("MD Generation Error", error);
       toast({
         title: "Export failed",
-        description: error.response?.data?.error || "Failed to generate architecture document.",
+        description: error.response?.data?.error || "Failed to start architecture generation.",
         variant: "destructive"
       });
-    } finally {
       setIsGeneratingMd(false);
     }
   };
@@ -155,7 +212,14 @@ export function RepositoryInsights({
             disabled={isGeneratingMd || !repository?.id}
             className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition disabled:opacity-50 flex items-center gap-2"
           >
-            {isGeneratingMd ? "Generating..." : "Export ARCHITECTURE.md"}
+            {isGeneratingMd ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {progressMessage} ({progressPercent}%)
+              </>
+            ) : (
+              "Export ARCHITECTURE.md"
+            )}
           </button>
 
           <button

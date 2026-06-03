@@ -125,12 +125,54 @@ export class AnalysisJobService {
     jobId: string;
     userId: number;
   }): Promise<AnalysisJob | null> {
-    return prisma.analysisJob.findFirst({
+    const job = await prisma.analysisJob.findUnique({
       where: {
         id: params.jobId,
-        userId: params.userId,
+      },
+      include: {
+        repository: {
+          select: { userId: true },
+        },
       },
     });
+
+    if (!job) return null;
+
+    let hasAccess = false;
+
+    // 1. User is the creator of the job
+    if (job.userId === params.userId) {
+      hasAccess = true;
+    } 
+    // 2. User is the owner of the repository
+    else if (job.repository.userId === params.userId) {
+      hasAccess = true;
+    } 
+    // 3. User has access via organization membership
+    else {
+      const orgAccess = await prisma.repositoryPolicyAssignment.findFirst({
+        where: {
+          repositoryId: job.repositoryId,
+          organization: {
+            members: {
+              some: { userId: params.userId },
+            },
+          },
+        },
+      });
+
+      if (orgAccess) {
+        hasAccess = true;
+      }
+    }
+
+    if (!hasAccess) {
+      return null;
+    }
+
+    // Strip the joined repository to match the expected return type
+    const { repository, ...jobData } = job as any;
+    return jobData as AnalysisJob;
   }
 
   async updateProgress(params: {

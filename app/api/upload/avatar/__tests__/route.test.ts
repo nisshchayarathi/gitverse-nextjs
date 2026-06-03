@@ -41,7 +41,11 @@ import {
   validateDataUrl,
   validateHttpAvatarUrl,
 } from "@/lib/services/imageService";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+
+const undici = require("undici");
+(global as any).Request = undici.Request;
+(global as any).Response = undici.Response;
 
 describe("POST /api/upload/avatar", () => {
   const mockUser = { userId: 123, email: "test@example.com" };

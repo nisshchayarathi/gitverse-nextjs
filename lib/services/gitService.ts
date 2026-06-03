@@ -235,9 +235,20 @@ export class GitService {
       noSingleBranch?: boolean;
       onProgress?: (percent: number, message: string) => void;
       signal?: AbortSignal;
+      accessToken?: string;
     },
   ): Promise<GitService> {
     const normalizedUrl = normalizeKnownRepoHttpUrl(url);
+    let finalUrl = normalizedUrl || url;
+    
+    // Inject access token for GitHub private repositories
+    if (opts?.accessToken && finalUrl.includes("github.com")) {
+      const parsedUrl = new URL(finalUrl);
+      parsedUrl.username = "x-access-token";
+      parsedUrl.password = opts.accessToken;
+      finalUrl = parsedUrl.toString();
+    }
+
     if (!normalizedUrl) {
       const sshMatch = url.match(/^git@([^:]+):([^\/]+)\/(.+?)(?:\.git)?$/);
       if (!sshMatch) {
@@ -250,7 +261,7 @@ export class GitService {
       if (!allowedHosts.has(host)) {
         throw new Error(`Repository host ${host} is not allowed`);
       }
-      url = `https://${host}/${owner}/${repo}`;
+      finalUrl = `https://${host}/${owner}/${repo}`;
     }
 
     await fs.mkdir(destination, { recursive: true });
@@ -274,7 +285,7 @@ export class GitService {
       "--depth",
       String(depth),
       noSingleBranch ? "--no-single-branch" : "--single-branch",
-      url,
+      finalUrl,
       destination,
     ];
 
@@ -324,7 +335,8 @@ export class GitService {
             );
             return;
           }
-          reject(new Error(`Failed to clone repository: ${msg}`));
+          const sanitizedMsg = msg.replace(/x-access-token:[^@]+@/g, "***@");
+          reject(new Error(`Failed to clone repository: ${sanitizedMsg}`));
         }
       });
 
@@ -335,20 +347,19 @@ export class GitService {
   /**
    * Check if a public GitHub repository exists and is accessible.
    */
-  static async checkGithubRepositoryExists(url: string): Promise<boolean> {
+  static async checkGithubRepositoryExists(url: string, accessToken?: string): Promise<boolean> {
+    const match = url.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
+    if (!match) return false;
+
+    const [, owner, repo] = match;
+    const headers: Record<string, string> = { "User-Agent": "GitVerse" };
+    
+    if (accessToken) {
+      headers["Authorization"] = `token ${accessToken}`;
+    }
+
     try {
-      const cleanUrl = url.trim().replace(/\/$/, "").replace(/\.git$/, "");
-      const parts = cleanUrl.split("/");
-      const repo = parts[parts.length - 1];
-      const owner = parts[parts.length - 2];
-
-      if (!owner || !repo) return false;
-
-      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-        headers: {
-          "User-Agent": "GitVerse-App",
-        },
-      });
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
       return res.status === 200;
     } catch {
       return false;
@@ -358,7 +369,7 @@ export class GitService {
   /**
    * Get the remote repository size in bytes (via GitHub API if applicable).
    */
-  static async getRemoteRepositorySize(url: string): Promise<number | null> {
+  static async getRemoteRepositorySize(url: string, accessToken?: string): Promise<number | null> {
     try {
       const cleanUrl = url.trim().replace(/\/$/, "").replace(/\.git$/, "");
       const parts = cleanUrl.split("/");
@@ -368,11 +379,12 @@ export class GitService {
       if (!owner || !repo) return null;
       if (!cleanUrl.includes("github.com")) return null;
 
-      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-        headers: {
-          "User-Agent": "GitVerse-App",
-        },
-      });
+      const headers: Record<string, string> = { "User-Agent": "GitVerse-App" };
+      if (accessToken) {
+        headers["Authorization"] = `token ${accessToken}`;
+      }
+
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
       if (res.status === 200) {
         const data = await res.json();
         // GitHub API returns size in KB

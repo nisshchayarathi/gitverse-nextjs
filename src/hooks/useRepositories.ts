@@ -32,7 +32,7 @@ const DEFAULT_LIMIT = 10;
 
 export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositoriesReturn {
   const [repos, setRepos] = useState<Repository[]>([]);
-  const [cursor, setCursor] = useState<number | undefined>(undefined);
+  const cursorRef = useRef<number | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -40,11 +40,20 @@ export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositories
   const [error, setError] = useState<string | null>(null);
 
   const isFetchingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchRepos = useCallback(
     async (isLoadMore = false) => {
+      // Prevent concurrent identical requests
       if (isFetchingRef.current) return;
       if (isLoadMore && !hasMore) return;
+
+      // Abort any previous pending request just in case
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
       isFetchingRef.current = true;
 
@@ -59,19 +68,20 @@ export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositories
         const url = new URL(buildApiUrl("/api/repositories"));
         url.searchParams.set("limit", limit.toString());
 
-        if (isLoadMore && cursor !== undefined) {
-          url.searchParams.set("cursor", cursor.toString());
+        if (isLoadMore && cursorRef.current !== undefined) {
+          url.searchParams.set("cursor", cursorRef.current.toString());
         }
 
         const response = await axios.get(url.toString(), {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          signal: controller.signal,
         });
+        // apiSuccess wraps response in { error, data: { repositories, nextCursor, hasMore } }
+        const { repositories, nextCursor: newCursor, hasMore: newHasMore } = response.data.data || {};
 
-        const { data, nextCursor, hasMore: newHasMore } = response.data;
-
-        const newRepos = Array.isArray(data) ? data : [];
+        const newRepos = Array.isArray(repositories) ? repositories : [];
 
         setRepos((prev) => {
           if (!isLoadMore) return newRepos;
@@ -82,20 +92,32 @@ export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositories
           return [...prev, ...filtered];
         });
 
-        setCursor(nextCursor);
+        setCursor(newCursor);
+        cursorRef.current = nextCursor;
         setHasMore(newHasMore);
       } catch (err: any) {
-        if (err.name !== "CanceledError" && err.name !== "AbortError") {
+        if (err.name !== "CanceledError" && err.name !== "AbortError" && !axios.isCancel(err)) {
           setError(err.response?.data?.error || err.message || "Failed to fetch repositories.");
         }
       } finally {
-        setIsLoading(false);
-        setIsLoadingMore(false);
-        isFetchingRef.current = false;
+        if (abortControllerRef.current === controller) {
+          setIsLoading(false);
+          setIsLoadingMore(false);
+          isFetchingRef.current = false;
+        }
       }
     },
-    [cursor, hasMore, limit]
+    [hasMore, limit]
   );
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // ✅ CLEAN useEffect (no duplicate fetch logic)
   useEffect(() => {
@@ -107,7 +129,7 @@ export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositories
   }, [fetchRepos]);
 
   const refresh = useCallback(async () => {
-    setCursor(undefined);
+    cursorRef.current = undefined;
     setHasMore(true);
     await fetchRepos(false);
   }, [fetchRepos]);

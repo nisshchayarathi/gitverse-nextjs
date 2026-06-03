@@ -154,9 +154,8 @@ export default function Dashboard() {
       const response = await axios.get(buildApiUrl("/api/repositories?limit=1000"), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // API returns { repositories: [...] }
-      const repos =
-        response.data.data?.repositories || response.data.repositories || [];
+      // API returns { data: { repositories: [...] } } via apiSuccess wrapper
+      const repos = response.data.data?.repositories || [];
       setRepositories(Array.isArray(repos) ? repos : []);
     } catch (error: any) {
       console.error("Error fetching repositories:", error);

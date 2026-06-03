@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import {
+  AlertTriangle,
   GitBranch,
   Star,
   GitFork,
@@ -29,6 +31,14 @@ import {
   Skeleton,
   CopyToClipboard,
 } from "@/components/ui";
+import { BeginnerModeToggle } from "@/components/repository/BeginnerModeToggle";
+import { BeginnerGuidanceCard } from "@/components/repository/BeginnerGuidanceCard";
+import { BeginnerQuestionsPanel } from "@/components/repository/BeginnerQuestionsPanel";
+import { QuickStartChecklist } from "@/components/repository/QuickStartChecklist";
+import { FolderImportanceGuide } from "@/components/repository/FolderImportanceGuide";
+import { SavedModulesPanel } from "@/components/repository/SavedModulesPanel";
+import { ModuleComparisonTool } from "@/components/repository/ModuleComparisonTool";
+import { useModuleBookmarks } from "@/hooks/useModuleBookmarks";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -37,6 +47,7 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/hooks/use-toast";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
+import { FavoriteButton } from "./FavoriteButton";
 
 
 interface RepositoryData {
@@ -176,6 +187,9 @@ export const RepositoryOverview = ({
   const readmeText: string | null = repositoryData?.readmeText ?? null;
   const readmePath: string | null = repositoryData?.readmePath ?? null;
 
+  // Initialize module bookmarks hook
+  const { bookmarkedModules, toggleBookmark, removeBookmark } = useModuleBookmarks();
+
   // Calculate total lines of code from languages only
   const totalLines =
     repositoryData?.languages?.reduce(
@@ -206,6 +220,106 @@ export const RepositoryOverview = ({
     openIssues: repositoryData?.openIssues || 0,
     license: repositoryData?.license || undefined,
   };
+
+  const [isBeginnerMode, setIsBeginnerMode] = useState(false);
+
+  const MODULE_GUIDANCE: Record<
+    string,
+    {
+      description: string;
+      recommendation: string;
+      difficulty: "beginner" | "intermediate" | "advanced";
+    }
+  > = {
+    components: {
+      description:
+        "Contains reusable UI building blocks used throughout the application.",
+      recommendation: "Recommended starting point for frontend contributors.",
+      difficulty: "beginner",
+    },
+    services: {
+      description: "Handles business logic and API communication.",
+      recommendation: "Changes here may affect multiple features.",
+      difficulty: "intermediate",
+    },
+    hooks: {
+      description: "Reusable React logic shared across components.",
+      recommendation: "Good place to learn application behavior.",
+      difficulty: "beginner",
+    },
+    utils: {
+      description: "Shared helper functions and utilities.",
+      recommendation: "Usually safe for small contributions.",
+      difficulty: "beginner",
+    },
+    pages: {
+      description: "Application routes and screens.",
+      recommendation: "Useful for understanding navigation flow.",
+      difficulty: "intermediate",
+    },
+    auth: {
+      description: "Authentication and access control.",
+      recommendation: "Requires understanding of security flows.",
+      difficulty: "advanced",
+    },
+  };
+
+  const ARCHITECTURE_GUIDANCE: Record<string, string> = {
+    services:
+      "Service layer responsible for API communication and business logic.",
+    hooks: "Custom React logic reused across multiple components.",
+    components: "Reusable visual building blocks used throughout the application.",
+    utils: "Utility helpers that keep the app consistent and reusable.",
+    pages: "Route and screen organization that controls navigation flow.",
+    auth: "Authentication logic that secures access and identity flows.",
+  };
+
+  const moduleFolders = useMemo(() => {
+    const segments = new Set<string>();
+
+    (repositoryData?.files || []).forEach((file: any) => {
+      const parts = String(file.path || "").split("/").filter(Boolean);
+      parts.slice(0, -1).forEach((segment) => {
+        if (segment) {
+          segments.add(segment);
+        }
+      });
+    });
+
+    return Array.from(segments).filter((segment) =>
+      Object.prototype.hasOwnProperty.call(MODULE_GUIDANCE, segment),
+    );
+  }, [repositoryData?.files]);
+
+  const hotspotGuidance = useMemo(() => {
+    const filePaths = (repositoryData?.files || []).map((file: any) =>
+      String(file.path || "").toLowerCase(),
+    );
+
+    return [
+      {
+        title: "Authentication",
+        hint: "Changes here may affect login and security-related features.",
+        active:
+          moduleFolders.includes("auth") ||
+          filePaths.some((path: string) => path.includes("/auth/")),
+      },
+      {
+        title: "Services",
+        hint: "Modifications may impact multiple application workflows.",
+        active: moduleFolders.includes("services"),
+      },
+      {
+        title: "State Management",
+        hint: "Shared application state can affect many screens.",
+        active: filePaths.some((path: string) =>
+          ["store", "state", "redux", "context"].some((keyword) =>
+            path.includes(keyword),
+          ),
+        ),
+      },
+    ].filter((item) => item.active);
+  }, [repositoryData?.files, moduleFolders]);
 
   const stats = [
     {
@@ -446,6 +560,81 @@ export const RepositoryOverview = ({
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="space-y-4 transition-all duration-300">
+        <BeginnerModeToggle
+          enabled={isBeginnerMode}
+          onToggle={() => setIsBeginnerMode(!isBeginnerMode)}
+        />
+
+        {isBeginnerMode && (
+          <div className="grid gap-4 lg:grid-cols-[1.75fr_minmax(260px,1fr)]">
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {moduleFolders.length > 0 ? (
+                  moduleFolders.map((folder) => (
+                    <BeginnerGuidanceCard
+                      key={folder}
+                      moduleName={folder}
+                      guidance={MODULE_GUIDANCE[folder]}
+                      architectureDescription={
+                        ARCHITECTURE_GUIDANCE[folder] ||
+                        "A common architecture concept for this module."
+                      }
+                    />
+                  ))
+                ) : (
+                  <Card className="glass border border-border/60 p-4">
+                    <CardDescription className="text-sm text-muted-foreground">
+                      No labeled modules detected for Beginner Mode guidance.
+                    </CardDescription>
+                  </Card>
+                )}
+              </div>
+
+              {hotspotGuidance.length > 0 && (
+                <Card className="glass border border-border/60">
+                  <CardHeader>
+                    <CardTitle className="text-base">Hotspot Guidance</CardTitle>
+                    <CardDescription>
+                      Contextual warnings for areas that may require extra care.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {hotspotGuidance.map((hotspot) => (
+                      <div
+                        key={hotspot.title}
+                        className="rounded-2xl border border-amber-200/60 bg-amber-100/10 p-4"
+                      >
+                        <div className="flex items-center gap-2 text-amber-700">
+                          <AlertTriangle className="h-4 w-4" />
+                          <p className="font-semibold">{hotspot.title}</p>
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {hotspot.hint}
+                        </p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            <BeginnerQuestionsPanel />
+          </div>
+        )}
+
+        <QuickStartChecklist />
+
+        <SavedModulesPanel
+          bookmarkedModules={bookmarkedModules}
+          onRemoveBookmark={removeBookmark}
+        />
+
+        <ModuleComparisonTool />
+
+        <FolderImportanceGuide />
       </div>
 
       {/* Repository Stats Grid */}

@@ -109,7 +109,7 @@ describe('repositoryUtils', () => {
     it('standardizes supported provider repository URLs', () => {
       expect(normalizeKnownRepoHttpUrl('https://github.com/user/repo.git')).toBe('https://github.com/user/repo');
       expect(normalizeKnownRepoHttpUrl('https://gitlab.com/group/repo')).toBe('https://gitlab.com/group/repo');
-      expect(normalizeKnownRepoHttpUrl('https://unsupported.com/user/repo')).toBe('https://unsupported.com/user/repo');
+      expect(normalizeKnownRepoHttpUrl('https://unsupported.com/user/repo')).toBeNull();
       expect(normalizeKnownRepoHttpUrl('invalid-url')).toBeNull();
     });
   });

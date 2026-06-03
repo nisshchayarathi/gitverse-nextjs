@@ -9,6 +9,17 @@ const undici = require("undici");
 (global as any).Request = undici.Request;
 (global as any).Response = undici.Response;
 
+if (!global.AbortSignal) {
+  global.AbortSignal = {} as any;
+}
+if (!global.AbortSignal.timeout) {
+  global.AbortSignal.timeout = (ms: number) => {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), ms);
+    return controller.signal;
+  };
+}
+
 /**
  * ====================================================================================
  * SECURITY INTEGRATION & ROBUSTNESS TEST SUITE: FILE CONTENT PREVIEW SECURITY BOUNDS
@@ -488,7 +499,8 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
 
       // Verify that individual path segments are encoded correctly
       expect(fetchSpy).toHaveBeenCalledWith(
-        expect.stringContaining("src/folder%20name%20with%20spaces/index.js")
+        expect.stringContaining("src/folder%20name%20with%20spaces/index.js"),
+        expect.any(Object)
       );
 
       fetchSpy.mockClear();
