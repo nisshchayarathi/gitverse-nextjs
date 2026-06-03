@@ -2,9 +2,8 @@
 // initialization from the mocked modules before the service import runs.
 var mockPrisma: any;
 
-jest.mock("../../lib/prisma", () => ({
-  __esModule: true,
-  default: (mockPrisma = {
+jest.mock("../../lib/prisma", () => {
+  mockPrisma = {
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
     $executeRaw: jest.fn(),
@@ -16,8 +15,16 @@ jest.mock("../../lib/prisma", () => ({
       updateMany: jest.fn(),
       count: jest.fn(),
     },
-  }),
-}));
+    repositoryPolicyAssignment: {
+      findFirst: jest.fn(),
+    },
+  };
+  return {
+    __esModule: true,
+    default: mockPrisma,
+    prisma: mockPrisma,
+  };
+});
 
 jest.mock("@prisma/client", () => {
   class PrismaClientKnownRequestError extends Error {
@@ -430,27 +437,86 @@ describe("AnalysisJobService – getJob", () => {
   });
 
   it("returns the job when it belongs to the user", async () => {
-    const job = jobFixture({ id: "job-1", userId: 7 });
-    asMock(mockPrisma.analysisJob.findFirst).mockResolvedValueOnce(job);
+    const job = jobFixture({
+      id: "job-1",
+      userId: 7,
+      repository: { userId: 99 },
+    });
+    asMock(mockPrisma.analysisJob.findUnique).mockResolvedValueOnce(job);
 
     const result = await service.getJob({ jobId: "job-1", userId: 7 });
 
-    expect(result).toEqual(job);
-    expect(asMock(mockPrisma.analysisJob.findFirst)).toHaveBeenCalledWith({
-      where: { id: "job-1", userId: 7 },
+    const { repository, ...expectedJob } = job;
+    expect(result).toEqual(expectedJob);
+    expect(asMock(mockPrisma.analysisJob.findUnique)).toHaveBeenCalledWith({
+      where: { id: "job-1" },
+      include: {
+        repository: {
+          select: { userId: true },
+        },
+      },
+    });
+  });
+
+  it("returns the job when the user is the owner of the repository", async () => {
+    const job = jobFixture({
+      id: "job-1",
+      userId: 8,
+      repository: { userId: 7 },
+    });
+    asMock(mockPrisma.analysisJob.findUnique).mockResolvedValueOnce(job);
+
+    const result = await service.getJob({ jobId: "job-1", userId: 7 });
+
+    const { repository, ...expectedJob } = job;
+    expect(result).toEqual(expectedJob);
+  });
+
+  it("returns the job when the user has access via organization membership", async () => {
+    const job = jobFixture({
+      id: "job-1",
+      userId: 8,
+      repositoryId: 42,
+      repository: { userId: 9 },
+    });
+    asMock(mockPrisma.analysisJob.findUnique).mockResolvedValueOnce(job);
+    asMock(mockPrisma.repositoryPolicyAssignment.findFirst).mockResolvedValueOnce({ id: "assignment-1" });
+
+    const result = await service.getJob({ jobId: "job-1", userId: 7 });
+
+    const { repository, ...expectedJob } = job;
+    expect(result).toEqual(expectedJob);
+    expect(asMock(mockPrisma.repositoryPolicyAssignment.findFirst)).toHaveBeenCalledWith({
+      where: {
+        repositoryId: 42,
+        organization: {
+          members: {
+            some: {
+              userId: 7,
+            },
+          },
+        },
+      },
     });
   });
 
   it("returns null when the job does not exist", async () => {
-    asMock(mockPrisma.analysisJob.findFirst).mockResolvedValueOnce(null);
+    asMock(mockPrisma.analysisJob.findUnique).mockResolvedValueOnce(null);
 
     const result = await service.getJob({ jobId: "missing", userId: 7 });
 
     expect(result).toBeNull();
   });
 
-  it("returns null when the job belongs to a different user", async () => {
-    asMock(mockPrisma.analysisJob.findFirst).mockResolvedValueOnce(null);
+  it("returns null when the job belongs to a different user and they lack repository access", async () => {
+    const job = jobFixture({
+      id: "job-1",
+      userId: 8,
+      repositoryId: 42,
+      repository: { userId: 9 },
+    });
+    asMock(mockPrisma.analysisJob.findUnique).mockResolvedValueOnce(job);
+    asMock(mockPrisma.repositoryPolicyAssignment.findFirst).mockResolvedValueOnce(null);
 
     const result = await service.getJob({ jobId: "job-1", userId: 99 });
 

@@ -199,27 +199,27 @@ model VerificationToken {
 }
 
 model Repository {
-  id                  Int                         @id @default(autoincrement())
+  id                  Int                           @id @default(autoincrement())
   name                String
   url                 String
   description         String?
-  targetDirectory     String?                     @map("target_directory")
-  readmePath          String?                     @map("readme_path")
-  readmeText          String?                     @map("readme_text") @db.Text
-  readmeFetchedAt     DateTime?                   @map("readme_fetched_at")
-  defaultBranch       String                      @default("main") @map("default_branch")
-  isPrivate           Boolean                     @default(false) @map("is_private")
-  inheritedRegion     DataResidencyRegion?        @map("inherited_region")
-  overrideAllowed     Boolean                     @default(false) @map("override_allowed")
-  stars               Int                         @default(0)
-  forks               Int                         @default(0)
-  size                Int                         @default(0) // Size in bytes
-  lastAnalyzedAt      DateTime?                   @map("last_analyzed_at")
-  status              String                      @default("pending") // pending, analyzing, completed, failed
-  userId              Int                         @map("user_id")
-  user                User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt           DateTime                    @default(now()) @map("created_at")
-  updatedAt           DateTime                    @updatedAt @map("updated_at")
+  targetDirectory     String?                       @map("target_directory")
+  readmePath          String?                       @map("readme_path")
+  readmeText          String?                       @map("readme_text") @db.Text
+  readmeFetchedAt     DateTime?                     @map("readme_fetched_at")
+  defaultBranch       String                        @default("main") @map("default_branch")
+  isPrivate           Boolean                       @default(false) @map("is_private")
+  inheritedRegion     DataResidencyRegion?          @map("inherited_region")
+  overrideAllowed     Boolean                       @default(false) @map("override_allowed")
+  stars               Int                           @default(0)
+  forks               Int                           @default(0)
+  size                Int                           @default(0) // Size in bytes
+  lastAnalyzedAt      DateTime?                     @map("last_analyzed_at")
+  status              String                        @default("pending") // pending, analyzing, completed, failed
+  userId              Int                           @map("user_id")
+  user                User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt           DateTime                      @default(now()) @map("created_at")
+  updatedAt           DateTime                      @updatedAt @map("updated_at")
   branches            Branch[]
   commits             Commit[]
   files               File[]
@@ -234,7 +234,7 @@ model Repository {
   knowledge           RepositoryKnowledge?
   syncJobs            RepositorySyncJob[]
   architectureChunks  RepositoryArchitectureChunk[]
-  lastSynchronizedAt  DateTime?                   @map("last_synchronized_at")
+  lastSynchronizedAt  DateTime?                     @map("last_synchronized_at")
 
   @@index([url])
   @@index([userId])
@@ -243,19 +243,18 @@ model Repository {
 }
 
 model RepositoryArchitectureChunk {
-  id           Int        @id @default(autoincrement())
-  repositoryId Int        @map("repository_id")
-  chunkPath    String     @map("chunk_path")
-  summary      String     @db.Text
-  createdAt    DateTime   @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  repositoryId Int      @map("repository_id")
+  chunkPath    String   @map("chunk_path")
+  summary      String   @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
   @@unique([repositoryId, chunkPath])
   @@index([repositoryId])
   @@map("repository_architecture_chunks")
 }
-
 
 model RepositorySyncJob {
   id           String    @id @default(uuid()) @db.Uuid

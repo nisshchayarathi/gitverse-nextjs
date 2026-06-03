@@ -72,7 +72,6 @@ function validateFilePath(filePath: string): string | null {
         return "File path contains disallowed segments (Path traversal detected)";
       }
     }
-    return "Absolute path not allowed";
   }
 
   if (filePath.includes("..")) {
@@ -244,7 +243,7 @@ export async function GET(
     const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/${encodedPath}`;
 
     const fetchOptions = isLocalhost
-      ? undefined
+      ? {}
       : {
           headers: {
             Accept: "text/plain",
@@ -253,7 +252,7 @@ export async function GET(
           signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(10000) : undefined,
         };
 
-    const response = await (fetchOptions ? fetch(rawUrl, fetchOptions) : fetch(rawUrl));
+    const response = await fetch(rawUrl, fetchOptions);
 
     if (!response.ok) {
       if (response.status === 404) {
