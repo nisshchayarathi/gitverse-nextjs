@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
         const expiresAt = await getTokenExpiry(request) ??
           new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         await blacklistToken(jti, user.userId, expiresAt);
+      } else {
+        console.warn(`[Logout] Single-device logout skipped: missing jti for user ${user.userId}. Token may be legacy or malformed.`);
       }
     }
 
@@ -104,7 +106,7 @@ async function getTokenExpiry(request: NextRequest): Promise<Date | null> {
 
   try {
     const token = await getToken({ req: request, secret: getNextAuthSecret() });
-    if (token?.exp) return new Date(token.exp * 1000);
+    if (token?.exp) return new Date((token.exp as number) * 1000);
   } catch {}
 
   return null;
