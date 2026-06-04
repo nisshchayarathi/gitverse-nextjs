@@ -449,7 +449,9 @@ export const authOptions: NextAuthOptions = {
                     expires: new Date(0).toISOString(),
                   } as any;
                 }
-              } catch {}
+              } catch (error) {
+                console.error("[auth] jti blacklist check failed", { jti, error });
+              }
             }
           }
         } catch {
