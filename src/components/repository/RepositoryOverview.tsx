@@ -37,6 +37,7 @@ import { FolderImportanceGuide } from "@/components/repository/FolderImportanceG
 import { SavedModulesPanel } from "@/components/repository/SavedModulesPanel";
 import { ModuleComparisonTool } from "@/components/repository/ModuleComparisonTool";
 import { GoodFirstIssueGenerator } from "@/components/repository/GoodFirstIssueGenerator";
+import { DuplicateFeatureDetector } from "@/components/repository/DuplicateFeatureDetector";
 import { RepositoryInsightsDashboard } from "@/components/repository/RepositoryInsightsDashboard";
 import { useModuleBookmarks } from "@/hooks/useModuleBookmarks";
 import { IssueData } from "@/types/firstPRSimulator";
@@ -632,6 +633,8 @@ export const RepositoryOverview = ({
         <RepositoryInsightsDashboard repositoryData={repositoryData} />
 
         <GoodFirstIssueGenerator repository={repositoryMetadata} />
+
+        <DuplicateFeatureDetector repository={repositoryMetadata} />
 
         <ModuleComparisonTool />
 
