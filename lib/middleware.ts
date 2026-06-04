@@ -124,7 +124,9 @@ export async function getAuthUser(
         if (jti) {
           try {
             if (await isTokenBlacklisted(jti)) return null;
-          } catch {}
+          } catch (error) {
+            console.error("[middleware] jti blacklist check failed", { jti, error });
+          }
         }
 
         userPayload = {
