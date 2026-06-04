@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import crypto from "crypto";
 
+/**
+ * Verifies a user's email address using a one-time token sent via email.
+ * Redirects to /login?verified=1 on success, or /login?error=... on failure.
+ * @param request - The incoming Next.js request containing the token query param
+ */
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
 
@@ -21,15 +26,19 @@ export async function GET(request: NextRequest) {
   }
 
   // Mark user as verified
-  await prisma.user.update({
-    where: { email: record.identifier },
-    data: { emailVerified: new Date() },
-  });
-
-  // Consume the one-time token
-  await prisma.verificationToken.delete({
-    where: { token: tokenHash },
-  });
+  try {
+    // Mark user as verified
+    await prisma.user.update({
+      where: { email: record.identifier },
+      data: { emailVerified: new Date() },
+    });
+    // Consume the one-time token
+    await prisma.verificationToken.delete({
+      where: { token: tokenHash },
+    });
+  } catch {
+    return NextResponse.redirect(new URL("/login?error=VerificationFailed", request.url));
+  }
 
   return NextResponse.redirect(new URL("/login?verified=1", request.url));
 }
