@@ -4,11 +4,10 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { generateToken } from "@/lib/auth";
 import { logger } from "@/lib/logger";
-import { getNextAuthSecret } from "@/lib/config/env";
 import crypto from "crypto";
-import { PASSWORD_REGEX } from "@/lib/utils/validators";
+import { sendVerificationEmail } from "@/lib/email";
 import {
-  getClientIp,
+  getClientIp,  
   countAttempts,
   recordAttempt,
 } from "@/lib/services/rateLimitService";
@@ -41,7 +40,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!PASSWORD_REGEX.test(password)) {
+    const passwordRegex =
+          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+    if (!passwordRegex.test(password)) {
       return NextResponse.json(
         {
           error:
@@ -51,15 +53,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (new TextEncoder().encode(password).length > 72) {
-      return NextResponse.json(
-        { error: "Password must be at most 72 bytes" },
-        { status: 400 }
-      );
-    }
-
     const hashedPassword = await bcrypt.hash(password, 10);
-    const txResult = await prisma.$transaction(async (tx) => {
+    const txResult = await prisma.$transaction(async (tx: any) => { 
       const existingUser = await tx.user.findUnique({
         where: { email: normalizedEmail },
       });
@@ -105,28 +100,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = txResult.user;
+const user = txResult.user;
 
-    await recordAttempt({
-      key: ip,
-      type: "SIGNUP",
-      success: true,
-    });
+await recordAttempt({
+  key: ip,
+  type: "SIGNUP",
+  success: true,
+});
 
-    const token = generateToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
+// Generate email verification token
+const verifyToken = crypto.randomBytes(32).toString("hex");
+const verifyTokenHash = crypto.createHash("sha256").update(verifyToken).digest("hex");
+await prisma.verificationToken.create({
+  data: {
+    identifier: user.email,
+    token: verifyTokenHash,
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  },
+});
+await sendVerificationEmail(user.email, verifyToken);
 
-    return NextResponse.json(
-      {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          avatarUrl: (user as any).image,
-        },
-        token,
-      },
-      { status: 201 }
-    );
+return NextResponse.json(
+  {
+    message: "Account created! Please check your email to verify your account.",
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      avatarUrl: (user as any).image,
+    },
+  },
+  { status: 201 }
+);
   } catch (error: any) {
     if (error?.code === "P2002") {
       return NextResponse.json(
@@ -138,10 +143,8 @@ export async function POST(request: NextRequest) {
     const rawIp = getClientIp(request);
     let ipFingerprint = "unknown";
     if (rawIp !== "unknown") {
-      const secret = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET;
-      if (secret) {
-        ipFingerprint = crypto.createHmac("sha256", secret).update(rawIp).digest("hex").substring(0, 16);
-      }
+      const secret = process.env.NEXTAUTH_SECRET || "fallback_secret";
+      ipFingerprint = crypto.createHmac("sha256", secret).update(rawIp).digest("hex").substring(0, 16);
     }
     logger.error({ err: sanitizeError(error), ipFingerprint }, "Signup error");
     return NextResponse.json(
