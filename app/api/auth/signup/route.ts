@@ -111,15 +111,24 @@ await recordAttempt({
 // Generate email verification token
 const verifyToken = crypto.randomBytes(32).toString("hex");
 const verifyTokenHash = crypto.createHash("sha256").update(verifyToken).digest("hex");
-await prisma.verificationToken.create({
-  data: {
-    identifier: user.email,
-    token: verifyTokenHash,
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
-  },
-});
-await sendVerificationEmail(user.email, verifyToken);
-
+try {
+  await prisma.verificationToken.create({
+    data: {
+      identifier: user.email,
+      token: verifyTokenHash,
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    },
+  });
+  await sendVerificationEmail(user.email, verifyToken);
+} catch (emailErr) {
+  // Roll back the created user so they can retry signup
+  await prisma.user.delete({ where: { id: user.id } });
+  logger.error({ err: emailErr }, "Failed to send verification email, user rolled back");
+  return NextResponse.json(
+    { error: "Account creation failed. Please try again." },
+    { status: 500 }
+  );
+}
 return NextResponse.json(
   {
     message: "Account created! Please check your email to verify your account.",
