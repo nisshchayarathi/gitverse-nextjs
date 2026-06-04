@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyToken, verifyTokenWithUserValidation } from "./auth";
-import { verifyToken } from "./auth";
+import { verifyTokenWithUserValidation, isTokenBlacklisted } from "./auth";
 import { getNextAuthSecret } from "./config/env";
 import type { JWTPayload } from "./auth";
 import prisma from "@/lib/prisma";
@@ -120,9 +119,18 @@ export async function getAuthUser(
           return null;
         }
 
+        // Check jti blacklist (single-device logout)
+        const jti = (token as any).jti as string | undefined;
+        if (jti) {
+          try {
+            if (await isTokenBlacklisted(jti)) return null;
+          } catch {}
+        }
+
         userPayload = {
           userId,
           email: token.email,
+          jti,
         };
       }
     } catch {

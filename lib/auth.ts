@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 import prisma from './prisma'
 import { getPrisma } from './prisma'
 import type { ExtendedPrismaClient } from './prisma'
@@ -9,6 +10,7 @@ export interface JWTPayload {
   userId: number;
   email: string;
   tokenVersion?: number;
+  jti?: string;
   iat?: number;
   exp?: number;
 }
@@ -49,6 +51,17 @@ export async function verifyTokenWithUserValidation(token: string): Promise<JWTP
       return null;
     }
     
+    // Check if token is blacklisted (single-device logout)
+    if (decoded.jti) {
+      const blacklisted = await prisma.blacklistedToken.findUnique({
+        where: { jti: decoded.jti },
+      });
+      if (blacklisted) {
+        console.warn(`[JWT] Token ${decoded.jti} is blacklisted for user ${decoded.userId}`);
+        return null;
+      }
+    }
+    
     // CRITICAL: Validate tokenVersion matches database
     // This prevents token reuse after password changes or logout
     if (decoded.tokenVersion !== user.tokenVersion) {
@@ -86,7 +99,8 @@ export async function verifyTokenWithUserValidation(token: string): Promise<JWTP
     return {
       userId: decoded.userId,
       email: decoded.email,
-      tokenVersion: decoded.tokenVersion
+      tokenVersion: decoded.tokenVersion,
+      jti: decoded.jti,
     };
   } catch (error: any) {
     console.warn(`[JWT] Token validation error: ${error.message}`);
@@ -112,7 +126,11 @@ export async function verifyTokenWithUserValidation(token: string): Promise<JWTP
 }
 
 export function generateToken(payload: JWTPayload): string {
-  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' })
+  const tokenPayload = {
+    ...payload,
+    jti: payload.jti || crypto.randomUUID(),
+  };
+  return jwt.sign(tokenPayload, getJwtSecret(), { expiresIn: '7d' })
 }
 
 /**
@@ -156,6 +174,19 @@ export async function incrementUserTokenVersion(userId: number): Promise<number>
   console.log(`[JWT] Token version incremented for user ${userId}: ${user.tokenVersion} -> ${newVersion}`);
   
   return newVersion;
+}
+
+export async function blacklistToken(jti: string, userId: number, expiresAt: Date): Promise<void> {
+  await prisma.blacklistedToken.upsert({
+    where: { jti },
+    create: { jti, userId, expiresAt },
+    update: {},
+  });
+}
+
+export async function isTokenBlacklisted(jti: string): Promise<boolean> {
+  const entry = await prisma.blacklistedToken.findUnique({ where: { jti } });
+  return !!entry;
 }
 
 /**

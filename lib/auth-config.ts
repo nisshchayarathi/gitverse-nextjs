@@ -2,7 +2,9 @@ import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
+import crypto from "crypto";
 import prisma from "@/lib/prisma";
+import { isTokenBlacklisted } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 import dns from "dns";
 import { OAuth2Client } from "google-auth-library";
@@ -435,6 +437,20 @@ export const authOptions: NextAuthOptions = {
                 expires: new Date(0).toISOString(),
               } as any;
             }
+
+            // Check jti blacklist (single-device logout)
+            const jti = (token as any).jti as string | undefined;
+            if (jti) {
+              try {
+                if (await isTokenBlacklisted(jti)) {
+                  return {
+                    ...session,
+                    user: { id: (session.user as any).id },
+                    expires: new Date(0).toISOString(),
+                  } as any;
+                }
+              } catch {}
+            }
           }
         } catch {
           // If DB is temporarily unavailable, fall back to the token/session values.
@@ -472,7 +488,15 @@ export const authOptions: NextAuthOptions = {
           ? (token as any).tokenVersion
           : undefined;
 
+      // jti for per-session blacklisting
+      let jti: string | undefined =
+        typeof (token as any).jti === "string"
+          ? (token as any).jti
+          : undefined;
+
       if (user) {
+        jti = crypto.randomUUID();
+
         const userId = Number((user as any).id);
         if (Number.isFinite(userId)) {
           try {
@@ -495,6 +519,7 @@ export const authOptions: NextAuthOptions = {
         name: name && name.length <= 256 ? name : undefined,
         picture: picture && picture.length <= 2048 ? picture : undefined,
         tokenVersion,
+        jti,
       };
 
       if (process.env.NEXTAUTH_DEBUG === "true") {
