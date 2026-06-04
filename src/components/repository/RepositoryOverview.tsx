@@ -38,6 +38,7 @@ import { SavedModulesPanel } from "@/components/repository/SavedModulesPanel";
 import { ModuleComparisonTool } from "@/components/repository/ModuleComparisonTool";
 import { GoodFirstIssueGenerator } from "@/components/repository/GoodFirstIssueGenerator";
 import { DuplicateFeatureDetector } from "@/components/repository/DuplicateFeatureDetector";
+import { HotspotForecasting } from "@/components/repository/HotspotForecasting";
 import { RepositoryInsightsDashboard } from "@/components/repository/RepositoryInsightsDashboard";
 import { useModuleBookmarks } from "@/hooks/useModuleBookmarks";
 import { IssueData } from "@/types/firstPRSimulator";
@@ -635,6 +636,28 @@ export const RepositoryOverview = ({
         <GoodFirstIssueGenerator repository={repositoryMetadata} />
 
         <DuplicateFeatureDetector repository={repositoryMetadata} />
+
+        <HotspotForecasting 
+          forecast={{
+            id: `repo-forecast-${repositoryData?.id}`,
+            repositoryId: repositoryData?.id || "",
+            generatedAt: new Date(),
+            forecastWindow: 90,
+            repositoryHealthScore: 72,
+            projectedHealthScore: 64,
+            healthTrend: "DEGRADING",
+            modulesAtRisk: 6,
+            criticalModules: 2,
+            highRiskModules: 4,
+            technicalDebtTrend: "INCREASING",
+            averageComplexityGrowth: 8.5,
+            averageDependencyGrowth: 6.2,
+            averageChurn: 4.8,
+            hotspotForecasts: [],
+            topRecommendations: [],
+            riskDistribution: { critical: 2, high: 4, medium: 7, low: 5 }
+          }}
+        />
 
         <ModuleComparisonTool />
 
