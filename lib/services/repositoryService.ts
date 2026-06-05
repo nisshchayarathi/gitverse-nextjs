@@ -9,6 +9,15 @@ import {
   invalidateExpiredCacheEntries,
 } from "./geminiAnalysisCacheService";
 import { ttlCache, TTL, repoStatsCacheKey } from "../utils/ttlCache";
+import { invalidateGeminiAnalysisCacheForRepository } from "./geminiAnalysisCacheService";
+import { FileChangeType } from "@prisma/client";
+import { repoSyncLimiter } from "../utils/concurrencyLimiter";
+import { withDbRetry } from "../utils/dbRetry";
+import { gitverseConfigParser, ParsedRepositoryKnowledge } from "../parsers/gitverseConfigParser";
+import { repositoryKnowledgeService } from "./repositoryKnowledgeService";
+import { getGithubAccessToken } from "./githubAuthService";
+import { detectMonorepoPackages } from "../utils/monorepoUtils";
+import { getGeminiService } from "./geminiService";
 
 /** Shape returned by getRepositoryStats / _fetchRepositoryStats. */
 interface RepoStats {
@@ -25,13 +34,6 @@ interface RepoStats {
   status: string;
   lastAnalyzedAt: Date | null;
 }
-
-import { invalidateGeminiAnalysisCacheForRepository } from "./geminiAnalysisCacheService";
-import { FileChangeType } from "@prisma/client";
-import { repoSyncLimiter } from "../utils/concurrencyLimiter";
-import { withDbRetry } from "../utils/dbRetry";
-import { gitverseConfigParser, ParsedRepositoryKnowledge } from "../parsers/gitverseConfigParser";
-import { repositoryKnowledgeService } from "./repositoryKnowledgeService";
 
 function yieldIfHighMemory(threshold?: number): Promise<void> {
   if (threshold === undefined) {

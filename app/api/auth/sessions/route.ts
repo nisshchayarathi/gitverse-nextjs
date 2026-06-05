@@ -6,6 +6,35 @@ import { SAFE_SESSION_SELECT } from "@/lib/utils/sessionResponse";
 
 export const dynamic = "force-dynamic";
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getAuthUser(request);
+
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    await prisma.user.update({
+      where: { id: user.userId },
+      data: { tokenVersion: { increment: 1 }, passwordChangedAt: new Date() },
+    });
+
+    const response = NextResponse.json({
+      message: "All sessions terminated successfully",
+    });
+
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+
+    return response;
+  } catch (error: any) {
+    console.error("Delete sessions error:", sanitizeError(error));
+    return NextResponse.json(
+      { error: "Failed to terminate sessions" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getAuthUser(request);

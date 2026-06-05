@@ -32,9 +32,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
-import { useRecentRepos } from "@/hooks/useRecentRepos";
-import { isValidGithubUrl } from "@/lib/utils/validators";
-import { RecentReposList } from "@/components/RecentReposList";
+
 interface Repository {
   id: string;
   name: string;

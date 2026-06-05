@@ -1,3 +1,6 @@
+
+"use client";
+
 import { Input } from "@/components/ui/Input";
 import { useState, useRef, useEffect } from "react";
 import { Send, Loader2, Sparkles, User, Bot, Copy, Check, Square } from "lucide-react";
@@ -169,7 +172,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
         },
       ]);
     }
-  }, []);
+  }, [messages.length, repositoryContext]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -334,6 +337,39 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
           </div>
         ))}
 
+        {/* Suggested Questions (only show when chat has just the greeting) */}
+        {messages.length === 1 && !isLoading && (
+          <div className="mt-8 mb-4">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3 px-2 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Suggested questions
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {[
+                "Can you explain the main architecture of this repository?",
+                "Where is the authentication logic located?",
+                "How do I set up this project locally?",
+                "What are the main dependencies used in this project?",
+              ].map((question, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setInput(question);
+                    // Slight delay to allow state update before submission
+                    setTimeout(() => {
+                      const form = document.getElementById("ai-chat-form") as HTMLFormElement;
+                      if (form) form.requestSubmit();
+                    }, 50);
+                  }}
+                  className="text-left p-3 text-sm glass rounded-lg hover:bg-primary/10 transition-colors border border-white/5 hover:border-primary/30"
+                >
+                  <p className="line-clamp-2 text-foreground/80">{question}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Streaming message */}
         {isLoading && streamingMessage && (
           <div className="flex gap-3 justify-start">
@@ -389,7 +425,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
             </button>
           )}
         </div>
-        <form onSubmit={handleSubmit} className="flex gap-2">
+        <form id="ai-chat-form" onSubmit={handleSubmit} className="flex gap-2">
           <Input
             type="text"
             value={input}

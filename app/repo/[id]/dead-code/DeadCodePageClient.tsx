@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import Link from "next/link";
@@ -41,11 +41,7 @@ export default function DeadCodePageClient() {
     return analyzeDeadCode(files);
   }, [files]);
 
-  useEffect(() => {
-    fetchRepository();
-  }, [id]);
-
-  const fetchRepository = async () => {
+  const fetchRepository = useCallback(async () => {
     if (!id) return;
     setError(null);
 
@@ -78,7 +74,11 @@ export default function DeadCodePageClient() {
       );
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchRepository();
+  }, [fetchRepository]);
 
   const handleReanalyze = async () => {
     try {

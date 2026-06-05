@@ -1,3 +1,20 @@
+var mockPrisma: any;
+jest.mock("../prisma", () => ({
+  __esModule: true,
+  default: (mockPrisma = {
+    $executeRaw: jest.fn(),
+    $transaction: jest.fn(),
+    analysisJob: {
+      count: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+  }),
+}));
+
 jest.mock("bullmq", () => {
   return {
     Queue: jest.fn().mockImplementation(() => ({
@@ -13,6 +30,16 @@ jest.mock("ioredis", () => {
       on: jest.fn(),
     })),
   };
+});
+
+function asMock<T>(fn: T): jest.Mock {
+  return fn as any;
+}
+
+const { AnalysisJobService } = require("../services/analysisJobService");
+
+beforeEach(() => {
+  jest.clearAllMocks();
 });
 
 describe("AnalysisJobService – heartbeat", () => {
@@ -368,7 +395,6 @@ describe("AnalysisJobService – exports", () => {
     expect(typeof cleanupStaleJobs).toBe("function");
   });
 });
-import { AnalysisJobService } from "../services/analysisJobService";
 
 describe("AnalysisJobService", () => {
   let service: AnalysisJobService;

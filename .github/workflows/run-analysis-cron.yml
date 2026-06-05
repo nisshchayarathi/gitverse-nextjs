@@ -2,7 +2,7 @@ name: Run Analysis Worker
 
 on:
   schedule:
-    - cron: '*/5 * * * *' # every 5 minutes
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -14,6 +14,8 @@ jobs:
       GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
       GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
       GITHUB_APP_SLUG: ${{ secrets.GITHUB_APP_SLUG }}
+      CRON_WORKER_TIMEOUT_MS: 240000
+      CRON_WORKER_BATCH: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -35,11 +37,113 @@ jobs:
       - name: Build worker
         run: npm run build:worker
 
+      - name: Pre-flight database health check
+        id: db-health
+        run: |
+          echo "Checking database connectivity..."
+          node -e "
+            const { PrismaClient } = require('@prisma/client');
+            const client = new PrismaClient();
+            client.\$queryRaw\`SELECT 1\`
+              .then(() => { console.log('Database health check passed'); process.exit(0); })
+              .catch((err) => { console.error('Database health check failed:', err.message); process.exit(1); });
+          "
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Release stale locks before worker run
+        run: |
+          echo "Releasing stale locks..."
+          node -e "
+            const { PrismaClient } = require('@prisma/client');
+            const client = new PrismaClient();
+            client.analysisJob.updateMany({
+              where: {
+                status: 'PROCESSING',
+                lockExpiresAt: { lt: new Date() }
+              },
+              data: {
+                status: 'QUEUED',
+                lockedBy: null,
+                lockedAt: null,
+              }
+            }).then((r) => {
+              console.log('Released ' + r.count + ' stale lock(s)');
+              process.exit(0);
+            }).catch((err) => {
+              console.error('Lock cleanup failed:', err.message);
+              process.exit(1);
+            });
+          "
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Run worker once
+        id: worker-run
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ANALYSIS_RUNNER_SECRET: ${{ secrets.ANALYSIS_RUNNER_SECRET }}
         run: |
-          echo "Running analysis worker (one-shot)"
-          export WORKER_ONCE=1
-          node dist-worker/scripts/analysisWorker.js
+          echo "Running analysis worker (one-shot, timeout 240s)"
+          cleanup() {
+            echo "Cleaning up worker..."
+            kill $child_pid 2>/dev/null
+            wait $child_pid 2>/dev/null
+          }
+          trap cleanup SIGTERM SIGINT EXIT
+          timeout 240 node dist-worker/scripts/cronWorker.js &
+          child_pid=$!
+          wait $child_pid
+          exit_code=$?
+          echo "Worker exited with code $exit_code"
+          exit $exit_code
+
+      - name: Report worker failure
+        if: failure() && steps.worker-run.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const runId = context.runId;
+            const workflowUrl = `https://github.com/${owner}/${repo}/actions/runs/${runId}`;
+            const body = [
+              '## Analysis Worker Failure Detected',
+              '',
+              `The scheduled analysis worker run [failed](${workflowUrl}) at ${new Date().toISOString()}.`,
+              '',
+              '### Possible Causes',
+              '- Database connection issue',
+              '- Worker process crash (OOM, unhandled rejection)',
+              '- Job processing timeout',
+              '- Infrastructure or network issue',
+              '',
+              '### Next Steps',
+              '1. Check the [workflow logs](${workflowUrl}) for error details',
+              '2. Verify database connectivity and connection pool health',
+              '3. Check for stuck jobs: `SELECT * FROM analysis_jobs WHERE status = \'PROCESSING\' AND lock_expires_at < NOW()`',
+              '4. If this is recurring, investigate the worker process for memory leaks or crashes',
+              '',
+              'This issue was auto-created by the cron worker workflow.'
+            ].join('\n');
+            const issues = await github.rest.issues.listForRepo({
+              owner, repo,
+              state: 'open',
+              labels: 'infra,bug',
+              per_page: 100
+            });
+            const existing = issues.data.find(i =>
+              i.title.includes('Analysis Worker Failure') &&
+              i.body.includes(runId.toString())
+            );
+            if (existing) {
+              console.log('Issue already exists: ' + existing.html_url);
+              return;
+            }
+            await github.rest.issues.create({
+              owner, repo,
+              title: `[Infra] Analysis Worker Failure (run ${runId})`,
+              labels: ['bug', 'infra'],
+              body
+            });
+            console.log('Created issue for worker failure');

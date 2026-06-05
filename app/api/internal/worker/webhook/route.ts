@@ -31,8 +31,11 @@ export const runtime = "nodejs";
 export const maxDuration = 300; // 5 minutes max duration for Vercel
 
 export async function POST(request: NextRequest) {
-  const workerId = request.headers.get("x-worker-id") || "unknown";
-  const rl = await checkRateLimit(workerId, RATE_LIMITS.WORKER_WEBHOOK);
+  if (!isInternalWorkerAuthorized(request.headers.get("authorization"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await checkRateLimit("webhook-worker", RATE_LIMITS.WORKER_WEBHOOK);
   if (!rl.allowed) return rateLimitResponse(rl, "Worker rate limit exceeded");
 
   const baseUrl = process.env.NEXTAUTH_URL || `http://${request.headers.get("host") || "localhost:3000"}`;
@@ -48,10 +51,6 @@ export async function POST(request: NextRequest) {
 }
 
 async function handlePost(request: NextRequest) {
-  if (!isInternalWorkerAuthorized(request.headers.get("authorization"))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { eventId } = await request.json().catch(() => ({}));
 
   if (!eventId) {

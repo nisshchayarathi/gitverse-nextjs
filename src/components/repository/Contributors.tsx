@@ -11,6 +11,7 @@ import {
   Clock,
   Zap,
 } from "lucide-react";
+import Image from "next/image";
 import { Card } from "@/components/ui";
 import { useState, useRef, useEffect } from "react";
 
@@ -195,11 +196,12 @@ export function Contributors({ repository }: ContributorsProps) {
               {/* Contributor header */}
               <div className="flex items-start gap-4 mb-4">
                 <div className="relative">
-                  <img
+                  <Image
                     src={contributor.avatar}
                     alt={contributor.name}
-                    className="w-12 h-12 rounded-full ring-2 ring-primary/20"
-                    loading="lazy"
+                    width={48}
+                    height={48}
+                    className="w-12 h-12 rounded-full ring-2 ring-primary/20 object-cover"
                   />
                   {rankBadge && (
                     <div className="absolute -top-1 -right-1 text-lg">

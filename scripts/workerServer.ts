@@ -131,10 +131,7 @@ async function main() {
     workerDone = resolve;
   });
 
-  // Pass signalHandlers: false to analysisWorker since workerServer
-  // handles the signal coordination and the worker should not register
-  // its own handlers that would race with the server's shutdown.
-  await startAnalysisWorkerLoop({ signalHandlers: false, once: false });
+  await startAnalysisWorkerLoop();
 
   if (!stopping) {
     workerDone?.();

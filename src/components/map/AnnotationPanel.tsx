@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { MapAnnotation } from '@/services/annotationService';
 import { MessageSquare, AlertTriangle, Bug, Wrench, FileText, Link as LinkIcon, Search, Filter, X } from 'lucide-react';
 
@@ -97,7 +98,13 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({ annotations, i
                 <p className="text-sm line-clamp-3 text-gray-200">{annotation.content}</p>
                 <div className="mt-2 flex items-center gap-2">
                   {annotation.author?.image ? (
-                    <img src={annotation.author.image} alt="author" className="w-5 h-5 rounded-full" />
+                    <Image 
+                      src={annotation.author.image} 
+                      alt="author" 
+                      width={20}
+                      height={20}
+                      className="w-5 h-5 rounded-full object-cover" 
+                    />
                   ) : (
                     <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] text-primary">
                       {annotation.author?.name?.[0] || 'U'}

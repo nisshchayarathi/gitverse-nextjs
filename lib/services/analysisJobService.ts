@@ -23,7 +23,7 @@ export class AnalysisJobService {
     failed: number;
     stuck: number;
   }> {
-    const [total, processing, queued, done, failed] =
+    const [total, processing, queued, done, failed, stuck] =
       await Promise.all([
         prisma.analysisJob.count({ where: { userId: params.userId } }),
         prisma.analysisJob.count({
@@ -38,8 +38,15 @@ export class AnalysisJobService {
         prisma.analysisJob.count({
           where: { userId: params.userId, status: "FAILED" },
         }),
+        prisma.analysisJob.count({
+          where: {
+            userId: params.userId,
+            status: "PROCESSING",
+            lockExpiresAt: { lt: new Date() },
+          },
+        }),
       ]);
-    return { total, processing, queued, done, failed, stuck: 0 };
+    return { total, processing, queued, done, failed, stuck };
   }
 
   async createRepositoryAnalysisJob(params: {
@@ -368,6 +375,32 @@ export class AnalysisJobService {
         lockExpiresAt: new Date(),
       },
     });
+  }
+
+  async reclaimOrphanedJobs(): Promise<number> {
+    const result = await prisma.analysisJob.updateMany({
+      where: {
+        status: "PROCESSING",
+        lockExpiresAt: { lt: new Date() },
+      },
+      data: {
+        status: "QUEUED",
+        lockedBy: null,
+        lockedAt: null,
+      },
+    });
+    return result.count;
+  }
+
+  async countOrphanedJobs(params?: { userId?: number }): Promise<number> {
+    const where: any = {
+      status: "PROCESSING",
+      lockExpiresAt: { lt: new Date() },
+    };
+    if (params?.userId != null) {
+      where.userId = params.userId;
+    }
+    return prisma.analysisJob.count({ where });
   }
 
   async markDrainReleased(params: {
