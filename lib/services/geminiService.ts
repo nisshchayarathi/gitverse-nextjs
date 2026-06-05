@@ -238,6 +238,19 @@ Provide only the commit messages, one per line.
       throw new Error("Gemini API quota exceeded. Please try again later.");
     }
 
+    // Detect 400 / token-limit / payload-too-large errors (merged from main).
+    if (
+      lowerMessage.includes("400 bad request") ||
+      lowerMessage.includes("token limit") ||
+      lowerMessage.includes("maximum context length") ||
+      lowerMessage.includes("too large") ||
+      (error as any)?.status === 400
+    ) {
+      throw new Error(
+        "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope."
+      );
+    }
+
     throw new Error(`${context} failed: ${message}`);
   }
 

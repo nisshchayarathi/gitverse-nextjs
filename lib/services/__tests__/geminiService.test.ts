@@ -47,6 +47,36 @@ describe("GeminiService Error Handling", () => {
         description: "generic error object",
       },
       {
+        errorObj: new Error("400 bad request: input too long"),
+        expectedThrow:
+          "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.",
+        description: "400 bad request string",
+      },
+      {
+        errorObj: new Error("token limit exceeded"),
+        expectedThrow:
+          "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.",
+        description: "token limit string",
+      },
+      {
+        errorObj: new Error("maximum context length exceeded"),
+        expectedThrow:
+          "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.",
+        description: "maximum context length string",
+      },
+      {
+        errorObj: new Error("request body too large"),
+        expectedThrow:
+          "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.",
+        description: "too large string",
+      },
+      {
+        errorObj: Object.assign(new Error("Bad Request"), { status: 400 }),
+        expectedThrow:
+          "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.",
+        description: "error with status 400",
+      },
+      {
         errorObj: "Just a string error",
         expectedThrow: "AI analysis failed: Unknown Gemini API error",
         description: "string error (non-Error object)",
