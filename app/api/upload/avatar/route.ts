@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorHandler } from "@/lib/utils/withErrorHandler";
-import { requireAuth, sanitizeError } from "@/lib/middleware";
+import { requireAuth } from "@/lib/middleware";
 import { logger } from "@/lib/logger";
 import {
   validateImageFile,
   validateDataUrl,
   validateHttpAvatarUrl,
 } from "@/lib/services/imageService";
+import { storeAvatar, parseDataUrl } from "@/lib/services/storageService";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 /**
@@ -18,8 +19,9 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware
  * - JSON body with a "dataUrl" field (base64 data URL)
  * - JSON body with a "url" field (HTTP/HTTPS URL)
  *
- * Uses withErrorHandler for consistent error response formatting.
- * Does not log sensitive user data (UIDs, file names) to console in production.
+ * Images are stored on disk. The database stores only the URL reference,
+ * not the raw image data. Run `git checkout public/uploads/` from .gitignore
+ * to exclude uploaded files from version control.
  */
 export const POST = withErrorHandler(async (request: NextRequest) => {
   const user = await requireAuth(request);
@@ -32,7 +34,6 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   let avatarUrl: string | null = null;
 
   if (contentType.includes("multipart/form-data")) {
-    // Handle file upload
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 
@@ -51,17 +52,15 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       );
     }
 
-    // Store the file as a data URL for now (in production, use blob storage)
     const buffer = Buffer.from(await file.arrayBuffer());
-    const base64 = buffer.toString("base64");
-    avatarUrl = `data:${file.type};base64,${base64}`;
+    const stored = await storeAvatar(buffer, user.userId, file.type);
+    avatarUrl = stored.url;
 
     logger.info(
       { userId: user.userId, mimeType: file.type, size: file.size },
       "Avatar uploaded via file"
     );
   } else if (contentType.includes("application/json")) {
-    // Handle JSON body with dataUrl or url
     const body = await request.json();
     const { dataUrl, url } = body;
 
@@ -73,7 +72,17 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           { status: 400 }
         );
       }
-      avatarUrl = dataUrl;
+
+      const parsed = parseDataUrl(dataUrl);
+      if (!parsed) {
+        return NextResponse.json(
+          { error: true, message: "Failed to parse data URL", code: 400 },
+          { status: 400 }
+        );
+      }
+
+      const stored = await storeAvatar(parsed.buffer, user.userId, parsed.mimeType);
+      avatarUrl = stored.url;
 
       logger.info({ userId: user.userId }, "Avatar uploaded via data URL");
     } else if (url) {

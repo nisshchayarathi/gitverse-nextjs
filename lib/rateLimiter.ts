@@ -52,6 +52,7 @@ const QUOTA_MAP: Record<
   "ai:review-pr": { free: 5, premium: 60, windowSec: 60 },
   "mfa:verify": { free: 5, premium: 20, windowSec: 60 },
   "mfa:setup": { free: 5, premium: 20, windowSec: 300 },
+  "users:change-password": { free: 10, premium: 30, windowSec: 300 },
   "repositories:file-content": { free: 30, premium: 300, windowSec: 60 },
   default: { free: 20, premium: 200, windowSec: 60 },
 };
