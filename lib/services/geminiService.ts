@@ -82,7 +82,7 @@ export class GeminiService {
       const response = await result.response;
       return response.text();
     } catch (error) {
-      this.handleGeminiError(error, "AI analysis");
+      throw this.handleGeminiError(error, "AI analysis");
     }
   }
 
@@ -126,7 +126,7 @@ export class GeminiService {
 
       return text;
     } catch (error) {
-      this.handleGeminiError(error, "AI analysis");
+      throw this.handleGeminiError(error, "AI analysis");
     }
   }
 
@@ -147,7 +147,7 @@ export class GeminiService {
       const response = await result.response;
       return response.text();
     } catch (error) {
-      this.handleGeminiError(
+      throw this.handleGeminiError(
         error,
         "AI chat",
         "Context is too large for AI chat. Please try again with a smaller scope."
@@ -193,7 +193,7 @@ export class GeminiService {
         return { text, tokensConsumed };
       }
     } catch (error) {
-      this.handleGeminiError(
+      throw this.handleGeminiError(
         error,
         "AI chat",
         "Prompt is too large for AI context limit. Please try again with a smaller scope."
@@ -240,7 +240,7 @@ Provide only the commit messages, one per line.
         .filter((line) => line.trim())
         .slice(0, 3);
     } catch (error) {
-      this.handleGeminiError(error, "Commit message suggestion");
+      throw this.handleGeminiError(error, "Commit message suggestion");
     }
   }
 
