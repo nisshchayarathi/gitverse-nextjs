@@ -12,7 +12,9 @@ const mockLogAuditEvent = jest.fn();
 const mockCheckRateLimit = jest.fn();
 const mockRateLimitResponse = jest.fn();
 const mockGetClientIp = jest.fn();
-const mockPrismaFindUnique = jest.fn();
+
+const mockUserFindUnique = jest.fn();
+const mockMfaConfigFindUnique = jest.fn();
 
 jest.mock("@/lib/middleware", () => ({
   requireAuth: (...args: any[]) => mockRequireAuth(...args),
@@ -43,10 +45,10 @@ jest.mock("@/lib/prisma", () => ({
   __esModule: true,
   default: {
     user: {
-      findUnique: (...args: any[]) => mockPrismaFindUnique(...args),
+      findUnique: (...args: any[]) => mockUserFindUnique(...args),
     },
     mfaConfig: {
-      findUnique: (...args: any[]) => mockPrismaFindUnique(...args),
+      findUnique: (...args: any[]) => mockMfaConfigFindUnique(...args),
     },
   },
 }));
@@ -67,10 +69,10 @@ describe("POST /api/auth/mfa/setup", () => {
     mockGetClientIp.mockReturnValue("127.0.0.1");
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 4, windowSec: 300, limit: 5, resetInSec: 300 });
     mockRequireAuth.mockResolvedValue({ userId: 1, email: "test@test.com" });
-    mockPrismaFindUnique.mockResolvedValue({ email: "test@example.com" });
+    mockUserFindUnique.mockResolvedValue({ email: "test@test.com" });
     mockGetMfaStatus.mockResolvedValue(null);
     mockGenerateTOTPSecret.mockReturnValue("JBSWY3DPEHPK3PXP");
-    mockBuildOtpAuthUri.mockReturnValue("otpauth://totp/test?secret=JBSWY3DPEHPK3PXP");
+    mockBuildOtpAuthUri.mockReturnValue("otpauth://totp/test@test.com?secret=JBSWY3DPEHPK3PXP");
     mockUpsertMfaSecret.mockResolvedValue(undefined);
   });
 
@@ -96,8 +98,15 @@ describe("POST /api/auth/mfa/setup", () => {
     );
   });
 
+  it("calls checkRateLimit with mfa:setup endpoint", async () => {
+    await POST(mockRequest());
+    expect(mockCheckRateLimit).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint: "mfa:setup" }),
+    );
+  });
+
   it("returns 404 when user not found", async () => {
-    mockPrismaFindUnique.mockResolvedValue(null);
+    mockUserFindUnique.mockResolvedValue(null);
 
     const response = await POST(mockRequest());
     expect(response.status).toBe(404);
@@ -105,7 +114,7 @@ describe("POST /api/auth/mfa/setup", () => {
     expect(body.error).toBe("User not found");
   });
 
-  it("returns 409 when MFA already enabled", async () => {
+  it("returns 409 when MFA is already enabled", async () => {
     mockGetMfaStatus.mockResolvedValue({ isEnabled: true });
 
     const response = await POST(mockRequest());
@@ -114,7 +123,7 @@ describe("POST /api/auth/mfa/setup", () => {
     expect(body.error).toContain("already enabled");
   });
 
-  it("generates secret and returns otpauth URI", async () => {
+  it("generates secret and returns otpauth URI on success", async () => {
     const response = await POST(mockRequest());
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -122,6 +131,12 @@ describe("POST /api/auth/mfa/setup", () => {
     expect(body.otpauthUri).toContain("otpauth://");
     expect(body.message).toContain("QR code");
     expect(mockUpsertMfaSecret).toHaveBeenCalledWith(1, "JBSWY3DPEHPK3PXP");
+  });
+
+  it("includes user email in otpauth URL", async () => {
+    const response = await POST(mockRequest());
+    const body = await response.json();
+    expect(body.otpauthUri).toContain("test@test.com");
   });
 
   it("logs audit event on successful setup", async () => {
@@ -143,6 +158,13 @@ describe("POST /api/auth/mfa/setup", () => {
         tier: "free",
       }),
     );
+  });
+
+  it("handles errors gracefully", async () => {
+    mockUserFindUnique.mockRejectedValue(new Error("DB error"));
+
+    const response = await POST(mockRequest());
+    expect(response.status).toBe(500);
   });
 
   it("handles server errors gracefully", async () => {
@@ -185,18 +207,29 @@ describe("DELETE /api/auth/mfa/setup", () => {
     );
   });
 
-  it("returns 400 when token is missing or invalid", async () => {
-    const response1 = await DELETE(mockRequest({}));
-    expect(response1.status).toBe(400);
-    const body1 = await response1.json();
-    expect(body1.error).toContain("6-digit");
+  it("calls checkRateLimit with mfa:setup endpoint", async () => {
+    mockMfaConfigFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
 
-    const response2 = await DELETE(mockRequest({ token: "abc" }));
-    expect(response2.status).toBe(400);
+    await DELETE(mockRequest({ token: "123456" }));
+    expect(mockCheckRateLimit).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint: "mfa:setup" }),
+    );
+  });
+
+  it("returns 400 when no token provided", async () => {
+    const response = await DELETE(mockRequest({}));
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain("6-digit");
+  });
+
+  it("returns 400 when token is not 6 digits", async () => {
+    const response = await DELETE(mockRequest({ token: "abc" }));
+    expect(response.status).toBe(400);
   });
 
   it("returns 409 when MFA is not enabled", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: false });
+    mockMfaConfigFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: false });
 
     const response = await DELETE(mockRequest({ token: "123456" }));
     expect(response.status).toBe(409);
@@ -204,8 +237,15 @@ describe("DELETE /api/auth/mfa/setup", () => {
     expect(body.error).toContain("not currently enabled");
   });
 
+  it("returns 409 when no config exists", async () => {
+    mockMfaConfigFindUnique.mockResolvedValue(null);
+
+    const response = await DELETE(mockRequest({ token: "123456" }));
+    expect(response.status).toBe(409);
+  });
+
   it("returns 401 when TOTP token is invalid", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
+    mockMfaConfigFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
     mockVerifyTOTP.mockReturnValue(false);
 
     const response = await DELETE(mockRequest({ token: "123456" }));
@@ -215,7 +255,7 @@ describe("DELETE /api/auth/mfa/setup", () => {
   });
 
   it("disables MFA with valid token", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
+    mockMfaConfigFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
 
     const response = await DELETE(mockRequest({ token: "123456" }));
     expect(response.status).toBe(200);
@@ -225,13 +265,21 @@ describe("DELETE /api/auth/mfa/setup", () => {
   });
 
   it("logs audit event on successful disable", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
+    mockMfaConfigFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
 
     await DELETE(mockRequest({ token: "123456" }));
     expect(mockLogAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "MFA_DISABLED",
-      }),
+      expect.objectContaining({ action: "MFA_DISABLED" }),
+    );
+  });
+
+  it("logs audit event on MFA verification failure", async () => {
+    mockMfaConfigFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
+    mockVerifyTOTP.mockReturnValue(false);
+
+    await DELETE(mockRequest({ token: "123456" }));
+    expect(mockLogAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "MFA_FAILED" }),
     );
   });
 

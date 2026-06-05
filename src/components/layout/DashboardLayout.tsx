@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import {
   GitBranch,
@@ -205,11 +206,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 <Button variant="ghost" className="gap-2">
                   <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center">
                     {user?.avatar ? (
-                      <img
+                      <Image
                         src={user.avatar}
                         alt={user.name}
-                        className="rounded-full"
-                        loading="lazy"
+                        width={32}
+                        height={32}
+                        className="rounded-full h-full w-full object-cover"
                       />
                     ) : (
                       <User className="h-4 w-4 text-primary-foreground" />

@@ -47,6 +47,7 @@ import { QuickStartChecklist } from "@/components/repository/QuickStartChecklist
 import { FolderImportanceGuide } from "@/components/repository/FolderImportanceGuide";
 import { SavedModulesPanel } from "@/components/repository/SavedModulesPanel";
 import { ModuleComparisonTool } from "@/components/repository/ModuleComparisonTool";
+import { GoodFirstIssueGenerator } from "@/components/repository/GoodFirstIssueGenerator";
 import { RepositoryInsightsDashboard } from "@/components/repository/RepositoryInsightsDashboard";
 import { useModuleBookmarks } from "@/hooks/useModuleBookmarks";
 import { IssueData } from "@/types/firstPRSimulator";
@@ -774,6 +775,8 @@ export const RepositoryOverview = ({
         />
 
         <RepositoryInsightsDashboard repositoryData={repositoryData} />
+
+        <GoodFirstIssueGenerator repository={repositoryMetadata} />
 
         <ModuleComparisonTool />
 
