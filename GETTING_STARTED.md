@@ -4,7 +4,7 @@ This is the Next.js version of GitVerse, migrated from the Vite + React version 
 
 ## Prerequisites
 
-- Node.js 18+ installed
+- **Node.js 22.x** (see [Supported Node Version](README.md#supported-node-version) in README)
 - PostgreSQL database (NeonDB recommended)
 - Google Gemini AI API key
 

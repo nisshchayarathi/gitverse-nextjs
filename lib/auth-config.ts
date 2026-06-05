@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
@@ -111,18 +112,13 @@ function prismaIntIdAdapter(): Adapter {
     },
 
     async createSession(session) {
-      const created = await prisma.session.create({
-        data: {
-          sessionToken: session.sessionToken,
-          userId: intUserId(session.userId),
-          expires: session.expires,
-        },
-      });
-
+      // No-op: with `session.strategy = "jwt"`, database sessions are never
+      // read by NextAuth.  Writing them here would produce orphaned rows
+      // that accumulate on every credentials sign-in.
       return {
-        sessionToken: created.sessionToken,
-        userId: String(created.userId),
-        expires: created.expires,
+        sessionToken: session.sessionToken,
+        userId: session.userId,
+        expires: session.expires,
       } satisfies AdapterSession;
     },
 
@@ -213,6 +209,15 @@ const googleTokenVerifier = isGoogleConfigured
   ? new OAuth2Client({ clientId: googleClientId! })
   : null;
 
+const githubClientId = process.env.GITHUB_ID;
+const githubClientSecret = process.env.GITHUB_SECRET;
+
+const isGithubConfigured =
+  !!githubClientId &&
+  !!githubClientSecret &&
+  !looksLikePlaceholder(githubClientId) &&
+  !looksLikePlaceholder(githubClientSecret);
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -263,11 +268,51 @@ if ((googleClientId || googleClientSecret) && !isGoogleConfigured) {
   );
 }
 
-const nextAuthSecret = process.env.NEXTAUTH_SECRET;
-if (!nextAuthSecret) {
-  throw new Error(
-    "NEXTAUTH_SECRET environment variable is required. Generate one with: openssl rand -base64 32"
+if ((githubClientId || githubClientSecret) && !isGithubConfigured) {
+  console.warn(
+    "[auth] GitHub OAuth is not fully configured. Set GITHUB_ID and GITHUB_SECRET to real values (not placeholders), then restart the dev server."
   );
+}
+
+// NextAuth secret is resolved lazily at runtime
+
+if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
+  console.warn(
+    "[auth][warning] NEXTAUTH_URL environment variable is not set in production. " +
+    "This will likely cause Google OAuth 'redirect_uri_mismatch' errors because the " +
+    "callback URL cannot be reliably inferred. Please set NEXTAUTH_URL to your exact production domain (e.g., https://yourdomain.com)."
+  );
+}
+
+const tokenVersionCache = new Map<string, { version: number; fetchedAt: number }>();
+const CACHE_TTL_MS = 60_000;
+
+async function getFreshTokenVersion(
+  sub: string | undefined,
+  fallback: number | undefined,
+): Promise<number | undefined> {
+  if (!sub) return fallback;
+  const userId = Number(sub);
+  if (!Number.isFinite(userId)) return fallback;
+
+  const cached = tokenVersionCache.get(sub);
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+    return cached.version;
+  }
+
+  try {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { tokenVersion: true },
+    });
+    if (dbUser) {
+      tokenVersionCache.set(sub, { version: dbUser.tokenVersion, fetchedAt: Date.now() });
+      return dbUser.tokenVersion;
+    }
+  } catch {
+    // DB unavailable — use the existing token version from the JWT cookie
+  }
+  return fallback;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -315,6 +360,20 @@ export const authOptions: NextAuthOptions = {
           }),
         ]
       : []),
+    ...(isGithubConfigured
+      ? [
+          GitHubProvider({
+            clientId: githubClientId!,
+            clientSecret: githubClientSecret!,
+            authorization: {
+              params: {
+                scope: "read:user user:email repo",
+              },
+            },
+            allowDangerousEmailAccountLinking: true,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -334,17 +393,17 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid email or password");
         }
 
-        // Security: never allow password login for Google-only accounts.
-        // A "Google-only" account has no local passwordHash, but does have a linked Google provider account.
+        // Security: never allow password login for OAuth-only accounts.
+        // An OAuth-only account has no local passwordHash, but does have a linked provider account.
         if (!user.passwordHash) {
-          const hasGoogleAccount =
+          const hasOAuthAccount =
             (await prisma.account.count({
-              where: { userId: user.id, provider: "google" },
+              where: { userId: user.id },
             })) > 0;
 
-          if (hasGoogleAccount) {
+          if (hasOAuthAccount) {
             throw new Error(
-              "Email already exists. Please sign in with Google."
+              "Email already exists. Please sign in with your linked social account."
             );
           }
 
@@ -385,13 +444,27 @@ export const authOptions: NextAuthOptions = {
         try {
           const fresh = await prisma.user.findUnique({
             where: { id },
-            select: { name: true, email: true, image: true },
+            select: { name: true, email: true, image: true, tokenVersion: true },
           });
 
           if (fresh) {
             session.user.name = fresh.name;
             session.user.email = fresh.email;
             session.user.image = fresh.image ?? undefined;
+
+            // Validate tokenVersion: if the JWT tokenVersion doesn't match
+            // the DB, the session has been invalidated (password change/logout).
+            const jwtTokenVersion = (token as any).tokenVersion as number | undefined;
+            if (
+              jwtTokenVersion != null &&
+              fresh.tokenVersion !== jwtTokenVersion
+            ) {
+              return {
+                ...session,
+                user: { id: (session.user as any).id },
+                expires: new Date(0).toISOString(),
+              } as any;
+            }
           }
         } catch {
           // If DB is temporarily unavailable, fall back to the token/session values.
@@ -421,11 +494,21 @@ export const authOptions: NextAuthOptions = {
           (token as any).picture) ||
         ((user as any)?.image as string | undefined);
 
+      // Attach tokenVersion for session invalidation on password change/logout.
+      // Always fetch from DB on every JWT callback invocation so that logout
+      // or password change is reflected within one token refresh cycle (~5 min).
+      // Cache the DB lookup for 60 seconds to avoid excessive queries.
+      const tokenVersion = await getFreshTokenVersion(
+        user ? String((user as any).id) : token.sub,
+        (token as any).tokenVersion as number | undefined,
+      );
+
       const safeToken: Record<string, unknown> = {
         sub,
         email: email && email.length <= 320 ? email : undefined,
         name: name && name.length <= 256 ? name : undefined,
         picture: picture && picture.length <= 2048 ? picture : undefined,
+        tokenVersion,
       };
 
       if (process.env.NEXTAUTH_DEBUG === "true") {
@@ -508,5 +591,5 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 7 * 24 * 60 * 60, // 7 days
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  // secret is injected lazily at route level
 };

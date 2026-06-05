@@ -4,6 +4,9 @@ export interface GraphNode {
   type: "folder" | "file";
   size: number;
   path: string;
+  depth: number;
+  isExpanded?: boolean;
+  hasChildren?: boolean;
 }
 
 export interface GraphLink {
@@ -20,10 +23,17 @@ export interface RawFile {
   dependencies?: string[];
 }
 
-export class GraphAnalyzer {
-  private maxDepth = 100;
+export interface GraphAnalyzerOptions {
+  expandedNodes: Set<string>;
+  hiddenDirectories: string[];
+  hiddenFileTypes: string[];
+  visibleDomains: string[];
+}
 
-  public buildDependencyGraph(files: RawFile[]): { nodes: GraphNode[], links: GraphLink[] } {
+export class GraphAnalyzer {
+  public buildDependencyGraph(
+    files: RawFile[]
+  ): { nodes: GraphNode[], links: GraphLink[] } {
     const nodesMap = new Map<string, GraphNode>();
     const links: GraphLink[] = [];
 
@@ -31,128 +41,113 @@ export class GraphAnalyzer {
       return { nodes: [], links: [] };
     }
 
-    // Process files (limit to top 30 to avoid clutter)
-    const topFiles = [...files]
-      .sort((a, b) => (b.lines || 0) - (a.lines || 0))
-      .slice(0, 30);
+    // Step 1: Build hierarchy structure (Tree)
+    const tree = new Map<string, { type: 'folder' | 'file', children: Set<string>, fileRef?: RawFile }>();
+    
+    // Virtual root
+    tree.set('root', { type: 'folder', children: new Set() });
 
-    const folderPaths = new Set<string>();
+    files.forEach(file => {
+      const parts = file.path.split('/');
+      
+      let currentPath = '';
+      let parentPath = 'root';
 
-    topFiles.forEach((file) => {
-      const parts = file.path.split("/");
-      for (let i = 1; i < parts.length; i++) {
-        folderPaths.add(parts.slice(0, i).join("/"));
+      for (let i = 0; i < parts.length; i++) {
+        const isFile = i === parts.length - 1;
+        currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
+        
+        if (!tree.has(currentPath)) {
+          tree.set(currentPath, {
+            type: isFile ? 'file' : 'folder',
+            children: new Set(),
+            fileRef: isFile ? file : undefined
+          });
+        }
+        
+        tree.get(parentPath)!.children.add(currentPath);
+        parentPath = currentPath;
       }
     });
 
-    // Create folder nodes
-    folderPaths.forEach((path) => {
-      const name = path.split("/").pop() || path;
-      nodesMap.set(`folder-${path}`, {
-        id: `folder-${path}`,
-        name,
-        type: "folder",
-        size: 100,
-        path,
-      });
-    });
+    // Step 2: Traverse tree to generate all GraphNodes
+    const queue = [{ path: 'root', depth: 0 }];
 
-    // Create file nodes
-    topFiles.forEach((file) => {
-      const name = file.path.split("/").pop() || file.path;
-      nodesMap.set(`file-${file.path}`, {
-        id: `file-${file.path}`,
-        name,
-        type: "file",
-        size: Math.min(Math.max((file.lines || 500) / 10, 40), 150),
-        path: file.path,
-      });
-    });
+    while (queue.length > 0) {
+      const { path, depth } = queue.shift()!;
+      const nodeData = tree.get(path);
+      if (!nodeData) continue;
 
-    const adjacencyList = new Map<string, string[]>();
-
-    const addEdge = (source: string, target: string) => {
-      if (!adjacencyList.has(source)) adjacencyList.set(source, []);
-      adjacencyList.get(source)!.push(target);
-    };
-
-    // Map parent relationships and explicit dependencies
-    topFiles.forEach((file) => {
-      const parts = file.path.split("/");
-      if (parts.length > 1) {
-        const parentFolder = parts.slice(0, -1).join("/");
-        addEdge(`file-${file.path}`, `folder-${parentFolder}`);
-      }
-
-      if (file.dependencies) {
-        file.dependencies.forEach((dep) => {
-          addEdge(`file-${file.path}`, `file-${dep}`);
+      if (path !== 'root') {
+        const isFolder = nodeData.type === 'folder';
+        const nodeId = `${isFolder ? 'folder' : 'file'}-${path}`;
+        
+        nodesMap.set(nodeId, {
+          id: nodeId,
+          name: path.split('/').pop() || path,
+          type: nodeData.type,
+          size: nodeData.fileRef ? Math.min(Math.max((nodeData.fileRef.lines || 500) / 10, 40), 150) : 100,
+          path,
+          depth,
+          isExpanded: false, // UI filter will determine this
+          hasChildren: isFolder && nodeData.children.size > 0
         });
       }
-    });
 
-    folderPaths.forEach((path) => {
-      const parts = path.split("/");
-      if (parts.length > 1) {
-        const parentFolder = parts.slice(0, -1).join("/");
-        if (folderPaths.has(parentFolder)) {
-          addEdge(`folder-${path}`, `folder-${parentFolder}`);
-        }
-      }
-    });
-
-    // SAFE GRAPH TRAVERSAL WITH CYCLE DETECTION
-    // Using visited set and recursion stack tracking to avoid 'Maximum call stack size exceeded'
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-
-    const traverseDependencies = (nodeId: string, depth: number) => {
-      if (depth > this.maxDepth) {
-        console.warn(`[GraphAnalyzer] Max depth ${this.maxDepth} reached at node ${nodeId}. Terminating branch safely.`);
-        return;
-      }
-
-      visited.add(nodeId);
-      recursionStack.add(nodeId);
-
-      const neighbors = adjacencyList.get(nodeId) || [];
-      for (const neighbor of neighbors) {
-        if (recursionStack.has(neighbor)) {
-          // Circular dependency detected
-          console.info(`[GraphAnalyzer] Circular dependency safely visualized: ${nodeId} -> ${neighbor}`);
-          links.push({
-            source: nodeId,
-            target: neighbor,
-            strength: 0.5,
-            isCyclic: true,
-          });
-        } else {
-          links.push({
-            source: nodeId,
-            target: neighbor,
-            strength: nodeId.startsWith("file-") ? 1 : 0.8,
-            isCyclic: false,
-          });
-          
-          if (!visited.has(neighbor)) {
-            traverseDependencies(neighbor, depth + 1);
-          }
-        }
-      }
-
-      recursionStack.delete(nodeId);
-    };
-
-    // Initiate traversal
-    for (const nodeId of nodesMap.keys()) {
-      if (!visited.has(nodeId)) {
-        traverseDependencies(nodeId, 0);
+      // Process all children to build the COMPLETE graph
+      for (const childPath of nodeData.children) {
+        queue.push({ path: childPath, depth: depth + 1 });
       }
     }
 
+    // Step 3: Resolve dependencies (Links)
+    // We build links directly between files. UI filtering will aggregate them later.
+    const linkSet = new Set<string>();
+
+    files.forEach(file => {
+      const sourceId = `file-${file.path}`;
+
+      if (file.dependencies) {
+        file.dependencies.forEach(dep => {
+          const targetId = `file-${dep}`;
+          // Only add link if target node exists (valid dependency)
+          if (nodesMap.has(targetId) && sourceId !== targetId) {
+            const linkId = `${sourceId}->${targetId}`;
+            if (!linkSet.has(linkId)) {
+              linkSet.add(linkId);
+              links.push({
+                source: sourceId,
+                target: targetId,
+                strength: 1,
+                isCyclic: false
+              });
+            }
+          }
+        });
+      }
+      
+      // Structural links: file to parent folder
+      const lastSlash = file.path.lastIndexOf('/');
+      if (lastSlash !== -1) {
+         const parent = file.path.substring(0, lastSlash);
+         const parentId = `folder-${parent}`;
+         if (nodesMap.has(parentId) && parentId !== sourceId) {
+             const linkId = `${sourceId}->${parentId}`;
+             if (!linkSet.has(linkId)) {
+                 linkSet.add(linkId);
+                 links.push({
+                    source: sourceId,
+                    target: parentId,
+                    strength: 0.5,
+                 });
+             }
+         }
+      }
+    });
+
     return {
       nodes: Array.from(nodesMap.values()),
-      links,
+      links
     };
   }
 }

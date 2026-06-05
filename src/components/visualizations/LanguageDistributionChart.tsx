@@ -111,13 +111,15 @@ export function LanguageDistributionChart({
       .attr("stroke", "rgba(0,0,0,0.5)")
       .attr("stroke-width", 2)
       .on("mouseenter", function (event, d) {
-        d3.select(this)
-          .transition()
-          .duration(200)
+         g.selectAll("path")
+         .interrupt()
+         .style("opacity", 0.25);
+       d3.select(this)
+          .style("opacity", 1)
           .attr("d", (datum: any) => arcHover(datum) || "")
           .attr("stroke", "rgba(255,255,255,0.8)")
-          .attr("stroke-width", 3);
-
+          .attr("stroke-width", 3) 
+          .style("filter", "brightness(1.1)");
         if (tooltipRef.current && svgRef.current) {
           const tooltip = d3.select(tooltipRef.current);
           tooltip.html(`
@@ -130,58 +132,43 @@ export function LanguageDistributionChart({
               <div class="text-xs">${d.data.lines.toLocaleString()} lines</div>
             </div>
           `);
-          const offset = 8;
-          const rect = svgRef.current.getBoundingClientRect();
-          const x = event.clientX - rect.left + offset;
-          const y = event.clientY - rect.top + offset;
-          tooltip
-            .style("opacity", "1")
-            .style("display", "block")
-            .style("left", `${rect.left + x}px`)
-            .style("top", `${rect.top + y}px`);
-        }
-      })
-      .on("mousemove", function (event) {
-        if (tooltipRef.current && svgRef.current) {
-          const offset = 8;
+          const offset = 16;
           const rect = svgRef.current.getBoundingClientRect();
           const x = event.clientX - rect.left + offset;
           const y = event.clientY - rect.top + offset;
           d3.select(tooltipRef.current)
-            .style("left", `${rect.left + x}px`)
-            .style("top", `${rect.top + y}px`);
+            .style("opacity", "1")
+            .style("display", "block")
+             .style("left", `${x}px`)
+              .style("top", `${y}px`);
         }
       })
-      .on("mouseleave", function () {
-        d3.select(this)
-          .transition()
-          .duration(200)
+      .on("mousemove", function (event, ) {
+        if (tooltipRef.current && svgRef.current) {
+          const offset = 16;
+          const rect = svgRef.current.getBoundingClientRect();
+          const x = event.clientX - rect.left + offset;
+          const y = event.clientY - rect.top + offset;
+            d3.select(tooltipRef.current)
+              .style("left", `${x}px`)
+              .style("top", `${y}px`);
+        }
+      })
+      .on("mouseleave", function (_event, _d) {
+           g.selectAll("path")
+           .interrupt()
+           .style("opacity", 1);
+           d3.select(this)
           .attr("d", (datum: any) => arc(datum) || "")
           .attr("stroke", "rgba(0,0,0,0.5)")
-          .attr("stroke-width", 2);
-
+          .attr("stroke-width", 2)
+          .style("filter", "none");  
         if (tooltipRef.current) {
           d3.select(tooltipRef.current)
             .style("opacity", "0")
             .style("display", "none");
         }
       });
-
-    // Animate arcs on load
-    arcs
-      .selectAll("path")
-      .transition()
-      .duration(1000)
-      .attrTween("d", function (d: any) {
-        const interpolate = d3.interpolate(
-          { startAngle: 0, endAngle: 0 },
-          d as any
-        );
-        return function (t) {
-          return arc(interpolate(t) as any) || "";
-        };
-      });
-
     // Center text
     const centerGroup = g.append("g");
 
@@ -214,7 +201,7 @@ export function LanguageDistributionChart({
   }, [repository]);
 
   return (
-    <Card className="glass p-4 sm:p-6">
+    <Card className="glass p-4 sm:p-6 overflow-visible">
       <div className="mb-4">
         <h3 className="text-base sm:text-lg font-semibold">
           Language Distribution
@@ -224,11 +211,11 @@ export function LanguageDistributionChart({
         </p>
       </div>
       {languageData.length > 0 && (
-      <div className="flex items-center justify-center overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+      <div className=" relative flex items-center justify-center overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
         <svg
           ref={svgRef}
           width="100%"
-          height="auto"
+          height="400"
           viewBox="0 0 400 400"
           preserveAspectRatio="xMidYMid meet"
           className="text-foreground max-w-md"
@@ -272,24 +259,21 @@ export function LanguageDistributionChart({
         )}
       </div>
       <div
-  ref={tooltipRef}
-  className="
-    fixed p-4 rounded-lg pointer-events-none shadow-xl border
-    translate-x-[-140px] translate-y-[-140px]
-    sm:translate-x-[-300px] sm:translate-y-[-300px]
-  "
-  style={{
-    opacity: 1, // control later with state
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
-    color: "white",
-    zIndex: 9999,
-    backdropFilter: "blur(8px)",
-    left: "0px",
-    top: "0px",
-    whiteSpace: "nowrap",
-  }}
-/>
-
+             ref={tooltipRef}
+             className="absolute p-4 rounded-lg pointer-events-none shadow-xl border border-gray-700/50"
+             style={{
+             opacity: 0, // control later with state
+              display: "none",
+             backgroundColor: "rgba(0, 0, 0, 0.9)",
+             color: "white",
+             zIndex: 9999,
+             backdropFilter: "blur(8px)",
+             left: "0px",
+             top: "0px",
+             whiteSpace: "nowrap",
+       }}
+      >
+     </div>
     </Card>
   );
 }

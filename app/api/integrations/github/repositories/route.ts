@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { GitHubService } from "@/lib/services/githubService";
+import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
 import prisma from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
@@ -12,12 +13,7 @@ export async function POST(request: NextRequest) {
 
     const token =
       tokenFromBody ||
-      (
-        await prisma.gitHubAccount.findUnique({
-          where: { userId: user.userId },
-          select: { accessToken: true },
-        })
-      )?.accessToken;
+      (await getDecryptedGitHubToken(user.userId));
 
     if (token) {
       const github = new GitHubService(token);

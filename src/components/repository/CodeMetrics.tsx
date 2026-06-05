@@ -245,20 +245,16 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
   // Calculate real dependencies from repository
   const packageJsonFile = repository?.files?.find(
     (f: any) => f.path?.toLowerCase() === "package.json"
-  );
+  ) as any;
   const totalDependencies =
     (packageJsonFile?.dependencies?.length || 0) +
     (packageJsonFile?.devDependencies?.length || 0);
 
-  // Estimate outdated and vulnerable based on file complexity metrics
-  const outdatedCount = Math.max(0, Math.floor(totalDependencies * 0.05));
-  const vulnerableCount = Math.max(0, Math.floor(totalDependencies * 0.02));
-
   const dependencies = {
     total: totalDependencies || repository?.languages?.length || 0,
-    outdated: outdatedCount,
-    vulnerable: vulnerableCount,
-  };
+    outdated: null,
+    vulnerable: null,
+};
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "good":
@@ -517,7 +513,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
                 </div>
               </div>
               <p className="text-2xl font-bold text-yellow-500">
-                {dependencies.outdated}
+                {dependencies.outdated ?? "N/A"}
               </p>
             </div>
             <div className="flex items-center justify-between p-4 glass rounded-lg">
@@ -533,7 +529,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
                 </div>
               </div>
               <p className="text-2xl font-bold text-red-500">
-                {dependencies.vulnerable}
+                {dependencies.vulnerable ?? "N/A"}
               </p>
             </div>
           </div>

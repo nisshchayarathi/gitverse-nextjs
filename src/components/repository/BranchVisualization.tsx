@@ -377,7 +377,7 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
                             <span
                               className={`text-xs px-2 py-0.5 rounded-full border ${branchColor}`}
                             >
-                              {selectedBranch?.name || "main"}
+                              {commit.branch}
                             </span>
                           </div>
                         </div>
