@@ -1,0 +1,6 @@
+dist-worker/
+node_modules/
+tsconfig.tsbuildinfo
+.env
+.env.local
+.next/

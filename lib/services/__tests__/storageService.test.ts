@@ -161,7 +161,7 @@ describe("storeAvatar", () => {
     const result = await storeAvatar(Buffer.from("x"), userId, "image/jpeg");
 
     expect(result.filePath).toBeDefined();
-    expect(result.filePath).toContain("public/uploads/avatars");
+    expect(result.filePath).toContain(path.join("public", "uploads", "avatars"));
 
     await fs.unlink(result.filePath).catch(() => {});
   });
