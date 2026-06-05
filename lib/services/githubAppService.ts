@@ -1,4 +1,4 @@
-import axios, { isAxiosError } from "axios";
+import axios from "axios";
 import jwt from "jsonwebtoken";
 
 function getRequiredEnv(name: string): string {
@@ -10,29 +10,16 @@ function getRequiredEnv(name: string): string {
 }
 
 function normalizePrivateKey(value: string): string {
+  // Common deployment pattern: store multiline key with literal "\n".
   return value.includes("\\n") ? value.replace(/\\n/g, "\n") : value;
-}
-
-function sanitizeAppError(error: any) {
-  if (isAxiosError(error) && error.config) {
-    const safeConfig = {
-      ...error.config,
-      headers: error.config.headers
-        ? {
-            ...error.config.headers,
-            Authorization: "[REDACTED]",
-          }
-        : error.config.headers,
-    };
-    error.config = safeConfig as any;
-  }
-  return error;
 }
 
 export class GitHubAppService {
   private appId: string;
   private privateKey: string;
 
+  private cachedJwt: string | null = null;
+  private cachedJwtExpiresAt = 0;
   constructor(opts?: { appId?: string; privateKey?: string }) {
     this.appId = opts?.appId || getRequiredEnv("GITHUB_APP_ID");
     this.privateKey = normalizePrivateKey(
@@ -42,13 +29,31 @@ export class GitHubAppService {
 
   createAppJwt(): string {
     const now = Math.floor(Date.now() / 1000);
+
+    // Reuse cached JWT if still valid for at least 60 more seconds
+    if (
+      this.cachedJwt &&
+      now < this.cachedJwtExpiresAt - 60
+    ) {
+      return this.cachedJwt;
+    }
+
+    const expiresAt = now + 9 * 60;
+
     const payload = {
       iat: now - 60,
-      exp: now + 9 * 60,
+      exp: expiresAt,
       iss: this.appId,
     };
 
-    return jwt.sign(payload, this.privateKey, { algorithm: "RS256" });
+    const token = jwt.sign(payload, this.privateKey, {
+      algorithm: "RS256",
+    });
+
+    this.cachedJwt = token;
+    this.cachedJwtExpiresAt = expiresAt;
+
+    return token;
   }
 
   async getInstallationAccessToken(installationId: number): Promise<string> {
@@ -57,27 +62,24 @@ export class GitHubAppService {
     }
 
     const appJwt = this.createAppJwt();
-    try {
-      const response = await axios.post(
-        `https://api.github.com/app/installations/${installationId}/access_tokens`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${appJwt}`,
-            Accept: "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
+    const response = await axios.post(
+      `https://api.github.com/app/installations/${installationId}/access_tokens`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${appJwt}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "User-Agent": "GitVerse-App",
         },
-      );
+      },
+    );
 
-      const token = response.data?.token as string | undefined;
-      if (!token) {
-        throw new Error("Failed to obtain installation access token");
-      }
-      return token;
-    } catch (err) {
-      throw sanitizeAppError(err);
+    const token = response.data?.token as string | undefined;
+    if (!token) {
+      throw new Error("Failed to obtain installation access token");
     }
+    return token;
   }
 
   async uninstallInstallation(installationId: number): Promise<void> {
@@ -86,19 +88,16 @@ export class GitHubAppService {
     }
 
     const appJwt = this.createAppJwt();
-    try {
-      await axios.delete(
-        `https://api.github.com/app/installations/${installationId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${appJwt}`,
-            Accept: "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
+    await axios.delete(
+      `https://api.github.com/app/installations/${installationId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${appJwt}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "User-Agent": "GitVerse-App",
         },
-      );
-    } catch (err) {
-      throw sanitizeAppError(err);
-    }
+      },
+    );
   }
 }

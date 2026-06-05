@@ -7,7 +7,7 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { Card, EmptyState } from "@/components/ui";
+import { Card } from "@/components/ui";
 import { geminiService, CodeAnalysisRequest } from "@/services/gemini";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -300,13 +300,35 @@ export function CodeAnalysisPanel() {
           </h3>
 
           {results.length === 0 ? (
-            <EmptyState
-              icon={Code}
-              title="No analysis yet"
-              description="Enter your code and select an analysis option above to get started"
-            />
-          ) : (
-            <div className="space-y-4 max-h-[600px] overflow-y-auto">
+  <div className="flex flex-col items-center justify-center text-center py-12 px-4">
+    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-4">
+      <Sparkles className="h-7 w-7 text-primary" />
+    </div>
+
+    <h3 className="text-lg font-semibold mb-2">
+      No AI analysis yet
+    </h3>
+
+    <p className="text-sm text-muted-foreground max-w-sm mb-6">
+      Paste your code and run an AI-powered analysis to get explanations,
+      bug detection, documentation, and improvement suggestions.
+    </p>
+
+    <button
+      onClick={() => {
+        const textarea = document.querySelector("textarea");
+        if (textarea) {
+          (textarea as HTMLTextAreaElement).focus();
+        }
+      }}
+      className="glass px-5 py-2 rounded-lg hover:bg-primary/20 transition-all duration-300"
+      aria-label="Start AI analysis"
+    >
+      Start Analysis
+    </button>
+  </div>
+) : (
+            <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar">
               {results.map((result, index) => {
                 const option = analysisOptions.find(
                   (opt) => opt.type === result.type

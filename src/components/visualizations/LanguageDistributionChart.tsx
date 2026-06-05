@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import { Card, EmptyState } from "@/components/ui";
-import { BarChart3 } from "lucide-react";
+import { Card } from "@/components/ui";
 
 interface LanguageData {
   name: string;
@@ -9,9 +8,18 @@ interface LanguageData {
   lines: number;
   color: string;
 }
+interface RepositoryLanguage{
+  name:string;
+  percentage: number;
+  lines?:number
+}
+
+interface RepositoryData{
+  languages?: RepositoryLanguage[];
+}
 
 interface LanguageDistributionChartProps {
-  repository?: any;
+  repository?: RepositoryData;
 }
 
 // Generate a vibrant random color
@@ -36,7 +44,7 @@ export function LanguageDistributionChart({
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const languageData: LanguageData[] = (repository?.languages || []).map(
-    (lang: any) => ({
+    (lang: RepositoryLanguage) => ({
       name: lang.name,
       percentage: lang.percentage,
       lines: lang.lines || 0,
@@ -48,7 +56,7 @@ export function LanguageDistributionChart({
     if (!svgRef.current) return;
 
     const languageData: LanguageData[] = (repository?.languages || []).map(
-      (lang: any) => ({
+      (lang: RepositoryLanguage) => ({
         name: lang.name,
         percentage: lang.percentage,
         lines: lang.lines || 0,
@@ -103,13 +111,15 @@ export function LanguageDistributionChart({
       .attr("stroke", "rgba(0,0,0,0.5)")
       .attr("stroke-width", 2)
       .on("mouseenter", function (event, d) {
-        d3.select(this)
-          .transition()
-          .duration(200)
+         g.selectAll("path")
+         .interrupt()
+         .style("opacity", 0.25);
+       d3.select(this)
+          .style("opacity", 1)
           .attr("d", (datum: any) => arcHover(datum) || "")
           .attr("stroke", "rgba(255,255,255,0.8)")
-          .attr("stroke-width", 3);
-
+          .attr("stroke-width", 3) 
+          .style("filter", "brightness(1.1)");
         if (tooltipRef.current && svgRef.current) {
           const tooltip = d3.select(tooltipRef.current);
           tooltip.html(`
@@ -122,58 +132,43 @@ export function LanguageDistributionChart({
               <div class="text-xs">${d.data.lines.toLocaleString()} lines</div>
             </div>
           `);
-          const offset = 8;
-          const rect = svgRef.current.getBoundingClientRect();
-          const x = event.clientX - rect.left + offset;
-          const y = event.clientY - rect.top + offset;
-          tooltip
-            .style("opacity", "1")
-            .style("display", "block")
-            .style("left", `${rect.left + x}px`)
-            .style("top", `${rect.top + y}px`);
-        }
-      })
-      .on("mousemove", function (event) {
-        if (tooltipRef.current && svgRef.current) {
-          const offset = 8;
+          const offset = 16;
           const rect = svgRef.current.getBoundingClientRect();
           const x = event.clientX - rect.left + offset;
           const y = event.clientY - rect.top + offset;
           d3.select(tooltipRef.current)
-            .style("left", `${rect.left + x}px`)
-            .style("top", `${rect.top + y}px`);
+            .style("opacity", "1")
+            .style("display", "block")
+             .style("left", `${x}px`)
+              .style("top", `${y}px`);
         }
       })
-      .on("mouseleave", function () {
-        d3.select(this)
-          .transition()
-          .duration(200)
+      .on("mousemove", function (event, ) {
+        if (tooltipRef.current && svgRef.current) {
+          const offset = 16;
+          const rect = svgRef.current.getBoundingClientRect();
+          const x = event.clientX - rect.left + offset;
+          const y = event.clientY - rect.top + offset;
+            d3.select(tooltipRef.current)
+              .style("left", `${x}px`)
+              .style("top", `${y}px`);
+        }
+      })
+      .on("mouseleave", function (_event, _d) {
+           g.selectAll("path")
+           .interrupt()
+           .style("opacity", 1);
+           d3.select(this)
           .attr("d", (datum: any) => arc(datum) || "")
           .attr("stroke", "rgba(0,0,0,0.5)")
-          .attr("stroke-width", 2);
-
+          .attr("stroke-width", 2)
+          .style("filter", "none");  
         if (tooltipRef.current) {
           d3.select(tooltipRef.current)
             .style("opacity", "0")
             .style("display", "none");
         }
       });
-
-    // Animate arcs on load
-    arcs
-      .selectAll("path")
-      .transition()
-      .duration(1000)
-      .attrTween("d", function (d: any) {
-        const interpolate = d3.interpolate(
-          { startAngle: 0, endAngle: 0 },
-          d as any
-        );
-        return function (t) {
-          return arc(interpolate(t) as any) || "";
-        };
-      });
-
     // Center text
     const centerGroup = g.append("g");
 
@@ -206,7 +201,7 @@ export function LanguageDistributionChart({
   }, [repository]);
 
   return (
-    <Card className="glass p-4 sm:p-6">
+    <Card className="glass p-4 sm:p-6 overflow-visible">
       <div className="mb-4">
         <h3 className="text-base sm:text-lg font-semibold">
           Language Distribution
@@ -215,69 +210,70 @@ export function LanguageDistributionChart({
           Interactive breakdown of codebase languages
         </p>
       </div>
-      {languageData.length === 0 ? (
-        <EmptyState
-          icon={BarChart3}
-          title="No language data"
-          description="We couldn't detect any programming languages in this repository."
+      {languageData.length > 0 && (
+      <div className=" relative flex items-center justify-center overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <svg
+          ref={svgRef}
+          width="100%"
+          height="400"
+          viewBox="0 0 400 400"
+          preserveAspectRatio="xMidYMid meet"
+          className="text-foreground max-w-md"
         />
-      ) : (
-        <>
-          <div className="flex items-center justify-center overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-            <svg
-              ref={svgRef}
-              width="100%"
-              height="auto"
-              viewBox="0 0 400 400"
-              preserveAspectRatio="xMidYMid meet"
-              className="text-foreground max-w-md"
-            />
-          </div>
-          <div className="mt-4 space-y-2">
-            {languageData.map((lang) => (
-              <div
-                key={lang.name}
-                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs sm:text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded flex-shrink-0"
-                    style={{ backgroundColor: lang.color }}
-                  />
-                  <span className="font-medium">{lang.name}</span>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-3 text-muted-foreground">
-                  <span className="truncate">
-                    {lang.lines.toLocaleString()} lines
-                  </span>
-                  <span className="font-semibold flex-shrink-0">
-                    {lang.percentage.toFixed(2)}%
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+      </div>
       )}
+      {/* Empty state when languageData is empty */}
+      {languageData.length === 0 && (
+        <div className="text-center py-8 text-muted-foreground text-sm">
+          No language data available for this repository
+        </div>
+      )}
+      <div className="mt-4 space-y-2">
+        {languageData.length > 0 ? (
+          languageData.map((lang) => (
+            <div
+              key={lang.name}
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs sm:text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded flex-shrink-0"
+                  style={{ backgroundColor: lang.color }}
+                />
+                <span className="font-medium">{lang.name}</span>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 text-muted-foreground">
+                <span className="truncate">
+                  {lang.lines.toLocaleString()} lines
+                </span>
+                <span className="font-semibold flex-shrink-0">
+                  {lang.percentage.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-xs sm:text-sm text-muted-foreground text-center">
+            No language data available
+          </p>
+        )}
+      </div>
       <div
-  ref={tooltipRef}
-  className="
-    fixed p-4 rounded-lg pointer-events-none shadow-xl border
-    translate-x-[-140px] translate-y-[-140px]
-    sm:translate-x-[-300px] sm:translate-y-[-300px]
-  "
-  style={{
-    opacity: 1, // control later with state
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
-    color: "white",
-    zIndex: 9999,
-    backdropFilter: "blur(8px)",
-    left: "0px",
-    top: "0px",
-    whiteSpace: "nowrap",
-  }}
-/>
-
+             ref={tooltipRef}
+             className="absolute p-4 rounded-lg pointer-events-none shadow-xl border border-gray-700/50"
+             style={{
+             opacity: 0, // control later with state
+              display: "none",
+             backgroundColor: "rgba(0, 0, 0, 0.9)",
+             color: "white",
+             zIndex: 9999,
+             backdropFilter: "blur(8px)",
+             left: "0px",
+             top: "0px",
+             whiteSpace: "nowrap",
+       }}
+      >
+     </div>
     </Card>
   );
 }
