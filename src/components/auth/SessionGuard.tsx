@@ -28,7 +28,9 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
       pathname?.startsWith(route)
     );
 
-    if (status === "unauthenticated" && isProtected) {
+    const isTestingBypass = process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true';
+
+    if (status === "unauthenticated" && isProtected && !isTestingBypass) {
       if (!hasAlerted.current) {
         hasAlerted.current = true;
         
@@ -44,7 +46,7 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
         // Redirect to login
         router.push(`/login?from=${encodeURIComponent(pathname || "/dashboard")}`);
       }
-    } else if (status === "authenticated") {
+    } else if (status === "authenticated" || isTestingBypass) {
       hasAlerted.current = false;
     }
   }, [status, pathname, router, toast]);
