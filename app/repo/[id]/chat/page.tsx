@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import axios from "axios";
@@ -20,11 +20,7 @@ export default function RepoChatPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchRepository();
-  }, [id]);
-
-  const fetchRepository = async () => {
+  const fetchRepository = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     setError(null);
@@ -42,7 +38,11 @@ export default function RepoChatPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchRepository();
+  }, [fetchRepository]);
 
   const repositoryContext = repository
     ? {

@@ -1,6 +1,6 @@
 import { FileText, Plus, Minus, GitMerge, Tag } from "lucide-react";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 
 interface FileChange {
   path: string;
@@ -69,43 +69,46 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
   const defaultBranch =
     repository?.branches?.find((b: any) => b.isDefault)?.name || "main";
 
-  const normalizeBranchName = (value: unknown): string => {
+  const normalizeBranchName = useCallback((value: unknown): string => {
     const str = typeof value === "string" ? value.trim() : "";
     if (!str) return defaultBranch;
     if (str === "--all") return defaultBranch;
     if (/^\d+$/.test(str)) return defaultBranch;
     return str;
-  };
+  }, [defaultBranch]);
 
   // Use real commits from repository or empty array
-  const commits: Commit[] =
-    repository?.commits?.map((commit: any) => ({
-      hash: commit.hash,
-      shortHash: commit.shortHash,
-      author: {
-        name: commit.authorName,
-        email: commit.authorEmail,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${commit.authorName}`,
-      },
-      message: commit.message,
-      description: commit.description,
-      timestamp: commit.committedAt,
-      branch: normalizeBranchName(commit.branch),
-      refs: Array.isArray(commit.refs) ? commit.refs : [],
-      filesChanged: commit.filesChanged || 0,
-      additions: commit.additions || 0,
-      deletions: commit.deletions || 0,
-      fileChanges:
-        commit.fileChanges?.map((fc: any) => ({
-          path: fc.path,
-          additions: fc.additions,
-          deletions: fc.deletions,
-          type: fc.changeType,
-        })) || [],
-      parents: commit.parents || [],
-      isMerge: commit.parents?.length > 1,
-      tags: commit.tags || [],
-    })) || [];
+  const commits: Commit[] = useMemo(() => {
+    return (
+      repository?.commits?.map((commit: any) => ({
+        hash: commit.hash,
+        shortHash: commit.shortHash,
+        author: {
+          name: commit.authorName,
+          email: commit.authorEmail,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${commit.authorName}`,
+        },
+        message: commit.message,
+        description: commit.description,
+        timestamp: commit.committedAt,
+        branch: normalizeBranchName(commit.branch),
+        refs: Array.isArray(commit.refs) ? commit.refs : [],
+        filesChanged: commit.filesChanged || 0,
+        additions: commit.additions || 0,
+        deletions: commit.deletions || 0,
+        fileChanges:
+          commit.fileChanges?.map((fc: any) => ({
+            path: fc.path,
+            additions: fc.additions,
+            deletions: fc.deletions,
+            type: fc.changeType,
+          })) || [],
+        parents: commit.parents || [],
+        isMerge: commit.parents?.length > 1,
+        tags: commit.tags || [],
+      })) || []
+    );
+  }, [repository?.commits, normalizeBranchName]);
 
   const refToBadgeText = (ref: string) => {
     const trimmed = ref.trim();

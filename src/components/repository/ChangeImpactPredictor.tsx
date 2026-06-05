@@ -52,9 +52,9 @@ const renderRiskNote = (riskLevel: string) => {
 };
 
 export function ChangeImpactPredictor({ repository, selectedFile, loading }: ChangeImpactPredictorProps) {
-  const files = repository?.files || [];
+  const files = useMemo(() => repository?.files || [], [repository?.files]);
 
-  const graph = useMemo(() => buildDependencyGraph(files || []), [files]);
+  const graph = useMemo(() => buildDependencyGraph(files), [files]);
 
   const impact = useMemo<ChangeImpactResult | null>(() => {
     if (!selectedFile || !selectedFile.path) return null;

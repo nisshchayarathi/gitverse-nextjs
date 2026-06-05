@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef, Children, isValidElement } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback, Children, isValidElement } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -245,7 +245,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
   };
 
   // Build file tree from repository files
-  const buildFileTree = (files: FileData[]): FileNode => {
+  const buildFileTree = useCallback((files: FileData[]): FileNode => {
     const root: FileNode = {
       name: repository?.name || "root",
       type: "folder",
@@ -281,10 +281,10 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
     });
 
     return root;
-  };
+  }, [repository?.name]);
 
   const files = useMemo(() => repository?.files || [], [repository?.files]);
-  const fileTree = useMemo(() => buildFileTree(files), [files, repository?.name]);
+  const fileTree = useMemo(() => buildFileTree(files), [files, buildFileTree]);
 
   useEffect(() => {
     if (!repository?.id || files.length === 0) {

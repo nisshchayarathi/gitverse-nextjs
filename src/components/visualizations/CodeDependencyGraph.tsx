@@ -392,7 +392,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     return () => {
       simulation.stop();
     };
-  }, [graphData]); // Use graphData as dependency
+  }, [graphData, setFocus, toggleExpand]); // Use graphData, setFocus, toggleExpand as dependencies
 
   // Effect to handle focus mode fading
   useEffect(() => {

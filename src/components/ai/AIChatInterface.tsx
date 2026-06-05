@@ -53,7 +53,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
         },
       ]);
     }
-  }, []);
+  }, [messages.length, repositoryContext]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -454,7 +454,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
         },
       ]);
     }
-  }, []);
+  }, [messages.length, repositoryContext]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

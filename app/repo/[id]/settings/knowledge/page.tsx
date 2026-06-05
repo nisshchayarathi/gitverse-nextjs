@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 
 interface Knowledge {
@@ -19,7 +19,7 @@ export default function RepositoryKnowledgeSettings() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchKnowledge = async () => {
+  const fetchKnowledge = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -34,9 +34,9 @@ export default function RepositoryKnowledgeSettings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [repositoryId]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     try {
       setRefreshing(true);
       setError(null);
@@ -53,13 +53,13 @@ export default function RepositoryKnowledgeSettings() {
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [repositoryId]);
 
   useEffect(() => {
     if (repositoryId) {
       fetchKnowledge();
     }
-  }, [repositoryId]);
+  }, [repositoryId, fetchKnowledge]);
 
   if (loading) {
     return <div className="p-6">Loading repository knowledge...</div>;
