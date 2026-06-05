@@ -43,6 +43,8 @@ RUN npm prune --omit=dev
 
 FROM base AS runner
 
+STOPSIGNAL SIGTERM
+
 # `git` is required at runtime for repository analysis (git clone/log/ls-files)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

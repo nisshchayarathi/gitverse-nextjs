@@ -20,18 +20,31 @@ function normalizePrivateKey(value) {
 class GitHubAppService {
     appId;
     privateKey;
+    cachedJwt = null;
+    cachedJwtExpiresAt = 0;
     constructor(opts) {
         this.appId = opts?.appId || getRequiredEnv("GITHUB_APP_ID");
         this.privateKey = normalizePrivateKey(opts?.privateKey || getRequiredEnv("GITHUB_APP_PRIVATE_KEY"));
     }
     createAppJwt() {
         const now = Math.floor(Date.now() / 1000);
+        // Reuse cached JWT if still valid for at least 60 more seconds
+        if (this.cachedJwt &&
+            now < this.cachedJwtExpiresAt - 60) {
+            return this.cachedJwt;
+        }
+        const expiresAt = now + 9 * 60;
         const payload = {
             iat: now - 60,
-            exp: now + 9 * 60, // max 10 minutes
+            exp: expiresAt,
             iss: this.appId,
         };
-        return jsonwebtoken_1.default.sign(payload, this.privateKey, { algorithm: "RS256" });
+        const token = jsonwebtoken_1.default.sign(payload, this.privateKey, {
+            algorithm: "RS256",
+        });
+        this.cachedJwt = token;
+        this.cachedJwtExpiresAt = expiresAt;
+        return token;
     }
     async getInstallationAccessToken(installationId) {
         if (!Number.isFinite(installationId)) {
@@ -43,6 +56,7 @@ class GitHubAppService {
                 Authorization: `Bearer ${appJwt}`,
                 Accept: "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "GitVerse-App",
             },
         });
         const token = response.data?.token;
@@ -61,6 +75,7 @@ class GitHubAppService {
                 Authorization: `Bearer ${appJwt}`,
                 Accept: "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "GitVerse-App",
             },
         });
     }

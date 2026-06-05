@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { GitHubAppService } from "@/lib/services/githubAppService";
 import { GitHubService } from "@/lib/services/githubService";
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       { status: 200 },
     );
   } catch (error: any) {
-    console.error("GitHub App sync error:", error);
+    console.error("GitHub App sync error:", sanitizeError(error));
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
@@ -118,7 +118,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to sync GitHub App installation repos",
-        details: error?.message || "Unknown error",
       },
       { status: 500 },
     );

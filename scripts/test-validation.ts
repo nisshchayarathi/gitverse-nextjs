@@ -1,0 +1,228 @@
+/**
+ * Manual test script for input validation changes.
+ * Run with: npx tsx scripts/test-validation.ts
+ *
+ * This script tests the validation endpoints manually.
+ * Requires the dev server to be running on http://localhost:3000
+ */
+
+const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
+
+interface TestResult {
+  endpoint: string;
+  method: string;
+  status: number;
+  body: any;
+  passed: boolean;
+}
+
+const results: TestResult[] = [];
+
+async function runTest(
+  endpoint: string,
+  method: string,
+  body: any | null,
+  expectedStatus: number,
+  token?: string,
+): Promise<TestResult> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${BASE_URL}${endpoint}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const data = await response.json();
+
+  const passed = response.status === expectedStatus;
+
+  const result: TestResult = {
+    endpoint,
+    method,
+    status: response.status,
+    body: data,
+    passed,
+  };
+
+  results.push(result);
+
+  console.log(
+    `${passed ? "✓" : "✗"} ${method} ${endpoint} → ${response.status} (expected ${expectedStatus})`,
+  );
+
+  if (!passed) {
+    console.log(`  Response: ${JSON.stringify(data, null, 2)}`);
+  }
+
+  return result;
+}
+
+async function runTests() {
+  console.log("Running validation tests...\n");
+
+  // Test 1: Suggest commit without any data
+  await runTest(
+    "/api/ai/suggest-commit",
+    "POST",
+    {},
+    400,
+    "test-token",
+  );
+
+  // Test 2: Suggest commit with empty arrays
+  await runTest(
+    "/api/ai/suggest-commit",
+    "POST",
+    { added: [], modified: [], deleted: [] },
+    400,
+    "test-token",
+  );
+
+  // Test 3: Suggest commit with valid data (will fail auth but validation passes first)
+  // Note: This tests that validation happens before auth check
+
+  // Test 4: GitHub import without URL
+  await runTest(
+    "/api/integrations/github/import",
+    "POST",
+    { token: "some-token" },
+    400,
+    "test-token",
+  );
+
+  // Test 5: GitHub import without token
+  await runTest(
+    "/api/integrations/github/import",
+    "POST",
+    { url: "https://github.com/owner/repo" },
+    400,
+    "test-token",
+  );
+
+  // Test 6: PR review without prUrl
+  await runTest(
+    "/api/ai/review-pr",
+    "POST",
+    { token: "some-token" },
+    400,
+    "test-token",
+  );
+
+  // Test 7: PR review without token
+  await runTest(
+    "/api/ai/review-pr",
+    "POST",
+    { prUrl: "https://github.com/owner/repo/pull/1" },
+    400,
+    "test-token",
+  );
+
+  // Test 8: Create repository without name
+  await runTest(
+    "/api/repositories",
+    "POST",
+    { url: "https://github.com/owner/repo" },
+    400,
+    "test-token",
+  );
+
+  // Test 9: Create repository without URL
+  await runTest(
+    "/api/repositories",
+    "POST",
+    { name: "test-repo" },
+    400,
+    "test-token",
+  );
+
+  // Test 10: Create repository with invalid URL
+  await runTest(
+    "/api/repositories",
+    "POST",
+    { name: "test-repo", url: "not-a-url" },
+    400,
+    "test-token",
+  );
+
+  // Test 11: Invalid repository ID
+  await runTest(
+    "/api/repositories/abc",
+    "GET",
+    null,
+    400,
+    "test-token",
+  );
+
+  // Test 12: Chat without repositoryId
+  await runTest(
+    "/api/ai/chat",
+    "POST",
+    { question: "Hello" },
+    400,
+    "test-token",
+  );
+
+  // Test 13: Chat without question
+  await runTest(
+    "/api/ai/chat",
+    "POST",
+    { repositoryId: 1 },
+    400,
+    "test-token",
+  );
+
+  // Test 14: Analyze repository without repositoryId
+  await runTest(
+    "/api/ai/analyze-repository",
+    "POST",
+    { type: "overview" },
+    400,
+    "test-token",
+  );
+
+  // Test 15: Explain file without repositoryId
+  await runTest(
+    "/api/ai/explain-file",
+    "POST",
+    { filePath: "src/index.ts" },
+    400,
+    "test-token",
+  );
+
+  // Test 16: Analyze code without code
+  await runTest(
+    "/api/ai/analyze-code",
+    "POST",
+    { language: "typescript", analysisType: "quality" },
+    400,
+    "test-token",
+  );
+
+  // Summary
+  console.log("\n--- Summary ---");
+  const passed = results.filter((r) => r.passed).length;
+  const total = results.length;
+  console.log(`${passed}/${total} tests passed`);
+
+  if (passed < total) {
+    console.log("\nFailed tests:");
+    results
+      .filter((r) => !r.passed)
+      .forEach((r) => {
+        console.log(`  - ${r.method} ${r.endpoint}: got ${r.status}`);
+      });
+    process.exit(1);
+  }
+}
+
+runTests().catch((err) => {
+  console.error("Test runner error:", err);
+  process.exit(1);
+});

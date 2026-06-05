@@ -1,0 +1,45 @@
+name: Run Analysis Worker
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # every 5 minutes
+  workflow_dispatch:
+
+jobs:
+  run-worker:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ANALYSIS_RUNNER_SECRET: ${{ secrets.ANALYSIS_RUNNER_SECRET }}
+      GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+      GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
+      GITHUB_APP_SLUG: ${{ secrets.GITHUB_APP_SLUG }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Prisma schema
+        run: test -f "$GITHUB_WORKSPACE/prisma/schema.prisma"
+
+      - name: Generate Prisma Client
+        run: npx prisma generate --schema "$GITHUB_WORKSPACE/prisma/schema.prisma"
+
+      - name: Build worker
+        run: npm run build:worker
+
+      - name: Run worker once
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANALYSIS_RUNNER_SECRET: ${{ secrets.ANALYSIS_RUNNER_SECRET }}
+        run: |
+          echo "Running analysis worker (one-shot)"
+          export WORKER_ONCE=1
+          node dist-worker/scripts/analysisWorker.js
