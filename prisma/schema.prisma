@@ -23,6 +23,20 @@ enum PullRequestStatus {
   FAILED
 }
 
+enum ComplexityLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum JourneyStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  PAUSED
+}
+
 model User {
   id                 Int            @id @default(autoincrement())
   email              String         @unique
@@ -37,6 +51,7 @@ model User {
   updatedAt          DateTime       @updatedAt @map("updated_at")
   repositories       Repository[]
   analysisJobs       AnalysisJob[]
+  journeys           ContributorJourney[]
   accounts           Account[]
   sessions           Session[]
   githubAccount      GitHubAccount?
@@ -183,6 +198,9 @@ model Repository {
   contributors    Contributor[]
   languages       Language[]
   analysisJobs    AnalysisJob[]
+  journeys        ContributorJourney[]
+  dependencies    FileDependency[]
+  fileImportance  FileImportance[]
 
   @@index([userId])
   @@map("repositories")
@@ -339,4 +357,91 @@ model Language {
 
   @@unique([repositoryId, name])
   @@map("languages")
+}
+
+// Contributor Journey Simulator Models
+model ContributorJourney {
+  id           Int                @id @default(autoincrement())
+  userId       Int                @map("user_id")
+  repositoryId Int                @map("repository_id")
+  moduleName   String             @map("module_name")
+  goalDescription String           @map("goal_description") @db.Text
+  status       JourneyStatus      @default(NOT_STARTED)
+  progress     Int                @default(0) // 0-100
+  estimatedDays Int               @default(0) @map("estimated_days")
+  startedAt    DateTime?          @map("started_at")
+  completedAt  DateTime?          @map("completed_at")
+  metadata     Json?              // Additional journey metadata
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   Repository         @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  steps        JourneyStep[]
+
+  @@unique([userId, repositoryId, moduleName])
+  @@index([userId, status])
+  @@index([repositoryId])
+  @@map("contributor_journeys")
+}
+
+model JourneyStep {
+  id           Int                @id @default(autoincrement())
+  journeyId    Int                @map("journey_id")
+  filePath     String             @map("file_path")
+  fileName     String             @map("file_name")
+  complexity   ComplexityLevel    @default(INTERMEDIATE)
+  estimatedMinutes Int            @default(15) @map("estimated_minutes")
+  description  String             @db.Text
+  reasoning    String             @db.Text // Why this file is important
+  order        Int                // Step order in the journey
+  completed    Boolean            @default(false)
+  completedAt  DateTime?          @map("completed_at")
+  dependencies String[]           // Array of file paths this file depends on
+  metadata     Json?              // Additional step metadata
+  createdAt    DateTime           @default(now()) @map("created_at")
+
+  journey      ContributorJourney @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+
+  @@unique([journeyId, filePath])
+  @@index([journeyId, order])
+  @@map("journey_steps")
+}
+
+model FileDependency {
+  id              Int        @id @default(autoincrement())
+  repositoryId    Int        @map("repository_id")
+  sourceFilePath  String     @map("source_file_path")
+  targetFilePath  String     @map("target_file_path")
+  dependencyType  String     // import, require, reference, etc.
+  occurrences     Int        @default(1) // How many times this dependency appears
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  repository      Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, sourceFilePath, targetFilePath])
+  @@index([repositoryId, sourceFilePath])
+  @@index([repositoryId])
+  @@map("file_dependencies")
+}
+
+model FileImportance {
+  id              Int        @id @default(autoincrement())
+  repositoryId    Int        @map("repository_id")
+  filePath        String     @map("file_path")
+  fileName        String     @map("file_name")
+  importanceScore Float      @map("importance_score") // 0-100
+  incomingDeps    Int        @default(0) @map("incoming_deps") // How many files depend on this
+  outgoingDeps    Int        @default(0) @map("outgoing_deps") // How many files this depends on
+  complexity      ComplexityLevel @default(INTERMEDIATE)
+  category        String?    // core, utils, features, etc.
+  description     String?    @db.Text
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  repository      Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, filePath])
+  @@index([repositoryId, importanceScore])
+  @@map("file_importance")
 }

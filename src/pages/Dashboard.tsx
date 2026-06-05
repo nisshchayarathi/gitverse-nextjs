@@ -25,6 +25,7 @@ import {
   Input,
   EmptyState,
 } from "@/components/ui";
+import KnowledgeGapWidget from "@/components/knowledge/KnowledgeGapWidget";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
@@ -353,6 +354,10 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
+          {/* Knowledge Gaps Widget */}
+          <div className="lg:col-span-1">
+            <KnowledgeGapWidget />
+          </div>
 
           {/* Recent Activity */}
           <Card className="glass">
