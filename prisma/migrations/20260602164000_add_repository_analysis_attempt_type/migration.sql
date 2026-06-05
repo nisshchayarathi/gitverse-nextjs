@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "AttemptType" ADD VALUE 'REPOSITORY_ANALYSIS';

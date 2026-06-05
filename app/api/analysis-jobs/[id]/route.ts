@@ -1,7 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireAuth, isHttpError } from "@/lib/middleware";
+import { requireAuth, isHttpError , sanitizeError } from "@/lib/middleware";
 import { analysisJobService } from "@/lib/services/analysisJobService";
+
+import { shouldThrottleJobKick } from "@/lib/utils/analysisRunner";
+
+
+async function kickLocalRunner(request: NextRequest, jobId: string) {
+  if (process.env.NODE_ENV === "production") return;
+
+ if (await shouldThrottleJobKick(jobId)) return;  
+  const origin = new URL(request.url).origin;
+  const secret = process.env.ANALYSIS_RUNNER_SECRET;
+
+  void fetch(`${origin}/api/internal/run-analysis`, {
+    method: "POST",
+    headers: secret ? { "x-analysis-runner-secret": secret } : undefined,
+  }).catch(() => {});
+}
+
 
 export async function GET(
   request: NextRequest,
@@ -10,14 +27,6 @@ export async function GET(
   try {
     const user = await requireAuth(request);
     const jobId = params.id;
-
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidPattern.test(jobId)) {
-      return NextResponse.json(
-        { error: "Invalid job ID format. Expected a UUID" },
-        { status: 400 }
-      );
-    }
 
     const job = await analysisJobService.getJob({
       jobId,
@@ -28,8 +37,9 @@ export async function GET(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    const details = job.progressDetails as { retryAfter?: number; rateLimited?: boolean } | null;
-    const retryAfter = details?.retryAfter ?? null;
+    if (job.status === "QUEUED") {
+      await kickLocalRunner(request, job.id);
+    }
 
     return NextResponse.json({
       job: {
@@ -48,12 +58,10 @@ export async function GET(
         error: job.error,
         updatedAt: job.updatedAt,
         createdAt: job.createdAt,
-        retryAfter,
-        rateLimited: details?.rateLimited ?? false,
       },
     });
   } catch (error: any) {
-    console.error("Get analysis job error:", error);
+    console.error("Get analysis job error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(

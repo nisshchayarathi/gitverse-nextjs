@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { buildApiUrl } from "@/services/apiConfig";
@@ -83,12 +83,12 @@ export default function Contribute() {
 
   const isBusy = busyAction != null;
 
-  const getAuthHeaders = () => {
+  const getAuthHeaders = useCallback(() => {
     const token = localStorage.getItem("gitverse_token");
     return { Authorization: `Bearer ${token}` };
-  };
+  }, []);
 
-  const fetchConnectedRepos = async () => {
+  const fetchConnectedRepos = useCallback(async () => {
     try {
       const res = await axios.get(
         buildApiUrl("/api/integrations/github/connected-repos"),
@@ -116,7 +116,41 @@ export default function Contribute() {
     } catch {
       // best-effort
     }
-  };
+  }, [getAuthHeaders]);
+
+  const onLoadRepos = useCallback(async () => {
+    setReposError(null);
+    setBusyAction("refreshRepos");
+
+    try {
+      const res = await axios.post(
+        buildApiUrl("/api/integrations/github/repositories"),
+        {},
+        { headers: getAuthHeaders() },
+      );
+
+      const items = Array.isArray(res.data?.repositories)
+        ? res.data.repositories
+        : [];
+      setRepos(
+        items.map((r: any) => ({
+          id: Number(r.id),
+          full_name: String(r.full_name),
+          private: Boolean(r.private),
+          html_url: String(r.html_url),
+        })),
+      );
+    } catch (e: any) {
+      const message =
+        e?.response?.data?.error ||
+        e?.response?.data?.details ||
+        e?.message ||
+        "Failed to load repos";
+      setReposError(message);
+    } finally {
+      setBusyAction(null);
+    }
+  }, [getAuthHeaders]);
 
   useEffect(() => {
     void fetchConnectedRepos();
@@ -150,8 +184,7 @@ export default function Contribute() {
     } catch {
       // ignore
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchConnectedRepos, onLoadRepos]);
 
   useEffect(() => {
     const enabledRepos = connectedRepos.filter((r) => r.enabled);
@@ -254,40 +287,6 @@ export default function Contribute() {
         e?.response?.data?.details ||
         e?.message ||
         "Failed to delete GitHub App data";
-      setReposError(message);
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const onLoadRepos = async () => {
-    setReposError(null);
-    setBusyAction("refreshRepos");
-
-    try {
-      const res = await axios.post(
-        buildApiUrl("/api/integrations/github/repositories"),
-        {},
-        { headers: getAuthHeaders() },
-      );
-
-      const items = Array.isArray(res.data?.repositories)
-        ? res.data.repositories
-        : [];
-      setRepos(
-        items.map((r: any) => ({
-          id: Number(r.id),
-          full_name: String(r.full_name),
-          private: Boolean(r.private),
-          html_url: String(r.html_url),
-        })),
-      );
-    } catch (e: any) {
-      const message =
-        e?.response?.data?.error ||
-        e?.response?.data?.details ||
-        e?.message ||
-        "Failed to load repos";
       setReposError(message);
     } finally {
       setBusyAction(null);

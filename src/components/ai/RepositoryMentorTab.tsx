@@ -3,7 +3,30 @@
 import { useMemo } from "react";
 import { AIRepoMentorSection } from "@/components/ai/AIRepoMentorSection";
 
-export function RepositoryMentorTab(props: { repositoryData?: any }) {
+export interface MentorRepositoryContributor {
+  name?: string | null;
+  authorName?: string | null;
+  email?: string | null;
+  authorEmail?: string | null;
+  commits?: number | string | null;
+  additions?: number | string | null;
+  deletions?: number | string | null;
+}
+
+export interface MentorRepositoryData {
+  id?: number | string;
+  name?: string;
+  description?: string | null;
+  languages?: Array<{ name?: string }>;
+  readmeText?: string | null;
+  contributors?: MentorRepositoryContributor[];
+}
+
+export interface RepositoryMentorTabProps {
+  repositoryData?: MentorRepositoryData;
+}
+
+export function RepositoryMentorTab(props: RepositoryMentorTabProps) {
   const repositoryData = props.repositoryData;
 
   const repoName: string = repositoryData?.name || "Unknown";
@@ -13,8 +36,8 @@ export function RepositoryMentorTab(props: { repositoryData?: any }) {
   const languageNames = useMemo(
     () =>
       (repositoryData?.languages || [])
-        .map((l: any) => l?.name)
-        .filter(Boolean),
+        .map((l: { name?: string }) => l?.name)
+        .filter((name): name is string => Boolean(name)),
     [repositoryData?.languages],
   );
 
@@ -24,7 +47,7 @@ export function RepositoryMentorTab(props: { repositoryData?: any }) {
     const raw = Array.isArray(repositoryData?.contributors)
       ? repositoryData.contributors
       : [];
-    return raw.map((c: any) => ({
+    return raw.map((c: MentorRepositoryContributor) => ({
       name: c?.name ?? c?.authorName ?? null,
       email: c?.email ?? c?.authorEmail ?? null,
       commits:
