@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
-import { Card, EmptyState } from "@/components/ui";
-import { Calendar } from "lucide-react";
+import { Card } from "@/components/ui";
 
 interface CommitData {
   date: string;
@@ -10,18 +9,35 @@ interface CommitData {
   hour: number;
 }
 
+export interface HeatmapCommit {
+  id?: string;
+  message?: string;
+  authorName?: string;
+  shortHash?: string;
+  committedAt?: string | Date;
+  createdAt?: string | Date;
+  additions?: number;
+  deletions?: number;
+}
+
+export interface HeatmapRepository {
+  commits?: HeatmapCommit[];
+}
+
 interface CommitActivityHeatmapProps {
-  repository?: any;
+  repository?: HeatmapRepository;
 }
 
 // Generate commit activity data from repository commits
-const generateCommitData = (commits: any[], now: Date): CommitData[] => {
+const generateCommitData = (commits: HeatmapCommit[], now: Date): CommitData[] => {
   const data: CommitData[] = [];
   const commitsByDate = new Map<string, number>();
 
   // Count commits by date
-  commits?.forEach((commit: any) => {
-    const date = new Date(commit.committedAt || commit.createdAt);
+  commits?.forEach((commit: HeatmapCommit) => {
+    const dateVal = commit.committedAt || commit.createdAt;
+    if (!dateVal) return;
+    const date = new Date(dateVal);
     const dateStr = date.toISOString().split("T")[0];
     commitsByDate.set(dateStr, (commitsByDate.get(dateStr) || 0) + 1);
   });
@@ -348,10 +364,9 @@ export function CommitActivityHeatmap({
   // Get commits for selected date
   const getCommitsForDate = (date: string) => {
     return (
-      repository?.commits?.filter((commit: any) => {
-        const commitDate = new Date(commit.committedAt || commit.createdAt)
-          .toISOString()
-          .split("T")[0];
+      repository?.commits?.filter((commit: HeatmapCommit) => {
+        const dateVal = commit.committedAt || commit.createdAt;
+        const commitDate = dateVal ? new Date(dateVal).toISOString().split("T")[0] : "";
         return commitDate === date;
       }) || []
     );
@@ -369,16 +384,8 @@ export function CommitActivityHeatmap({
           Contribution activity over the last 52 weeks
         </p>
       </div>
-      {!repository?.commits || repository.commits.length === 0 ? (
-        <EmptyState
-          icon={Calendar}
-          title="No commit activity"
-          description="We couldn't find any commit history recorded for this repository."
-        />
-      ) : (
-        <>
-          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-            <svg
+      <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <svg
           ref={svgRef}
           width={`${Math.max(1200, svgRef.current?.parentElement?.clientWidth || 900)}`}
           height="250"
@@ -414,7 +421,7 @@ export function CommitActivityHeatmap({
           </div>
 
           <div className="space-y-2 max-h-48 sm:max-h-60 overflow-y-auto">
-            {selectedCommits.map((commit: any) => (
+            {selectedCommits.map((commit: HeatmapCommit) => (
               <div
                 key={commit.id}
                 className="p-2 sm:p-3 bg-background/30 rounded border border-border/30 hover:border-border/60 transition-colors"
@@ -430,24 +437,24 @@ export function CommitActivityHeatmap({
                       <span className="font-mono">{commit.shortHash}</span>
                       <span className="hidden sm:inline">•</span>
                       <span>
-                        {new Date(commit.committedAt).toLocaleTimeString(
+                        {commit.committedAt || commit.createdAt ? new Date(commit.committedAt || commit.createdAt || "").toLocaleTimeString(
                           "en-US",
                           {
                             hour: "2-digit",
                             minute: "2-digit",
                           }
-                        )}
+                        ) : "Unknown"}
                       </span>
                     </div>
                   </div>
-                  {commit.additions > 0 || commit.deletions > 0 ? (
+                  {(commit.additions || 0) > 0 || (commit.deletions || 0) > 0 ? (
                     <div className="flex items-center gap-2 text-xs flex-shrink-0">
-                      {commit.additions > 0 && (
+                      {(commit.additions || 0) > 0 && (
                         <span className="text-green-400">
                           +{commit.additions}
                         </span>
                       )}
-                      {commit.deletions > 0 && (
+                      {(commit.deletions || 0) > 0 && (
                         <span className="text-red-400">
                           -{commit.deletions}
                         </span>
@@ -459,8 +466,6 @@ export function CommitActivityHeatmap({
             ))}
           </div>
         </div>
-      )}
-        </>
       )}
 
 <div

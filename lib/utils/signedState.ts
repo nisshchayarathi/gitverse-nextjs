@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { getNextAuthSecret } from "../config/env";
 
 function base64UrlEncode(input: Buffer | string): string {
   const buf = typeof input === "string" ? Buffer.from(input, "utf8") : input;
@@ -19,8 +20,7 @@ function base64UrlDecodeToString(input: string): string {
 function getSecret(): string {
   const secret = (
     process.env.GITHUB_APP_STATE_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
-    ""
+    getNextAuthSecret()
   ).trim();
   if (!secret) {
     throw new Error(

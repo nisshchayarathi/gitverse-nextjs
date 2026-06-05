@@ -65,7 +65,6 @@ export function SavedModulesPanel({
             icon={Star}
             title="No bookmarked modules"
             description="Bookmark important repository areas to revisit them later."
-            compact
           />
         )}
       </CardContent>

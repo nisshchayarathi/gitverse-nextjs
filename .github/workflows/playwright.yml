@@ -1,0 +1,38 @@
+name: Playwright Tests
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: lts/*
+        cache: 'npm'
+    - name: Install dependencies
+      run: npm ci
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+    - name: Generate Prisma Client
+      run: npx prisma generate
+    - name: Run Playwright tests
+      run: npm run test:e2e
+      env:
+        DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+        JWT_SECRET: "dummy-secret"
+        NEXTAUTH_SECRET: "dummy-secret"
+        NEXTAUTH_URL: "http://localhost:3000"
+        GEMINI_API_KEY: "dummy-key"
+        INTERNAL_WORKER_SECRET: "dummy-secret"
+        TOKEN_ENCRYPTION_KEY: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 30

@@ -4,7 +4,7 @@ This is the Next.js version of GitVerse, migrated from the Vite + React version 
 
 ## Prerequisites
 
-- Node.js 22.x installed (see [Supported Node Version](README.md#supported-node-version))
+- **Node.js 22.x** (see [Supported Node Version](README.md#supported-node-version) in README)
 - PostgreSQL database (NeonDB recommended)
 - Google Gemini AI API key
 
@@ -230,3 +230,65 @@ For issues or questions:
 ---
 
 **Note**: This is a complete migration of the original Vite project to Next.js. All features and UI remain identical.
+
+
+## Setting Up GitHub App (for PR Reviews)
+
+### Step 1: Create a GitHub App
+
+1. Go to **GitHub → Settings → Developer settings → GitHub Apps**
+2. Click **New GitHub App**
+3. Fill in:
+   - **App name:** `gitverse-your-username` (must be unique)
+   - **Homepage URL:** `https://your-app.vercel.app`
+   - **Webhook URL:** `https://your-app.vercel.app/api/webhooks/github`
+   - **Webhook secret:** Generate any random string — save it as `GITHUB_WEBHOOK_SECRET`
+4. Set **Permissions:**
+   - Pull requests → **Read & Write**
+   - Contents → **Read only**
+   - Issues → **Read & Write**
+5. Click **Create GitHub App**
+
+### Step 2: Get Your Credentials
+
+After creating the app:
+
+- Copy **App ID** → save as `GITHUB_APP_ID`
+- Copy **App slug** (from the URL) → save as `GITHUB_APP_SLUG`
+- Scroll down → click **Generate a private key** → downloads a `.pem` file
+
+### Step 3: Format the Private Key
+
+**For local `.env.local`:**
+```bash
+# Open the .pem file and copy its contents
+# Replace actual newlines with \n — paste as a single line:
+GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----"
+```
+
+**For Vercel:**
+1. Open the `.pem` file in a text editor
+2. Copy the **entire content** (including BEGIN/END lines)
+3. In Vercel Dashboard → Environment Variables → paste as-is (Vercel handles multiline automatically)
+
+### Step 4: Install the App on Your Repo
+
+1. Go to your GitHub App → **Install App**
+2. Select your repository
+3. Click **Install**
+
+---
+
+## Troubleshooting: GitHub App Issues
+
+### Webhook not receiving events
+- Check that `GITHUB_WEBHOOK_SECRET` matches exactly what you set in GitHub App settings
+- Check logs at: **Vercel Dashboard → Functions → Logs**
+
+### "Bad credentials" error
+- `GITHUB_APP_PRIVATE_KEY` format is incorrect — ensure `\n` is a literal backslash-n, not an actual newline
+- `GITHUB_APP_ID` must contain numeric digits only — do not add extra quotes or spaces
+
+### Private key error on Vercel
+- When pasting in Vercel, copy the **entire content** of the `.pem` file
+- The full PEM block must be preserved — header may be `-----BEGIN RSA PRIVATE KEY-----` or `-----BEGIN PRIVATE KEY-----` depending on your key format

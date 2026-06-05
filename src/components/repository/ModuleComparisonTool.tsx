@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, EmptyState, 
 import { ModuleSelector } from "./ModuleSelector";
 import { ModuleComparisonCard } from "./ModuleComparisonCard";
 import { getModuleMetadata } from "@/config/moduleMetadata";
-import { X } from "lucide-react";
+import { X, GitCompare } from "lucide-react";
 
 export function ModuleComparisonTool() {
   const [moduleOne, setModuleOne] = useState<string | null>(null);
@@ -146,10 +146,9 @@ export function ModuleComparisonTool() {
           </div>
         ) : (
           <EmptyState
-            icon={undefined}
+            icon={GitCompare}
             title="Select two modules to compare"
             description="Choose two different modules to see their purpose, complexity, and how they differ in your repository architecture."
-            compact
           />
         )}
       </CardContent>

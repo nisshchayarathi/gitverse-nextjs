@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   GitBranch,
@@ -8,11 +8,16 @@ import {
   Code,
   Sparkles,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Check,
   Link2,
   MessageSquare,
   Loader2,
 } from "lucide-react";
+import { RecentReposList } from "@/components/RecentReposList";
+import { useRecentRepos } from "@/hooks/useRecentRepos";
+import { isValidGithubUrl } from "@/lib/utils/validators";
 import { Navbar, Footer } from "@/components/layout";
 import {
   Button,
@@ -24,11 +29,19 @@ import {
   CardContent,
 } from "@/components/ui";
 
+
 export default function LandingPage() {
   const router = useRouter();
   const [repoUrl, setRepoUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [scoreAnimate, setScoreAnimate] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeFeatureIndex, setActiveFeatureIndex] = useState(0);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+  const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const isAnalyzeDisabled = !repoUrl.trim() || isLoading;
+  
+  const { addRepo } = useRecentRepos();
 
   const mentorMessages = useMemo(
     () => [
@@ -57,7 +70,6 @@ export default function LandingPage() {
     }
 
     const rafId = window.requestAnimationFrame(() => {
-      // Trigger CSS transitions (e.g., score ring fill) after first paint.
       setScoreAnimate(true);
     });
 
@@ -127,6 +139,29 @@ export default function LandingPage() {
 
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!repoUrl.trim() || isLoading) return;
+
+    setError(null);
+
+    // Strict GitHub URL validation on submission
+    if (!isValidGithubUrl(repoUrl)) {
+      setError("Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo).");
+      return;
+    }
+
+    // Extract repository owner and name from the URL
+    const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
+    const urlParts = cleanUrl.split("/");
+    const name = urlParts[urlParts.length - 1] || "";
+    const owner = urlParts[urlParts.length - 2] || "";
+
+    if (name && owner) {
+      addRepo({
+        owner,
+        name,
+        url: repoUrl.trim(),
+      });
+    }
 
     // Demo-only CTA: keep it as UI (no navigation / no analysis).
     setIsLoading(true);
@@ -179,6 +214,38 @@ export default function LandingPage() {
         "Production readiness assessment, architecture pattern recognition, and intelligent recommendations.",
     },
   ];
+
+  const totalFeatures = features.length;
+  const activeFeature = features[activeFeatureIndex];
+
+  useEffect(() => {
+    if (isCarouselPaused) return;
+
+    const intervalId = window.setInterval(() => {
+      setActiveFeatureIndex((index) => (index + 1) % totalFeatures);
+    }, 6500);
+
+    return () => window.clearInterval(intervalId);
+  }, [totalFeatures, isCarouselPaused]);
+
+  useEffect(() => {
+    const activeSlide = slideRefs.current[activeFeatureIndex];
+    if (activeSlide) {
+      activeSlide.scrollIntoView({
+        behavior: "smooth",
+        inline: "center",
+        block: "nearest",
+      });
+    }
+  }, [activeFeatureIndex]);
+
+  const goPrev = () => {
+    setActiveFeatureIndex((i) => (i - 1 + totalFeatures) % totalFeatures);
+  };
+
+  const goNext = () => {
+    setActiveFeatureIndex((i) => (i + 1) % totalFeatures);
+  };
 
   const howItWorks = [
     {
@@ -377,16 +444,17 @@ export default function LandingPage() {
                     type="url"
                     placeholder="https://github.com/username/repository"
                     value={repoUrl}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setRepoUrl(e.target.value)
-                    }
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      setRepoUrl(e.target.value);
+                      setError(null);
+                    }}
                     className="flex-1 h-12 bg-background/50 border-0 text-base placeholder:text-muted-foreground/60 focus-visible:ring-primary"
                   />
                   <Button
                     type="submit"
                     size="lg"
-                    disabled={isLoading}
-                    className="group h-12 px-6 bg-gradient-primary hover:opacity-90 transition-opacity font-semibold transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                    disabled={isAnalyzeDisabled}
+                    className="group h-12 px-6 bg-gradient-primary font-semibold transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
                   >
                     {isLoading ? (
                       <>
@@ -403,10 +471,20 @@ export default function LandingPage() {
                 </div>
                 <div className="cta-shell__scan" aria-hidden="true" />
               </div>
+              {error && (
+                <p className="text-sm text-red-500 font-medium mt-2">
+                  ⚠️ {error}
+                </p>
+              )}
               <p className="text-sm text-muted-foreground mt-3">
                 Demo UI only — real analysis happens after install/sign up.
               </p>
+
             </form>
+
+            {/* Recent Repositories */}
+            <RecentReposList />
+
 
             {/* Demos */}
             <div
@@ -561,36 +639,102 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="marquee marquee--pause-on-hover reveal" data-reveal>
-            <div
-              className="marquee__track gap-6 py-2"
-              style={{ ["--marquee-duration"]: "34s" } as React.CSSProperties}
+          <div
+            className="feature-carousel"
+            role="region"
+            aria-roledescription="carousel"
+            aria-label="GitVerse features"
+            onMouseEnter={() => setIsCarouselPaused(true)}
+            onMouseLeave={() => setIsCarouselPaused(false)}
+            onFocus={() => setIsCarouselPaused(true)}
+            onBlur={() => setIsCarouselPaused(false)}
+            onTouchStart={() => setIsCarouselPaused(true)}
+            onTouchEnd={() => setIsCarouselPaused(false)}
+            onTouchCancel={() => setIsCarouselPaused(false)}
+          >
+            <button
+              className="feature-carousel__nav feature-carousel__nav--left"
+              aria-label="Previous feature"
+              onClick={goPrev}
             >
-              {[...features, ...features].map((feature, index) => (
-                <Card
-                  key={`${feature.title}-${index}`}
-                  className="glass feature-card group shrink-0 w-[320px] md:w-[360px]"
-                >
-                  <CardHeader>
-                    <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <feature.icon className="h-6 w-6 text-primary-foreground" />
-                    </div>
-                    <CardTitle className="font-heading">
-                      {feature.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-muted-foreground text-base">
-                      {feature.description}
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              ))}
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <div className="feature-carousel__viewport">
+              <div className="feature-carousel__track">
+                {features.map((feature, index) => (
+                  <div
+                    key={feature.title}
+                    ref={(el) => { slideRefs.current[index] = el; }}
+                    className={`feature-carousel__slide ${
+                      index === activeFeatureIndex ? "active" : ""
+                    } cursor-pointer`}
+                    aria-current={index === activeFeatureIndex ? "true" : undefined}
+                    aria-label={`${feature.title} (${index + 1} of ${totalFeatures})`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setActiveFeatureIndex(index);
+                      const el = slideRefs.current[index];
+                      if (el && typeof el.scrollIntoView === 'function') {
+                        el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setActiveFeatureIndex(index);
+                        const el = slideRefs.current[index];
+                        if (el && typeof el.scrollIntoView === 'function') {
+                          el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        }
+                      }
+                    }}
+                  >
+                    <Card className="glass feature-card group w-full">
+                      <CardHeader>
+                        <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                          <feature.icon className="h-6 w-6 text-primary-foreground" />
+                        </div>
+                        <CardTitle className="font-heading">
+                          {feature.title}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <CardDescription className="text-muted-foreground text-base">
+                          {feature.description}
+                        </CardDescription>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ))}
+              </div>
             </div>
+            <button
+              className="feature-carousel__nav feature-carousel__nav--right"
+              aria-label="Next feature"
+              onClick={goNext}
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
 
-            {/* Edge fades */}
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-background to-transparent" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background to-transparent" />
+            <div className="feature-carousel__controls" aria-label="Feature navigation">
+              <div className="flex items-center justify-center gap-2">
+                {features.map((feature, index) => (
+                  <button
+                    key={feature.title}
+                    type="button"
+                    onClick={() => setActiveFeatureIndex(index)}
+                    aria-label={`Show ${feature.title}`}
+                    aria-current={index === activeFeatureIndex ? "true" : "false"}
+                    className={`feature-carousel__dot ${
+                      index === activeFeatureIndex
+                        ? "bg-primary"
+                        : "bg-border/40 hover:opacity-80"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -675,7 +819,7 @@ export default function LandingPage() {
             {pricingPlans.map((plan) => (
               <Card
                 key={plan.name}
-                className={`relative glass ${plan.popular ? "border-primary glow-primary" : "glass-hover"}`}
+                className={`relative glass transition-all duration-300 ${plan.popular ? "border-primary glow-primary" : "border-border/50 hover:border-primary hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1"}`}
               >
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-primary rounded-full text-sm font-medium text-primary-foreground">
