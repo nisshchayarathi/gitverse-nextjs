@@ -1,6 +1,7 @@
 import PageTransition from "@/components/PageTransition";
 
 import "@/lib/env";
+import { AnimatePresence, motion } from "framer-motion";
 import { ReactNode } from "react";
 import { Metadata } from "next";
 import { Inter, Source_Sans_3 } from "next/font/google";
@@ -11,6 +12,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import { FocusRingManager } from "@/components/ui/FocusRingManager";
 import ProgressBarProvider from "@/components/providers/ProgressBarProvider";
+import { usePathname } from "next/navigation";
 import "./globals.css";
 
 const inter = Inter({
@@ -38,6 +40,8 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${sourceSans.variable}`}>
@@ -54,9 +58,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <FocusRingManager />
               <ProgressBarProvider>
                 <main id="main-content">
-                  <PageTransition>
-                    {children}
-                  </PageTransition>
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={pathname}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      {children}
+                    </motion.div>
+                  </AnimatePresence>
                 </main>
               </ProgressBarProvider>
 
