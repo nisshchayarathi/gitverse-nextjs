@@ -23,7 +23,7 @@ interface DeadCodeDetectorProps {
 }
 
 export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetectorProps) {
-  const files = (repository?.files || []) as RepositoryFile[];
+  const files = useMemo(() => (repository?.files || []) as RepositoryFile[], [repository?.files]);
 
   const report = useMemo(() => {
     if (!files.length) return null;

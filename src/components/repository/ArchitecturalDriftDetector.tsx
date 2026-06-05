@@ -34,7 +34,7 @@ interface ArchitecturalDriftDetectorProps {
 }
 
 export function ArchitecturalDriftDetector({ repository, loading = false }: ArchitecturalDriftDetectorProps) {
-  const files = (repository?.files || []) as RepositoryFile[];
+  const files = useMemo(() => (repository?.files || []) as RepositoryFile[], [repository?.files]);
   const [viewMode, setViewMode] = useState<"overview" | "comparison">("overview");
 
   const { currentSnapshot, health } = useMemo(() => {

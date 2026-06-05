@@ -1,6 +1,6 @@
 import { HTMLAttributes } from "react";
 
-interface ChecklistItemProps extends HTMLAttributes<HTMLLabelElement> {
+interface ChecklistItemProps extends Omit<HTMLAttributes<HTMLLabelElement>, "onToggle"> {
   id: string;
   label: string;
   checked: boolean;

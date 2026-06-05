@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  
+  "functions": {
+    "app/api/internal/run-analysis/route.ts": {
+      "maxDuration": 300
+    }
+  },
+
+  "crons": [
+    {
+      "path": "/api/cron/webhook-recovery",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/analysis-job-cleanup",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

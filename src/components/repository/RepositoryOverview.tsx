@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useMemo, Children, isValidElement } from "react";
 import {
   AlertTriangle,
   GitBranch,
@@ -14,7 +14,16 @@ import {
   Activity,
   TrendingUp,
   ExternalLink,
+  Sparkles,
+  Edit2,
+  Copy,
+  Save,
+  Check,
+  RefreshCw,
+  Loader2,
+  Package,
 } from "lucide-react";
+import Link from "next/link";
 import {
   Button,
   Card,
@@ -24,6 +33,8 @@ import {
   CardContent,
   EmptyState,
   Input,
+  Skeleton,
+  CopyToClipboard,
 } from "@/components/ui";
 import { BeginnerModeToggle } from "@/components/repository/BeginnerModeToggle";
 import { BeginnerGuidanceCard } from "@/components/repository/BeginnerGuidanceCard";
@@ -47,6 +58,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import { Modal } from "@/components/ui/Modal";
+import { useToast } from "@/hooks/use-toast";
+import { buildApiUrl } from "@/services/apiConfig";
+import axios from "axios";
+import { FavoriteButton } from "./FavoriteButton";
+
 
 interface RepositoryData {
   id: string;
@@ -73,6 +90,113 @@ interface RepositoryOverviewProps {
 export const RepositoryOverview = ({
   repositoryData,
 }: RepositoryOverviewProps) => {
+  const [isFavorited, setIsFavorited] = useState(false);
+
+  const { toast } = useToast();
+  const [isReadmeModalOpen, setIsReadmeModalOpen] = useState(false);
+  const [isGeneratingReadme, setIsGeneratingReadme] = useState(false);
+  const [generatedReadme, setGeneratedReadme] = useState("");
+  const [editorText, setEditorText] = useState("");
+  const [editorMode, setEditorMode] = useState<"edit" | "preview">("preview");
+  const [isSavingReadme, setIsSavingReadme] = useState(false);
+  const [hasCopied, setHasCopied] = useState(false);
+
+  const handleGenerateReadme = async () => {
+    setIsGeneratingReadme(true);
+    setIsReadmeModalOpen(true);
+    setEditorMode("preview");
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      const response = await axios.post(
+        buildApiUrl("/api/ai/generate-readme"),
+        { repositoryId: Number(repository.id) },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const readme = response.data.markdown;
+      setGeneratedReadme(readme);
+      setEditorText(readme);
+    } catch (error: any) {
+      console.error("Error generating README:", error);
+      toast({
+        title: "Generation failed",
+        description: error.response?.data?.error || "Failed to generate README using Gemini.",
+        variant: "destructive",
+      });
+      setIsReadmeModalOpen(false);
+    } finally {
+      setIsGeneratingReadme(false);
+    }
+  };
+
+  const handleCopyReadme = async () => {
+    try {
+      await navigator.clipboard.writeText(editorText);
+      setHasCopied(true);
+      toast({
+        title: "Copied",
+        description: "Markdown copied to clipboard successfully.",
+      });
+      setTimeout(() => setHasCopied(false), 2000);
+    } catch (err) {
+      toast({
+        title: "Failed to copy",
+        description: "Could not copy text to clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveReadme = async () => {
+    setIsSavingReadme(true);
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      await axios.put(
+        buildApiUrl(`/api/repositories/${repository.id}/readme`),
+        { readmeText: editorText, readmePath: readmePath || "README.md" },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      toast({
+        title: "README Saved",
+        description: "Successfully updated repository README in the database.",
+      });
+
+      // Update local view of repositoryData
+      if (repositoryData) {
+        repositoryData.readmeText = editorText;
+        if (!repositoryData.readmePath) {
+          repositoryData.readmePath = "README.md";
+        }
+      }
+      setIsReadmeModalOpen(false);
+    } catch (error: any) {
+      console.error("Error saving README:", error);
+      toast({
+        title: "Save failed",
+        description: error.response?.data?.error || "Failed to save README changes.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingReadme(false);
+    }
+  };
+
+  const handleToggleFavorite = async (id: string, nextState: boolean) => {
+    // Simulate server API latency of 1.5 seconds
+    await new Promise((resolve, reject) => {
+      setTimeout(() => {
+        // Simulate a 30% chance of failure to showcase the try/catch rollback
+        if (Math.random() > 0.7) {
+          reject(new Error("Database connection lost. Please try again."));
+        } else {
+          setIsFavorited(nextState);
+          resolve(null);
+        }
+      }, 1500);
+    });
+  };
+
   // IMPORTANT: derive README directly from props so it always matches the
   // currently-selected repository (avoids showing stale README when navigating).
   const readmeText: string | null = repositoryData?.readmeText ?? null;
@@ -168,14 +292,14 @@ export const RepositoryOverview = ({
     setSelectedIssue(null);
   };
 
-  const MODULE_GUIDANCE: Record<
+  const MODULE_GUIDANCE = useMemo<Record<
     string,
     {
       description: string;
       recommendation: string;
       difficulty: "beginner" | "intermediate" | "advanced";
     }
-  > = {
+  >>(() => ({
     components: {
       description:
         "Contains reusable UI building blocks used throughout the application.",
@@ -207,7 +331,7 @@ export const RepositoryOverview = ({
       recommendation: "Requires understanding of security flows.",
       difficulty: "advanced",
     },
-  };
+  }), []);
 
   const ARCHITECTURE_GUIDANCE: Record<string, string> = {
     services:
@@ -234,7 +358,7 @@ export const RepositoryOverview = ({
     return Array.from(segments).filter((segment) =>
       Object.prototype.hasOwnProperty.call(MODULE_GUIDANCE, segment),
     );
-  }, [repositoryData?.files]);
+  }, [repositoryData?.files, MODULE_GUIDANCE]);
 
   const hotspotGuidance = useMemo(() => {
     const filePaths = (repositoryData?.files || []).map((file: any) =>
@@ -320,6 +444,9 @@ export const RepositoryOverview = ({
   }));
 
   const hasUsableReadme = Boolean(readmeText && readmeText !== "doesnt exist");
+  const isAnalyzing =
+    repositoryData?.status === "pending" ||
+    repositoryData?.status === "analyzing";
 
   const githubRawBase = (() => {
     const url = String(repositoryData?.url || "");
@@ -427,6 +554,16 @@ export const RepositoryOverview = ({
               <span className="px-2 py-1 rounded-full text-xs bg-accent/10 text-accent flex-shrink-0">
                 {repository.language}
               </span>
+              {repositoryData?.parent && (
+                <Link
+                  href={`/repo/${repositoryData.parent.id}`}
+                  className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary flex items-center gap-1 hover:bg-primary/20 transition-colors flex-shrink-0"
+                  title="View Parent Repository"
+                >
+                  <Package className="h-3 w-3" />
+                  Part of {repositoryData.parent.name}
+                </Link>
+              )}
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground mb-3 break-words">
               {repository.description}
@@ -452,6 +589,14 @@ export const RepositoryOverview = ({
                 Updated {repository.updatedAt}
               </span>
             </div>
+          </div>
+          {/* Favorite Action Button */}
+          <div className="flex-shrink-0 self-start sm:self-center">
+            <FavoriteButton
+              initialIsFavorited={isFavorited}
+              repositoryId={repository.id}
+              onToggle={handleToggleFavorite}
+            />
           </div>
         </div>
 
@@ -664,6 +809,42 @@ export const RepositoryOverview = ({
         <FolderImportanceGuide />
       </div>
 
+      {/* Monorepo Sub-packages */}
+      {repositoryData?.subPackages && repositoryData.subPackages.length > 0 && (
+        <Card className="glass border border-primary/20 bg-primary/5">
+          <CardHeader className="p-4 sm:p-6 pb-2">
+            <CardTitle className="font-heading text-lg sm:text-xl flex items-center gap-2 text-primary">
+              <Package className="h-5 w-5" />
+              Monorepo Workspaces
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              This repository contains multiple packages. Select one to view its isolated analysis.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {repositoryData.subPackages.map((subPkg: any) => (
+                <Link
+                  key={subPkg.id}
+                  href={`/repo/${subPkg.id}`}
+                  className="p-3 rounded-xl border border-border/50 bg-background/50 hover:bg-background/80 hover:border-primary/50 transition-all group flex flex-col gap-1"
+                >
+                  <div className="font-medium flex items-center justify-between">
+                    <span className="truncate">{subPkg.targetDirectory}</span>
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+                  </div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {subPkg.status}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Repository Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {stats.map((stat, index) => (
@@ -707,32 +888,24 @@ export const RepositoryOverview = ({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0 sm:pt-0">
-            {languages.length > 0 ? (
-              languages.map((lang: any) => (
-                <div key={lang.name}>
-                  <div className="flex items-center justify-between mb-2 gap-2">
-                    <span className="text-xs sm:text-sm font-medium truncate">
-                      {lang.name}
-                    </span>
-                    <span className="text-xs sm:text-sm text-muted-foreground flex-shrink-0">
-                      {lang.percentage}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div
-                      className={`${lang.color} h-2 rounded-full transition-all`}
-                      style={{ width: `${lang.percentage}%` }}
-                    />
-                  </div>
+            {languages.map((lang: any) => (
+              <div key={lang.name}>
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <span className="text-xs sm:text-sm font-medium truncate">
+                    {lang.name}
+                  </span>
+                  <span className="text-xs sm:text-sm text-muted-foreground flex-shrink-0">
+                    {lang.percentage}%
+                  </span>
                 </div>
-              ))
-            ) : (
-              <EmptyState
-                icon={Code}
-                title="No language data"
-                description="We couldn't detect any programming languages."
-              />
-            )}
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className={`${lang.color} h-2 rounded-full transition-all`}
+                    style={{ width: `${lang.percentage}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 
@@ -747,34 +920,26 @@ export const RepositoryOverview = ({
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
-            {recentActivity.length > 0 ? (
-              <div className="space-y-3 sm:space-y-4">
-                {recentActivity.map((activity: any, index: number) => (
-                  <div key={index} className="flex items-start gap-2 sm:gap-3">
-                    <div className="mt-1 p-1.5 rounded-full bg-accent/10 flex-shrink-0">
-                      <Activity className="h-3 w-3 text-accent" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm">
-                        <span className="font-medium">{activity.user}</span>{" "}
-                        <span className="text-muted-foreground break-words">
-                          {activity.message}
-                        </span>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {activity.time}
-                      </p>
-                    </div>
+            <div className="space-y-3 sm:space-y-4">
+              {recentActivity.map((activity: any, index: number) => (
+                <div key={index} className="flex items-start gap-2 sm:gap-3">
+                  <div className="mt-1 p-1.5 rounded-full bg-accent/10 flex-shrink-0">
+                    <Activity className="h-3 w-3 text-accent" />
                   </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={Activity}
-                title="No activity history"
-                description="No recent commits recorded."
-              />
-            )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm">
+                      <span className="font-medium">{activity.user}</span>{" "}
+                      <span className="text-muted-foreground break-words">
+                        {activity.message}
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {activity.time}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -782,16 +947,40 @@ export const RepositoryOverview = ({
       {/* README */}
       <div className="grid grid-cols-1 gap-4 sm:gap-6">
         <Card className="glass">
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="font-heading text-lg sm:text-xl">
-              README
-            </CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
-              {readmePath ? `Showing ${readmePath}` : "README"}
-            </CardDescription>
+          <CardHeader className="p-4 sm:p-6 flex flex-row items-center justify-between gap-4 flex-wrap">
+            <div>
+              <CardTitle className="font-heading text-lg sm:text-xl">
+                README
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                {readmePath ? `Showing ${readmePath}` : "README"}
+              </CardDescription>
+            </div>
+            <button
+              onClick={handleGenerateReadme}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/95 text-primary-foreground text-xs font-semibold shadow-lg shadow-primary/20 transition-all duration-300 transform hover:scale-105"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Generate AI README
+            </button>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-3">
-            {hasUsableReadme ? (
+            {isAnalyzing && !hasUsableReadme ? (
+              <div className="bg-background/50 border border-border/50 rounded-lg p-4 space-y-4" aria-busy="true" aria-label="Loading README">
+                <Skeleton className="h-8 w-1/3 sm:w-1/4" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-11/12" />
+                  <Skeleton className="h-4 w-5/6" />
+                </div>
+                <div className="pt-4 space-y-2">
+                  <Skeleton className="h-6 w-1/4 sm:w-1/5" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-4/5" />
+                  <Skeleton className="h-32 w-full mt-4" />
+                </div>
+              </div>
+            ) : hasUsableReadme ? (
               <div className="bg-background/50 border border-border/50 rounded-lg p-3 max-h-96 overflow-auto text-sm leading-relaxed">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -854,6 +1043,7 @@ export const RepositoryOverview = ({
                             : "";
 
                       return (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={resolved}
                           alt={alt || ""}
@@ -886,12 +1076,31 @@ export const RepositoryOverview = ({
                         </code>
                       );
                     },
-                    pre: (props) => (
-                      <pre
-                        className="my-3 p-3 rounded-lg bg-black/30 overflow-auto"
-                        {...props}
-                      />
-                    ),
+                    pre: ({ children, ...props }) => {
+                      let codeText = "";
+                      Children.forEach(children, (child) => {
+                        if (isValidElement(child) && child.props) {
+                          codeText = String(child.props.children || "");
+                        }
+                      });
+
+                      return (
+                        <div className="relative group my-3">
+                          <pre
+                            className="p-3 rounded-lg bg-black/30 overflow-auto"
+                            {...props}
+                          >
+                            {children}
+                          </pre>
+                          {codeText && (
+                            <CopyToClipboard
+                              text={codeText.replace(/\n$/, "")}
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                            />
+                          )}
+                        </div>
+                      );
+                    },
                     ul: (props) => (
                       <ul
                         className="list-disc pl-6 my-2 space-y-1"
@@ -948,6 +1157,170 @@ export const RepositoryOverview = ({
           </CardContent>
         </Card>
       </div>
+
+      {/* AI README Builder Modal */}
+      <Modal
+        isOpen={isReadmeModalOpen}
+        onClose={() => !isGeneratingReadme && !isSavingReadme && setIsReadmeModalOpen(false)}
+        title="AI README Builder"
+        size="xl"
+      >
+        {isGeneratingReadme ? (
+          <div className="flex flex-col items-center justify-center py-16 space-y-6 text-center">
+            <div className="relative">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
+              <Sparkles className="h-6 w-6 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold mb-2">Analyzing Repository & Drafting README</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Gemini is analyzing the file structure and manifest dependencies to build a highly accurate, technical README for your project...
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col h-[70vh] max-h-[600px] text-foreground">
+            {/* Toolbar / Tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4 mb-4 gap-3">
+              <div className="flex bg-secondary-100 dark:bg-secondary-900 p-1 rounded-lg self-start">
+                <button
+                  onClick={() => setEditorMode("preview")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${editorMode === "preview"
+                    ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Preview
+                </button>
+                <button
+                  onClick={() => setEditorMode("edit")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${editorMode === "edit"
+                    ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                  Edit Markdown
+                </button>
+              </div>
+              <div className="flex items-center gap-2 self-end">
+                <button
+                  onClick={handleGenerateReadme}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-secondary-100 dark:hover:bg-secondary-900 text-xs font-semibold transition-all"
+                  title="Regenerate README"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Regenerate
+                </button>
+                <button
+                  onClick={handleCopyReadme}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-secondary-100 dark:hover:bg-secondary-900 text-xs font-semibold transition-all"
+                >
+                  {hasCopied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleSaveReadme}
+                  disabled={isSavingReadme}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/95 text-primary-foreground text-xs font-semibold shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
+                >
+                  {isSavingReadme ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-3.5 w-3.5" />
+                      <span>Save to Overview</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Editor Workspace */}
+            <div className="flex-1 overflow-hidden min-h-0 border border-border rounded-lg bg-background/50">
+              {editorMode === "edit" ? (
+                <textarea
+                  value={editorText}
+                  onChange={(e) => setEditorText(e.target.value)}
+                  className="w-full h-full p-4 font-mono text-sm bg-black/15 text-foreground focus:outline-none resize-none overflow-y-auto leading-relaxed border-0 focus:ring-0"
+                  placeholder="Paste or write Markdown here..."
+                />
+              ) : (
+                <div className="w-full h-full p-4 overflow-y-auto text-sm leading-relaxed max-h-[400px]">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[
+                      rehypeRaw,
+                      [rehypeSanitize, readmeSanitizeSchema],
+                    ]}
+                    components={{
+                      h1: (props) => <h1 className="text-xl sm:text-2xl font-bold mt-2 mb-3 border-b border-border/45 pb-2" {...props} />,
+                      h2: (props) => <h2 className="text-lg sm:text-xl font-semibold mt-5 mb-2 border-b border-border/25 pb-1" {...props} />,
+                      h3: (props) => <h3 className="text-base sm:text-lg font-semibold mt-4 mb-2" {...props} />,
+                      p: (props) => <p className="my-2 text-sm leading-relaxed text-muted-foreground" {...props} />,
+                      a: ({ href, children, ...props }) => (
+                        <a
+                          href={resolveRepoRelativeUrl(String(href || ""), "link")}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline underline-offset-2 hover:text-primary/85 transition-colors"
+                          {...props}
+                        >
+                          {children}
+                        </a>
+                      ),
+                      img: ({ src, alt, title, ...props }) => {
+                        const resolved = resolveRepoRelativeUrl(String(src || ""), "image");
+                        // eslint-disable-next-line @next/next/no-img-element
+                        return <img src={resolved} alt={alt || ""} title={title} loading="lazy" className="max-w-full h-auto rounded-md my-3" {...props} />;
+                      },
+                      code: ({ className, children, ...props }) => {
+                        const isBlock = Boolean(className);
+                        if (!isBlock) {
+                          return <code className="px-1.5 py-0.5 rounded bg-muted text-xs font-mono" {...props}>{children}</code>;
+                        }
+                        return <code className={`block whitespace-pre-wrap text-xs leading-relaxed font-mono ${className || ""}`} {...props}>{children}</code>;
+                      },
+                      pre: ({ children, ...props }) => (
+                        <pre className="p-4 my-3 rounded-lg bg-black/25 border border-border/40 overflow-auto font-mono" {...props}>
+                          {children}
+                        </pre>
+                      ),
+                      ul: (props) => <ul className="list-disc pl-6 my-2 space-y-1 text-muted-foreground" {...props} />,
+                      ol: (props) => <ol className="list-decimal pl-6 my-2 space-y-1 text-muted-foreground" {...props} />,
+                      li: (props) => <li className="text-sm leading-relaxed" {...props} />,
+                      hr: (props) => <hr className="my-4 border-border/50" {...props} />,
+                      blockquote: (props) => <blockquote className="border-l-4 border-primary/40 pl-4 my-3 italic text-muted-foreground bg-muted/20 py-2 rounded-r-md" {...props} />,
+                      table: (props) => (
+                        <div className="my-3 overflow-auto border border-border rounded-lg">
+                          <table className="min-w-full text-sm divide-y divide-border" {...props} />
+                        </div>
+                      ),
+                      th: (props) => <th className="text-left font-semibold p-3 bg-muted text-foreground" {...props} />,
+                      td: (props) => <td className="p-3 border-t border-border/50 text-muted-foreground" {...props} />,
+                    }}
+                  >
+                    {editorText || "No markdown content yet."}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

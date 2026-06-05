@@ -1,5 +1,5 @@
 import { GitBranch, Clock, User, CheckCircle, GitCommit } from "lucide-react";
-import { Card, EmptyState } from "@/components/ui";
+import { Card } from "@/components/ui";
 import { useState } from "react";
 
 interface Branch {
@@ -14,6 +14,7 @@ interface Branch {
     author: string;
     timestamp: string;
   };
+  lastCommitAt?: string;
   ahead: number;
   behind: number;
   commits: BranchCommit[];
@@ -23,17 +24,48 @@ interface BranchCommit {
   hash: string;
   message: string;
   author: string;
+  authorName?: string;
   timestamp: string;
   branch: string;
   parents: string[];
   isMerge: boolean;
 }
 
+export interface RepositoryBranch {
+  id: string | number;
+  name: string;
+  isDefault?: boolean;
+  isProtected?: boolean;
+  lastCommitAt?: string | Date;
+}
+
+export interface RepositoryCommit {
+  id?: string | number;
+  hash?: string;
+  shortHash?: string;
+  message?: string;
+  authorName?: string;
+  committedAt?: string | Date;
+  createdAt?: string | Date;
+  branch?: string;
+  parents?: string[];
+  isMerge?: boolean;
+}
+
 interface BranchVisualizationProps {
-  repository?: any;
+  repository?: {
+    branches?: RepositoryBranch[];
+    commits?: RepositoryCommit[];
+  };
 }
 
 type FilterType = "all" | "active" | "stale" | "merged";
+
+const toSafeIso = (value?: string | Date) => {
+  if (!value) return new Date().toISOString();
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+};
 
 export function BranchVisualization({ repository }: BranchVisualizationProps) {
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
@@ -41,7 +73,7 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
 
   // Use real branches from repository or empty array
   const branches: Branch[] =
-    repository?.branches?.map((branch: any) => ({
+    repository?.branches?.map((branch: RepositoryBranch) => ({
       id: branch.id.toString(),
       name: branch.name,
       isDefault: branch.isDefault || false,
@@ -51,7 +83,7 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
         hash: "",
         message: "",
         author: "",
-        timestamp: branch.lastCommitAt || new Date().toISOString(),
+        timestamp: toSafeIso(branch.lastCommitAt),
       },
       ahead: 0,
       behind: 0,
@@ -109,16 +141,6 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
       return "bg-purple-500/20 text-purple-500 border-purple-500/30";
     return "bg-green-500/20 text-green-500 border-green-500/30";
   };
-
-  if (branches.length === 0) {
-    return (
-      <EmptyState
-        icon={GitBranch}
-        title="No branches found"
-        description="We couldn't find any branches in this repository."
-      />
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -306,11 +328,22 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
             <div className="space-y-4">
               {(repository?.commits || [])
                 .slice(0, 10)
-                .map((commit: any, index: number) => {
+                .map((rawCommit: RepositoryCommit, index: number) => {
+                  const commit: BranchCommit = {
+                    hash: rawCommit.hash || rawCommit.shortHash || "",
+                    message: rawCommit.message || "",
+                    author: rawCommit.authorName || "Unknown",
+                    authorName: rawCommit.authorName || "Unknown",
+                    timestamp: toSafeIso(rawCommit.committedAt ?? rawCommit.createdAt),
+                    branch: rawCommit.branch || "main",
+                    parents: rawCommit.parents || [],
+                    isMerge: rawCommit.isMerge || false,
+                  };
                   const branchColor = getBranchTypeColor(commit.branch);
 
+                  const commitKey = commit.hash || String(rawCommit.id ?? index);
                   return (
-                    <div key={commit.hash} className="relative">
+                    <div key={commitKey} className="relative">
                       {/* Connection lines */}
                       {index > 0 && (
                         <div className="absolute left-2 -top-4 h-4 w-px bg-primary/30" />
@@ -344,7 +377,7 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
                             <span
                               className={`text-xs px-2 py-0.5 rounded-full border ${branchColor}`}
                             >
-                              {selectedBranch?.name || "main"}
+                              {commit.branch}
                             </span>
                           </div>
                         </div>
