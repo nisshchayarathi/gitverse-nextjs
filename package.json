@@ -6,7 +6,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "cross-env NODE_OPTIONS=\"--dns-result-order=ipv4first --no-network-family-autoselection\" next dev",
+   "dev": "NODE_OPTIONS=\"--dns-result-order=ipv4first --no-network-family-autoselection\" next dev",
     "build": "prisma generate && next build",
     "analyze": "cross-env ANALYZE=true next build",
     "typecheck": "prisma generate && rm -f tsconfig.tsbuildinfo && tsc -p tsconfig.json --noEmit",
@@ -17,6 +17,7 @@
     "worker": "cross-env NODE_OPTIONS=\"--dns-result-order=ipv4first --no-network-family-autoselection\" node dist-worker/scripts/analysisWorker.js",
     "worker:server": "cross-env NODE_OPTIONS=\"--dns-result-order=ipv4first --no-network-family-autoselection\" node dist-worker/scripts/workerServer.js",
     "worker:dev": "tsx scripts/analysisWorker.ts",
+    "dev:all": "concurrently \"npm run dev\" \"npm run worker:dev\" --names \"next,worker\" --prefix-colors \"cyan,magenta\"",
     "lint": "next lint",
     "format": "prettier --write \"**/*.{ts,tsx,css}\"",
     "prisma:generate": "prisma generate",
@@ -96,6 +97,8 @@
     "@typescript-eslint/eslint-plugin": "^8.60.0",
     "@typescript-eslint/parser": "^8.60.0",
     "autoprefixer": "^10.4.16",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
     "eslint": "^8.55.0",
     "eslint-config-next": "^14.1.0",
     "jest": "^29.7.0",
