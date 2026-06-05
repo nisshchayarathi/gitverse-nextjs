@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['avatars.githubusercontent.com', 'gitlab.com', 'bitbucket.org'],
+    domains: ['avatars.githubusercontent.com', 'gitlab.com', 'bitbucket.org', 'api.dicebear.com'],
   },
   webpack: (config) => {
     config.resolve.alias.canvas = false

@@ -57,8 +57,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
 
   const changedFiles = useMemo(() => {
     if (!selectedCommit) return null;
-    return new Map(
-      (selectedCommit.fileChanges || []).map((fc: any) => [fc.path, fc.changeType || fc.type])
+    return new Map<string, string>(
+      (selectedCommit.fileChanges || []).map((fc: any) => [fc.path as string, (fc.changeType || fc.type) as string])
     );
   }, [selectedCommit]);
 

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingSpinner } from "@/components/ui/Spinner";
+import { GitPullRequest } from "lucide-react";
 import { generateFirstPRSimulator } from "@/services/firstPRSimulatorService";
 import { IssueData, RepositoryMetadata } from "@/types/firstPRSimulator";
 
@@ -45,6 +46,7 @@ export function FirstPRSimulator({ issue, repository, loading = false }: FirstPR
         </CardHeader>
         <CardContent>
           <EmptyState
+            icon={GitPullRequest}
             title="Select an issue"
             description="The First PR Simulator will recommend target files, difficulty, and tests once an issue is chosen."
           />

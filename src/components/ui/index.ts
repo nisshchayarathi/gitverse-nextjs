@@ -9,6 +9,7 @@ export { toast } from '@/hooks/use-toast'
 export { EmptyState } from './EmptyState'
 export { Skeleton } from './Skeleton'
 export { CopyToClipboard } from './CopyToClipboard'
+export { Badge } from './Badge'
 export {
   DropdownMenu,
   DropdownMenuTrigger,

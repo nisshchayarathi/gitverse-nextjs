@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import * as d3 from "d3";
+import Image from "next/image";
 import {
   Play,
   Pause,
@@ -489,13 +490,6 @@ export function GitTimeMachine({ repository }: GitTimeMachineProps) {
             .style("top", `${event.clientY + 15}px`);
         }
       })
-      .on("mouseleave", function () {
-        if (tooltipRef.current) {
-          d3.select(tooltipRef.current)
-            .style("opacity", "0")
-            .style("display", "none");
-        }
-      })
       .on("mouseleave", function (_event: any, d: any) {
         d3.select(this)
           .transition()
@@ -511,7 +505,9 @@ export function GitTimeMachine({ repository }: GitTimeMachineProps) {
           .attr("stroke-width", 1.5);
 
         if (tooltipRef.current) {
-          d3.select(tooltipRef.current).style("opacity", 0);
+          d3.select(tooltipRef.current)
+            .style("opacity", "0")
+            .style("display", "none");
         }
       })
       .on("click", (_event: any, d: any) => {
@@ -708,9 +704,11 @@ export function GitTimeMachine({ repository }: GitTimeMachineProps) {
                 <div className="space-y-3.5 text-xs animate-fade-in-up">
                   {/* Author detail info */}
                   <div className="flex items-center gap-2.5">
-                    <img
+                    <Image
                       src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${activeCommit.authorName}`}
                       alt={activeCommit.authorName}
+                      width={36}
+                      height={36}
                       className="h-9 w-9 rounded-full bg-white/10 p-0.5 border border-white/20 shadow-md glow-author"
                     />
                     <div className="flex-1 min-w-0">
