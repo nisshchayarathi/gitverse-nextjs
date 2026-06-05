@@ -65,7 +65,7 @@ export function RepositoryIssues({ repository }: RepositoryIssuesProps) {
     setError(null);
     setSelectedIssue(null);
     try {
-      const skillsQuery = customSkills || skillsList.join(",");
+      const skillsQuery = customSkills !== undefined ? customSkills : skillsList.join(",");
       const res = await axios.get(
         buildApiUrl(`/api/repositories/${repository.id}/issues`),
         {
