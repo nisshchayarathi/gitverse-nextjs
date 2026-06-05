@@ -26,6 +26,7 @@ import {
   EmptyState,
 } from "@/components/ui";
 import KnowledgeGapWidget from "@/components/knowledge/KnowledgeGapWidget";
+import ArchitectureDriftWidget from "@/components/architecture/ArchitectureDriftWidget";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
@@ -355,8 +356,14 @@ export default function Dashboard() {
             </CardContent>
           </Card>
           {/* Knowledge Gaps Widget */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-3">
             <KnowledgeGapWidget />
+            <div>
+              {/* Architecture Drift Widget */}
+              <div className="lg:col-span-1">
+                <ArchitectureDriftWidget />
+              </div>
+            </div>
           </div>
 
           {/* Recent Activity */}

@@ -445,3 +445,30 @@ model FileImportance {
   @@index([repositoryId, importanceScore])
   @@map("file_importance")
 }
+
+model ArchitectureSnapshot {
+  id           Int        @id @default(autoincrement())
+  repositoryId Int        @map("repository_id")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  snapshot     Json
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@index([repositoryId, createdAt])
+  @@map("architecture_snapshots")
+}
+
+model ArchitectureDriftReport {
+  id                 Int                 @id @default(autoincrement())
+  repositoryId       Int                 @map("repository_id")
+  repository         Repository          @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  baselineSnapshotId Int?                @map("baseline_snapshot_id")
+  baselineSnapshot   ArchitectureSnapshot? @relation(fields: [baselineSnapshotId], references: [id])
+  comparedSnapshotId Int?                @map("compared_snapshot_id")
+  comparedSnapshot   ArchitectureSnapshot? @relation(fields: [comparedSnapshotId], references: [id])
+  driftScore         Float
+  report             Json
+  createdAt          DateTime            @default(now()) @map("created_at")
+
+  @@index([repositoryId, createdAt])
+  @@map("architecture_drift_reports")
+}
