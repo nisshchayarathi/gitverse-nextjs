@@ -24,9 +24,31 @@ import {
   EmptyState,
   Button,
   LoadingSpinner,
-  Badge,
 } from "@/components/ui";
 import { generateGoodFirstIssues, getIssuesByDifficulty } from "@/services/issueGeneratorService";
+
+interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
+  variant?: "default" | "secondary" | "destructive" | "outline";
+}
+
+function Badge({ children, className = "", variant = "default", ...props }: BadgeProps) {
+  const variantStyles = {
+    default: "bg-primary text-primary-foreground hover:bg-primary/80",
+    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/80",
+    outline: "text-foreground border border-input hover:bg-accent hover:text-accent-foreground",
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${variantStyles[variant]} ${className}`}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+}
+
 import { RepositoryAnalysisData } from "@/types/contributionPath";
 import { RepositoryFile } from "@/types/firstPRSimulator";
 import { GeneratedIssue, DifficultyCategory } from "@/types/generatedIssue";
@@ -295,7 +317,7 @@ export function GoodFirstIssueGenerator({
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={<Lightbulb className="w-12 h-12" />}
+            icon={Lightbulb}
             title="No Repository Data"
             description="Complete a repository analysis to generate good first issues"
           />
@@ -318,7 +340,7 @@ export function GoodFirstIssueGenerator({
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={<Sparkles className="w-12 h-12" />}
+            icon={Sparkles}
             title="No Issues Found"
             description="Repository appears to be in good shape! No immediate opportunities detected."
           />
@@ -405,7 +427,7 @@ export function GoodFirstIssueGenerator({
 
       {issues.length === 0 ? (
         <EmptyState
-          icon={<Filter className="w-12 h-12" />}
+          icon={Filter}
           title="No Issues in This Category"
           description={`No ${selectedDifficulty.toLowerCase()} level issues found. Try selecting a different difficulty level.`}
         />
