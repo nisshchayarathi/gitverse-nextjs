@@ -27,11 +27,12 @@ import {
   ArrowLeft,
   Trash2,
   Activity,
+  FileX2,
+  MessageSquare,
   CheckCircle2,
   Clock,
   Loader2,
   XCircle,
-  FileX2,
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";

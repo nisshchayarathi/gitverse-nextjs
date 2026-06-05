@@ -24,6 +24,8 @@ interface RepoStats {
   }[];
   status: string;
   lastAnalyzedAt: Date | null;
+}
+
 import { invalidateGeminiAnalysisCacheForRepository } from "./geminiAnalysisCacheService";
 import { FileChangeType } from "@prisma/client";
 import { repoSyncLimiter } from "../utils/concurrencyLimiter";

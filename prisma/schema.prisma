@@ -432,7 +432,6 @@ model FileChange {
   file       File?          @relation(fields: [fileId], references: [id], onDelete: SetNull)
   createdAt  DateTime       @default(now()) @map("created_at")
 
-  @@index([fileId])
   @@index([commitId])
   // FK for onDelete: SetNull cascade and future file-scoped change queries
   @@index([fileId])
@@ -615,7 +614,6 @@ model RateLimit {
   expiresAt DateTime @map("expires_at")
 
   @@index([key])
-  @@index([expiresAt])
   @@index([key, expiresAt])
   @@index([expiresAt], name: "rate_limits_expires_at_idx")
   @@map("rate_limits")
