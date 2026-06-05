@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyToken } from "./auth";
+import { verifyTokenWithUserValidation } from "./auth";
+import { getNextAuthSecret } from "./config/env";
 import type { JWTPayload } from "./auth";
 import prisma from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
@@ -12,6 +13,7 @@ export interface AuthenticatedRequest {
  * Resolves the authenticated user from either a JWT bearer token
  * or a NextAuth session cookie.
  * Rejects tokens issued before the user's latest password change.
+ * Uses secure token validation with tokenVersion verification.
  */
 export async function getAuthUser(
   request: NextRequest
@@ -19,39 +21,43 @@ export async function getAuthUser(
   const authHeader = request.headers.get("authorization");
   let userPayload: JWTPayload | null = null;
 
-  // 1) Existing JWT auth (Authorization: Bearer ...)
+  // 1) Secure JWT auth (Authorization: Bearer ...)
+  // Uses verifyTokenWithUserValidation for proper tokenVersion checking
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.substring(7);
-    const payload = verifyToken(token);
+    
+    try {
+      const payload = await verifyTokenWithUserValidation(token);
+      
+      if (payload) {
+        // Additional security check: verify user still exists
+        const dbUser = await prisma.user.findUnique({
+          where: { id: payload.userId },
+          select: {
+            id: true,
+            tokenVersion: true,
+            lockedUntil: true,
+          },
+        });
 
-    if (payload) {
-      const dbUser = await prisma.user.findUnique({
-        where: { id: payload.userId },
-        select: {
-          id: true,
-          passwordChangedAt: true,
-        },
-      });
+        if (!dbUser) {
+          return null;
+        }
 
-      if (!dbUser) {
-        return null;
+        if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
+          return null;
+        }
+
+        // Double-check tokenVersion matches (extra security)
+        if (payload.tokenVersion !== dbUser.tokenVersion) {
+          return null;
+        }
+
+        userPayload = payload;
       }
-
-      const issuedAt =
-        typeof (payload as any).iat === "number"
-          ? (payload as any).iat
-          : null;
-
-      if (
-        dbUser.passwordChangedAt &&
-        (issuedAt === null ||
-          issuedAt * 1000 <=
-            dbUser.passwordChangedAt.getTime())
-      ) {
-        return null;
-      }
-
-      userPayload = payload;
+    } catch (error) {
+      console.warn("[Auth] JWT validation error:", error);
+      return null;
     }
   }
 
@@ -60,7 +66,7 @@ export async function getAuthUser(
     try {
       const token = await getToken({
         req: request,
-        secret: process.env.NEXTAUTH_SECRET,
+        secret: getNextAuthSecret(),
       });
 
       if (token?.sub && token.email) {
@@ -76,10 +82,15 @@ export async function getAuthUser(
             id: true,
             passwordChangedAt: true,
             tokenVersion: true,
+            lockedUntil: true,
           },
         });
 
         if (!dbUser) {
+          return null;
+        }
+
+        if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
           return null;
         }
 
@@ -120,9 +131,9 @@ export async function getAuthUser(
 
   if (!userPayload) return null;
 
-  // 3) Verify user existence and token version
+  // Final verification: ensure user still exists
   try {
-    const dbUser = await prisma.user.findUnique({
+    const finalUser = await prisma.user.findUnique({
       where: { id: userPayload.userId },
       select: {
         id: true,
@@ -131,35 +142,12 @@ export async function getAuthUser(
       },
     });
 
-    if (!dbUser) {
+    if (!finalUser) {
       return null;
     }
 
-    if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
+    if (finalUser.lockedUntil && finalUser.lockedUntil > new Date()) {
       return null;
-    }
-
-    const isJwtAuth = !!(
-      authHeader &&
-      authHeader.startsWith("Bearer ")
-    );
-
-    // JWT-authenticated users must provide a valid tokenVersion.
-    // This allows logout/password-change invalidation to immediately
-    // revoke previously issued tokens.
-    if (isJwtAuth) {
-      // Reject legacy JWTs without tokenVersion
-      if (userPayload.tokenVersion == null) {
-        return null;
-      }
-
-      // Require exact token version match
-      if (
-        userPayload.tokenVersion !==
-        dbUser.tokenVersion
-      ) {
-        return null;
-      }
     }
   } catch (error) {
     console.error(

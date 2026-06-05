@@ -42,7 +42,8 @@ class GeminiService {
   async chat(
     message: string,
     context?: RepositoryContext,
-    history: ChatMessage[] = []
+    history: ChatMessage[] = [],
+    signal?: AbortSignal
   ): Promise<string> {
     try {
       // Add repository context to the prompt if provided
@@ -67,6 +68,7 @@ User Question: ${message}
           "Content-Type": "application/json",
           ...this.getAuthHeaders(),
         },
+        signal,
         body: JSON.stringify({ 
           repositoryId: context?.id ? Number(context.id) : undefined, 
           prompt: enhancedMessage, 
@@ -91,22 +93,23 @@ User Question: ${message}
       return text;
     } catch (error) {
       console.error("Gemini API error:", error);
-      throw new Error("Failed to get response from AI assistant");
+      throw error;
     }
   }
 
   async *chatStream(
     message: string,
     context?: RepositoryContext,
-    history: ChatMessage[] = []
+    history: ChatMessage[] = [],
+    signal?: AbortSignal
   ): AsyncGenerator<string> {
     try {
       // Server route isn't streaming; yield the full response once.
-      const text = await this.chat(message, context, history);
+      const text = await this.chat(message, context, history, signal);
       yield text;
     } catch (error) {
       console.error("Gemini API streaming error:", error);
-      throw new Error("Failed to stream response from AI assistant");
+      throw error;
     }
   }
 

@@ -1,7 +1,12 @@
+import { logger } from '@/lib/logger'
+import { sanitizeError } from '@/lib/middleware'
+
 // This file contains route templates
 const routes = {
   "app/api/ai/suggest-commit/route.ts": `import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/middleware'
+import { logger } from '@/lib/logger'
+import { sanitizeError } from '@/lib/middleware'
 import { geminiService } from '@/lib/services/geminiService'
 
 export async function POST(request: NextRequest) {
@@ -19,14 +24,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ suggestions })
   } catch (error: any) {
-    console.error('Commit suggestion error:', error)
+    logger.error({ err: sanitizeError(error), route: 'app/api/ai/suggest-commit/route.ts' }, 'Commit suggestion error')
     return NextResponse.json(
-      { error: 'Failed to generate suggestions', details: error.message },
+      { error: 'Failed to generate suggestions' },
       { status: 500 }
     )
   }
 }`,
   "app/api/users/profile/route.ts": `import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/logger'
+import { sanitizeError } from '@/lib/middleware'
 import prisma from '@/lib/prisma'
 import { requireAuth } from '@/lib/middleware'
 
@@ -80,7 +87,7 @@ export async function PUT(request: NextRequest) {
       avatarUrl: (updatedUser as any).image,
     })
   } catch (error: any) {
-    console.error('Error updating profile:', error)
+    logger.error({ err: sanitizeError(error), route: 'app/api/users/profile/route.ts' }, 'Error updating profile')
     return NextResponse.json(
       { message: 'Failed to update profile' },
       { status: 500 }
@@ -89,4 +96,7 @@ export async function PUT(request: NextRequest) {
 }`,
 };
 
-console.log(JSON.stringify(routes, null, 2));
+logger.info(
+  { routeCount: Object.keys(routes).length, routeNames: Object.keys(routes) },
+  'Prepared route templates'
+);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { gitverseConfigParser } from '../../src/parsers/gitverseConfigParser';
-import { gitverseConfigValidator } from '../../src/validators/gitverseConfigValidator';
+import { gitverseConfigParser } from '../../lib/parsers/gitverseConfigParser';
+import { gitverseConfigValidator } from '../../lib/validators/gitverseConfigValidator';
 
 describe('Repository Knowledge Config', () => {
   describe('gitverseConfigValidator', () => {

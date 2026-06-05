@@ -1,24 +1,41 @@
 const requiredEnvVars = [
   "DATABASE_URL",
-  "JWT_SECRET",
-  "NEXTAUTH_SECRET",
   "NEXTAUTH_URL",
   "GEMINI_API_KEY",
   "INTERNAL_WORKER_SECRET",
   "TOKEN_ENCRYPTION_KEY",
 ] as const;
 
+function getEnvValidationSkipReasons() {
+  const reasons: string[] = [];
+
+  if (process.env.NODE_ENV === "test") {
+    reasons.push("NODE_ENV=test");
+  }
+  if (process.env.CI === "true") {
+    reasons.push("CI=true");
+  }
+  if (process.env.GITHUB_ACTIONS === "true") {
+    reasons.push("GITHUB_ACTIONS=true");
+  }
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    reasons.push("NEXT_PHASE=phase-production-build");
+  }
+
+  return reasons;
+}
+
 function shouldSkipEnvValidation() {
-  return (
-    process.env.NODE_ENV === "test" ||
-    process.env.CI === "true" ||
-    process.env.GITHUB_ACTIONS === "true"
-  );
+  return getEnvValidationSkipReasons().length > 0;
 }
 
 function validateEnv() {
-  if (shouldSkipEnvValidation()) {
-    console.log("⚠️ Skipping environment validation in test/CI environment");
+  const skipReasons = getEnvValidationSkipReasons();
+
+  if (skipReasons.length > 0) {
+    console.log(
+      `⚠️ Skipping environment validation: ${skipReasons.join(" | ")}`
+    );
 
     return;
   }

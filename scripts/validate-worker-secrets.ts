@@ -1,20 +1,6 @@
-/**
- * Environment validation script for webhook worker authorization.
- *
- * This script can be run at startup or during deployment to verify
- * that required secrets are properly configured and isolated.
- *
- * Usage:
- *   tsx scripts/validate-worker-secrets.ts
- *
- * Exit codes:
- *   0 - All validations passed
- *   1 - Required secrets missing
- *   2 - Secret isolation warnings (non-blocking)
- */
-
 import {
   validateRequiredSecrets,
+  validateRequiredAnalysisSecrets,
   validateSecretIsolation,
 } from "../lib/utils/internalAuth";
 
@@ -28,22 +14,27 @@ export function validateEnvironment(): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Check required secrets
   const missingSecrets = validateRequiredSecrets();
   if (missingSecrets.length > 0) {
     errors.push(
       `Missing required secrets: ${missingSecrets.join(", ")}. ` +
-        `Set INTERNAL_WORKER_SECRET in your environment.`
+        `Set INTERNAL_WORKER_SECRET and ANALYSIS_RUNNER_SECRET in your environment.`
     );
   }
 
-  // Check secret isolation
   const isolationWarnings = validateSecretIsolation();
   if (isolationWarnings.length > 0) {
     warnings.push(...isolationWarnings);
   }
 
-  // Additional checks
+  const analysisSecrets = validateRequiredAnalysisSecrets();
+  if (analysisSecrets.errors.length > 0) {
+    errors.push(...analysisSecrets.errors);
+  }
+  if (analysisSecrets.warnings.length > 0) {
+    warnings.push(...analysisSecrets.warnings);
+  }
+
   const workerSecret = process.env.INTERNAL_WORKER_SECRET;
   if (workerSecret && workerSecret.length < 16) {
     warnings.push(
@@ -73,7 +64,6 @@ export function validateEnvironment(): ValidationResult {
   };
 }
 
-// Run if executed directly
 if (require.main === module) {
   console.log("Validating environment configuration...\n");
 

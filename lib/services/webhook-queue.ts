@@ -5,7 +5,71 @@ import { deriveBearerToken } from "@/lib/utils/internalAuth";
 
 const MAX_CONCURRENT_WEBHOOKS = 5;
 
+type QueuedWebhook = {
+  event: string;
+  action: string | undefined;
+  payload: any;
+  status: string;
+};
+
+const globalForQueue = globalThis as unknown as {
+  webhookBuffer: QueuedWebhook[];
+  webhookFlushTimeout: NodeJS.Timeout | null;
+};
+
+if (!globalForQueue.webhookBuffer) {
+  globalForQueue.webhookBuffer = [];
+}
+if (!globalForQueue.webhookFlushTimeout) {
+  globalForQueue.webhookFlushTimeout = null;
+}
+
 export class WebhookQueueService {
+  /**
+   * Enqueues a webhook event in memory and schedules a background flush.
+   */
+  enqueueWebhook(payload: any, event: string, action: string | undefined, baseUrl: string) {
+    globalForQueue.webhookBuffer.push({
+      event: event || "unknown",
+      action: action,
+      payload,
+      status: "pending",
+    });
+
+    if (!globalForQueue.webhookFlushTimeout) {
+      globalForQueue.webhookFlushTimeout = setTimeout(() => {
+        this.flushWebhooks(baseUrl).catch(console.error);
+      }, 500); // Batch after 500ms
+    }
+  }
+
+  private async flushWebhooks(baseUrl: string) {
+    const batch = globalForQueue.webhookBuffer.splice(0, globalForQueue.webhookBuffer.length);
+    globalForQueue.webhookFlushTimeout = null;
+
+    if (batch.length === 0) return;
+
+    try {
+      await prisma.webhookEvent.createMany({
+        data: batch,
+      });
+      // After flushing, trigger workers
+      this.triggerWorkers(baseUrl).catch((err: any) => {
+        console.error("[WebhookQueue] Failed to trigger queue workers:", err);
+      });
+    } catch (error) {
+      console.error("[WebhookQueue] Failed to flush webhooks:", error);
+      // Push back to queue on failure
+      globalForQueue.webhookBuffer.unshift(...batch);
+      
+      // Retry in 5s
+      if (!globalForQueue.webhookFlushTimeout) {
+        globalForQueue.webhookFlushTimeout = setTimeout(() => {
+          this.flushWebhooks(baseUrl).catch(console.error);
+        }, 5000);
+      }
+    }
+  }
   /**
    * Attempts to trigger pending webhooks up to the maximum concurrent capacity.
    * If the capacity is reached, it exits silently.

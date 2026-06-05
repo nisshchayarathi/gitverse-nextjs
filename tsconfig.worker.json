@@ -15,5 +15,10 @@
     "scripts/analysisWorker.ts",
     "scripts/workerServer.ts",
     "lib/**/*.ts"
+  ],
+  "exclude": [
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }

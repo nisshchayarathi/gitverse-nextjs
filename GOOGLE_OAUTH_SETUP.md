@@ -111,14 +111,18 @@ npx prisma generate
 
 ## Production Deployment
 
+> [!IMPORTANT]
+> **Strict URL Matching is Required**
+> NextAuth infers redirect URIs from environment variables. If `NEXTAUTH_URL` is omitted, the callback URL might be inferred from dynamic preview URLs (e.g., `*.vercel.app`), causing `redirect_uri_mismatch` errors in production.
+
 When deploying to production:
 
-1. Update `NEXTAUTH_URL` to your production URL
-2. Add your production URL to Google Cloud Console:
-   - Authorized JavaScript origins
-   - Authorized redirect URIs
-3. Ensure all environment variables are set in your production environment
-4. Run the database migration in production
+1. **Explicitly Set `NEXTAUTH_URL`**: Update this environment variable to your exact production URL without a trailing slash (e.g., `https://gitverse.yourdomain.com`).
+2. **Match Google Cloud Console**: Add your production URL to Google Cloud Console:
+   - Authorized JavaScript origins: Exactly matches `NEXTAUTH_URL`.
+   - Authorized redirect URIs: Exactly `{NEXTAUTH_URL}/api/auth/callback/google`.
+3. Ensure all environment variables are set in your production environment.
+4. Run the database migration in production.
 
 ## Troubleshooting
 

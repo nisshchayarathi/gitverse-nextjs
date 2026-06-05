@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
+import { logger } from "@/lib/logger";
 import { getGeminiService } from "@/lib/services/geminiService";
 import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
 import { getClientIp } from "@/lib/services/rateLimitService";
@@ -7,6 +8,7 @@ import {
   validateContentType,
   AI_REQUEST_LIMITS,
 } from "@/lib/utils/aiRequestValidation";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 function validateArrayField(
   items: unknown,
@@ -37,6 +39,9 @@ function validateArrayField(
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+
+    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    if (!globalRl.allowed) return rateLimitResponse(globalRl);
 
     const allowed = await checkAiRateLimit(
       String(user.userId), "userId", "suggest-commit", 20, 60_000
@@ -96,7 +101,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ suggestions });
   } catch (error: any) {
-    console.error("Commit suggestion error:", sanitizeError(error));
+    logger.error(
+      { err: sanitizeError(error), route: "app/api/ai/suggest-commit/route.ts" },
+      "Commit suggestion error"
+    );
 
     if (isHttpError(error)) {
       return NextResponse.json(

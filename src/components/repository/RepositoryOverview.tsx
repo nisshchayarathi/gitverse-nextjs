@@ -1,6 +1,8 @@
-import { useState, Children, isValidElement } from "react";
-import { FavoriteButton } from "./FavoriteButton";
+"use client";
+
+import { useState, useMemo, Children, isValidElement } from "react";
 import {
+  AlertTriangle,
   GitBranch,
   Star,
   GitFork,
@@ -19,16 +21,36 @@ import {
   Check,
   RefreshCw,
   Loader2,
+  Package,
 } from "lucide-react";
+import Link from "next/link";
 import {
+  Button,
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
+  EmptyState,
+  Input,
   Skeleton,
   CopyToClipboard,
 } from "@/components/ui";
+import { BeginnerModeToggle } from "@/components/repository/BeginnerModeToggle";
+import { BeginnerGuidanceCard } from "@/components/repository/BeginnerGuidanceCard";
+import { BeginnerQuestionsPanel } from "@/components/repository/BeginnerQuestionsPanel";
+import { FirstPRSimulator } from "@/components/repository/FirstPRSimulator";
+import { ContributionPathGenerator } from "@/components/repository/ContributionPathGenerator";
+import { DeadCodeDetector } from "@/components/repository/DeadCodeDetector";
+import { ArchitecturalDriftDetector } from "@/components/repository/ArchitecturalDriftDetector";
+import { QuickStartChecklist } from "@/components/repository/QuickStartChecklist";
+import { FolderImportanceGuide } from "@/components/repository/FolderImportanceGuide";
+import { SavedModulesPanel } from "@/components/repository/SavedModulesPanel";
+import { ModuleComparisonTool } from "@/components/repository/ModuleComparisonTool";
+import { RepositoryInsightsDashboard } from "@/components/repository/RepositoryInsightsDashboard";
+import { useModuleBookmarks } from "@/hooks/useModuleBookmarks";
+import { IssueData } from "@/types/firstPRSimulator";
+import { RepositoryAnalysisData } from "@/types/contributionPath";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -37,6 +59,7 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/hooks/use-toast";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
+import { FavoriteButton } from "./FavoriteButton";
 
 
 interface RepositoryData {
@@ -86,7 +109,7 @@ export const RepositoryOverview = ({
         { repositoryId: Number(repository.id) },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       const readme = response.data.markdown;
       setGeneratedReadme(readme);
       setEditorText(readme);
@@ -130,12 +153,12 @@ export const RepositoryOverview = ({
         { readmeText: editorText, readmePath: readmePath || "README.md" },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       toast({
         title: "README Saved",
         description: "Successfully updated repository README in the database.",
       });
-      
+
       // Update local view of repositoryData
       if (repositoryData) {
         repositoryData.readmeText = editorText;
@@ -176,6 +199,9 @@ export const RepositoryOverview = ({
   const readmeText: string | null = repositoryData?.readmeText ?? null;
   const readmePath: string | null = repositoryData?.readmePath ?? null;
 
+  // Initialize module bookmarks hook
+  const { bookmarkedModules, removeBookmark } = useModuleBookmarks();
+
   // Calculate total lines of code from languages only
   const totalLines =
     repositoryData?.languages?.reduce(
@@ -206,6 +232,160 @@ export const RepositoryOverview = ({
     openIssues: repositoryData?.openIssues || 0,
     license: repositoryData?.license || undefined,
   };
+
+  const [isBeginnerMode, setIsBeginnerMode] = useState(false);
+  const [issueTitle, setIssueTitle] = useState("");
+  const [issueBody, setIssueBody] = useState("");
+  const [selectedIssue, setSelectedIssue] = useState<IssueData | null>(null);
+
+  const sampleIssue = useMemo(() => {
+    if (!repositoryData?.issues?.length) return null;
+    const issue = repositoryData.issues[0];
+    return {
+      id: issue.id?.toString?.() || "sample-issue",
+      title: issue.title || "",
+      body: issue.body || issue.description || "",
+      labels: issue.labels || [],
+    } as IssueData;
+  }, [repositoryData?.issues]);
+
+  const issueToSimulate = selectedIssue || sampleIssue;
+
+  const repositoryMetadata = useMemo<RepositoryAnalysisData>(() => ({
+    id: repositoryData?.id,
+    name: repositoryData?.name,
+    description: repositoryData?.description,
+    url: repositoryData?.url,
+    size: repositoryData?.size,
+    files: repositoryData?.files,
+    languages: repositoryData?.languages,
+    commits: repositoryData?.commits,
+    contributors: repositoryData?.contributors,
+    issues: repositoryData?.issues,
+  }), [repositoryData]);
+
+  const hasIssueInput = Boolean(issueTitle.trim() || issueBody.trim());
+
+  const buildManualIssue = (): IssueData | null => {
+    if (!issueTitle.trim() && !issueBody.trim()) return null;
+    return {
+      id: "manual-issue",
+      title: issueTitle.trim() || "First PR issue",
+      body: issueBody.trim() || "",
+      labels: [],
+    };
+  };
+
+  const handleRunSimulation = () => {
+    const issue = buildManualIssue();
+    if (issue) {
+      setSelectedIssue(issue);
+    }
+  };
+
+  const handleResetSimulation = () => {
+    setIssueTitle("");
+    setIssueBody("");
+    setSelectedIssue(null);
+  };
+
+  const MODULE_GUIDANCE: Record<
+    string,
+    {
+      description: string;
+      recommendation: string;
+      difficulty: "beginner" | "intermediate" | "advanced";
+    }
+  > = {
+    components: {
+      description:
+        "Contains reusable UI building blocks used throughout the application.",
+      recommendation: "Recommended starting point for frontend contributors.",
+      difficulty: "beginner",
+    },
+    services: {
+      description: "Handles business logic and API communication.",
+      recommendation: "Changes here may affect multiple features.",
+      difficulty: "intermediate",
+    },
+    hooks: {
+      description: "Reusable React logic shared across components.",
+      recommendation: "Good place to learn application behavior.",
+      difficulty: "beginner",
+    },
+    utils: {
+      description: "Shared helper functions and utilities.",
+      recommendation: "Usually safe for small contributions.",
+      difficulty: "beginner",
+    },
+    pages: {
+      description: "Application routes and screens.",
+      recommendation: "Useful for understanding navigation flow.",
+      difficulty: "intermediate",
+    },
+    auth: {
+      description: "Authentication and access control.",
+      recommendation: "Requires understanding of security flows.",
+      difficulty: "advanced",
+    },
+  };
+
+  const ARCHITECTURE_GUIDANCE: Record<string, string> = {
+    services:
+      "Service layer responsible for API communication and business logic.",
+    hooks: "Custom React logic reused across multiple components.",
+    components: "Reusable visual building blocks used throughout the application.",
+    utils: "Utility helpers that keep the app consistent and reusable.",
+    pages: "Route and screen organization that controls navigation flow.",
+    auth: "Authentication logic that secures access and identity flows.",
+  };
+
+  const moduleFolders = useMemo(() => {
+    const segments = new Set<string>();
+
+    (repositoryData?.files || []).forEach((file: any) => {
+      const parts = String(file.path || "").split("/").filter(Boolean);
+      parts.slice(0, -1).forEach((segment) => {
+        if (segment) {
+          segments.add(segment);
+        }
+      });
+    });
+
+    return Array.from(segments).filter((segment) =>
+      Object.prototype.hasOwnProperty.call(MODULE_GUIDANCE, segment),
+    );
+  }, [repositoryData?.files]);
+
+  const hotspotGuidance = useMemo(() => {
+    const filePaths = (repositoryData?.files || []).map((file: any) =>
+      String(file.path || "").toLowerCase(),
+    );
+
+    return [
+      {
+        title: "Authentication",
+        hint: "Changes here may affect login and security-related features.",
+        active:
+          moduleFolders.includes("auth") ||
+          filePaths.some((path: string) => path.includes("/auth/")),
+      },
+      {
+        title: "Services",
+        hint: "Modifications may impact multiple application workflows.",
+        active: moduleFolders.includes("services"),
+      },
+      {
+        title: "State Management",
+        hint: "Shared application state can affect many screens.",
+        active: filePaths.some((path: string) =>
+          ["store", "state", "redux", "context"].some((keyword) =>
+            path.includes(keyword),
+          ),
+        ),
+      },
+    ].filter((item) => item.active);
+  }, [repositoryData?.files, moduleFolders]);
 
   const stats = [
     {
@@ -371,6 +551,16 @@ export const RepositoryOverview = ({
               <span className="px-2 py-1 rounded-full text-xs bg-accent/10 text-accent flex-shrink-0">
                 {repository.language}
               </span>
+              {repositoryData?.parent && (
+                <Link
+                  href={`/repo/${repositoryData.parent.id}`}
+                  className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary flex items-center gap-1 hover:bg-primary/20 transition-colors flex-shrink-0"
+                  title="View Parent Repository"
+                >
+                  <Package className="h-3 w-3" />
+                  Part of {repositoryData.parent.name}
+                </Link>
+              )}
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground mb-3 break-words">
               {repository.description}
@@ -447,6 +637,184 @@ export const RepositoryOverview = ({
           </div>
         </div>
       </div>
+
+      <div className="space-y-4 transition-all duration-300">
+        <Card className="glass border border-border/60 p-4">
+          <CardHeader>
+            <CardTitle>First PR Simulator</CardTitle>
+            <CardDescription>
+              Generate a recommended first PR plan from a repository issue or a custom issue description.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 lg:grid-cols-[1fr_1.5fr]">
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-muted-foreground">Issue title</label>
+                <Input
+                  value={issueTitle}
+                  onChange={(event) => setIssueTitle(event.target.value)}
+                  placeholder="e.g. Fix broken repository filtering"
+                />
+              </div>
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-muted-foreground">Issue description</label>
+                <textarea
+                  value={issueBody}
+                  onChange={(event) => setIssueBody(event.target.value)}
+                  className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  placeholder="Describe the issue and expected behavior..."
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={handleRunSimulation}
+                  disabled={!hasIssueInput}
+                >
+                  Simulate issue
+                </Button>
+                {sampleIssue && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setSelectedIssue(sampleIssue)}
+                  >
+                    Use first available issue
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  onClick={handleResetSimulation}
+                >
+                  Reset
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground max-w-xl">
+                The simulator uses issue text and repository structure to recommend a starter file set, difficulty, and test focus.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <FirstPRSimulator issue={issueToSimulate} repository={repositoryMetadata} />
+
+        <ContributionPathGenerator repository={repositoryMetadata} />
+
+        <DeadCodeDetector repository={repositoryMetadata} />
+
+        <ArchitecturalDriftDetector repository={repositoryMetadata} />
+
+        <BeginnerModeToggle
+          enabled={isBeginnerMode}
+          onToggle={() => setIsBeginnerMode(!isBeginnerMode)}
+        />
+
+        {isBeginnerMode && (
+          <div className="grid gap-4 lg:grid-cols-[1.75fr_minmax(260px,1fr)]">
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {moduleFolders.length > 0 ? (
+                  moduleFolders.map((folder) => (
+                    <BeginnerGuidanceCard
+                      key={folder}
+                      moduleName={folder}
+                      guidance={MODULE_GUIDANCE[folder]}
+                      architectureDescription={
+                        ARCHITECTURE_GUIDANCE[folder] ||
+                        "A common architecture concept for this module."
+                      }
+                    />
+                  ))
+                ) : (
+                  <Card className="glass border border-border/60 p-4">
+                    <CardDescription className="text-sm text-muted-foreground">
+                      No labeled modules detected for Beginner Mode guidance.
+                    </CardDescription>
+                  </Card>
+                )}
+              </div>
+
+              {hotspotGuidance.length > 0 && (
+                <Card className="glass border border-border/60">
+                  <CardHeader>
+                    <CardTitle className="text-base">Hotspot Guidance</CardTitle>
+                    <CardDescription>
+                      Contextual warnings for areas that may require extra care.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {hotspotGuidance.map((hotspot) => (
+                      <div
+                        key={hotspot.title}
+                        className="rounded-2xl border border-amber-200/60 bg-amber-100/10 p-4"
+                      >
+                        <div className="flex items-center gap-2 text-amber-700">
+                          <AlertTriangle className="h-4 w-4" />
+                          <p className="font-semibold">{hotspot.title}</p>
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {hotspot.hint}
+                        </p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            <BeginnerQuestionsPanel />
+          </div>
+        )}
+
+        <QuickStartChecklist />
+
+        <SavedModulesPanel
+          bookmarkedModules={bookmarkedModules}
+          onRemoveBookmark={removeBookmark}
+        />
+
+        <RepositoryInsightsDashboard repositoryData={repositoryData} />
+
+        <ModuleComparisonTool />
+
+        <FolderImportanceGuide />
+      </div>
+
+      {/* Monorepo Sub-packages */}
+      {repositoryData?.subPackages && repositoryData.subPackages.length > 0 && (
+        <Card className="glass border border-primary/20 bg-primary/5">
+          <CardHeader className="p-4 sm:p-6 pb-2">
+            <CardTitle className="font-heading text-lg sm:text-xl flex items-center gap-2 text-primary">
+              <Package className="h-5 w-5" />
+              Monorepo Workspaces
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              This repository contains multiple packages. Select one to view its isolated analysis.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {repositoryData.subPackages.map((subPkg: any) => (
+                <Link
+                  key={subPkg.id}
+                  href={`/repo/${subPkg.id}`}
+                  className="p-3 rounded-xl border border-border/50 bg-background/50 hover:bg-background/80 hover:border-primary/50 transition-all group flex flex-col gap-1"
+                >
+                  <div className="font-medium flex items-center justify-between">
+                    <span className="truncate">{subPkg.targetDirectory}</span>
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+                  </div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {subPkg.status}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Repository Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -788,22 +1156,20 @@ export const RepositoryOverview = ({
               <div className="flex bg-secondary-100 dark:bg-secondary-900 p-1 rounded-lg self-start">
                 <button
                   onClick={() => setEditorMode("preview")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    editorMode === "preview"
-                      ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${editorMode === "preview"
+                    ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   <Eye className="h-3.5 w-3.5" />
                   Preview
                 </button>
                 <button
                   onClick={() => setEditorMode("edit")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    editorMode === "edit"
-                      ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${editorMode === "edit"
+                    ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   <Edit2 className="h-3.5 w-3.5" />
                   Edit Markdown

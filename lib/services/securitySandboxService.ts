@@ -5,6 +5,9 @@ import * as path from "path";
 import * as os from "os";
 import prisma from "@/lib/prisma";
 import crypto from "crypto";
+import { validateSafeUrl } from "@/lib/utils/ssrfValidator";
+import { GitHubService } from "./githubService";
+import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
 
 const execFileAsync = promisify(execFile);
 
@@ -252,6 +255,11 @@ export async function runSecuritySandbox(params: {
     throw new Error("Security sandbox is not enabled. Set SECURITY_SANDBOX_ENABLED=true");
   }
 
+  const isSafeUrl = await validateSafeUrl(params.repositoryUrl);
+  if (!isSafeUrl) {
+    throw new Error("Security sandbox aborted: Repository URL resolves to an untrusted or private network address.");
+  }
+
   // Create sandbox record
   const sandbox = await prisma.securitySandbox.create({
     data: {
@@ -285,6 +293,42 @@ export async function runSecuritySandbox(params: {
     ]);
 
     // Update sandbox record with results
+    const hasSecrets = (result.testResults as any[]).some(
+      (t) => t.testName === "secret_exposure" && !t.passed
+    );
+
+    if (hasSecrets && params.pullRequestId) {
+      const repo = await prisma.repository.findUnique({
+        where: { id: params.repositoryId },
+        include: { 
+          user: { include: { githubAccount: true } }
+        }
+      });
+      const pr = await prisma.pullRequest.findUnique({
+        where: { id: params.pullRequestId }
+      });
+
+      if (repo && repo.user.githubAccount && pr) {
+        try {
+          const githubService = new GitHubService(repo.user.githubAccount.accessToken);
+          const parts = repo.url.split("/");
+          const owner = parts[parts.length - 2];
+          const name = parts[parts.length - 1];
+          const pullNumber = pr.prNumber;
+          
+          await githubService.updatePullRequest(owner, name, pullNumber, {
+            state: "closed",
+          });
+          await githubService.postPullRequestComment(
+            owner, name, pullNumber,
+            "🚨 **CRITICAL SECURITY ALERT** 🚨\n\nThis PR has been automatically quarantined and closed because high-entropy secrets were detected. Please revoke the secrets immediately and remove them from your commit history before reopening."
+          );
+        } catch (e) {
+          console.error("Failed to quarantine PR:", e);
+        }
+      }
+    }
+
     await prisma.securitySandbox.update({
       where: { id: sandbox.id },
       data: {
@@ -295,6 +339,54 @@ export async function runSecuritySandbox(params: {
         completedAt: new Date(),
       },
     });
+
+    if (params.pullRequestId && (result.exploitPayload || result.testResults.some(r => !r.passed))) {
+      try {
+        const repository = await prisma.repository.findUnique({ where: { id: params.repositoryId } });
+        const pr = await prisma.pullRequest.findUnique({ where: { id: params.pullRequestId } });
+        
+        if (repository && pr) {
+          const ownerRepo = GitHubService.parseGitHubUrl(params.repositoryUrl);
+          if (ownerRepo) {
+            const { owner, repo } = ownerRepo;
+            const token = await getDecryptedGitHubToken(repository.userId);
+            const github = new GitHubService(token || undefined);
+            
+            // Check gitverse.yml for toggle
+            const configContent = await github.getFileContent(owner, repo, "gitverse.yml", params.headSha);
+            let shouldPost = true;
+            if (configContent) {
+              if (configContent.includes("sandboxComments: false") || configContent.includes("sandbox_comments: false")) {
+                shouldPost = false;
+              }
+            }
+            
+            if (shouldPost) {
+              let md = "## 🛡️ Security Sandbox Report\n\n";
+              md += "The security sandbox detected potential vulnerabilities during its automated probes.\n\n";
+              md += "| Test | Status | Details |\n";
+              md += "|------|--------|---------|\n";
+              
+              for (const test of result.testResults) {
+                const statusIcon = test.passed ? "✅ Passed" : "❌ Failed";
+                let details = test.error || test.response || "No details";
+                if (details.length > 200) details = details.substring(0, 200) + "...";
+                details = details.replace(/\n/g, " ");
+                md += `| ${test.testName} | ${statusIcon} | ${details} |\n`;
+              }
+              
+              if (result.exploitPayload) {
+                md += `\n**Exploit Payload Executed:**\n\`\`\`\n${result.exploitPayload}\n\`\`\`\n`;
+              }
+              
+              await github.postPullRequestComment(owner, repo, pr.prNumber, md);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to post PR comment for security sandbox", err);
+      }
+    }
 
     return {
       sandboxId: sandbox.id,

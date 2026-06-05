@@ -1,8 +1,23 @@
-# GitVerse
+<div align="center">
 
-Turn any GitHub repo into an interactive map of its architecture, modules, and risks.
+# GitVerse 🗺️
 
-GitVerse is built for the moment you open a new codebase and ask: “Where do I start?”
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
+[![Node.js](https://img.shields.io/badge/Node.js-22.x-339933?style=flat-square&logo=node.js)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Deploy on Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)](https://vercel.com)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://github.com/nisshchayarathi/gitverse-nextjs/pulls)
+
+> **Paste a repo. Understand it in minutes.**
+
+GitVerse turns any GitHub repository into an interactive visual map of its architecture, modules, and risk hotspots — so you always know where to start.
+
+Whether you're a new contributor facing an unfamiliar codebase, or a maintainer trying to communicate structure to your team, GitVerse gives you the full picture instantly.
+
+</div>
 
 ## Pitch
 
@@ -234,8 +249,7 @@ Environment Variables:**
 | Variable | Required | Description | Example |
 |---|---|---|---|
 | `DATABASE_URL` |  Yes | PostgreSQL connection string (Neon recommended) | `postgresql://user:pass@host/db` |
-| `JWT_SECRET` | No (if `NEXTAUTH_SECRET` is set) | Secret key for JWT signing (fallback for `NEXTAUTH_SECRET`) | `openssl rand -base64 32` |
-| `GEMINI_API_KEY` |  Yes | Google Gemini API key | Get from [Google AI Studio](https://aistudio.google.com) |
+| `JWT_SECRET` | Yes | Secret key for JWT signing | `openssl rand -base64 32` |
 | `NEXTAUTH_URL` |  Yes | Your deployed Vercel URL | `https://your-app.vercel.app` |
 | `NEXTAUTH_SECRET` |  Yes | NextAuth session signing secret | `openssl rand -base64 32` |
 | `GOOGLE_CLIENT_ID` |  No (required for OAuth) | Google OAuth client ID | From Google Cloud Console |
@@ -304,7 +318,7 @@ Add these in **Vercel Dashboard → Settings → Environment Variables**:
 | `GITHUB_APP_ID` | ⚡ PR Reviews | Only if using GitHub App integration |
 | `GITHUB_APP_PRIVATE_KEY` | ⚡ PR Reviews | Only if using GitHub App integration |
 | `GITHUB_WEBHOOK_SECRET` | ⚡ PR Reviews | Only if using GitHub webhooks |
-| `ANALYSIS_RUNNER_SECRET` | ⚡ Cron | Required for scheduled analysis jobs on Vercel |
+| `ANALYSIS_RUNNER_SECRET` | ✅ Always | Required in production. Protects `/api/internal/run-analysis`. Generate with `openssl rand -hex 32`. Must NOT be passed via query string. |
 | `GITVERSE_ANALYSIS_BACKEND` | ⚡ Cron | URL of your analysis worker backend |
 | `SMTP_HOST` | ⚡ Email | Only if using password reset emails |
 | `SMTP_USER` | ⚡ Email | Only if using password reset emails |
@@ -315,7 +329,7 @@ Add these in **Vercel Dashboard → Settings → Environment Variables**:
 - **Wrong DATABASE_URL** — Use the **pooler** URL from NeonDB for Vercel (not direct connection)
 - **Missing NEXTAUTH_URL** — Must be set to your exact production domain
 - **GITHUB_APP_PRIVATE_KEY format** — Paste with literal `\n` between lines, wrapped in quotes
-- **ANALYSIS_RUNNER_SECRET not set** - Required in production; `/api/internal/run-analysis` rejects requests with 401 until the secret is configured
+- **ANALYSIS_RUNNER_SECRET not set** - Required in production; `/api/internal/run-analysis` rejects requests with 500 until the secret is configured. Generate with `openssl rand -hex 32`. Never pass the secret via query string.
 
 ### Docker
 
@@ -357,7 +371,7 @@ firebase deploy
 Required:
 
 - `DATABASE_URL` - PostgreSQL connection string
-- `JWT_SECRET` - JWT secret key
+- `JWT_SECRET` - JWT signing secret. The app will crash on startup without it.
 - `GEMINI_API_KEY` - Google Gemini API key
 
 OAuth (Google / NextAuth):
@@ -370,7 +384,6 @@ OAuth (Google / NextAuth):
 
 Optional:
 
-- `JWT_SECRET` - JWT signing secret (fallback/alternate secret configuration)
 - `NEXT_PUBLIC_API_URL` - API URL for client-side (defaults to current domain)
 
 ## 🤝 Contributing
@@ -386,6 +399,24 @@ Optional:
 A huge thank you to all contributors who have helped improve GitVerse ❤️
 Your efforts make this project stronger, more reliable, and more impactful for the community.
 
+<p align="center">
+  <a href="https://github.com/nisshchayarathi/gitverse-nextjs/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=nisshchayarathi/gitverse-nextjs" alt="Contributors"/>
+  </a>
+</p>
+
+## ⭐ Project Support
+
+<p align="center">
+  <a href="https://github.com/nisshchayarathi/gitverse-nextjs/stargazers">
+    <img src="https://img.shields.io/github/stars/nisshchayarathi/gitverse-nextjs?style=social" alt="Stars">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/nisshchayarathi/gitverse-nextjs/network/members">
+    <img src="https://img.shields.io/github/forks/nisshchayarathi/gitverse-nextjs?style=social" alt="Forks">
+  </a>
+</p>
+
 ## 📄 License
 
 This project is licensed under the MIT License.
@@ -397,6 +428,107 @@ This project is licensed under the MIT License.
 - Google for Gemini AI
 - NeonDB for serverless PostgreSQL
 - All contributors and users of GitVerse
+
+## ❓ FAQ – Common Questions & Edge Cases
+> This section covers product behavior, limitations, and design decisions not included in troubleshooting.
+### 1. Can GitVerse analyze very large repositories?
+Yes, but performance depends on repo size.
+
+- Small repos → fast (seconds)
+- Medium repos → moderate (few seconds to a minute)
+- Large monorepos → slower due to:
+  - dependency graph building
+  - AI summarization
+  - full file traversal
+
+### 2. Does GitVerse store repository data?
+GitVerse may temporarily store:
+- repository structure
+- analysis results
+- AI-generated summaries
+
+This helps improve performance and reduce repeated computation. You can extend it to add long-term caching if needed.
+
+### 3. What happens if GitHub API rate limits are hit?
+If GitHub rate limits are reached:
+- repository fetch may fail
+- partial analysis may be returned
+
+Recommended improvements:
+- use GitHub App authentication for higher limits
+- add retry with exponential backoff
+- cache repository metadata
+
+### 4. Does GitVerse support GitLab or Bitbucket?
+Not currently.
+
+GitVerse is built for GitHub only, but it can be extended by abstracting `gitService.ts` into provider-based adapters.
+
+### 5. Is GitVerse real-time collaborative?
+No.
+
+Currently:
+- single-user analysis only
+- no shared sessions or live collaboration
+
+Future idea:
+- shared repo exploration rooms
+- collaborative AI chat per repository
+
+### 6. How accurate is AI-based architecture mapping?
+AI results are:
+- helpful for understanding structure
+- not guaranteed to reflect runtime behavior perfectly
+
+Accuracy depends on:
+- code quality
+- naming conventions
+- project structure clarity
+
+### 7. Can I customize graphs and visualizations?
+Yes.
+
+Modify:
+src/components/visualizations/
+
+You can customize:
+- dependency graphs
+- module maps
+- risk heatmaps
+- node layouts
+
+### 8. Is GitVerse suitable for production-level analysis?
+Yes, but mainly for:
+- onboarding developers
+- exploring unfamiliar codebases
+- hackathon or OSS contribution workflows
+
+It is not a replacement for full static analysis tools.
+
+### 9. Can I customize AI prompts?
+Yes.
+
+Edit:
+lib/services/geminiService.ts
+
+You can change:
+- architecture explanation style
+- onboarding prompts
+- risk detection logic
+- suggestion formats
+
+### 10. What makes GitVerse different from GitHub UI?
+GitHub shows files.
+
+GitVerse shows understanding:
+- architecture map
+- dependency flow
+- hotspots & risks
+- AI onboarding assistant
+
+It turns a repo into a **learning system, not just a file browser**.
+
+
 
 ---
 

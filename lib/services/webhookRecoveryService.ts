@@ -40,7 +40,7 @@ export async function recoverStuckEvents(): Promise<{
       await prisma.webhookEvent.update({
         where: { id: event.id },
         data: {
-          status: "failed",
+          status: "dlq",
           error: "Exceeded max retries after stuck recovery",
           retryCount: currentRetryCount,
         },
@@ -82,7 +82,7 @@ export async function recoverStuckEvents(): Promise<{
       await prisma.webhookEvent.update({
         where: { id: event.id },
         data: {
-          status: "failed",
+          status: "dlq",
           error: "Exceeded max retries",
           nextRetryAt: null,
         },
@@ -120,6 +120,10 @@ export async function recoverStuckEvents(): Promise<{
     const maxRetries = (event as any).maxRetries ?? 3;
 
     if (currentRetryCount >= maxRetries) {
+      await prisma.webhookEvent.update({
+        where: { id: event.id },
+        data: { status: "dlq" }
+      });
       skipped++;
       continue;
     }

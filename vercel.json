@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/webhook-recovery",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/analysis-job-cleanup",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

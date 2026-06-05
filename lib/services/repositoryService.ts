@@ -4,12 +4,40 @@ import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
+import {
+  invalidateCacheForCommit,
+  invalidateExpiredCacheEntries,
+} from "./geminiAnalysisCacheService";
+import { ttlCache, TTL, repoStatsCacheKey } from "../utils/ttlCache";
+
+/** Shape returned by getRepositoryStats / _fetchRepositoryStats. */
+interface RepoStats {
+  totalCommits: number;
+  totalContributors: number;
+  totalFiles: number;
+  totalBranches: number;
+  recentActivity: {
+    shortHash: string;
+    message: string;
+    authorName: string;
+    committedAt: Date;
+  }[];
+  status: string;
+  lastAnalyzedAt: Date | null;
 import { invalidateGeminiAnalysisCacheForRepository } from "./geminiAnalysisCacheService";
 import { FileChangeType } from "@prisma/client";
+import { repoSyncLimiter } from "../utils/concurrencyLimiter";
+import { withDbRetry } from "../utils/dbRetry";
 import { gitverseConfigParser, ParsedRepositoryKnowledge } from "../parsers/gitverseConfigParser";
 import { repositoryKnowledgeService } from "./repositoryKnowledgeService";
 
-function yieldIfHighMemory(threshold = 0.7): Promise<void> {
+function yieldIfHighMemory(threshold?: number): Promise<void> {
+  if (threshold === undefined) {
+    const envThreshold = process.env.GITVERSE_MEM_YIELD_THRESHOLD;
+    threshold = envThreshold ? parseFloat(envThreshold) : 0.7;
+    if (isNaN(threshold)) threshold = 0.7;
+  }
+
   const usage = process.memoryUsage();
   if (usage.heapUsed / usage.heapTotal > threshold) {
     return new Promise((resolve) => setImmediate(resolve));
@@ -23,6 +51,7 @@ export interface AnalyzeRepositoryInput {
   description?: string;
   targetDirectory?: string;
   userId: number;
+  isPrivate?: boolean;
 }
 
 export type RepositoryAnalysisProgress = {
@@ -100,11 +129,27 @@ export class RepositoryService {
     let gitService: GitService | null = null;
 
     try {
-      // For README we don't need all branches; keep it lightweight.
-      gitService = await GitService.cloneRepository(repository.url, tempDir, {
-        depth: 1,
-        noSingleBranch: false,
-      });
+      // Check repository size before cloning
+      const MAX_REPO_SIZE = 500 * 1024 * 1024; // 500 MB limit
+      const token = await getGithubAccessToken(userId);
+      const remoteSize = await GitService.getRemoteRepositorySize(repository.url, token);
+      if (remoteSize !== null && remoteSize > MAX_REPO_SIZE) {
+        throw new Error(`Repository exceeds maximum allowed size of 500MB (${(remoteSize / 1024 / 1024).toFixed(2)}MB).`);
+      }
+
+      const readmeController = new AbortController();
+      const readmeTimeout = setTimeout(() => readmeController.abort(), 5 * 60 * 1000);
+
+      try {
+        gitService = await GitService.cloneRepository(repository.url, tempDir, {
+          depth: 1,
+          noSingleBranch: false,
+          accessToken: token,
+          signal: readmeController.signal,
+        });
+      } finally {
+        clearTimeout(readmeTimeout);
+      }
 
       const scopedPath = repository.targetDirectory
         ? path.join(tempDir, repository.targetDirectory)
@@ -155,15 +200,15 @@ export class RepositoryService {
     }
 
     const existingRepositoryName = await prisma.repository.findFirst({
-  where: {
-    name: input.name,
-    userId: input.userId,
-  },
-});
+      where: {
+        name: input.name,
+        userId: input.userId,
+      },
+    });
 
-if (existingRepositoryName) {
-  throw new Error("Repository with this name already exists");
-}
+    if (existingRepositoryName) {
+      throw new Error("Repository with this name already exists");
+    }
 
     const repository = await prisma.repository.create({
       data: {
@@ -173,6 +218,7 @@ if (existingRepositoryName) {
         targetDirectory: input.targetDirectory ?? null,
         userId: input.userId,
         status: "pending",
+        isPrivate: input.isPrivate ?? false,
       },
     });
 
@@ -237,6 +283,14 @@ if (existingRepositoryName) {
     try {
       checkAborted();
 
+      // Check repository size before cloning to prevent disk exhaustion DoS
+      const MAX_REPO_SIZE = 500 * 1024 * 1024; // 500 MB limit
+      const token = await getGithubAccessToken(userId);
+      const remoteSize = await GitService.getRemoteRepositorySize(repository.url, token);
+      if (remoteSize !== null && remoteSize > MAX_REPO_SIZE) {
+        throw new Error(`Repository exceeds maximum allowed size of 500MB (${(remoteSize / 1024 / 1024).toFixed(2)}MB).`);
+      }
+
       // Clone repository
       await report({
         progressPercent: 5,
@@ -244,6 +298,7 @@ if (existingRepositoryName) {
       });
       gitService = await GitService.cloneRepository(repository.url, tempDir, {
         signal,
+        accessToken: token,
         onProgress: (pct, msg) => {
           const analysisPct = 5 + Math.round((pct / 100) * 3);
           report({ progressPercent: Math.min(8, analysisPct), progressMessage: msg });
@@ -264,23 +319,30 @@ if (existingRepositoryName) {
 
       checkAborted();
 
-      await report({ progressPercent: 9, progressMessage: "Checking AI context configuration" });
-      
+      // Check for monorepo workspaces if this is the root project
+      let subPackages: string[] = [];
+      if (!repository.targetDirectory) {
+        await report({ progressPercent: 9, progressMessage: "Detecting Monorepo sub-packages..." });
+        subPackages = await detectMonorepoPackages(tempDir);
+      }
+
+      await report({ progressPercent: 10, progressMessage: "Checking AI context configuration" });
+
       let knowledgeJson: ParsedRepositoryKnowledge | undefined = undefined;
       let knowledgeMd: ParsedRepositoryKnowledge | undefined = undefined;
-      
+
       try {
         const jsonPath = path.join(tempDir, ".gitverse.json");
         const jsonContent = await fs.readFile(jsonPath, "utf8");
         knowledgeJson = gitverseConfigParser.parseJson(jsonContent);
       } catch (e) { /* Ignore missing or invalid */ }
-      
+
       try {
         const mdPath = path.join(tempDir, ".gitverse.md");
         const mdContent = await fs.readFile(mdPath, "utf8");
         knowledgeMd = gitverseConfigParser.parseMarkdown(mdContent);
       } catch (e) { /* Ignore missing or invalid */ }
-      
+
       const parsedKnowledge = gitverseConfigParser.mergeKnowledge(knowledgeJson, knowledgeMd);
 
       checkAborted();
@@ -291,7 +353,7 @@ if (existingRepositoryName) {
       });
       const [size, branches] = await Promise.all([
         gitService.getRepositorySize(),
-        gitService.getBranches(),
+        gitService.getBranches(signal),
       ]);
 
       checkAborted();
@@ -302,7 +364,7 @@ if (existingRepositoryName) {
         progressPercent: 25,
         progressMessage: "Fetching commit history...",
       });
-      const commits = await gitService.getCommits("--all", 1000);
+      const commits = await gitService.getCommits("--all", 1000, signal);
 
       checkAborted();
 
@@ -310,7 +372,7 @@ if (existingRepositoryName) {
         progressPercent: 65,
         progressMessage: "Scanning files",
       });
-      const files = await gitService.getFileTree(opts?.scope || repository.targetDirectory || undefined);
+      const files = await gitService.getFileTree(opts?.scope || repository.targetDirectory || undefined, signal);
       checkAborted();
 
       await report({
@@ -323,8 +385,8 @@ if (existingRepositoryName) {
       });
 
       const [contributors, languages] = await Promise.all([
-        gitService.getContributors(),
-        gitService.detectLanguages(repository.targetDirectory ?? undefined),
+        gitService.getContributors(signal),
+        gitService.detectLanguages(repository.targetDirectory ?? undefined, signal),
       ]);
 
       checkAborted();
@@ -336,14 +398,14 @@ if (existingRepositoryName) {
         // Delete stale analysis data for a clean slate, then re-insert fresh data.
         // This avoids the skipDuplicates problem where old rows from a previous
         // partial run survive alongside new data.
-        await tx.commit.deleteMany({ where: { repositoryId } });
-        await tx.branch.deleteMany({ where: { repositoryId } });
-        await tx.file.deleteMany({ where: { repositoryId } });
-        await tx.contributor.deleteMany({ where: { repositoryId } });
-        await tx.language.deleteMany({ where: { repositoryId } });
+        await prisma.commit.deleteMany({ where: { repositoryId } });
+        await prisma.branch.deleteMany({ where: { repositoryId } });
+        await prisma.file.deleteMany({ where: { repositoryId } });
+        await prisma.contributor.deleteMany({ where: { repositoryId } });
+        await prisma.language.deleteMany({ where: { repositoryId } });
 
         // Update README
-        await tx.repository.update({
+        await prisma.repository.update({
           where: { id: repositoryId },
           data: {
             readmePath: readme?.path ?? "README.md",
@@ -354,7 +416,7 @@ if (existingRepositoryName) {
 
         // Insert branches
         if (branches.length > 0) {
-          await tx.branch.createMany({
+          await prisma.branch.createMany({
             data: branches.map((branch) => ({
               name: branch.name,
               isDefault: branch.isDefault,
@@ -372,7 +434,7 @@ if (existingRepositoryName) {
           for (let i = 0; i < commits.length; i += commitChunkSize) {
             const chunk = commits.slice(i, i + commitChunkSize);
 
-            await tx.commit.createMany({
+            await prisma.commit.createMany({
               data: chunk.map((commit) => ({
                 hash: commit.hash,
                 shortHash: commit.shortHash,
@@ -392,7 +454,7 @@ if (existingRepositoryName) {
               })),
             });
 
-            const insertedCommits = await tx.commit.findMany({
+            const insertedCommits = await prisma.commit.findMany({
               where: {
                 repositoryId,
                 hash: { in: chunk.map((c: { hash: string }) => c.hash) },
@@ -426,7 +488,7 @@ if (existingRepositoryName) {
             );
 
             if (fileChanges.length > 0) {
-              await tx.fileChange.createMany({ data: fileChanges });
+              await prisma.fileChange.createMany({ data: fileChanges });
             }
           }
         }
@@ -436,7 +498,7 @@ if (existingRepositoryName) {
           const chunkSize = 500;
           for (let i = 0; i < files.length; i += chunkSize) {
             const chunk = files.slice(i, i + chunkSize);
-            await tx.file.createMany({
+            await prisma.file.createMany({
               data: chunk.map((file) => ({
                 path: file.path,
                 name: file.name,
@@ -455,7 +517,7 @@ if (existingRepositoryName) {
           const totalContributions = contributors.reduce(
             (sum: number, c: { commits: number }) => sum + c.commits, 0,
           );
-          await tx.contributor.createMany({
+          await prisma.contributor.createMany({
             data: contributors.map((contributor: { commits: number; name: string; email: string; additions: number; deletions: number; firstCommit: Date; lastCommit: Date }) => {
               const percentage =
                 totalContributions > 0
@@ -518,7 +580,7 @@ if (existingRepositoryName) {
             }),
           );
 
-          await tx.language.createMany({
+          await prisma.language.createMany({
             data: languagesWithAdjustedPercentage.map(
               (language: { name: string; percentage: number; bytes: number; lines: number }) => ({
                 name: language.name,
@@ -532,7 +594,7 @@ if (existingRepositoryName) {
         }
 
         // Final status update
-        await tx.repository.update({
+        await prisma.repository.update({
           where: { id: repositoryId },
           data: {
             status: "completed",
@@ -542,7 +604,7 @@ if (existingRepositoryName) {
           },
         });
       });
-      
+
       // Save repository knowledge if found
       try {
         await repositoryKnowledgeService.upsertKnowledge(repositoryId, parsedKnowledge);
@@ -552,6 +614,8 @@ if (existingRepositoryName) {
 
       // Cache invalidation (outside transaction — best-effort, non-critical)
       try {
+        await invalidateExpiredCacheEntries(repositoryId);
+
         const headCommit = await prisma.commit.findFirst({
           where: { repositoryId, branch: defaultBranch },
           orderBy: { committedAt: "desc" },
@@ -559,11 +623,46 @@ if (existingRepositoryName) {
         });
 
         if (headCommit?.hash) {
-          await invalidateGeminiAnalysisCacheForRepository(repositoryId, headCommit.hash);
+          await invalidateCacheForCommit(repositoryId, headCommit.hash);
         }
       } catch (error) {
         console.warn("Gemini cache invalidation failed:", error);
       }
+
+      // Automatically queue AnalysisJobs for any detected Monorepo sub-packages
+      if (subPackages.length > 0) {
+        await report({ progressPercent: 98, progressMessage: "Queueing sub-package analysis..." });
+        for (const pkgPath of subPackages) {
+          try {
+            const subRepo = await this.createRepository({
+              name: `${repository.name}/${pkgPath}`,
+              url: repository.url,
+              userId: repository.userId,
+              targetDirectory: pkgPath,
+              isPrivate: repository.isPrivate,
+            });
+
+            await prisma.repository.update({
+              where: { id: subRepo.id },
+              data: { parentId: repository.id }
+            });
+
+            await prisma.analysisJob.create({
+              data: {
+                repositoryId: subRepo.id,
+                userId: repository.userId,
+                status: "QUEUED",
+                type: "repository_analysis",
+              },
+            });
+          } catch (e) {
+            console.warn(`Failed to queue analysis for sub-package ${pkgPath}:`, e);
+          }
+        }
+      }
+
+      // Invalidate cached stats — analysis has changed commits, files, contributors, etc.
+      ttlCache.deleteByPrefix(`repo-stats:${repositoryId}:`);
 
       await report({ progressPercent: 100, progressMessage: "Completed" });
 
@@ -573,6 +672,9 @@ if (existingRepositoryName) {
         where: { id: repositoryId },
         data: { status: "failed" },
       });
+      // Invalidate cached stats — status has changed to "failed".
+      ttlCache.deleteByPrefix(`repo-stats:${repositoryId}:`);
+      await report({ progressMessage: "Failed" });
       await report({ progressMessage: "Analysis failed. Please try again." });
       throw error;
     } finally {
@@ -587,13 +689,145 @@ if (existingRepositoryName) {
   }
 
   /**
+   * Generates architecture map iteratively for massive repositories
+   */
+  async generateArchitectureIteratively(
+    repositoryId: number,
+    userId: number,
+    opts?: { onProgress?: RepositoryAnalysisProgressReporter }
+  ) {
+    const repository = await prisma.repository.findFirst({
+      where: { id: repositoryId, userId },
+      include: {
+        files: true,
+        commits: { take: 50 },
+        languages: { take: 20 },
+        contributors: { take: 20 }
+      }
+    });
+
+    if (!repository) {
+      throw new Error("Repository not found");
+    }
+
+    const report = async (update: RepositoryAnalysisProgress) => {
+      if (opts?.onProgress) {
+        try { await opts.onProgress(update); } catch { }
+      }
+    };
+
+    await report({ progressPercent: 10, progressMessage: "Grouping files into chunks..." });
+
+    const flatFiles = repository.files || [];
+    const chunkSize = 100;
+    const chunks: Array<typeof flatFiles> = [];
+
+    for (let i = 0; i < flatFiles.length; i += chunkSize) {
+      chunks.push(flatFiles.slice(i, i + chunkSize));
+    }
+
+    if (chunks.length === 0) {
+      await report({ progressPercent: 100, progressMessage: "No files to analyze." });
+      return;
+    }
+
+    const geminiService = getGeminiService();
+    let completedChunks = 0;
+    const totalChunks = chunks.length;
+
+    // Clear previous chunks for this repo
+    await prisma.repositoryArchitectureChunk.deleteMany({
+      where: { repositoryId }
+    });
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      await report({
+        progressPercent: 10 + Math.floor((completedChunks / totalChunks) * 60),
+        progressMessage: `Analyzing chunk ${i + 1} of ${totalChunks}...`
+      });
+
+      let aiResponse = await geminiService.analyzeRepository({
+        repositoryId,
+        type: "architecture-chunk",
+        context: {
+          fileTree: chunk.map((f: any) => f.path).join("\n"),
+        }
+      });
+
+      aiResponse = aiResponse
+        .replace(/^[\s\n]*```(?:markdown|md)?[\s\n]*/i, "")
+        .replace(/[\s\n]*```[\s\n]*$/i, "")
+        .trim();
+
+      await prisma.repositoryArchitectureChunk.create({
+        data: {
+          repositoryId,
+          chunkPath: `chunk-${i}`,
+          summary: aiResponse
+        }
+      });
+
+      completedChunks++;
+    }
+
+    await report({ progressPercent: 70, progressMessage: "Synthesizing final architecture map..." });
+
+    const savedChunks = await prisma.repositoryArchitectureChunk.findMany({
+      where: { repositoryId },
+      orderBy: { id: "asc" }
+    });
+
+    const combinedSummaries = savedChunks.map(c => `Chunk ${c.chunkPath}:\n${c.summary}`).join("\n\n---\n\n");
+
+    let finalAiResponse = await geminiService.analyzeRepository({
+      repositoryId,
+      type: "architecture-document",
+      context: {
+        fileTree: `Combined Intermediate Summaries:\n\n${combinedSummaries}`,
+        commits: repository.commits.map((c) => ({
+          message: c.message,
+          author: c.authorName,
+          date: c.committedAt.toISOString(),
+        })),
+        languages: repository.languages.map((l) => ({
+          name: l.name,
+          percentage: l.percentage,
+        })),
+        contributors: repository.contributors.map((c) => ({
+          name: c.name,
+          commits: c.commits,
+        })),
+      }
+    });
+
+    finalAiResponse = finalAiResponse
+      .replace(/^[\s\n]*```(?:markdown|md)?[\s\n]*/i, "")
+      .replace(/[\s\n]*```[\s\n]*$/i, "")
+      .trim();
+
+    await prisma.repositoryKnowledge.upsert({
+      where: { repositoryId },
+      create: {
+        repositoryId,
+        projectDescription: finalAiResponse
+      },
+      update: {
+        projectDescription: finalAiResponse
+      }
+    });
+
+    await report({ progressPercent: 100, progressMessage: "Completed architecture generation." });
+  }
+
+  /**
    * Get repository with all related data
    */
   async getRepository(id: number, userId: number) {
     const repository = await prisma.repository.findFirst({
       where: {
-        id,
-        userId,
+        id: Number(id),
+        userId: Number(userId),
       },
       include: {
         branches: {
@@ -617,6 +851,8 @@ if (existingRepositoryName) {
           take: 500,
         },
         knowledge: true,
+        subPackages: true,
+        parent: true,
       },
     });
 
@@ -635,17 +871,16 @@ if (existingRepositoryName) {
             contributors: true,
             files: true,
             branches: true,
+            subPackages: true,
           },
         },
         languages: {
           orderBy: { percentage: "desc" },
           take: 3,
         },
+        parent: true,
       },
-      orderBy: [
-        { createdAt: "desc" },
-        { id: "desc" } // Deterministic tie-breaker
-      ],
+      orderBy: { id: "desc" },
     });
 
     let nextCursor: number | undefined = undefined;
@@ -673,6 +908,31 @@ if (existingRepositoryName) {
       throw new Error("Repository not found");
     }
 
+    await prisma.$transaction([
+      // Explicitly delete file changes linked to commits of this repository
+      prisma.fileChange.deleteMany({
+        where: { commit: { repositoryId: id } },
+      }),
+      // Explicitly delete commits to prevent orphaned relational data
+      prisma.commit.deleteMany({
+        where: { repositoryId: id },
+      }),
+      // Explicitly delete analysis jobs
+      prisma.analysisJob.deleteMany({
+        where: { repositoryId: id },
+      }),
+      // Repository deletion handles the rest via Cascade
+      prisma.repository.delete({
+        where: { id },
+      }),
+    ]);
+    await prisma.repository.delete({
+      where: { id },
+    });
+
+    // Invalidate cached stats — repository no longer exists.
+    ttlCache.deleteByPrefix(`repo-stats:${id}:`);
+
     return { success: true };
   }
   //Explicitly set the status of a repository
@@ -688,8 +948,30 @@ if (existingRepositoryName) {
 
   /**
    * Get repository statistics
+   *
+   * Results are cached in-process for TTL.REPO_STATS (5 minutes) to avoid
+   * repeated DB round-trips for the same repo. The cache is invalidated
+   * automatically when analysis completes, fails, or the repo is deleted.
    */
   async getRepositoryStats(id: number, userId: number) {
+    const cacheKey = repoStatsCacheKey(id, userId);
+
+    // Return cached result if still fresh.
+    const cached = ttlCache.get<RepoStats>(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const stats = await this._fetchRepositoryStats(id, userId);
+
+    // Populate cache.
+    ttlCache.set(cacheKey, stats, TTL.REPO_STATS);
+
+    return stats;
+  }
+
+  /** Raw DB fetch for repository stats — called by getRepositoryStats. */
+  private async _fetchRepositoryStats(id: number, userId: number): Promise<RepoStats> {
     const repository = await prisma.repository.findFirst({
       where: { id, userId },
     });

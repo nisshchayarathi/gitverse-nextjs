@@ -10,27 +10,73 @@ export class DependencyGraphService {
   async buildGraph(repoPath: string): Promise<DependencyGraph> {
     const graph: DependencyGraph = new Map();
     
-    // Helper to recursively find files
-    const findFiles = async (dir: string, fileList: string[]) => {
+    const MAX_DIRECTORY_DEPTH = process.env.MAX_DIRECTORY_DEPTH ? parseInt(process.env.MAX_DIRECTORY_DEPTH, 10) : 20;
+    const MAX_FILES_INDEXED = process.env.MAX_FILES_INDEXED ? parseInt(process.env.MAX_FILES_INDEXED, 10) : 10000;
+    const TIMEOUT_MS = process.env.TRAVERSAL_TIMEOUT_MS ? parseInt(process.env.TRAVERSAL_TIMEOUT_MS, 10) : 30000;
+    
+    const files: string[] = [];
+    const queue: Array<{ dir: string; depth: number }> = [{ dir: repoPath, depth: 0 }];
+    const visitedPaths = new Set<string>();
+    const startTime = Date.now();
+
+    while (queue.length > 0) {
+      if (Date.now() - startTime > TIMEOUT_MS) {
+        console.warn(`DependencyGraphService: Traversal timeout exceeded (${TIMEOUT_MS}ms). Aborting safely.`);
+        break;
+      }
+
+      if (files.length >= MAX_FILES_INDEXED) {
+        console.warn(`DependencyGraphService: Max files limit reached (${MAX_FILES_INDEXED}). Stopping indexing.`);
+        break;
+      }
+
+      const { dir, depth } = queue.shift()!;
+
+      try {
+        // Resolve real path to detect circular symlinks
+        const realDirPath = await fs.realpath(dir);
+        if (visitedPaths.has(realDirPath)) {
+          console.warn(`DependencyGraphService: Circular symlink or previously visited path detected at ${dir}. Skipping.`);
+          continue;
+        }
+        visitedPaths.add(realDirPath);
+      } catch (err) {
+        // Ignore realpath errors (e.g. broken symlink)
+        continue;
+      }
+
+      if (depth >= MAX_DIRECTORY_DEPTH) {
+        console.warn(`DependencyGraphService: Max directory depth reached at ${dir}. Skipping children.`);
+        continue;
+      }
+
       try {
         const entries = await fs.readdir(dir, { withFileTypes: true });
         for (const entry of entries) {
           const fullPath = path.join(dir, entry.name);
-          if (entry.isDirectory()) {
-            if (!['node_modules', '.git', '.next', 'dist', 'build', 'out'].includes(entry.name)) {
-              await findFiles(fullPath, fileList);
+          
+          let isDir = entry.isDirectory();
+          if (entry.isSymbolicLink()) {
+            try {
+              const stat = await fs.stat(fullPath);
+              isDir = stat.isDirectory();
+            } catch {
+              continue; // Broken symlink
+            }
+          }
+
+          if (isDir) {
+            if (!['node_modules', '.git', '.next', 'dist', 'build', 'out', 'coverage', 'vendor'].includes(entry.name)) {
+              queue.push({ dir: fullPath, depth: depth + 1 });
             }
           } else if (['.ts', '.tsx', '.js', '.jsx'].includes(path.extname(entry.name))) {
-            fileList.push(fullPath);
+            files.push(fullPath);
           }
         }
       } catch (err) {
         // Ignore read errors for inaccessible folders
       }
-    };
-
-    const files: string[] = [];
-    await findFiles(repoPath, files);
+    }
 
     // Initialize graph keys
     const relativeFiles = files.map(f => path.relative(repoPath, f).replace(/\\/g, '/'));

@@ -1,3 +1,4 @@
+import { SafeHttpClient } from "@/services/security/safe-http-client";
 import { WebhookQueueService } from "../webhook-queue";
 import prisma from "../../prisma";
 
@@ -11,8 +12,21 @@ jest.mock("../../prisma", () => ({
   }
 }));
 
+jest.mock("@/services/security/safe-http-client", () => ({
+  SafeHttpClient: {
+    fetch: jest.fn((url, init) => {
+      (global as any).fetch(url, init);
+      return Promise.resolve({} as any);
+    }),
+  },
+}));
+
 // Mock global fetch
-global.fetch = jest.fn(() => Promise.resolve({} as any));
+jest.mock("@/services/security/safe-http-client", () => ({
+  SafeHttpClient: {
+    fetch: jest.fn(() => Promise.resolve({} as any)),
+  },
+}));
 
 describe("WebhookQueueService", () => {
   const queue = new WebhookQueueService();
@@ -32,7 +46,7 @@ describe("WebhookQueueService", () => {
     expect(status.activeWorkers).toBe(5);
     expect(status.pendingJobs).toBe(10);
     expect(prisma.webhookEvent.findMany).not.toHaveBeenCalled();
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(SafeHttpClient.fetch).not.toHaveBeenCalled();
   });
 
   it("should dispatch jobs up to available capacity", async () => {
@@ -57,6 +71,6 @@ describe("WebhookQueueService", () => {
       orderBy: { createdAt: "asc" },
       take: 2,
     });
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(SafeHttpClient.fetch).toHaveBeenCalledTimes(2);
   });
 });

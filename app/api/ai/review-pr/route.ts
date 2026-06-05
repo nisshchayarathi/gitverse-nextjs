@@ -5,10 +5,20 @@ import {
   reviewPullRequest,
 } from "@/lib/services/prReviewService";
 import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+
+const REVIEW_PR_RATE_LIMIT = 5;
+const REVIEW_PR_WINDOW_MS = 60_000;
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+
+    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    if (!globalRl.allowed) return rateLimitResponse(globalRl);
+
+    const allowed = await checkRateLimit(String(user.userId), { namespace: "review-pr", maxRequests: REVIEW_PR_RATE_LIMIT, windowMs: REVIEW_PR_WINDOW_MS });
+    if (!allowed.allowed) return rateLimitResponse(allowed);
 
     const body = await request.json();
     const prUrl = body?.prUrl as string | undefined;

@@ -1,13 +1,19 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import { getGeminiAnalysisCache, setGeminiAnalysisCache } from "./geminiAnalysisCacheService";
+import { buildCacheKey } from "../utils/cacheKey";
+
+const CURRENT_MODEL_VERSION = "gemini-2.5-flash";
 
 export interface AIAnalysisRequest {
   repositoryId: number;
   type:
-    | "overview"
-    | "code-quality"
-    | "security"
-    | "architecture"
-    | "suggestions";
+  | "overview"
+  | "code-quality"
+  | "security"
+  | "architecture"
+  | "suggestions"
+  | "architecture-document"
+  | "architecture-chunk";
   context?: {
     files?: Array<{ path: string; content: string }>;
     fileTree?: string;
@@ -28,6 +34,8 @@ export interface AICodeAnalysisRequest {
   language: string;
   analysisType: "explain" | "improve" | "bugs" | "document" | "refactor";
   context?: string;
+  repositoryId?: number;
+  commitHash?: string;
 }
 
 export interface AIRepositoryChatRequest {
@@ -52,11 +60,11 @@ export class GeminiService {
   private model: GenerativeModel;
 
   constructor(apiKey?: string) {
-    const key = apiKey || process.env.GEMINI_API_KEY;
-    if (!key) {
-      throw new Error("GEMINI_API_KEY is required");
+    const key = apiKey || process.env.GEMINI_API_KEY || "dummy-key-for-build";
+    if (!key || key === "dummy-key-for-build") {
+      // Defer throwing to runtime if possible, or warn. For now, use a dummy key during init.
     }
-
+    
     this.client = new GoogleGenerativeAI(key);
     this.model = this.client.getGenerativeModel({ model: "gemini-2.5-flash" });
   }
@@ -82,7 +90,7 @@ export class GeminiService {
    * Analyze code snippet
    */
   async analyzeCode(request: AICodeAnalysisRequest): Promise<string> {
-    const { code, language, analysisType, context } = request;
+    const { code, language, analysisType, context, repositoryId, commitHash } = request;
 
     let prompt = this.buildCodeAnalysisPrompt(
       code,
@@ -90,11 +98,33 @@ export class GeminiService {
       analysisType,
       context,
     );
+    
+    let cacheKey: ReturnType<typeof buildCacheKey> | null = null;
+    if (repositoryId && commitHash) {
+      cacheKey = buildCacheKey({
+        repositoryId,
+        commitHash,
+        analysisType: `code-${analysisType}`,
+        modelVersion: CURRENT_MODEL_VERSION,
+        analysisScope: "full",
+        context: { code, language, analysisType, context },
+      });
+      const cached = await getGeminiAnalysisCache(cacheKey);
+      if (cached.hit && cached.result) {
+        return cached.result;
+      }
+    }
 
     try {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
-      return response.text();
+      const text = response.text();
+
+      if (cacheKey) {
+        await setGeminiAnalysisCache(cacheKey, text);
+      }
+
+      return text;
     } catch (error) {
       this.handleGeminiError(error, "AI analysis");
     }
@@ -117,7 +147,11 @@ export class GeminiService {
       const response = await result.response;
       return response.text();
     } catch (error) {
-      this.handleGeminiError(error, "AI chat");
+      this.handleGeminiError(
+        error,
+        "AI chat",
+        "Context is too large for AI chat. Please try again with a smaller scope."
+      );
     }
   }
 
@@ -159,7 +193,11 @@ export class GeminiService {
         return { text, tokensConsumed };
       }
     } catch (error) {
-      this.handleGeminiError(error, "AI chat");
+      this.handleGeminiError(
+        error,
+        "AI chat",
+        "Prompt is too large for AI context limit. Please try again with a smaller scope."
+      );
     }
   }
 
@@ -172,6 +210,12 @@ export class GeminiService {
     deleted: string[];
     diff?: string;
   }): Promise<string[]> {
+    // Truncate diff to fit safely within context limits (approx 100k chars ~ 25k tokens)
+    const MAX_DIFF_LENGTH = 100000;
+    const safeDiff = changes.diff 
+      ? (changes.diff.length > MAX_DIFF_LENGTH ? changes.diff.substring(0, MAX_DIFF_LENGTH) + "\n...[Diff truncated]" : changes.diff)
+      : "";
+
     const prompt = `
 Generate 3 conventional commit messages for the following code changes:
 
@@ -179,7 +223,7 @@ Added files: ${changes.added.join(", ") || "none"}
 Modified files: ${changes.modified.join(", ") || "none"}
 Deleted files: ${changes.deleted.join(", ") || "none"}
 
-${changes.diff ? `Diff:\n${changes.diff.substring(0, 1000)}` : ""}
+${safeDiff ? `Diff:\n${safeDiff}` : ""}
 
 Format: type(scope): subject
 Examples: feat(auth): add login endpoint, fix(ui): resolve button alignment
@@ -208,9 +252,10 @@ Provide only the commit messages, one per line.
    *
    * @param error The unknown error caught in catch block.
    * @param context The descriptive context string (e.g. "AI analysis").
+   * @param custom400Message An optional custom error message for 400 / token limit / payload too large errors.
    * @throws A quota-exceeded error if rate-limited, otherwise a formatted context error.
    */
-  private handleGeminiError(error: unknown, context: string): never {
+  private handleGeminiError(error: unknown, context: string, custom400Message?: string): never {
     // Determine the proper log prefix based on context to match original error logs
     const logContext =
       context === "AI analysis"
@@ -247,6 +292,7 @@ Provide only the commit messages, one per line.
       (error as any)?.status === 400
     ) {
       throw new Error(
+        custom400Message ||
         "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope."
       );
     }
@@ -350,6 +396,35 @@ Provide improvement suggestions:
 
 Prioritize by impact and effort.`;
 
+      case "architecture-document":
+        return `${baseContext}${scopeNote}
+
+You are an expert software architect analyzing an established codebase. Based on the provided repository context, generate a comprehensive ARCHITECTURE.md file. Use Markdown formatting. Ensure your response is strictly the Markdown content.
+
+# Architecture Overview
+[Provide a high level summary of the application's core functionality and its primary architectural pattern.]
+
+## Core Modules
+[Based on the file structure, identify 3-5 of the most crucial modules/components. Describe their primary responsibilities.]
+
+## Dependencies
+[Identify primary external dependencies, runtimes, and frameworks based on the context. Explain their role within the stack.]
+
+## Data Flow
+[Conceptually map how data traverses the application between the recognized components.]
+
+## Risks
+[List potential technical debt, scalability bottlenecks, or security concerns given the tech stack and complexity.]
+
+## Contributor Notes
+[Provide guidelines, gotchas, or important notes for new developers joining the codebase.]`;
+
+      case "architecture-chunk":
+        return `Analyze this chunk of files from the repository file tree:
+${context?.fileTree}
+
+Provide a concise, high-level summary of the modules, components, and responsibilities represented by these files. This summary will be combined with other chunk summaries to build a final architecture overview.`;
+
       default:
         return `${fullContext}\n\nAnalyze this repository and provide insights.`;
     }
@@ -364,7 +439,13 @@ Prioritize by impact and effort.`;
     analysisType: string,
     context?: string,
   ): string {
-    const basePrompt = `Language: ${language}\n${context ? `Context: ${context}\n` : ""}\n\nCode:\n\`\`\`${language}\n${code}\n\`\`\`\n\n`;
+    // Truncate code to ~150000 characters to prevent API 400 Context Overflow
+    const MAX_CODE_LENGTH = 150000;
+    const truncatedCode = code.length > MAX_CODE_LENGTH 
+      ? code.substring(0, MAX_CODE_LENGTH) + "\n...[Code truncated due to length limits]" 
+      : code;
+
+    const basePrompt = `Language: ${language}\n${context ? `Context: ${context}\n` : ""}\n\nCode:\n\`\`\`${language}\n${truncatedCode}\n\`\`\`\n\n`;
 
     switch (analysisType) {
       case "explain":

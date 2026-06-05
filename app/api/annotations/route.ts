@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/middleware";
 import { prisma } from "@/lib/prisma";
 import { broadcastAnnotationEvent } from "@/lib/services/annotationSync";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,6 +35,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+    const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.ANNOTATION_WRITE);
+    if (!rl.allowed) return rateLimitResponse(rl);
     const body = await request.json();
     
     const { repositoryId, targetType, targetId, content, annotationType, positionX, positionY } = body;

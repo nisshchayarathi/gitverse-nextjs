@@ -77,9 +77,9 @@ export default function CompareRepositories() {
       const response = await axios.get(buildApiUrl("/api/repositories?limit=100"), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      const repos = response.data?.repositories || [];
+      const repos = response.data.data?.repositories || [];
       // Filter only analyzed/complete repositories
-      setRepoList(repos);
+      setRepoList(Array.isArray(repos) ? repos : []);
     } catch (error) {
       console.error("Failed to fetch repositories:", error);
       toast({

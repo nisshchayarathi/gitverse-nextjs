@@ -1,4 +1,6 @@
 /**
+ * @jest-environment node
+ *
  * Tests for POST /api/upload/avatar
  *
  * These tests verify the avatar upload endpoint handles:
@@ -37,7 +39,11 @@ import {
   validateDataUrl,
   validateHttpAvatarUrl,
 } from "@/lib/services/imageService";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+
+const undici = require("undici");
+(global as any).Request = undici.Request;
+(global as any).Response = undici.Response;
 
 describe("POST /api/upload/avatar", () => {
   const mockUser = { userId: 123, email: "test@example.com" };
@@ -57,7 +63,10 @@ describe("POST /api/upload/avatar", () => {
         body: JSON.stringify({ url: "https://example.com/avatar.jpg" }),
       });
 
-      await expect(POST(request)).rejects.toThrow("Unauthorized");
+      const response = await POST(request);
+      const data = await response.json();
+      expect(response.status).toBe(500);
+      expect(data.error).toBe(true);
     });
   });
 
@@ -88,7 +97,6 @@ describe("POST /api/upload/avatar", () => {
       const formData = new FormData();
       const request = new NextRequest("http://localhost/api/upload/avatar", {
         method: "POST",
-        headers: { "content-type": "multipart/form-data" },
         body: formData,
       });
 
@@ -114,7 +122,6 @@ describe("POST /api/upload/avatar", () => {
 
       const request = new NextRequest("http://localhost/api/upload/avatar", {
         method: "POST",
-        headers: { "content-type": "multipart/form-data" },
         body: formData,
       });
 
@@ -140,7 +147,6 @@ describe("POST /api/upload/avatar", () => {
 
       const request = new NextRequest("http://localhost/api/upload/avatar", {
         method: "POST",
-        headers: { "content-type": "multipart/form-data" },
         body: formData,
       });
 
@@ -161,7 +167,6 @@ describe("POST /api/upload/avatar", () => {
 
       const request = new NextRequest("http://localhost/api/upload/avatar", {
         method: "POST",
-        headers: { "content-type": "multipart/form-data" },
         body: formData,
       });
 

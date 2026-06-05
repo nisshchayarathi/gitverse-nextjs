@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { requireAuth, sanitizeError } from "@/lib/middleware";
+import { logger } from "@/lib/logger";
 import bcrypt from "bcryptjs";
 import {
   isRateLimited,
@@ -402,7 +403,10 @@ export async function PUT(request: NextRequest) {
           },
         });
       } catch (auditError) {
-        console.error("Failed to create audit log:", auditError);
+        logger.error(
+          { err: sanitizeError(auditError), route: "app/api/users/profile/route.ts", action: "create-audit-log" },
+          "Failed to create audit log"
+        );
       }
     }
 
@@ -414,7 +418,10 @@ export async function PUT(request: NextRequest) {
         : "Profile updated successfully",
     });
   } catch (error: any) {
-    console.error("Error updating profile:", sanitizeError(error));
+    logger.error(
+      { err: sanitizeError(error), route: "app/api/users/profile/route.ts" },
+      "Error updating profile"
+    );
 
     if (error?.code === "P2025") {
       return NextResponse.json(

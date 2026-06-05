@@ -65,7 +65,8 @@ export default function PRSimulator() {
       const response = await axios.get(buildApiUrl("/api/repositories?limit=100"), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      setRepoList(response.data?.repositories || []);
+      const repos = response.data.data?.repositories || [];
+      setRepoList(Array.isArray(repos) ? repos : []);
     } catch (error) {
       console.error("Failed to load repositories:", error);
       toast({

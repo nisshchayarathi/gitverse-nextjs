@@ -3,6 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.disconnectPrisma = disconnectPrisma;
+exports.getPoolHealth = getPoolHealth;
+exports.getPoolMetrics = getPoolMetrics;
 exports.prisma = void 0;
 exports.getPrisma = getPrisma;
 const client_1 = require("@prisma/client");
@@ -11,7 +14,6 @@ const adapter_pg_1 = require("@prisma/adapter-pg");
 const adapter_neon_1 = require("@prisma/adapter-neon");
 const serverless_1 = require("@neondatabase/serverless");
 const ws_1 = __importDefault(require("ws"));
-// Set webSocketConstructor so @neondatabase/serverless works via WebSockets in Node.js/serverless environments
 serverless_1.neonConfig.webSocketConstructor = ws_1.default;
 function getAdapterChoice(connectionString) {
     const envChoice = (process.env.PRISMA_ADAPTER || "").trim().toLowerCase();
@@ -26,7 +28,6 @@ function getAdapterChoice(connectionString) {
         host = new URL(connectionString).host;
     }
     catch {
-        // Ignore URL parsing errors; fall through
     }
     const isNeonHost = host.endsWith(".neon.tech") || connectionString.includes("neon.tech");
     if (isNeonHost)
@@ -55,7 +56,7 @@ function withRetry(client) {
                                 throw error;
                             }
                             retries++;
-                            const backoff = Math.pow(2, retries) * 500; // 1s, 2s, 4s
+                            const backoff = Math.pow(2, retries) * 500;
                             console.warn(`[Prisma Retry] DB connection error (attempt ${retries}/${maxRetries}). Retrying in ${backoff}ms...`);
                             await new Promise((r) => setTimeout(r, backoff));
                         }
@@ -65,13 +66,38 @@ function withRetry(client) {
         },
     });
 }
+const pools = [];
+function registerPool(pool, adapter) {
+    pools.push({ pool, adapter });
+}
+function getPoolMetrics() {
+    return pools.map(({ pool, adapter }) => ({
+        adapter,
+        totalConnections: pool.totalCount ?? 0,
+        idleConnections: pool.idleCount ?? 0,
+        waitingClients: pool.waitingCount ?? 0,
+    }));
+}
+function getPoolHealth() {
+    const metrics = getPoolMetrics();
+    const totalConnections = metrics.reduce((s, m) => s + m.totalConnections, 0);
+    const idleConnections = metrics.reduce((s, m) => s + m.idleConnections, 0);
+    const waitingClients = metrics.reduce((s, m) => s + m.waitingClients, 0);
+    return {
+        healthy: waitingClients === 0 || idleConnections > 0,
+        activePools: metrics.length,
+        totalConnections,
+        idleConnections,
+        waitingClients,
+        metrics,
+    };
+}
 function createPrismaClient() {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
         throw new Error("DATABASE_URL is required");
     }
     const adapterChoice = getAdapterChoice(connectionString);
-    // Connection Pool configuration
     const poolMaxRaw = process.env.PG_POOL_MAX;
     const defaultPoolMax = process.env.NODE_ENV === "production" ? 10 : 5;
     const poolMax = poolMaxRaw ? Number(poolMaxRaw) : defaultPoolMax;
@@ -84,7 +110,6 @@ function createPrismaClient() {
         ? connectionTimeoutMs
         : 30000;
     if (adapterChoice === "neon-ws") {
-        // 1. WebSocket-based pooled adapter for Neon in serverless environment
         const pool = new serverless_1.Pool({
             connectionString,
             connectionTimeoutMillis: normalizedConnectionTimeoutMs,
@@ -94,6 +119,7 @@ function createPrismaClient() {
         pool.on("error", (err) => {
             console.error("Unexpected Neon WebSocket pool error:", err);
         });
+        registerPool(pool, "neon-ws");
         const adapter = new adapter_neon_1.PrismaNeon(pool);
         return withRetry(new client_1.PrismaClient({
             adapter,
@@ -101,11 +127,9 @@ function createPrismaClient() {
         }));
     }
     if (adapterChoice === "neon-http") {
-        // 2. HTTP-based fetch adapter for Neon (no pooling)
         const adapter = new adapter_neon_1.PrismaNeonHttp(connectionString, {});
         return withRetry(new client_1.PrismaClient({ adapter, log: ["error", "warn"] }));
     }
-    // 3. Default: pg TCP connection pool adapter
     const pool = new pg_1.Pool({
         connectionString,
         connectionTimeoutMillis: normalizedConnectionTimeoutMs,
@@ -116,6 +140,7 @@ function createPrismaClient() {
     pool.on("error", (err) => {
         console.error("Unexpected pg TCP pool error:", err);
     });
+    registerPool(pool, "pg");
     const adapter = new adapter_pg_1.PrismaPg(pool);
     return withRetry(new client_1.PrismaClient({
         adapter,
@@ -129,6 +154,32 @@ function getPrisma() {
     }
     return globalForPrisma.prisma;
 }
+const DISCONNECT_TIMEOUT_MS = 10_000;
+let disconnectInProgress = false;
+async function disconnectPrisma(options) {
+    if (disconnectInProgress)
+        return;
+    disconnectInProgress = true;
+    const client = globalForPrisma.prisma;
+    if (client) {
+        globalForPrisma.prisma = undefined;
+        try {
+            const timeoutMs = options?.timeoutMs ?? DISCONNECT_TIMEOUT_MS;
+            const disconnect = client.$disconnect();
+            const timer = timeoutMs > 0
+                ? new Promise((_, reject) => setTimeout(() => reject(new Error("disconnect timed out")), timeoutMs))
+                : null;
+            await (timer ? Promise.race([disconnect, timer]) : disconnect);
+        }
+        catch (err) {
+            const isTimeout = err?.message === "disconnect timed out";
+            console.warn(isTimeout
+                ? "[Prisma] disconnect timed out \u2014 forcing cleanup"
+                : `[Prisma] disconnect error: ${err?.message ?? err}`);
+        }
+    }
+    disconnectInProgress = false;
+}
 const prisma = new Proxy({}, {
     get(_target, prop) {
         const client = getPrisma();
@@ -137,3 +188,8 @@ const prisma = new Proxy({}, {
 });
 exports.prisma = prisma;
 exports.default = prisma;
+process.once("beforeExit", async () => {
+    if (globalForPrisma.prisma) {
+        await disconnectPrisma();
+    }
+});

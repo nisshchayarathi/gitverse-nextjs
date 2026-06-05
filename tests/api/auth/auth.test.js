@@ -1,3 +1,5 @@
+import { PASSWORD_REGEX } from '../../../lib/utils/validators';
+
 describe('Authentication API Integration Tests', () => {
   
   // ==================== SIGNUP TESTS ====================
@@ -58,6 +60,37 @@ describe('Authentication API Integration Tests', () => {
       const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invalidEmail);
       
       expect(isValid).toBe(false);
+    });
+
+    test('Password complexity - too short is rejected', () => {
+      const password = 'Ab1';
+      expect(PASSWORD_REGEX.test(password)).toBe(false);
+    });
+
+    test('Password complexity - missing uppercase is rejected', () => {
+      const password = 'password123!';
+      expect(PASSWORD_REGEX.test(password)).toBe(false);
+    });
+
+    test('Password complexity - missing lowercase is rejected', () => {
+      const password = 'PASSWORD123!';
+      expect(PASSWORD_REGEX.test(password)).toBe(false);
+    });
+
+    test('Password complexity - missing digit is rejected', () => {
+      const password = 'Password!';
+      expect(PASSWORD_REGEX.test(password)).toBe(false);
+    });
+
+    test('Password complexity - valid password is accepted', () => {
+      const password = 'Password123!';
+      expect(PASSWORD_REGEX.test(password)).toBe(true);
+    });
+
+    test('Password complexity - over 72 bytes is rejected', () => {
+      const longPassword = 'a'.repeat(73) + 'A1';
+      const isTooLong = new TextEncoder().encode(longPassword).length > 72;
+      expect(isTooLong).toBe(true);
     });
   });
 

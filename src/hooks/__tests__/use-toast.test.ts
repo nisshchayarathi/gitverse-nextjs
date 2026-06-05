@@ -1,4 +1,6 @@
-import { reducer } from '../use-toast';
+import { act, renderHook } from '@testing-library/react';
+
+import { reducer, toast, useToast } from '../use-toast';
 
 describe('useToast reducer', () => {
   const initialState = { toasts: [] };
@@ -94,6 +96,36 @@ describe('useToast reducer', () => {
       const action = { type: 'REMOVE_TOAST' as const, toastId: undefined };
       const result = reducer(state, action);
       expect(result.toasts).toHaveLength(0);
+    });
+  });
+
+  describe('dismiss timeout', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('removes dismissed toasts after the short cleanup delay', () => {
+      jest.useFakeTimers();
+
+      const { result } = renderHook(() => useToast());
+
+      act(() => {
+        const createdToast = toast({ title: 'Timed toast' });
+        createdToast.dismiss();
+      });
+
+      expect(result.current.toasts).toHaveLength(1);
+      expect(result.current.toasts[0].open).toBe(false);
+
+      act(() => {
+        jest.advanceTimersByTime(999);
+      });
+      expect(result.current.toasts).toHaveLength(1);
+
+      act(() => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(result.current.toasts).toHaveLength(0);
     });
   });
 });

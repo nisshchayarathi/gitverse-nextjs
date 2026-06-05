@@ -3,18 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getEphemeralSecret = getEphemeralSecret;
 exports.isAnalysisRunnerAuthorized = isAnalysisRunnerAuthorized;
 exports.shouldThrottleJobKick = shouldThrottleJobKick;
 exports.registerUnhandledRejectionLogger = registerUnhandledRejectionLogger;
 const crypto_1 = __importDefault(require("crypto"));
-const lastKickAtByJobId = new Map();
-const EPHEMERAL_SECRET = !process.env.ANALYSIS_RUNNER_SECRET
-    ? crypto_1.default.randomBytes(32).toString("hex")
-    : undefined;
-function getEphemeralSecret() {
-    return EPHEMERAL_SECRET;
-}
+
 function timingSafeCompare(a, b) {
     const bufA = Buffer.from(a);
     const bufB = Buffer.from(b);
@@ -24,8 +17,23 @@ function timingSafeCompare(a, b) {
     }
     return crypto_1.default.timingSafeEqual(bufA, bufB);
 }
+
+function getRequiredSecret() {
+    const secret = process.env.ANALYSIS_RUNNER_SECRET;
+    if (!secret) {
+        if (process.env.NODE_ENV === "production") {
+            console.error(
+                "[AnalysisRunner] ANALYSIS_RUNNER_SECRET is not set. " +
+                "The endpoint will reject all requests until it is configured."
+            );
+        }
+        return "";
+    }
+    return secret;
+}
+
 function isAnalysisRunnerAuthorized(request) {
-    const configuredSecret = process.env.ANALYSIS_RUNNER_SECRET || EPHEMERAL_SECRET;
+    const configuredSecret = getRequiredSecret();
     if (!configuredSecret) {
         return false;
     }
@@ -33,13 +41,9 @@ function isAnalysisRunnerAuthorized(request) {
     if (headerSecret && timingSafeCompare(headerSecret, configuredSecret)) {
         return true;
     }
-    const url = new URL(request.url);
-    const querySecret = url.searchParams.get("secret");
-    if (querySecret && timingSafeCompare(querySecret, configuredSecret)) {
-        return true;
-    }
     return false;
 }
+
 function shouldThrottleJobKick(jobId) {
     const now = Date.now();
     const lastKickAt = lastKickAtByJobId.get(jobId) ?? 0;
@@ -49,6 +53,9 @@ function shouldThrottleJobKick(jobId) {
     lastKickAtByJobId.set(jobId, now);
     return false;
 }
+
+const lastKickAtByJobId = new Map();
+
 function registerUnhandledRejectionLogger() {
     if (globalThis.__analysisRunnerUnhandledRegistered) {
         return;

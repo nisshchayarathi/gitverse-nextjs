@@ -54,6 +54,13 @@ export const DEFAULT_RETRY_CONFIG = {
   backoffMultiplier: 2,
 } as const;
 
+export interface RetryConfig {
+  maxRetries?: number;
+  baseDelayMs?: number;
+  maxDelayMs?: number;
+  backoffMultiplier?: number;
+}
+
 /**
  * Determines whether an error is retryable based on its message content
  * or HTTP status code.
@@ -113,7 +120,7 @@ export function isRetryableError(error: unknown): boolean {
  */
 export function computeBackoffMs(
   attempt: number,
-  config?: Partial<typeof DEFAULT_RETRY_CONFIG>,
+  config?: RetryConfig,
 ): number {
   const {
     baseDelayMs,
@@ -133,7 +140,7 @@ export function computeBackoffMs(
  */
 export function nextRetryDate(
   attempt: number,
-  config?: Partial<typeof DEFAULT_RETRY_CONFIG>,
+  config?: RetryConfig,
 ): Date {
   return new Date(Date.now() + computeBackoffMs(attempt, config));
 }
@@ -166,7 +173,7 @@ export function classifyRetry(params: {
   currentRetryCount: number;
   maxRetries: number;
   error: unknown;
-  config?: Partial<typeof DEFAULT_RETRY_CONFIG>;
+  config?: RetryConfig;
 }): {
   shouldRetry: boolean;
   retryCount: number;
@@ -206,7 +213,8 @@ function extractAllErrorMessages(error: unknown): string[] {
 
     if (obj instanceof Error) {
       if (obj.message) messages.push(obj.message);
-      if (obj.cause) collect(obj.cause, depth + 1);
+      const cause = (obj as any).cause;
+      if (cause) collect(cause, depth + 1);
       return;
     }
 

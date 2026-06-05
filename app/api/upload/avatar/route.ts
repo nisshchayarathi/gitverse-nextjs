@@ -7,6 +7,7 @@ import {
   validateDataUrl,
   validateHttpAvatarUrl,
 } from "@/lib/services/imageService";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 /**
  * POST /api/upload/avatar
@@ -22,6 +23,9 @@ import {
  */
 export const POST = withErrorHandler(async (request: NextRequest) => {
   const user = await requireAuth(request);
+
+  const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.AVATAR_UPLOAD);
+  if (!rl.allowed) return rateLimitResponse(rl);
 
   const contentType = request.headers.get("content-type") || "";
 

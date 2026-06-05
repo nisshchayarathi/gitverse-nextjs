@@ -1,6 +1,9 @@
 import dotenv from "dotenv";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  validateRequiredAnalysisSecrets,
+} from "../lib/utils/internalAuth";
 
 type ValidationResult = {
   key: string;
@@ -99,7 +102,7 @@ function validateOptionalValue(
 
 function formatResult(result: ValidationResult): string {
   const statusIcon = result.isValid ? "✅" : "❌";
-  const colorCode = result.isValid ? 32 : 31; // Green for success, Red for failure
+  const colorCode = result.isValid ? 32 : 31;
   return colorize(`${statusIcon} ${result.key}: ${result.message}`, colorCode);
 }
 
@@ -169,6 +172,23 @@ function runValidation() {
         };
       },
     ),
+    validateOptionalValue(
+      "ANALYSIS_RUNNER_SECRET",
+      process.env.ANALYSIS_RUNNER_SECRET,
+      (value) => {
+        const isValid =
+          Buffer.byteLength(value, "utf8") >= 16 &&
+          !isPlaceholder(value) &&
+          !["secret", "changeme", "password"].includes(value.trim().toLowerCase());
+
+        return {
+          isValid,
+          message: isValid
+            ? "Configured"
+            : "Should be at least 16 characters and not a placeholder",
+        };
+      },
+    ),
   ];
 
   const activeResults = results.filter((result): result is ValidationResult => result !== null);
@@ -177,6 +197,27 @@ function runValidation() {
   activeResults.forEach((result) => {
     console.log(formatResult(result));
   });
+
+  const analysisSecrets = validateRequiredAnalysisSecrets();
+
+  if (analysisSecrets.warnings.length > 0) {
+    console.log(colorize("\nWarnings:", 33));
+    analysisSecrets.warnings.forEach((w) => {
+      console.warn(colorize(`  ⚠️  ${w}`, 33));
+    });
+  }
+
+  if (analysisSecrets.errors.length > 0) {
+    analysisSecrets.errors.forEach((e) => {
+      console.error(colorize(`  ❌ ${e}`, 31));
+    });
+    failures.push({
+      key: "ANALYSIS_RUNNER_SECRET",
+      required: true,
+      isValid: false,
+      message: analysisSecrets.errors.join("; "),
+    });
+  }
 
   if (failures.length > 0) {
     console.error(

@@ -2,8 +2,12 @@ import { NextRequest } from "next/server";
 import { EventEmitter } from "events";
 
 import { addClient, removeClient } from "@/lib/services/annotationSync";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 export async function GET(request: NextRequest) {
+  const rl = await checkRateLimit(request.headers.get("x-forwarded-for") || "unknown", RATE_LIMITS.ANNOTATION_SYNC);
+  if (!rl.allowed) return rateLimitResponse(rl, "Too many sync connections");
+
   const searchParams = request.nextUrl.searchParams;
   const repositoryId = searchParams.get("repositoryId");
 

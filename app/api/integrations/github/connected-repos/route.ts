@@ -3,12 +3,15 @@ import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
 import { RedactSensitiveFields } from "@/services/security/redact-sensitive-fields";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+    const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.GITHUB_CONNECTED_REPOS);
+    if (!rl.allowed) return rateLimitResponse(rl);
     const account = await prisma.gitHubAccount.findUnique({
       where: { userId: user.userId },
       select: {

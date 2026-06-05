@@ -7,6 +7,7 @@ export interface ImpactReportData {
   driftWarnings: string[];
   dependencyRisks: string[];
   recommendations: string[];
+  mermaidGraph?: string;
 }
 
 export class GithubImpactReporter {
@@ -49,6 +50,11 @@ export class GithubImpactReporter {
       commentBody += `## 💡 Reviewer Recommendations\n`;
       data.recommendations.forEach(r => commentBody += `- ${r}\n`);
       commentBody += `\n`;
+    }
+
+    // Blast Radius Graph
+    if (data.mermaidGraph) {
+      commentBody += `## 🕸️ Blast Radius Dependency Graph\n\`\`\`mermaid\n${data.mermaidGraph}\n\`\`\`\n\n`;
     }
 
     try {

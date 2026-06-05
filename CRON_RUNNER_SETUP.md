@@ -7,12 +7,11 @@ GitVerse uses a polling-based analysis job system. When a repository is queued f
 ## How It Works
 
 1. An API route (e.g. `POST /api/repositories/[id]/analyze`) enqueues an `AnalysisJob` in the database.
-2. A runner calls `GET /api/internal/run-analysis` to claim and process one pending job.
+2. A runner calls `POST /api/internal/run-analysis` to claim and process one pending job.
 3. Progress is written to the `analysis_jobs` table and polled via `GET /api/analysis-jobs/[id]`.
 
-The endpoint `/api/internal/run-analysis` supports both `GET` and `POST`.
-All requests require `ANALYSIS_RUNNER_SECRET` when it is configured.
-When no secret is configured, only Vercel Cron `GET` requests are authorized in production (identified via Vercel environment variables and `User-Agent`).
+The endpoint `/api/internal/run-analysis` only supports `POST`.
+All requests require `ANALYSIS_RUNNER_SECRET` in production. The secret is passed exclusively via the `x-analysis-runner-secret` HTTP header. Query string authentication is not supported to prevent credential leakage in access logs, proxy logs, and browser history.
 
 ---
 
@@ -22,14 +21,12 @@ Vercel's built-in cron scheduler triggers your serverless function on a schedule
 
 ### 1. Add the cron to `vercel.json`
 
-Include `ANALYSIS_RUNNER_SECRET` as a query parameter in the cron path so the endpoint can authenticate the request:
-
 ```json
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
-      "path": "/api/internal/run-analysis?secret=YOUR_ANALYSIS_RUNNER_SECRET",
+      "path": "/api/internal/run-analysis",
       "schedule": "* * * * *"
     }
   ],
@@ -41,42 +38,34 @@ Include `ANALYSIS_RUNNER_SECRET` as a query parameter in the cron path so the en
 }
 ```
 
-> **Note:** Vercel cron jobs are only available on Pro and Enterprise plans. The free Hobby plan does not support them.
-
 ### 2. Set environment variables in Vercel
 
 In **Vercel Dashboard → Settings → Environment Variables**, add:
 
 | Variable | Description |
 |---|---|
-| `ANALYSIS_RUNNER_SECRET` | A random secret string. Generate one with `openssl rand -base64 32`. In production, omitting it blocks normal manual/scripted access (except Vercel Cron GETs that pass Vercel UA/env checks). |
+| `ANALYSIS_RUNNER_SECRET` | Required. Generate with `openssl rand -hex 32`. The endpoint will reject all requests if this is not set in production. |
+| `CRON_SECRET` | Optional. Set to match `ANALYSIS_RUNNER_SECRET` so Vercel Cron injections authenticate correctly. |
 
-### How authentication works on Vercel
+### How authentication works
 
-Vercel cron triggers send a plain `GET` request with the `User-Agent: vercel-cron/1.0` header. The endpoint authenticates via the `ANALYSIS_RUNNER_SECRET` environment variable:
+Vercel cron triggers send a `GET` request with the `User-Agent: vercel-cron/1.0` header. The endpoint authenticates using `ANALYSIS_RUNNER_SECRET` from the environment. Set `CRON_SECRET` to the same value as `ANALYSIS_RUNNER_SECRET` for Vercel Cron compatibility.
 
-- If `ANALYSIS_RUNNER_SECRET` is set: **every request must include it**, regardless of HTTP method or User-Agent. The Vercel cron path must include `?secret=VALUE` as shown above.
-- If `ANALYSIS_RUNNER_SECRET` is NOT set: only Vercel Cron GETs (identified by Vercel environment variables and User-Agent) are allowed in production. Manual/scripted calls return `401`.
-
-For manual or scripted calls in production, provide the secret via header or query parameter:
-
+For manual or scripted calls:
 ```bash
-# POST with header
 curl -X POST https://your-app.vercel.app/api/internal/run-analysis \
   -H "x-analysis-runner-secret: YOUR_SECRET"
-
-# GET with query param
-curl "https://your-app.vercel.app/api/internal/run-analysis?secret=YOUR_SECRET"
 ```
 
 ### Error handling
 
 | Scenario | Behaviour |
 |---|---|
-| No pending jobs | Returns `204 No Content` — safe to ignore |
-| Job processing fails | Returns 500; job is re-queued until max attempts, then marked FAILED |
+| No pending jobs | Returns `204 No Content` |
+| Job processing fails | Returns 500; job re-queued until max attempts, then FAILED |
 | Unauthorized request | Returns `401 Unauthorized` |
-| Unhandled exception | Returns `500` with error message |
+| Secret not configured | Returns `500` with `SECRET_MISSING` code |
+| Rate limited | Returns `429` |
 
 ---
 
@@ -92,8 +81,8 @@ The workflow is already included at `.github/workflows/run-analysis-cron.yml`:
 name: Run Analysis Worker
 on:
   schedule:
-    - cron: '*/5 * * * *'   # every 5 minutes
-  workflow_dispatch:          # allows manual runs from the GitHub UI
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
 jobs:
   run-worker:
     runs-on: ubuntu-latest
@@ -128,16 +117,15 @@ In **GitHub → Repository Settings → Secrets and variables → Actions**, add
 
 ### 3. Trigger on demand
 
-You can also trigger the worker immediately from another service (e.g. after a job is enqueued) using the `triggerAnalysisWorkerWorkflow` helper:
+You can also trigger the worker immediately from another service:
 
 ```ts
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
 
 await triggerAnalysisWorkerWorkflow();
-// Uses GITHUB_WORKFLOW_REPOSITORY, GITHUB_WORKFLOW_TOKEN, and GITHUB_WORKFLOW_FILE from env
 ```
 
-Required environment variables for this:
+Required environment variables:
 
 | Variable | Description |
 |---|---|
@@ -150,10 +138,9 @@ Required environment variables for this:
 
 | Scenario | Behaviour |
 |---|---|
-| No pending jobs | Worker exits cleanly with no output |
-| Job fails | Re-queued until retries exhausted; then marked FAILED. Worker still exits 0... |
-| Workflow dispatch fails | `triggerAnalysisWorkerWorkflow` throws — catch and handle in your calling code |
-| Missing secrets | `getRequiredEnv` throws with the variable name clearly stated |
+| No pending jobs | Worker exits cleanly |
+| Job fails | Re-queued until retries exhausted; then FAILED |
+| Missing secrets | `getRequiredEnv` throws with the variable name |
 
 ---
 
@@ -162,38 +149,21 @@ Required environment variables for this:
 If you are running GitVerse on a VPS or with Docker, use the long-running worker process:
 
 ```bash
-# Build the worker
 npm run build:worker
-
-# Run continuously (polls for jobs in a loop)
 npm run worker
-
-# Or run once and exit
 WORKER_ONCE=1 node dist-worker/scripts/analysisWorker.js
 ```
-
-Pair this with your OS scheduler (e.g. `cron`, `systemd`) or use `npm run worker:server` for the built-in polling server mode.
 
 ---
 
 ## Calling the endpoint manually
 
-You can trigger a single job run directly via HTTP for testing or scripting:
-
 ```bash
-# POST with secret in header
 curl -X POST https://your-app.vercel.app/api/internal/run-analysis \
   -H "x-analysis-runner-secret: YOUR_SECRET"
-
-# GET with secret in query string
-curl "https://your-app.vercel.app/api/internal/run-analysis?secret=YOUR_SECRET"
 ```
 
-In local development with no `ANALYSIS_RUNNER_SECRET` set, the endpoint is open:
-
-```bash
-curl http://localhost:3000/api/internal/run-analysis
-```
+The secret must be passed via `x-analysis-runner-secret` header. Query string authentication is not supported.
 
 ---
 
@@ -201,8 +171,9 @@ curl http://localhost:3000/api/internal/run-analysis
 
 | Variable | Required | Description |
 |---|---|---|
-| `ANALYSIS_RUNNER_SECRET` | Recommended | Secures the `/api/internal/run-analysis` endpoint. When set, all requests must include it regardless of method or User-Agent. If omitted, only Vercel Cron GETs are allowed in production. |
-| `GITHUB_WORKFLOW_REPOSITORY` | Option B only | Repo to dispatch workflow on, e.g. `myorg/gitverse-nextjs` |
+| `ANALYSIS_RUNNER_SECRET` | Yes (production) | Secures `/api/internal/run-analysis`. Generate with `openssl rand -hex 32`. |
+| `CRON_SECRET` | Optional | For Vercel Cron compatibility. Set to match `ANALYSIS_RUNNER_SECRET`. |
+| `GITHUB_WORKFLOW_REPOSITORY` | Option B only | Repo to dispatch workflow on |
 | `GITHUB_WORKFLOW_TOKEN` | Option B only | GitHub token with `Actions: write` |
 | `GITHUB_WORKFLOW_FILE` | Option B only | Defaults to `run-analysis-cron.yml` |
 | `GITHUB_WORKFLOW_REF` | Option B only | Defaults to `main` |
@@ -214,7 +185,6 @@ curl http://localhost:3000/api/internal/run-analysis
 | | Vercel Cron | GitHub Actions | Self-hosted |
 |---|---|---|---|
 | Requires Vercel Pro | ✅ Yes | ❌ No | ❌ No |
-| No `git clone` on runner | ✅ Yes | ❌ No | ❌ No |
 | Free | ❌ | ✅ (within GHA limits) | ✅ |
 | Minimum interval | 1 minute | 5 minutes | Any |
 | Best for | Vercel Pro deployments | Vercel Hobby / GitHub-hosted | Docker / VPS |

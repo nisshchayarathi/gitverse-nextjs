@@ -32,30 +32,34 @@ export class RollbackPrService {
       };
     }
 
-    try {
-      const client = (githubService as any).client;
+     try {
+       const client = (githubService as any).client;
 
-      // 1. Generate Revert Branch
-      const revertGenerator = getRevertGeneratorService();
-      const revertBranchName = await revertGenerator.createRevertBranch(
-        installationId,
-        owner,
-        repo,
-        correlation.likelyCommitSha || "",
-        incident.id
-      );
+       // 1. Generate Revert Branch
+       const revertGenerator = getRevertGeneratorService();
+       const revertBranchName = await revertGenerator.createRevertBranch(
+         installationId,
+         owner,
+         repo,
+         correlation.likelyCommitSha || "",
+         incident.id
+       );
 
-      // 2. Generate Incident Report for PR Body
-      const reportService = getIncidentReportService();
-      const prBody = reportService.generatePrDescription(incident, correlation);
+       // 2. Get repository information to determine default branch
+       const repository = await githubService.getRepository(owner, repo);
+       const baseBranch = repository.default_branch;
 
-      // 3. Create Emergency PR
-      const { data: pr } = await client.post(`/repos/${owner}/${repo}/pulls`, {
-        title: `🚨 Emergency Rollback: Revert PR #${correlation.likelyPrNumber} after production incident`,
-        head: revertBranchName,
-        base: "main", // Assuming main, could be dynamic
-        body: prBody,
-      });
+       // 3. Generate Incident Report for PR Body
+       const reportService = getIncidentReportService();
+       const prBody = reportService.generatePrDescription(incident, correlation);
+
+       // 4. Create Emergency PR
+       const { data: pr } = await client.post(`/repos/${owner}/${repo}/pulls`, {
+         title: `🚨 Emergency Rollback: Revert PR #${correlation.likelyPrNumber} after production incident`,
+         head: revertBranchName,
+         base: baseBranch,
+         body: prBody,
+       });
 
       console.log(`[RollbackPr] Created emergency rollback PR: ${pr.html_url}`);
 

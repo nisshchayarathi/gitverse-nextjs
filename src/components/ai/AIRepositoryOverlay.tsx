@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, X, Minimize2, Maximize2, Sparkles } from "lucide-react";
+import { Send, Loader2, X, Minimize2, Maximize2, Sparkles, Square } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -56,8 +56,18 @@ export function AIRepositoryOverlay({ repository }: AIRepositoryOverlayProps) {
   const [streamingMessage, setStreamingMessage] = useState("");
   const [contextSent, setContextSent] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+  };
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -98,10 +108,15 @@ export function AIRepositoryOverlay({ repository }: AIRepositoryOverlayProps) {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input;
     setInput("");
     setIsLoading(true);
     setStreamingMessage("");
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    let fullResponse = "";
     try {
       // Build comprehensive repository context only for first message
       const contributorsArray = Array.isArray(repository.contributors)
@@ -189,7 +204,7 @@ You MUST answer questions using ONLY the data provided above. Do NOT:
 
 When asked about contributors or who made the most commits, use the exact names and numbers from the "TOP CONTRIBUTORS" section above.
 
-User Question: ${input}`;
+User Question: ${currentInput}`;
         setContextSent(true);
       } else {
         // For follow-up questions, include recent conversation history
@@ -201,15 +216,14 @@ User Question: ${input}`;
           )
           .join("\n\n");
 
-        contextualPrompt = `${conversationHistory}\n\n${input}`;
+        contextualPrompt = `${conversationHistory}\n\n${currentInput}`;
       }
 
-      let fullResponse = "";
       const stream = geminiService.chatStream(contextualPrompt, {
         id: repository.id ? Number(repository.id) : undefined,
         name: repository.name,
         languages: repository.languages?.map(l => l.name) || [],
-      });
+      }, [], controller.signal);
 
       for await (const chunk of stream) {
         fullResponse += chunk;
@@ -224,16 +238,34 @@ User Question: ${input}`;
 
       setMessages((prev) => [...prev, assistantMessage]);
       setStreamingMessage("");
-    } catch (error) {
-      console.error("Chat error:", error);
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to get AI response",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      if (error.name === "AbortError") {
+        console.log("Chat generation aborted by user.");
+        if (fullResponse) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: fullResponse + " _[Generation stopped by user]_",
+              timestamp: new Date(),
+            },
+          ]);
+        }
+        setStreamingMessage("");
+      } else {
+        console.error("Chat error:", error);
+        toast({
+          title: "Error",
+          description:
+            error instanceof Error ? error.message : "Failed to get AI response",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -427,7 +459,7 @@ User Question: ${input}`;
               onSubmit={handleSubmit}
               className="p-4 border-t border-white/10 bg-background/80"
             >
-              <div className="flex gap-2">
+               <div className="flex gap-2">
                 <input
                   type="text"
                   value={input}
@@ -436,6 +468,16 @@ User Question: ${input}`;
                   className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
                   disabled={isLoading}
                 />
+                {isLoading && (
+                  <button
+                    type="button"
+                    onClick={handleStop}
+                    className="bg-destructive/10 border border-destructive/20 text-destructive hover:bg-destructive/20 px-3 rounded-lg transition-colors flex items-center justify-center"
+                    title="Stop generation"
+                  >
+                    <Square className="w-4 h-4 fill-destructive" />
+                  </button>
+                )}
                 <button
                   type="submit"
                   disabled={isLoading || !input.trim()}

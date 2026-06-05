@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
@@ -208,6 +209,15 @@ const googleTokenVerifier = isGoogleConfigured
   ? new OAuth2Client({ clientId: googleClientId! })
   : null;
 
+const githubClientId = process.env.GITHUB_ID;
+const githubClientSecret = process.env.GITHUB_SECRET;
+
+const isGithubConfigured =
+  !!githubClientId &&
+  !!githubClientSecret &&
+  !looksLikePlaceholder(githubClientId) &&
+  !looksLikePlaceholder(githubClientSecret);
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -258,10 +268,19 @@ if ((googleClientId || googleClientSecret) && !isGoogleConfigured) {
   );
 }
 
-const nextAuthSecret = process.env.NEXTAUTH_SECRET;
-if (!nextAuthSecret) {
-  throw new Error(
-    "NEXTAUTH_SECRET environment variable is required. Generate one with: openssl rand -base64 32"
+if ((githubClientId || githubClientSecret) && !isGithubConfigured) {
+  console.warn(
+    "[auth] GitHub OAuth is not fully configured. Set GITHUB_ID and GITHUB_SECRET to real values (not placeholders), then restart the dev server."
+  );
+}
+
+// NextAuth secret is resolved lazily at runtime
+
+if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
+  console.warn(
+    "[auth][warning] NEXTAUTH_URL environment variable is not set in production. " +
+    "This will likely cause Google OAuth 'redirect_uri_mismatch' errors because the " +
+    "callback URL cannot be reliably inferred. Please set NEXTAUTH_URL to your exact production domain (e.g., https://yourdomain.com)."
   );
 }
 
@@ -310,6 +329,20 @@ export const authOptions: NextAuthOptions = {
           }),
         ]
       : []),
+    ...(isGithubConfigured
+      ? [
+          GitHubProvider({
+            clientId: githubClientId!,
+            clientSecret: githubClientSecret!,
+            authorization: {
+              params: {
+                scope: "read:user user:email repo",
+              },
+            },
+            allowDangerousEmailAccountLinking: true,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -329,17 +362,17 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid email or password");
         }
 
-        // Security: never allow password login for Google-only accounts.
-        // A "Google-only" account has no local passwordHash, but does have a linked Google provider account.
+        // Security: never allow password login for OAuth-only accounts.
+        // An OAuth-only account has no local passwordHash, but does have a linked provider account.
         if (!user.passwordHash) {
-          const hasGoogleAccount =
+          const hasOAuthAccount =
             (await prisma.account.count({
-              where: { userId: user.id, provider: "google" },
+              where: { userId: user.id },
             })) > 0;
 
-          if (hasGoogleAccount) {
+          if (hasOAuthAccount) {
             throw new Error(
-              "Email already exists. Please sign in with Google."
+              "Email already exists. Please sign in with your linked social account."
             );
           }
 
@@ -544,5 +577,5 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 7 * 24 * 60 * 60, // 7 days
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  // secret is injected lazily at route level
 };

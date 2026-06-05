@@ -30,3 +30,12 @@ export function isValidGitSha(value: string): boolean {
   if (!value || typeof value !== "string") return false;
   return /^[a-f0-9]{40}$/i.test(value) || /^[a-f0-9]{64}$/i.test(value);
 }
+
+/**
+ * Strict regex checking password complexity:
+ * - At least 8 characters
+ * - At least one uppercase letter
+ * - At least one lowercase letter
+ * - At least one digit
+ */
+export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;

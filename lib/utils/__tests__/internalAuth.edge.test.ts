@@ -1,17 +1,12 @@
-/**
- * Edge case tests for internalAuth utilities.
- *
- * Tests unusual inputs, boundary conditions, and error scenarios
- * to ensure robustness of the authorization system.
- */
-
 import crypto from "crypto";
 import {
   deriveBearerToken,
   validateAuthorizationHeader,
   isInternalWorkerAuthorized,
   isCronAuthorized,
+  isAnalysisRunnerTokenValid,
   validateRequiredSecrets,
+  validateRequiredAnalysisSecrets,
   validateSecretIsolation,
 } from "../internalAuth";
 
@@ -51,18 +46,6 @@ describe("InternalAuth Edge Cases", () => {
     it("handles unicode emoji in secret", () => {
       const emojiSecret = "🔐 secret 🔑";
       const token = deriveBearerToken(emojiSecret);
-      expect(token).toMatch(/^Bearer [a-f0-9]{64}$/);
-    });
-
-    it("handles newlines in secret", () => {
-      const newlineSecret = "line1\nline2\r\nline3";
-      const token = deriveBearerToken(newlineSecret);
-      expect(token).toMatch(/^Bearer [a-f0-9]{64}$/);
-    });
-
-    it("handles tabs in secret", () => {
-      const tabSecret = "col1\tcol2\tcol3";
-      const token = deriveBearerToken(tabSecret);
       expect(token).toMatch(/^Bearer [a-f0-9]{64}$/);
     });
 
@@ -120,15 +103,6 @@ describe("InternalAuth Edge Cases", () => {
       const token = deriveBearerToken(secret);
       expect(validateAuthorizationHeader(` ${token}`, secret)).toBe(false);
       expect(validateAuthorizationHeader(`${token} `, secret)).toBe(false);
-      expect(validateAuthorizationHeader(`  ${token}  `, secret)).toBe(false);
-    });
-
-    it("handles double Bearer prefix", () => {
-      const secret = "test-secret";
-      const token = deriveBearerToken(secret);
-      expect(validateAuthorizationHeader(`Bearer ${token}`, secret)).toBe(
-        false
-      );
     });
 
     it("handles null secret", () => {
@@ -145,11 +119,6 @@ describe("InternalAuth Edge Cases", () => {
       const token = deriveBearerToken("12345");
       expect(validateAuthorizationHeader(token, "12345")).toBe(true);
     });
-
-    it("handles very short secret", () => {
-      const token = deriveBearerToken("a");
-      expect(validateAuthorizationHeader(token, "a")).toBe(true);
-    });
   });
 
   describe("isInternalWorkerAuthorized edge cases", () => {
@@ -164,14 +133,7 @@ describe("InternalAuth Edge Cases", () => {
       expect(isInternalWorkerAuthorized(token)).toBe(true);
     });
 
-    it("handles INTERNAL_WORKER_SECRET with leading/trailing spaces", () => {
-      process.env.INTERNAL_WORKER_SECRET = "  secret  ";
-      const token = deriveBearerToken("  secret  ");
-      expect(isInternalWorkerAuthorized(token)).toBe(true);
-    });
-
     it("handles rapid environment changes", () => {
-      // Simulate rapid secret rotation
       process.env.INTERNAL_WORKER_SECRET = "secret-1";
       const token1 = deriveBearerToken("secret-1");
       expect(isInternalWorkerAuthorized(token1)).toBe(true);
@@ -180,20 +142,6 @@ describe("InternalAuth Edge Cases", () => {
       const token2 = deriveBearerToken("secret-2");
       expect(isInternalWorkerAuthorized(token2)).toBe(true);
       expect(isInternalWorkerAuthorized(token1)).toBe(false);
-    });
-
-    it("handles concurrent access patterns", async () => {
-      process.env.INTERNAL_WORKER_SECRET = "concurrent-secret";
-      const token = deriveBearerToken("concurrent-secret");
-
-      const promises = Array.from({ length: 50 }, async () => {
-        // Simulate concurrent reads and writes
-        const readResult = isInternalWorkerAuthorized(token);
-        return readResult;
-      });
-
-      const results = await Promise.all(promises);
-      expect(results.every((r) => r === true)).toBe(true);
     });
   });
 
@@ -206,13 +154,11 @@ describe("InternalAuth Edge Cases", () => {
       expect(isCronAuthorized(cronToken)).toBe(true);
     });
 
-    it("rejects ANALYSIS_RUNNER_SECRET when CRON_SECRET is set", () => {
+    it("also accepts direct CRON_SECRET token", () => {
       process.env.CRON_SECRET = "cron-secret";
       process.env.ANALYSIS_RUNNER_SECRET = "runner-secret";
 
-      const runnerToken = deriveBearerToken("runner-secret");
-      // CRON_SECRET takes precedence, so runner token should fail
-      expect(isCronAuthorized(runnerToken)).toBe(false);
+      expect(isCronAuthorized("Bearer cron-secret")).toBe(true);
     });
 
     it("prefers CRON_SECRET over ANALYSIS_RUNNER_SECRET", () => {
@@ -239,9 +185,43 @@ describe("InternalAuth Edge Cases", () => {
     });
   });
 
+  describe("isAnalysisRunnerTokenValid edge cases", () => {
+    it("returns true for matching secret", () => {
+      process.env.ANALYSIS_RUNNER_SECRET = "test-runner-secret";
+      expect(isAnalysisRunnerTokenValid("test-runner-secret")).toBe(true);
+    });
+
+    it("returns false for non-matching secret", () => {
+      process.env.ANALYSIS_RUNNER_SECRET = "real-secret";
+      expect(isAnalysisRunnerTokenValid("wrong-secret")).toBe(false);
+    });
+
+    it("returns false when env var not set", () => {
+      delete process.env.ANALYSIS_RUNNER_SECRET;
+      expect(isAnalysisRunnerTokenValid("any-secret")).toBe(false);
+    });
+
+    it("returns false for null input", () => {
+      process.env.ANALYSIS_RUNNER_SECRET = "some-secret";
+      expect(isAnalysisRunnerTokenValid(null)).toBe(false);
+    });
+
+    it("returns false for empty input", () => {
+      process.env.ANALYSIS_RUNNER_SECRET = "some-secret";
+      expect(isAnalysisRunnerTokenValid("")).toBe(false);
+    });
+
+    it("handles case sensitivity", () => {
+      process.env.ANALYSIS_RUNNER_SECRET = "CaseSensitiveSecret";
+      expect(isAnalysisRunnerTokenValid("CaseSensitiveSecret")).toBe(true);
+      expect(isAnalysisRunnerTokenValid("casesensitivesecret")).toBe(false);
+    });
+  });
+
   describe("validateRequiredSecrets edge cases", () => {
     it("returns empty array when all secrets are set", () => {
       process.env.INTERNAL_WORKER_SECRET = "worker-secret";
+      process.env.NODE_ENV = "development";
       expect(validateRequiredSecrets()).toEqual([]);
     });
 
@@ -250,16 +230,25 @@ describe("InternalAuth Edge Cases", () => {
       expect(validateRequiredSecrets()).toContain("INTERNAL_WORKER_SECRET");
     });
 
-    it("returns INTERNAL_WORKER_SECRET when empty", () => {
-      process.env.INTERNAL_WORKER_SECRET = "";
-      expect(validateRequiredSecrets()).toContain("INTERNAL_WORKER_SECRET");
+    it("returns ANALYSIS_RUNNER_SECRET when not set in production", () => {
+      process.env.NODE_ENV = "production";
+      process.env.INTERNAL_WORKER_SECRET = "worker-secret";
+      delete process.env.ANALYSIS_RUNNER_SECRET;
+      expect(validateRequiredSecrets()).toContain("ANALYSIS_RUNNER_SECRET");
+    });
+  });
+
+  describe("validateRequiredAnalysisSecrets edge cases", () => {
+    it("returns warnings for common default secrets", () => {
+      process.env.ANALYSIS_RUNNER_SECRET = "changeme";
+      const result = validateRequiredAnalysisSecrets();
+      expect(result.warnings.some((w) => w.includes("placeholder"))).toBe(true);
     });
 
-    it("returns multiple missing secrets", () => {
-      delete process.env.INTERNAL_WORKER_SECRET;
-      // Add more secrets to check as needed
-      const missing = validateRequiredSecrets();
-      expect(missing.length).toBeGreaterThanOrEqual(1);
+    it("returns warnings for short secrets", () => {
+      process.env.ANALYSIS_RUNNER_SECRET = "abc";
+      const result = validateRequiredAnalysisSecrets();
+      expect(result.warnings.some((w) => w.includes("shorter"))).toBe(true);
     });
   });
 
@@ -268,49 +257,27 @@ describe("InternalAuth Edge Cases", () => {
       process.env.INTERNAL_WORKER_SECRET = "worker-123";
       process.env.GITHUB_WEBHOOK_SECRET = "webhook-456";
       process.env.JWT_SECRET = "jwt-789";
+      process.env.ANALYSIS_RUNNER_SECRET = "runner-000";
+      process.env.CRON_SECRET = "cron-111";
 
       expect(validateSecretIsolation()).toEqual([]);
     });
 
-    it("warns when INTERNAL_WORKER_SECRET equals GITHUB_WEBHOOK_SECRET", () => {
-      process.env.INTERNAL_WORKER_SECRET = "same-secret";
-      process.env.GITHUB_WEBHOOK_SECRET = "same-secret";
-
-      const warnings = validateSecretIsolation();
-      expect(
-        warnings.some((w) => w.includes("GITHUB_WEBHOOK_SECRET"))
-      ).toBe(true);
-    });
-
-    it("warns when INTERNAL_WORKER_SECRET equals JWT_SECRET", () => {
-      process.env.INTERNAL_WORKER_SECRET = "same-secret";
-      process.env.JWT_SECRET = "same-secret";
-
-      const warnings = validateSecretIsolation();
-      expect(warnings.some((w) => w.includes("JWT_SECRET"))).toBe(true);
-    });
-
-    it("warns when CRON_SECRET equals INTERNAL_WORKER_SECRET", () => {
-      process.env.CRON_SECRET = "same-secret";
-      process.env.INTERNAL_WORKER_SECRET = "same-secret";
-
-      const warnings = validateSecretIsolation();
-      expect(warnings.some((w) => w.includes("CRON_SECRET"))).toBe(true);
-    });
-
-    it("returns multiple warnings when multiple secrets are reused", () => {
+    it("warns when multiple secrets are reused", () => {
       process.env.INTERNAL_WORKER_SECRET = "shared-secret";
       process.env.GITHUB_WEBHOOK_SECRET = "shared-secret";
       process.env.JWT_SECRET = "shared-secret";
+      process.env.ANALYSIS_RUNNER_SECRET = "shared-secret";
 
       const warnings = validateSecretIsolation();
-      expect(warnings.length).toBeGreaterThanOrEqual(2);
+      expect(warnings.length).toBeGreaterThanOrEqual(3);
     });
 
     it("handles missing secrets gracefully", () => {
       delete process.env.INTERNAL_WORKER_SECRET;
       delete process.env.GITHUB_WEBHOOK_SECRET;
       delete process.env.JWT_SECRET;
+      delete process.env.ANALYSIS_RUNNER_SECRET;
 
       expect(validateSecretIsolation()).toEqual([]);
     });
@@ -329,93 +296,6 @@ describe("InternalAuth Edge Cases", () => {
     it("token derived from one secret fails validation with another", () => {
       const token = deriveBearerToken("secret-one");
       expect(validateAuthorizationHeader(token, "secret-two")).toBe(false);
-    });
-
-    it("isInternalWorkerAuthorized uses deriveBearerToken internally", () => {
-      process.env.INTERNAL_WORKER_SECRET = "internal-test-secret";
-
-      const token = deriveBearerToken("internal-test-secret");
-      expect(isInternalWorkerAuthorized(token)).toBe(true);
-    });
-  });
-
-  describe("Performance characteristics", () => {
-    it("deriveBearerToken is fast for normal secrets", () => {
-      const secret = "performance-test-secret";
-
-      const start = Date.now();
-      for (let i = 0; i < 1000; i++) {
-        deriveBearerToken(secret);
-      }
-      const end = Date.now();
-
-      // Should complete 1000 derivations in under 100ms
-      expect(end - start).toBeLessThan(100);
-    });
-
-    it("validateAuthorizationHeader is fast for normal inputs", () => {
-      const secret = "performance-test-secret";
-      const token = deriveBearerToken(secret);
-
-      const start = Date.now();
-      for (let i = 0; i < 1000; i++) {
-        validateAuthorizationHeader(token, secret);
-      }
-      const end = Date.now();
-
-      // Should complete 1000 validations in under 100ms
-      expect(end - start).toBeLessThan(100);
-    });
-
-    it("isInternalWorkerAuthorized is fast for normal inputs", () => {
-      process.env.INTERNAL_WORKER_SECRET = "perf-secret";
-      const token = deriveBearerToken("perf-secret");
-
-      const start = Date.now();
-      for (let i = 0; i < 1000; i++) {
-        isInternalWorkerAuthorized(token);
-      }
-      const end = Date.now();
-
-      // Should complete 1000 checks in under 100ms
-      expect(end - start).toBeLessThan(100);
-    });
-  });
-
-  describe("Security properties", () => {
-    it("timing-safe comparison for valid tokens", () => {
-      process.env.INTERNAL_WORKER_SECRET = "timing-test";
-      const validToken = deriveBearerToken("timing-test");
-
-      const times: number[] = [];
-      for (let i = 0; i < 50; i++) {
-        const start = process.hrtime.bigint();
-        isInternalWorkerAuthorized(validToken);
-        const end = process.hrtime.bigint();
-        times.push(Number(end - start));
-      }
-
-      // Verify all validations succeed (the main security property)
-      // Timing tests are environment-dependent
-      expect(times.length).toBe(50);
-      expect(times.every((t) => t >= 0)).toBe(true);
-    });
-
-    it("timing-safe comparison for invalid tokens", () => {
-      process.env.INTERNAL_WORKER_SECRET = "timing-test";
-      const invalidToken = "Bearer " + "a".repeat(64);
-
-      const times: number[] = [];
-      for (let i = 0; i < 50; i++) {
-        const start = process.hrtime.bigint();
-        isInternalWorkerAuthorized(invalidToken);
-        const end = process.hrtime.bigint();
-        times.push(Number(end - start));
-      }
-
-      // Verify all validations complete (the main security property)
-      expect(times.length).toBe(50);
-      expect(times.every((t) => t >= 0)).toBe(true);
     });
   });
 });

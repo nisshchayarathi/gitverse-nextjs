@@ -36,11 +36,16 @@ export function getLanguageColor(language: string): string {
  * File size formatting utilities
  */
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B'
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 1) {
+    return '0 B'
+  }
 
   const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB']
+  const i = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(k)),
+    sizes.length - 1
+  )
 
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
 }
@@ -253,7 +258,7 @@ export function normalizeKnownRepoHttpUrl(input: string): string | null {
 
   const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
   const supportedHosts = new Set(["github.com", "gitlab.com", "bitbucket.org"]);
-  if (!supportedHosts.has(host)) return input;
+  if (!supportedHosts.has(host)) return null;
 
   const parts = parsed.pathname.split("/").filter(Boolean);
   if (parts.length < 2) return null;
