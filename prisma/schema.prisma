@@ -197,11 +197,13 @@ model Repository {
   files           File[]
   contributors    Contributor[]
   languages       Language[]
-  analysisJobs    AnalysisJob[]
-  journeys        ContributorJourney[]
-  dependencies    FileDependency[]
-  fileImportance  FileImportance[]
-  activityAreas   RepositoryActivityArea[]
+  analysisJobs      AnalysisJob[]
+  journeys          ContributorJourney[]
+  dependencies      FileDependency[]
+  fileImportance    FileImportance[]
+  activityAreas     RepositoryActivityArea[]
+  architectureSnapshots ArchitectureSnapshot[]
+  architectureDriftReports ArchitectureDriftReport[]
 
   @@index([userId])
   @@map("repositories")
@@ -448,11 +450,13 @@ model FileImportance {
 }
 
 model ArchitectureSnapshot {
-  id           Int        @id @default(autoincrement())
-  repositoryId Int        @map("repository_id")
-  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  snapshot     Json
-  createdAt    DateTime   @default(now()) @map("created_at")
+  id                        Int                       @id @default(autoincrement())
+  repositoryId              Int                       @map("repository_id")
+  repository                Repository                @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  snapshot                  Json
+  baselineDriftReports      ArchitectureDriftReport[] @relation("baseline")
+  comparedDriftReports      ArchitectureDriftReport[] @relation("compared")
+  createdAt                 DateTime                  @default(now()) @map("created_at")
 
   @@index([repositoryId, createdAt])
   @@map("architecture_snapshots")
@@ -463,9 +467,9 @@ model ArchitectureDriftReport {
   repositoryId       Int                 @map("repository_id")
   repository         Repository          @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   baselineSnapshotId Int?                @map("baseline_snapshot_id")
-  baselineSnapshot   ArchitectureSnapshot? @relation(fields: [baselineSnapshotId], references: [id])
+  baselineSnapshot   ArchitectureSnapshot? @relation("baseline", fields: [baselineSnapshotId], references: [id])
   comparedSnapshotId Int?                @map("compared_snapshot_id")
-  comparedSnapshot   ArchitectureSnapshot? @relation(fields: [comparedSnapshotId], references: [id])
+  comparedSnapshot   ArchitectureSnapshot? @relation("compared", fields: [comparedSnapshotId], references: [id])
   driftScore         Float
   report             Json
   createdAt          DateTime            @default(now()) @map("created_at")
