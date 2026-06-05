@@ -19,22 +19,25 @@ export function validateCsrfOrigin(request: NextRequest): boolean {
   const authHeader = request.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) return true;
 
-  const allowedOrigin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL;
+  const allowedOrigin =
+    process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL;
   if (!allowedOrigin) {
     // In development without NEXTAUTH_URL set, allow localhost origins.
     if (process.env.NODE_ENV !== "production") return true;
-    console.error("[CSRF] NEXTAUTH_URL is not set — cannot validate origin in production");
+    console.error(
+      "[CSRF] NEXTAUTH_URL is not set — cannot validate origin in production",
+    );
     return false;
   }
 
   try {
-    const allowedHost = new URL(allowedOrigin).host;
+    const expectedOrigin = new URL(allowedOrigin).origin;
 
     // Prefer Origin header (sent on all cross-origin and same-site requests in modern browsers).
     const origin = request.headers.get("origin");
     if (origin) {
       try {
-        return new URL(origin).host === allowedHost;
+        return new URL(origin).origin === expectedOrigin;
       } catch {
         return false;
       }
@@ -44,13 +47,16 @@ export function validateCsrfOrigin(request: NextRequest): boolean {
     const referer = request.headers.get("referer");
     if (referer) {
       try {
-        return new URL(referer).host === allowedHost;
+        return new URL(referer).origin === expectedOrigin;
       } catch {
         return false;
       }
     }
   } catch (err) {
-    console.error("[CSRF] Error parsing allowed origin or request headers:", err);
+    console.error(
+      "[CSRF] Error parsing allowed origin or request headers:",
+      err,
+    );
     return false;
   }
 
@@ -61,6 +67,6 @@ export function validateCsrfOrigin(request: NextRequest): boolean {
 export function csrfError() {
   return NextResponse.json(
     { error: "CSRF validation failed: request origin not allowed" },
-    { status: 403 }
+    { status: 403 },
   );
 }

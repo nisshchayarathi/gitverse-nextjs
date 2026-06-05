@@ -1,7 +1,10 @@
 import { NextRequest } from "next/server";
 import { validateCsrfOrigin } from "../csrf";
 
-function mockRequest(method: string, headers: Record<string, string>): NextRequest {
+function mockRequest(
+  method: string,
+  headers: Record<string, string>,
+): NextRequest {
   return {
     method,
     headers: {
@@ -77,6 +80,16 @@ describe("validateCsrfOrigin", () => {
 
     const req = mockRequest("POST", {
       origin: "https://evil.com",
+    });
+    expect(validateCsrfOrigin(req)).toBe(false);
+  });
+
+  it("blocks mismatched Origin scheme in production", () => {
+    process.env.NODE_ENV = "production";
+    process.env.NEXTAUTH_URL = "https://gitverse.com";
+
+    const req = mockRequest("POST", {
+      origin: "http://gitverse.com",
     });
     expect(validateCsrfOrigin(req)).toBe(false);
   });

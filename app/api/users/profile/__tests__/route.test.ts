@@ -16,6 +16,13 @@
 jest.mock("@/lib/middleware", () => ({
   requireAuth: jest.fn(),
   sanitizeError: jest.fn((err) => err?.message || "Unknown error"),
+  isHttpError: jest.fn(
+    (err) =>
+      err &&
+      typeof err === "object" &&
+      "status" in err &&
+      typeof err.status === "number",
+  ),
 }));
 
 jest.mock("@/lib/prisma", () => ({
@@ -52,7 +59,11 @@ jest.mock("bcryptjs", () => ({
 import { PUT } from "../route";
 import { requireAuth } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
-import { isRateLimited, recordAttempt, clearFailedAttempts } from "@/lib/services/rateLimitService";
+import {
+  isRateLimited,
+  recordAttempt,
+  clearFailedAttempts,
+} from "@/lib/services/rateLimitService";
 import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
 
@@ -81,7 +92,9 @@ describe("PUT /api/users/profile", () => {
     jest.clearAllMocks();
     (requireAuth as jest.Mock).mockResolvedValue(mockUser);
     (prisma.user.findFirst as jest.Mock).mockResolvedValue(null);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockCurrentPasswordUser);
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(
+      mockCurrentPasswordUser,
+    );
     (prisma.user.update as jest.Mock).mockResolvedValue({
       id: 123,
       name: "Test User",
@@ -193,7 +206,10 @@ describe("PUT /api/users/profile", () => {
       const request = new NextRequest("http://localhost/api/users/profile", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "a".repeat(101), email: "test@example.com" }),
+        body: JSON.stringify({
+          name: "a".repeat(101),
+          email: "test@example.com",
+        }),
       });
 
       const response = await PUT(request);
@@ -221,7 +237,10 @@ describe("PUT /api/users/profile", () => {
       const request = new NextRequest("http://localhost/api/users/profile", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Test", email: "a".repeat(255) + "@example.com" }),
+        body: JSON.stringify({
+          name: "Test",
+          email: "a".repeat(255) + "@example.com",
+        }),
       });
 
       const response = await PUT(request);
@@ -416,7 +435,10 @@ describe("PUT /api/users/profile", () => {
 
       await PUT(request);
 
-      expect(clearFailedAttempts).toHaveBeenCalledWith("123", "CHANGE_PASSWORD");
+      expect(clearFailedAttempts).toHaveBeenCalledWith(
+        "123",
+        "CHANGE_PASSWORD",
+      );
     });
 
     it("allows email change with correct current password", async () => {
@@ -660,7 +682,8 @@ describe("PUT /api/users/profile", () => {
         body: JSON.stringify({
           name: "Test",
           email: "current@example.com",
-          avatar: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          avatar:
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
         }),
       });
 
@@ -777,7 +800,7 @@ describe("PUT /api/users/profile", () => {
           data: expect.objectContaining({
             name: "Trimmed Name",
           }),
-        })
+        }),
       );
     });
 
@@ -798,7 +821,7 @@ describe("PUT /api/users/profile", () => {
           data: expect.objectContaining({
             email: "current@example.com",
           }),
-        })
+        }),
       );
     });
   });
@@ -822,7 +845,7 @@ describe("PUT /api/users/profile", () => {
 
     it("returns 500 on database error", async () => {
       (prisma.user.update as jest.Mock).mockRejectedValue(
-        new Error("Database connection failed")
+        new Error("Database connection failed"),
       );
 
       const request = new NextRequest("http://localhost/api/users/profile", {
@@ -840,7 +863,7 @@ describe("PUT /api/users/profile", () => {
 
     it("returns 404 when user is deleted during update", async () => {
       (prisma.user.update as jest.Mock).mockRejectedValue(
-        Object.assign(new Error("Record not found"), { code: "P2025" })
+        Object.assign(new Error("Record not found"), { code: "P2025" }),
       );
 
       const request = new NextRequest("http://localhost/api/users/profile", {
@@ -883,7 +906,7 @@ describe("PUT /api/users/profile", () => {
           data: expect.objectContaining({
             tokenVersion: { increment: 1 },
           }),
-        })
+        }),
       );
     });
 
@@ -904,7 +927,7 @@ describe("PUT /api/users/profile", () => {
           data: expect.not.objectContaining({
             tokenVersion: expect.anything(),
           }),
-        })
+        }),
       );
     });
   });
