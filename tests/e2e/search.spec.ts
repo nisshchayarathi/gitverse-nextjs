@@ -9,7 +9,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Search Page – Authentication Guard', () => {
 
   test('should redirect unauthenticated users to login', async ({ page }) => {
-    await page.goto('/search')
+    await page.goto('/search?playwright_no_bypass=true')
     // Must land on /login — not stay on /search
     await expect(page).toHaveURL(/\/login/, { timeout: 10000 })
   })

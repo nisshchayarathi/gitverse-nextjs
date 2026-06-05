@@ -28,7 +28,9 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
       pathname?.startsWith(route)
     );
 
-    const isTestingBypass = process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true';
+    const isTestingBypass =
+      process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true' &&
+      (typeof window === 'undefined' || new URLSearchParams(window.location.search).get('playwright_no_bypass') !== 'true');
 
     if (status === "unauthenticated" && isProtected && !isTestingBypass) {
       if (!hasAlerted.current) {

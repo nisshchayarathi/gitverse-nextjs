@@ -55,13 +55,14 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/contribute");
 
   const isTestingBypass =
-    process.env.PLAYWRIGHT_TEST === "true" ||
-    process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === "true";
+    (process.env.PLAYWRIGHT_TEST === "true" ||
+     process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === "true") &&
+    request.nextUrl.searchParams.get("playwright_no_bypass") !== "true";
 
   if (isProtectedRoute && !isAuthenticated && !isTestingBypass) {
     const loginUrl = new URL("/login", request.url);
     
-    // 🔥 FIX: Include query parameters so deep links aren't destroyed on redirect
+    // FIX: Include query parameters so deep links aren't destroyed on redirect
     const callbackPath = request.nextUrl.search
       ? `${pathname}${request.nextUrl.search}`
       : pathname;

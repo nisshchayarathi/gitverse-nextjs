@@ -15,7 +15,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const pathname = usePathname()
 
   useEffect(() => {
-    const isTestingBypass = process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true'
+    const isTestingBypass =
+      process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true' &&
+      (typeof window === 'undefined' || new URLSearchParams(window.location.search).get('playwright_no_bypass') !== 'true')
     if (!isLoading && !isAuthenticated && !isTestingBypass) {
       router.push(`/login?from=${encodeURIComponent(pathname || '/')}`)
     }
@@ -32,7 +34,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     )
   }
 
-  const isTestingBypass = process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true'
+  const isTestingBypass =
+    process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true' &&
+    (typeof window === 'undefined' || new URLSearchParams(window.location.search).get('playwright_no_bypass') !== 'true')
   if (!isAuthenticated && !isTestingBypass) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">

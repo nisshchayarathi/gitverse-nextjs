@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Dashboard Page Tests', () => {
   test.describe('Authentication', () => {
     test('should redirect to login when not authenticated', async ({ page }) => {
-      await page.goto('/dashboard')
+      await page.goto('/dashboard?playwright_no_bypass=true')
       await expect(page).toHaveURL(/\/login/)
     })
   })
