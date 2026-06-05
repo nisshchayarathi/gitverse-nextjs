@@ -72,8 +72,7 @@ describe("GeminiService Error Handling", () => {
       },
       {
         errorObj: Object.assign(new Error("Bad Request"), { status: 400 }),
-        expectedThrow:
-          "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.",
+        expectedThrow: "AI analysis failed: Bad Request",
         description: "error with status 400",
       },
       {
