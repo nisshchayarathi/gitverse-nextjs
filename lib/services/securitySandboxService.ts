@@ -6,6 +6,7 @@ import * as os from "os";
 import prisma from "@/lib/prisma";
 import crypto from "crypto";
 import { validateSafeUrl } from "@/lib/utils/ssrfValidator";
+import { isValidGitUrl } from "@/lib/utils/validators";
 import { GitHubService } from "./githubService";
 import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
 
@@ -253,6 +254,10 @@ export async function runSecuritySandbox(params: {
 }): Promise<SandboxRunResult> {
   if (!isSandboxEnabled()) {
     throw new Error("Security sandbox is not enabled. Set SECURITY_SANDBOX_ENABLED=true");
+  }
+
+  if (!isValidGitUrl(params.repositoryUrl)) {
+    throw new Error("Security sandbox aborted: Repository URL must use HTTPS and point to an allowed git host (github.com, gitlab.com, bitbucket.org).");
   }
 
   const isSafeUrl = await validateSafeUrl(params.repositoryUrl);
