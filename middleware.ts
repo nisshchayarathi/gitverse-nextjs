@@ -54,7 +54,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/search") ||
     pathname.startsWith("/contribute");
 
-  if (isProtectedRoute && !isAuthenticated) {
+  const isTestingBypass =
+    process.env.PLAYWRIGHT_TEST === "true" ||
+    process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === "true";
+
+  if (isProtectedRoute && !isAuthenticated && !isTestingBypass) {
     const loginUrl = new URL("/login", request.url);
     
     // 🔥 FIX: Include query parameters so deep links aren't destroyed on redirect

@@ -11,6 +11,7 @@ test.describe('Repository Page Tests', () => {
   test.describe('Page Structure', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/login')
+      await page.goto('/repo/test-repo-123')
     })
 
     test('should have navigation elements visible', async ({ page }) => {
