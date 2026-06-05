@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { getGeminiService } from "@/lib/services/geminiService";
 import { repositoryService } from "@/lib/services/repositoryService";
+import { validateAndSanitizePrompt } from "@/lib/utils/promptSafety";
 import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
 import { getClientIp } from "@/lib/services/rateLimitService";
 import {
@@ -50,6 +51,20 @@ export async function POST(request: NextRequest) {
     if (contentTypeError) return contentTypeError;
 
     const body = await request.json();
+    const prompt = body.prompt;
+
+    // Free-form mode: client provides a prebuilt prompt.
+    if (prompt !== undefined) {
+      const validation = validateAndSanitizePrompt(prompt);
+      if (!validation.isValid) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
+      const response = await getGeminiService().chatRaw(
+        validation.sanitizedPrompt!,
+      );
+      return NextResponse.json({ response: response.text });
+    }
+
     const repositoryId = Number(body.repositoryId);
     const question = body.question || body.prompt;
     const conversationHistory = body.conversationHistory || body.messages;
