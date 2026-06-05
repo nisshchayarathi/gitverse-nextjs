@@ -1,9 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/middleware";
+import { getAuthUser , sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
+import { SAFE_SESSION_SELECT } from "@/lib/utils/sessionResponse";
 
 export const dynamic = "force-dynamic";
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getAuthUser(request);
+
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    await prisma.user.update({
+      where: { id: user.userId },
+      data: { tokenVersion: { increment: 1 }, passwordChangedAt: new Date() },
+    });
+
+    const response = NextResponse.json({
+      message: "All sessions terminated successfully",
+    });
+
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+
+    return response;
+  } catch (error: any) {
+    console.error("Delete sessions error:", sanitizeError(error));
+    return NextResponse.json(
+      { error: "Failed to terminate sessions" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,6 +59,7 @@ export async function GET(request: NextRequest) {
     // Fetch one extra item to determine if there is a next page
     const sessions = await prisma.session.findMany({
       where: { userId: user.userId },
+      select: SAFE_SESSION_SELECT,
       take: limit + 1,
       skip: cursor ? 1 : 0,
       cursor: cursor ? { id: cursor } : undefined,
@@ -44,9 +75,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       items: toJsonSafe(sessions),
       nextCursor,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+      },
     });
   } catch (error: any) {
-    console.error("Fetch sessions error:", error);
+    console.error("Fetch sessions error:", sanitizeError(error));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

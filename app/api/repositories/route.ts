@@ -1,87 +1,256 @@
+import {
+  normalizeKnownRepoHttpUrl,
+  normalizeTargetDirectory,
+} from "@/lib/utils/repositoryUtils";
+import { validateSafeUrl } from "@/lib/utils/ssrfValidator";
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { countAttempts, recordAttempt } from "@/lib/services/rateLimitService";
+import {
+  isHttpError,
+  requireAuth,
+  sanitizeError,
+  getPrismaErrorResponse,
+} from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
+import { getGithubAccessToken } from "@/lib/services/githubAuthService";
+import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
+import { GitService } from "@/lib/services/gitService";
+import { logger } from "@/lib/logger";
+import { apiError, apiSuccess } from "@/lib/utils/apiResponse";
+import { isValidGitScope } from "@/lib/utils/validators";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+function kickLocalRunner(request: NextRequest) {
+  if (process.env.NODE_ENV === "production") return;
+  const origin = new URL(request.url).origin;
+  const secret = process.env.ANALYSIS_RUNNER_SECRET;
+  if (!secret) return;
+  void fetch(`${origin}/api/internal/run-analysis`, {
+    method: "POST",
+    headers: { "x-analysis-runner-secret": secret },
+  }).catch(() => {
+    // Best-effort only.
+  });
+}
+
+function kickProductionWorker() {
+  if (process.env.NODE_ENV !== "production") return;
+
+  void triggerAnalysisWorkerWorkflow().catch((error) => {
+    logger.error(
+      { err: sanitizeError(error) },
+      "Failed to dispatch analysis worker workflow",
+    );
+  });
+}
+
+function normalizeGitHubRepoUrl(input: string): string | null {
+  const trimmed = input.trim();
+
+  const patterns = [
+    /^https:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+?)(?:\.git)?\/?$/i,
+    /^http:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+?)(?:\.git)?\/?$/i,
+    /^git@github\.com:([^/\s]+)\/([^/\s#?]+?)(?:\.git)?$/i,
+    /^ssh:\/\/git@github\.com\/([^/\s]+)\/([^/\s#?]+?)(?:\.git)?$/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+
+    if (match) {
+      const owner = match[1];
+      const repo = match[2];
+
+      return `https://github.com/${owner}/${repo}`;
+    }
+  }
+
+  return null;
+}
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
-    const body = await request.json();
-    const { name, url, description } = body;
 
-    console.log("Create repository request:", {
-      name,
-      url,
-      userId: user.userId,
-    });
+    const burstRl = await checkRateLimit(String(user.userId), RATE_LIMITS.REPOSITORY_CREATE_BURST);
+    if (!burstRl.allowed) return rateLimitResponse(burstRl);
+
+    const attemptsCount = await countAttempts(
+      String(user.userId),
+      "REPOSITORY_ANALYSIS",
+      24 * 60 * 60 * 1000
+    );
+
+    if (attemptsCount >= 5) {
+      return apiError("Analysis rate limit exceeded. Please try again later.", 429);
+    }
+
+    const body = await request.json();
+    const { name, url, description, targetDirectory } = body;
 
     if (!name || !url) {
-      return NextResponse.json(
-        { error: "Name and URL are required" },
-        { status: 400 }
+      return apiError("Name and URL are required", 400);
+    }
+
+    const normalizedUrl = normalizeKnownRepoHttpUrl(url);
+    if (!normalizedUrl) {
+      return apiError(
+        "Invalid repository URL. Use a full repository URL like https://github.com/owner/repo",
+        400,
       );
     }
 
-    // Validate URL format
-    const urlPattern = /^https?:\/\/.+/;
-    if (!urlPattern.test(url)) {
-      return NextResponse.json(
-        { error: "Invalid repository URL" },
-        { status: 400 }
+    const isSafe = await validateSafeUrl(normalizedUrl);
+    if (!isSafe) {
+      return apiError(
+        "Invalid repository URL. The URL resolves to an untrusted or private network address.",
+        400,
       );
+    }
+
+    // Backend check to catch non-existent or private repositories
+    let exists = false;
+    let isPrivate = false;
+    
+    // First try without token (public check)
+    exists = await GitService.checkGithubRepositoryExists(normalizedUrl);
+    
+    if (!exists) {
+      // Try with user's github token (private check)
+      const token = await getGithubAccessToken(user.userId);
+      if (token) {
+        exists = await GitService.checkGithubRepositoryExists(normalizedUrl, token);
+        if (exists) {
+          isPrivate = true;
+        }
+      }
+    }
+
+    if (!exists) {
+      return NextResponse.json(
+        { error: "GitHub repository not found or not accessible. If it is private, please sign in with GitHub." },
+        { status: 404 }
+      );
+    }
+
+    const normalizedTargetDirectory = normalizeTargetDirectory(targetDirectory);
+    if (targetDirectory && !normalizedTargetDirectory) {
+      return apiError(
+        "Invalid targetDirectory. Example: packages/ui or apps/web",
+        400,
+      );
+    }
+
+    let trimmedScope: string | undefined = undefined;
+    const rawScope = body.scope;
+    if (rawScope != null) {
+      if (typeof rawScope !== "string") {
+        return NextResponse.json(
+          {
+            error:
+              "Invalid scope. Only alphanumeric characters, underscore, dot, slash, and hyphen are allowed.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const normalizedScope = rawScope.trim();
+      if (normalizedScope) {
+        if (!isValidGitScope(normalizedScope)) {
+          return NextResponse.json(
+            {
+              error:
+                "Invalid scope. Only alphanumeric characters, underscore, dot, slash, and hyphen are allowed.",
+            },
+            { status: 400 },
+          );
+        }
+        trimmedScope = normalizedScope;
+      }
     }
 
     const repository = await repositoryService.createRepository({
       name,
-      url,
+      url: normalizedUrl,
       description,
+      targetDirectory: normalizedTargetDirectory ?? undefined,
       userId: user.userId,
+      isPrivate,
     });
 
-    console.log("Repository created:", repository.id);
+    logger.info({ repositoryId: repository.id }, "Repository created");
 
     const job = await analysisJobService.createRepositoryAnalysisJob({
       repositoryId: repository.id,
       userId: user.userId,
+      scope: trimmedScope || undefined,
     });
 
-    return NextResponse.json(
-      { repository, jobId: job.id, jobStatus: job.status },
-      { status: 201 }
+    kickLocalRunner(request);
+    kickProductionWorker();
+
+    await recordAttempt({
+      key: String(user.userId),
+      type: "REPOSITORY_ANALYSIS",
+      success: true,
+      userId: user.userId,
+    });
+
+    return apiSuccess(
+      {
+        repository,
+        jobId: job.id,
+        jobStatus: job.status,
+      },
+      201,
     );
   } catch (error: any) {
-    console.error("Create repository error:", error);
-    console.error("Error stack:", error.stack);
-    if (isHttpError(error)) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status }
-      );
-    }
-    return NextResponse.json(
-      { error: "Failed to create repository" },
-      { status: 500 }
+    const stack =
+      process.env.NODE_ENV === "development"
+        ? error.stack
+        : error.stack?.split("\n").slice(0, 3).join("\n");
+    logger.error(
+      { err: sanitizeError(error), stack },
+      "Create repository error",
     );
+    if (isHttpError(error)) {
+      return apiError(error.message, error.status);
+    }
+    return apiError("Failed to create repository", 500);
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request);
-    const repositories = await repositoryService.listRepositories(user.userId);
 
-    return NextResponse.json({ repositories });
+    const { searchParams } = new URL(request.url);
+    const limitParam = searchParams.get("limit");
+    const cursorParam = searchParams.get("cursor");
+
+    const result = await repositoryService.listRepositories(
+      user.userId,
+      limitParam ? parseInt(limitParam) : 10,
+      cursorParam ? parseInt(cursorParam) : undefined,
+    );
+
+    return apiSuccess({
+      repositories: result.data,
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore,
+    });
   } catch (error: any) {
     console.error("List repositories error:", error);
-    if (isHttpError(error)) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status }
-      );
+
+    logger.error({ err: sanitizeError(error) }, "List repositories error");
+    const prismaError = getPrismaErrorResponse(error);
+    if (prismaError) {
+      return prismaError;
     }
-    return NextResponse.json(
-      { error: "Failed to list repositories" },
-      { status: 500 }
-    );
+
+    if (isHttpError(error)) {
+      return apiError(error.message, error.status);
+    }
+    return apiError("Failed to list repositories", 500);
   }
 }

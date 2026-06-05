@@ -3,9 +3,11 @@
 export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useState, useRef } from "react";
-import { User, Lock, Shield, Trash2, AlertCircle } from "lucide-react";
+import Image from "next/image";
+import { User, Lock, Shield, Trash2, AlertCircle, Sun, Moon, Cpu } from "lucide-react";
 import { Save } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useTheme } from "@/context/ThemeContext";
 import {
   Card,
   CardHeader,
@@ -22,12 +24,15 @@ import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
+import { useAISettings, AIProviderType } from "@/hooks/useAISettings";
 
 export default function Settings() {
   const { user, logout, isLoading: authLoading } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const didInitProfileForm = useRef(false);
@@ -85,6 +90,41 @@ export default function Settings() {
     if (authLoading) return;
     fetchUserInfo();
   }, [authLoading, fetchUserInfo]);
+
+  useEffect(() => {
+  return () => {
+    if (avatar?.startsWith("blob:")) {
+      URL.revokeObjectURL(avatar);
+    }
+  };
+}, [avatar]);
+
+  // AI Settings State
+  const { settings, updateSettings, isLoaded: isAISettingsLoaded } = useAISettings();
+  const [aiProvider, setAiProvider] = useState<AIProviderType>("gemini");
+  const [aiGeminiKey, setAiGeminiKey] = useState("");
+  const [aiOpenaiKey, setAiOpenaiKey] = useState("");
+
+  useEffect(() => {
+    if (isAISettingsLoaded) {
+      setAiProvider(settings.provider);
+      setAiGeminiKey(settings.geminiKey);
+      setAiOpenaiKey(settings.openaiKey);
+    }
+  }, [settings, isAISettingsLoaded]);
+
+  const handleSaveAISettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSettings({
+      provider: aiProvider,
+      geminiKey: aiGeminiKey,
+      openaiKey: aiOpenaiKey,
+    });
+    toast({
+      title: "AI Settings Saved",
+      description: "Your local AI provider and API keys have been updated.",
+    });
+  };
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -174,6 +214,8 @@ export default function Settings() {
       if (response.status === 200) {
         initialEmailRef.current = trimmedEmail;
         setEmailChangeNewPassword("");
+        setName(trimmedName);
+        setEmail(trimmedEmail);
         toast({
           title: "Profile Updated",
           description: "Your profile has been successfully updated",
@@ -184,7 +226,6 @@ export default function Settings() {
       toast({
         title: "Error",
         description:
-          error?.response?.data?.message ||
           error?.response?.data?.error ||
           "Failed to update profile",
         variant: "destructive",
@@ -244,7 +285,7 @@ export default function Settings() {
       toast({
         title: "Error",
         description:
-          error.response?.data?.message || "Failed to change password",
+          error.response?.data?.error || "Failed to change password",
         variant: "destructive",
       });
     } finally {
@@ -281,25 +322,22 @@ export default function Settings() {
     }
 
     // Convert to base64
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      setAvatar(base64);
-      toast({
-        title: "Avatar Updated",
-        description: 'Click "Save Changes" to confirm the update',
-      });
-    };
-    reader.readAsDataURL(file);
+    const previewUrl = URL.createObjectURL(file);
+
+     setAvatar(previewUrl);
+
+     toast ({
+     title: "Avatar Updated",
+    description: 'Click "Save Changes" to confirm the update',
+});
   };
 
-  const handleDeleteAccount = async () => {
-    if (isDeletingAccount) return;
+  const handleDeleteAccount = () => {
+    setShowDeleteModal(true);
+  };
 
-    const confirmed = window.confirm(
-      "Delete your account? This permanently deletes your data and cannot be undone."
-    );
-    if (!confirmed) return;
+  const confirmDeleteAccount = async () => {
+    if (isDeletingAccount) return;
 
     setIsDeletingAccount(true);
     try {
@@ -322,7 +360,7 @@ export default function Settings() {
       toast({
         title: "Error",
         description:
-          error.response?.data?.message || "Failed to delete account",
+          error.response?.data?.error || "Failed to delete account",
         variant: "destructive",
       });
     } finally {
@@ -332,7 +370,9 @@ export default function Settings() {
 
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
+    { id: "preferences", label: "Appearance", icon: Sun },
     { id: "security", label: "Security", icon: Shield },
+    { id: "ai", label: "AI Settings", icon: Cpu },
     { id: "danger", label: "Danger Zone", icon: Trash2 },
   ];
 
@@ -449,6 +489,7 @@ export default function Settings() {
                       <Input
                         id="name"
                         type="text"
+                        autoComplete="name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="John Doe"
@@ -462,6 +503,7 @@ export default function Settings() {
                       <Input
                         id="email"
                         type="email"
+                        autoComplete="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="john@example.com"
@@ -488,6 +530,7 @@ export default function Settings() {
                           <Input
                             id="email-change-password"
                             type="password"
+                            autoComplete="new-password"
                             value={emailChangeNewPassword}
                             onChange={(e) =>
                               setEmailChangeNewPassword(e.target.value)
@@ -506,15 +549,19 @@ export default function Settings() {
                       <div className="flex items-center gap-4">
                         <div className="h-16 w-16 rounded-full bg-gradient-primary flex items-center justify-center overflow-hidden">
                           {avatar ? (
-                            <img
+                            <Image
                               src={avatar}
                               alt={name}
+                              width={64}
+                              height={64}
                               className="w-full h-full object-cover"
                             />
                           ) : user?.avatar ? (
-                            <img
+                            <Image
                               src={user.avatar}
                               alt={user.name}
+                              width={64}
+                              height={64}
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -559,6 +606,58 @@ export default function Settings() {
               </Card>
             )}
 
+            {/* Appearance Tab */}
+            {activeTab === "preferences" && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle className="font-heading flex items-center gap-2">
+                    <Sun className="h-5 w-5" />
+                    Appearance Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Customize the theme of the application
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Theme Mode</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setTheme('light')}
+                        aria-pressed={theme === 'light'}
+                        aria-label="Use light mode"
+                        className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${
+                          theme === 'light'
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Sun className="h-8 w-8 mb-2" />
+                        <span className="font-semibold text-sm">Light Mode</span>
+                        <span className="text-xs text-muted-foreground mt-1">Sleek light workspace</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTheme('dark')}
+                        aria-pressed={theme === 'dark'}
+                        aria-label="Use dark mode"
+                        className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${
+                          theme === 'dark'
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Moon className="h-8 w-8 mb-2" />
+                        <span className="font-semibold text-sm">Dark Mode</span>
+                        <span className="text-xs text-muted-foreground mt-1">Reduce eye strain at night</span>
+                      </button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Security Tab */}
             {activeTab === "security" && (
               <Card className="glass">
@@ -584,6 +683,7 @@ export default function Settings() {
                           id="current-password"
                           type="password"
                           value={currentPassword}
+                          autoComplete="current-password"
                           onChange={(e) => setCurrentPassword(e.target.value)}
                           className="pl-10"
                           placeholder="••••••••"
@@ -603,6 +703,7 @@ export default function Settings() {
                         <Input
                           id="new-password"
                           type="password"
+                          autoComplete="new-password"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           className="pl-10"
@@ -626,6 +727,7 @@ export default function Settings() {
                         <Input
                           id="confirm-password"
                           type="password"
+                          autoComplete="new-password"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           className="pl-10"
@@ -642,6 +744,85 @@ export default function Settings() {
                       >
                         <Lock className="h-4 w-4 mr-2" />
                         {isLoading ? "Updating..." : "Update Password"}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* AI Settings Tab */}
+            {activeTab === "ai" && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle className="font-heading flex items-center gap-2">
+                    <Cpu className="h-5 w-5" />
+                    AI Summary Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Configure your AI provider to generate module and file summaries. Keys are stored securely in your browser&apos;s localStorage.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSaveAISettings} className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="ai-provider" className="text-sm font-medium">
+                        AI Provider
+                      </label>
+                      <select
+                        id="ai-provider"
+                        value={aiProvider}
+                        onChange={(e) => setAiProvider(e.target.value as AIProviderType)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value="gemini">Google Gemini</option>
+                        <option value="openai">OpenAI</option>
+                      </select>
+                    </div>
+
+                    {aiProvider === "gemini" && (
+                      <div className="space-y-2">
+                        <label htmlFor="gemini-key" className="text-sm font-medium">
+                          Gemini API Key
+                        </label>
+                        <Input
+                          id="gemini-key"
+                          type="password"
+                          placeholder="AIzaSy..."
+                          value={aiGeminiKey}
+                          onChange={(e) => setAiGeminiKey(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Enter your Google Gemini API Key. Get one from Google AI Studio.
+                        </p>
+                      </div>
+                    )}
+
+                    {aiProvider === "openai" && (
+                      <div className="space-y-2">
+                        <label htmlFor="openai-key" className="text-sm font-medium">
+                          OpenAI API Key
+                        </label>
+                        <Input
+                          id="openai-key"
+                          type="password"
+                          placeholder="sk-..."
+                          value={aiOpenaiKey}
+                          onChange={(e) => setAiOpenaiKey(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Enter your OpenAI API Key.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="pt-4">
+                      <Button
+                        type="submit"
+                        className="bg-gradient-primary hover:opacity-90 transition-opacity"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        Save AI Settings
                       </Button>
                     </div>
                   </form>
@@ -683,6 +864,48 @@ export default function Settings() {
           </div>
         </div>
       </div>
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-account-title"
+          onKeyDown={(e) => e.key === "Escape" && setShowDeleteModal(false)}
+          onClick={(e) => e.target === e.currentTarget && setShowDeleteModal(false)}
+        >
+          <Card className="w-full max-w-sm">
+            <CardHeader>
+              <CardTitle id="delete-account-title">Delete Account</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-6">
+                This permanently deletes your account and all data. This cannot be undone.
+              </p>
+
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDeleteModal(false)}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    confirmDeleteAccount();
+                  }}
+                  disabled={isDeletingAccount}
+                >
+                  {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
     </DashboardLayout>
   );
 }

@@ -1,10 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { getGeminiService } from "@/lib/services/geminiService";
+import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
+import { getClientIp } from "@/lib/services/rateLimitService";
+import {
+  validateContentType,
+  AI_REQUEST_LIMITS,
+} from "@/lib/utils/aiRequestValidation";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAuth(request);
+    const user = await requireAuth(request);
+
+    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    if (!globalRl.allowed) return rateLimitResponse(globalRl);
+
+    const allowed = await checkAiRateLimit(
+      String(user.userId), "userId", "analyze-code", 20, 60_000
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before retrying." },
+        { status: 429 }
+      );
+    }
+
+    const contentTypeError = validateContentType(request);
+    if (contentTypeError) return contentTypeError;
+
     const body = await request.json();
     const { code, language, analysisType, context } = body;
 
@@ -22,6 +46,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (context && typeof context === "string" && context.length > AI_REQUEST_LIMITS.MAX_CONTEXT_CHARS) {
+      return NextResponse.json(
+        {
+          error: `Context too long (max ${AI_REQUEST_LIMITS.MAX_CONTEXT_CHARS} characters)`,
+        },
+        { status: 400 }
+      );
+    }
+
     const analysis = await getGeminiService().analyzeCode({
       code,
       language,
@@ -29,9 +62,15 @@ export async function POST(request: NextRequest) {
       context,
     });
 
+    void logAiRequest({
+      userId: user.userId,
+      ip: getClientIp(request),
+      endpoint: "analyze-code",
+    });
+
     return NextResponse.json({ analysis, analysisType });
   } catch (error: any) {
-    console.error("Code analysis error:", error);
+    console.error("Code analysis error:", sanitizeError(error));
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },

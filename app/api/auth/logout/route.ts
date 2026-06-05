@@ -1,73 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/middleware";
+import { getAuthUser, sanitizeError } from "@/lib/middleware";
+import prisma from "@/lib/prisma";
+import { getToken } from "next-auth/jwt";
+import { getNextAuthSecret } from "@/lib/config/env";
+import { appendClearCookieHeaders } from "@/lib/utils/authCookie";
 
 export async function POST(request: NextRequest) {
   try {
-    const contentType = request.headers.get("content-type");
-
-    if (contentType && !contentType.includes("application/json")) {
-      return NextResponse.json(
-        { error: "Content-Type must be application/json"},
-        { status: 400 }
-      );
-    }
-
-        const user = await getAuthUser(request);
+    const user = await getAuthUser(request);
 
     if (!user) {
       return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 });
-    }
-
-const contentLength = request.headers.get("content-length");
-
-if (
-  contentType &&
-  contentType.includes("application/json") &&
-  contentLength !== "0"
-) {
-
-  const MAX_BODY_SIZE = 1024;
-
-if (contentLength && Number(contentLength) > MAX_BODY_SIZE) {
-  return NextResponse.json(
-    { error: "Request body too large" },
-    { status: 413 }
-  );
-}
-
-  const rawBody = await request.text();
-
-  // Only validate JSON when body actually exists
-  if (rawBody.trim().length > 0) {
-    try {
-      JSON.parse(rawBody);
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid JSON payload" },
-        { status: 400 }
+        { error: "Invalid or expired authentication token" },
+        { status: 401 }
       );
     }
-  }
-}
 
-  //Logout response
+    await prisma.user.update({
+      where: { id: user.userId },
+      data: {
+        tokenVersion: { increment: 1 },
+        passwordChangedAt: new Date(),
+      },
+    });
 
-  // In a stateless JWT setup, logout is handled client-side by removing the token
-  // We can optionally implement token blacklisting here if needed
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      const nextAuthToken = await getToken({
+        req: request,
+        secret: getNextAuthSecret(),
+      });
 
-  return NextResponse.json(
-    { message: "Logged out successfully" },
-    { status: 200 }
-  );
+      if (nextAuthToken) {
+        await prisma.session.deleteMany({
+          where: { userId: user.userId },
+        });
 
-} catch (error) {
-    console.error("Logout API Error:", error);
+        const response = NextResponse.json({
+          message: "Logged out successfully",
+        });
+        appendClearCookieHeaders(response);
+        return response;
+      }
+    }
 
-    //prevent stack trace from reaching client
+    return NextResponse.json({
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    console.error("Logout error:", sanitizeError(error));
+
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to process logout request" },
       { status: 500 }
     );
   }
