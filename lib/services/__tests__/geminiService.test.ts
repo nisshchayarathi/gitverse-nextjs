@@ -77,13 +77,28 @@ describe("GeminiService Error Handling", () => {
       },
       {
         errorObj: "Just a string error",
-        expectedThrow: "AI analysis failed: Unknown Gemini API error",
-        description: "string error (non-Error object)",
+        expectedThrow: "AI analysis failed: Just a string error",
+        description: "string error (preserves string message)",
+      },
+      {
+        errorObj: { message: "quota exceeded from custom object" },
+        expectedThrow: "Gemini API quota exceeded. Please try again later.",
+        description: "non-Error object with message property (quota detection)",
+      },
+      {
+        errorObj: { message: "some API client error" },
+        expectedThrow: "AI analysis failed: some API client error",
+        description: "non-Error object with message property (generic)",
       },
       {
         errorObj: null,
         expectedThrow: "AI analysis failed: Unknown Gemini API error",
         description: "null error (non-Error object)",
+      },
+      {
+        errorObj: 42,
+        expectedThrow: "AI analysis failed: Unknown Gemini API error",
+        description: "number error (non-Error, non-string, non-object)",
       },
     ];
 

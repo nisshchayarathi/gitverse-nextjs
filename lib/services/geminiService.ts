@@ -266,11 +266,26 @@ Provide only the commit messages, one per line.
 
     console.error(`${logContext} error:`, error);
 
-    // Prevent undefined error messages by checking error instanceof Error and providing a fallback.
-    const message =
-      error instanceof Error
-        ? error.message || "Unknown Gemini API error"
-        : "Unknown Gemini API error";
+    // Extract message from various error shapes:
+    // - Error instances (most common)
+    // - Non-Error objects with a `message` string property (common in some API clients)
+    // - Plain string throws
+    // This preserves rate-limit/quota detection for all error shapes.
+    let message: string;
+    if (error instanceof Error) {
+      message = error.message || "Unknown Gemini API error";
+    } else if (
+      typeof error === "object" &&
+      error !== null &&
+      "message" in error &&
+      typeof (error as { message: unknown }).message === "string"
+    ) {
+      message = (error as { message: string }).message || "Unknown Gemini API error";
+    } else if (typeof error === "string") {
+      message = error || "Unknown Gemini API error";
+    } else {
+      message = "Unknown Gemini API error";
+    }
 
     // How quota/rate-limit detection works:
     // It checks if the error message (case-insensitive) contains "quota", "rate limit", or "429".
