@@ -201,6 +201,7 @@ model Repository {
   journeys        ContributorJourney[]
   dependencies    FileDependency[]
   fileImportance  FileImportance[]
+  activityAreas   RepositoryActivityArea[]
 
   @@index([userId])
   @@map("repositories")
@@ -471,4 +472,25 @@ model ArchitectureDriftReport {
 
   @@index([repositoryId, createdAt])
   @@map("architecture_drift_reports")
+}
+
+model RepositoryActivityArea {
+  id               Int        @id @default(autoincrement())
+  repositoryId     Int        @map("repository_id")
+  repository       Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  areaPath         String     @map("area_path") // e.g., "src", "lib", "components"
+  activityScore    Float      @map("activity_score") // 0-100, based on recency and frequency
+  commitCount      Int        @map("commit_count") // Number of commits affecting this area
+  lastUpdatedAt    DateTime   @map("last_updated_at") // Most recent commit in this area
+  contributorCount Int        @default(0) @map("contributor_count") // Unique contributors
+  contributors     String[]   @default([]) // JSON array of contributor emails/names
+  filesChanged     Int        @default(0) @map("files_changed") // Number of files changed
+  additionsCount   Int        @default(0) @map("additions_count")
+  deletionsCount   Int        @default(0) @map("deletions_count")
+  computedAt       DateTime   @default(now()) @map("computed_at")
+
+  @@unique([repositoryId, areaPath])
+  @@index([repositoryId, activityScore])
+  @@index([repositoryId, lastUpdatedAt])
+  @@map("repository_activity_areas")
 }

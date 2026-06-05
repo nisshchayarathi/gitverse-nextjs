@@ -27,6 +27,7 @@ import {
 } from "@/components/ui";
 import KnowledgeGapWidget from "@/components/knowledge/KnowledgeGapWidget";
 import ArchitectureDriftWidget from "@/components/architecture/ArchitectureDriftWidget";
+import RecentlyActiveAreasWidget from "@/components/activity/RecentlyActiveAreasWidget";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
@@ -263,9 +264,10 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Recent Repositories */}
-          <Card className="lg:col-span-2 glass">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          {/* Recent Repositories & Active Areas */}
+          <div className="space-y-4 sm:space-y-6">
+            <Card className="glass">
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
@@ -355,16 +357,15 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
-          {/* Knowledge Gaps Widget */}
-          <div className="lg:col-span-1 space-y-3">
-            <KnowledgeGapWidget />
-            <div>
-              {/* Architecture Drift Widget */}
-              <div className="lg:col-span-1">
-                <ArchitectureDriftWidget />
-              </div>
-            </div>
+          <RecentlyActiveAreasWidget />
           </div>
+
+          {/* Right Sidebar: Knowledge Gaps & Architecture Drift */}
+          <div className="space-y-4 sm:space-y-6">
+            <KnowledgeGapWidget />
+            <ArchitectureDriftWidget />
+          </div>
+        </div>
 
           {/* Recent Activity */}
           <Card className="glass">
