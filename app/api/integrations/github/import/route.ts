@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, sanitizeError } from "@/lib/middleware";
+import { requireAuth, sanitizeError, isHttpError } from "@/lib/middleware";
 import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
@@ -82,6 +82,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ repository, jobId: job.id, jobStatus: job.status, source: "github" }, { status: 201 });
   } catch (error: any) {
     console.error("GitHub import error:", sanitizeError(error));
+
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
+    }
 
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { requireAuth, sanitizeError } from "@/lib/middleware";
+import { requireAuth, sanitizeError, isHttpError } from "@/lib/middleware";
 
 /**
  * Handles authenticated password changes and invalidates
@@ -95,6 +95,13 @@ export async function POST(request: NextRequest) {
       "Error changing password:",
       sanitizeError(error)
     );
+
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
+    }
 
     return NextResponse.json(
       { error: "Failed to change password" },

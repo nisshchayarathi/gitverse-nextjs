@@ -3,10 +3,13 @@ import { getAuthUser , sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
 import { SAFE_SESSION_SELECT } from "@/lib/utils/sessionResponse";
+import { validateCsrfOrigin, csrfError } from "@/lib/csrf";
 
 export const dynamic = "force-dynamic";
 
 export async function DELETE(request: NextRequest) {
+  if (!validateCsrfOrigin(request)) return csrfError();
+
   try {
     const user = await getAuthUser(request);
 

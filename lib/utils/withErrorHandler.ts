@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ApiError } from "../errors/ApiError";
+import { isHttpError } from "@/lib/middleware";
 
 export function withErrorHandler(handler: Function) {
   return async (...args: any[]) => {
@@ -16,6 +17,17 @@ export function withErrorHandler(handler: Function) {
             code: error.statusCode,
           },
           { status: error.statusCode }
+        );
+      }
+
+      if (isHttpError(error)) {
+        return NextResponse.json(
+          {
+            error: true,
+            message: error.message,
+            code: error.status,
+          },
+          { status: error.status }
         );
       }
 

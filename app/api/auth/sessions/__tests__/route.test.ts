@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { DELETE, GET } from "../route";
 
 const mockFindUnique = jest.fn();
@@ -23,7 +23,13 @@ jest.mock("@/lib/middleware", () => ({
   sanitizeError: jest.fn((e: any) => String(e)),
 }));
 
+jest.mock("@/lib/csrf", () => ({
+  validateCsrfOrigin: jest.fn(() => true),
+  csrfError: jest.fn(() => NextResponse.json({ error: "CSRF validation failed: request origin not allowed" }, { status: 403 })),
+}));
+
 const { getAuthUser } = require("@/lib/middleware");
+const { validateCsrfOrigin } = require("@/lib/csrf");
 
 function mockRequest(authHeader?: string, params?: { cursor?: string; limit?: string }): NextRequest {
   const url = new URL("http://localhost:3000/api/auth/sessions");
@@ -77,6 +83,15 @@ describe("DELETE /api/auth/sessions", () => {
     expect(response.status).toBe(500);
     const body = await response.json();
     expect(body.error).toBe("Failed to terminate sessions");
+  });
+
+  it("returns 403 when CSRF validation fails", async () => {
+    validateCsrfOrigin.mockReturnValueOnce(false);
+
+    const response = await DELETE(mockRequest());
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toContain("CSRF validation failed");
   });
 });
 

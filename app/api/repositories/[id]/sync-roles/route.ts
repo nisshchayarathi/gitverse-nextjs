@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { GitHubService } from "@/lib/services/githubService";
-import { requireAuth } from "@/lib/middleware";
+import { requireAuth, isHttpError } from "@/lib/middleware";
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -68,6 +68,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: any) {
     console.error("Sync roles error:", error);
+    if (isHttpError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

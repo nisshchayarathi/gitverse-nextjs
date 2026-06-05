@@ -4,6 +4,7 @@ import { getNextAuthSecret } from "./config/env";
 import type { JWTPayload } from "./auth";
 import prisma from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
+import { validateCsrfOrigin } from "./csrf";
 
 export interface AuthenticatedRequest {
   user: JWTPayload;
@@ -174,6 +175,10 @@ export async function getAuthUser(
 export async function requireAuth(
   request: NextRequest
 ): Promise<JWTPayload> {
+  if (!validateCsrfOrigin(request)) {
+    throw new HttpError(403, "CSRF validation failed");
+  }
+
   const user = await getAuthUser(request);
 
   if (!user) {

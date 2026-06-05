@@ -1,3 +1,12 @@
+const securityHeaders = [
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  {
+    key: "Content-Security-Policy",
+    value: "frame-ancestors 'self'",
+  },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -7,6 +16,14 @@ const nextConfig = {
   webpack: (config) => {
     config.resolve.alias.canvas = false
     return config
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: securityHeaders,
+      },
+    ];
   },
 }
 

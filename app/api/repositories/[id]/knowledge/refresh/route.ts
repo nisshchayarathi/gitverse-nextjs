@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware";
+import { requireAuth, isHttpError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { GitService } from "@/lib/services/gitService";
 import { getGithubAccessToken } from "@/lib/services/githubAuthService";
@@ -93,6 +93,9 @@ export async function POST(
     return NextResponse.json({ success: true, knowledge: formattedKnowledge });
   } catch (error: any) {
     console.error("Failed to refresh repository knowledge:", error);
+    if (isHttpError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return NextResponse.json({ error: "Failed to refresh repository knowledge" }, { status: 500 });
   }
 }
