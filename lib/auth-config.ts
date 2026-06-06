@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import dns from "dns";
 import { OAuth2Client } from "google-auth-library";
+import { Prisma } from "@prisma/client";
 import type {
   Adapter,
   AdapterAccount,
@@ -95,8 +96,23 @@ function prismaIntIdAdapter(): Adapter {
         ...account,
         userId: intUserId(account.userId),
       } as any;
-      await prisma.account.create({ data });
-      return account;
+
+      try {
+        await prisma.account.create({ data });
+        return account;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          console.warn(`[auth] Account linking prevented: The ${account.provider} account is already linked elsewhere.`);
+          // Throwing a specific error string NextAuth understands
+          throw new Error("OAuthAccountAlreadyLinked");
+        }
+        
+        // If it's a different random database error, let it throw normally
+        throw error;
+      }
     },
 
     async unlinkAccount({
