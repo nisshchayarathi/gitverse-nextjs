@@ -1,36 +1,59 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
-import { getGeminiAnalysisCache, setGeminiAnalysisCache } from "./geminiAnalysisCacheService";
+import {
+  getGeminiAnalysisCache,
+  setGeminiAnalysisCache,
+} from "./geminiAnalysisCacheService";
 import { buildCacheKey } from "../utils/cacheKey";
 
 const CURRENT_MODEL_VERSION = "gemini-2.5-flash";
 
 const HIGH_CONFIDENCE_SECRETS = [
-  { name: 'GitHub Token', pattern: /(?:gh[pousr]_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})/g },
-  { name: 'Google API Key', pattern: /AIza[0-9A-Za-z\-_]{35}/g },
-  { name: 'AWS Access Key', pattern: /AKIA[0-9A-Z]{16}/g },
-  { name: 'Slack Token', pattern: /xox[baprs]-[0-9]{12}-[0-9]{12}-[a-zA-Z0-9]{24}/g },
-  { name: 'RSA Private Key', pattern: /-----BEGIN RSA PRIVATE KEY-----[\s\S]*?-----END RSA PRIVATE KEY-----/g },
+  {
+    name: "GitHub Token",
+    pattern:
+      /(?:gh[pousr]_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})/,
+  },
+  { name: "Google API Key", pattern: /AIza[0-9A-Za-z\-_]{35}/ },
+  { name: "AWS Access Key", pattern: /AKIA[0-9A-Z]{16}/ },
+  {
+    name: "Slack Token",
+    pattern: /xox[baprs]-[0-9]{12}-[0-9]{12}-[a-zA-Z0-9]{24}/,
+  },
+  {
+    name: "RSA Private Key",
+    pattern:
+      /-----BEGIN RSA PRIVATE KEY-----[\s\S]*?-----END RSA PRIVATE KEY-----/,
+  },
 ];
 
 const SUSPECTED_SECRETS = [
-  { name: 'Generic Secret', pattern: /(?:secret|key|token|password|passwd|pwd)[\s:=]+['"]?([a-zA-Z0-9\-_=]{16,})['"]?/gi },
-  { name: 'Bearer Token', pattern: /bearer\s+([a-zA-Z0-9\-\._~+\/]+=*)/gi }
+  {
+    name: "Generic Secret",
+    pattern:
+      /(?:secret|key|token|password|passwd|pwd)[\s:=]+['"]?([a-zA-Z0-9\-_=]{16,})['"]?/gi,
+  },
+  { name: "Bearer Token", pattern: /bearer\s+([a-zA-Z0-9\-\._~+\/]+=*)/gi },
 ];
 
 export function scanAndRedactPayload(payload: string): string {
   // 1. Check for high-confidence secrets
   for (const rule of HIGH_CONFIDENCE_SECRETS) {
     if (rule.pattern.test(payload)) {
-      throw new Error(`High-confidence secret detected: ${rule.name}. Halting PR review to prevent secret leak to AI provider.`);
+      throw new Error(
+        `High-confidence secret detected: ${rule.name}. Halting PR review to prevent secret leak to AI provider.`,
+      );
     }
   }
 
   // 2. Redact suspected tokens
   let redactedPayload = payload;
   for (const rule of SUSPECTED_SECRETS) {
-    redactedPayload = redactedPayload.replace(rule.pattern, (match, secretToken) => {
-      return match.replace(secretToken, '[REDACTED_SECRET]');
-    });
+    redactedPayload = redactedPayload.replace(
+      rule.pattern,
+      (match, secretToken) => {
+        return match.replace(secretToken, "[REDACTED_SECRET]");
+      },
+    );
   }
 
   return redactedPayload;
@@ -39,13 +62,13 @@ export function scanAndRedactPayload(payload: string): string {
 export interface AIAnalysisRequest {
   repositoryId: number;
   type:
-  | "overview"
-  | "code-quality"
-  | "security"
-  | "architecture"
-  | "suggestions"
-  | "architecture-document"
-  | "architecture-chunk";
+    | "overview"
+    | "code-quality"
+    | "security"
+    | "architecture"
+    | "suggestions"
+    | "architecture-document"
+    | "architecture-chunk";
   context?: {
     files?: Array<{ path: string; content: string }>;
     fileTree?: string;
@@ -96,7 +119,7 @@ export class GeminiService {
     if (!key || key === "dummy-key-for-build") {
       // Defer throwing to runtime if possible, or warn. For now, use a dummy key during init.
     }
-    
+
     this.client = new GoogleGenerativeAI(key);
     this.model = this.client.getGenerativeModel({ model: "gemini-2.5-flash" });
   }
@@ -126,15 +149,17 @@ export class GeminiService {
       ) {
         throw new Error("Gemini API quota exceeded. Please try again later.");
       }
-      
+
       if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
+        message.includes("400 bad request") ||
+        message.includes("token limit") ||
         message.includes("maximum context length") ||
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.");
+        throw new Error(
+          "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.",
+        );
       }
 
       throw new Error(`AI analysis failed: ${error.message}`);
@@ -145,7 +170,8 @@ export class GeminiService {
    * Analyze code snippet
    */
   async analyzeCode(request: AICodeAnalysisRequest): Promise<string> {
-    const { code, language, analysisType, context, repositoryId, commitHash } = request;
+    const { code, language, analysisType, context, repositoryId, commitHash } =
+      request;
 
     let prompt = this.buildCodeAnalysisPrompt(
       code,
@@ -154,7 +180,7 @@ export class GeminiService {
       context,
     );
     prompt = scanAndRedactPayload(prompt);
-    
+
     let cacheKey: ReturnType<typeof buildCacheKey> | null = null;
     if (repositoryId && commitHash) {
       cacheKey = buildCacheKey({
@@ -193,15 +219,17 @@ export class GeminiService {
       ) {
         throw new Error("Gemini API quota exceeded. Please try again later.");
       }
-      
+
       if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
+        message.includes("400 bad request") ||
+        message.includes("token limit") ||
         message.includes("maximum context length") ||
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.");
+        throw new Error(
+          "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.",
+        );
       }
 
       throw new Error(`AI analysis failed: ${error.message}`);
@@ -237,15 +265,17 @@ export class GeminiService {
       ) {
         throw new Error("Gemini API quota exceeded. Please try again later.");
       }
-      
+
       if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
+        message.includes("400 bad request") ||
+        message.includes("token limit") ||
         message.includes("maximum context length") ||
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Context is too large for AI chat. Please try again with a smaller scope.");
+        throw new Error(
+          "Context is too large for AI chat. Please try again with a smaller scope.",
+        );
       }
 
       throw new Error(`AI chat failed: ${error.message}`);
@@ -280,13 +310,19 @@ export class GeminiService {
         const result = await this.model.generateContent({ contents });
         const response = await result.response;
         const text = response.text();
-        const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
+        const tokensConsumed =
+          response.usageMetadata?.totalTokenCount ||
+          Math.ceil((prompt.length + text.length) / 4);
         return { text, tokensConsumed };
       } else {
-        const result = await this.model.generateContent(scanAndRedactPayload(prompt));
+        const result = await this.model.generateContent(
+          scanAndRedactPayload(prompt),
+        );
         const response = await result.response;
         const text = response.text();
-        const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
+        const tokensConsumed =
+          response.usageMetadata?.totalTokenCount ||
+          Math.ceil((prompt.length + text.length) / 4);
         return { text, tokensConsumed };
       }
     } catch (error: any) {
@@ -303,13 +339,15 @@ export class GeminiService {
       }
 
       if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
+        message.includes("400 bad request") ||
+        message.includes("token limit") ||
         message.includes("maximum context length") ||
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Prompt is too large for AI context limit. Please try again with a smaller scope.");
+        throw new Error(
+          "Prompt is too large for AI context limit. Please try again with a smaller scope.",
+        );
       }
 
       throw new Error(`AI chat failed: ${error.message}`);
@@ -327,8 +365,10 @@ export class GeminiService {
   }): Promise<string[]> {
     // Truncate diff to fit safely within context limits (approx 100k chars ~ 25k tokens)
     const MAX_DIFF_LENGTH = 100000;
-    const safeDiff = changes.diff 
-      ? (changes.diff.length > MAX_DIFF_LENGTH ? changes.diff.substring(0, MAX_DIFF_LENGTH) + "\n...[Diff truncated]" : changes.diff)
+    const safeDiff = changes.diff
+      ? changes.diff.length > MAX_DIFF_LENGTH
+        ? changes.diff.substring(0, MAX_DIFF_LENGTH) + "\n...[Diff truncated]"
+        : changes.diff
       : "";
 
     let prompt = `
@@ -359,7 +399,7 @@ Provide only the commit messages, one per line.
       console.error("Commit message suggestion error:", error);
 
       throw new Error(
-        error?.message || "Failed to generate commit message suggestions"
+        error?.message || "Failed to generate commit message suggestions",
       );
     }
   }
@@ -385,19 +425,22 @@ ${context?.fileTree ? `\nFile Structure:\n${context.fileTree}\n` : ""}`;
         knowledgeContext += `Project Description: ${context.knowledge.projectDescription}\n`;
       }
       if (context.knowledge.architecturePrinciples?.length) {
-        knowledgeContext += `Architecture Principles:\n- ${context.knowledge.architecturePrinciples.join('\n- ')}\n`;
+        knowledgeContext += `Architecture Principles:\n- ${context.knowledge.architecturePrinciples.join("\n- ")}\n`;
       }
-      if (context.knowledge.glossary && Object.keys(context.knowledge.glossary).length > 0) {
+      if (
+        context.knowledge.glossary &&
+        Object.keys(context.knowledge.glossary).length > 0
+      ) {
         knowledgeContext += `Glossary:\n`;
         Object.entries(context.knowledge.glossary).forEach(([k, v]) => {
           knowledgeContext += `- ${k}: ${v}\n`;
         });
       }
       if (context.knowledge.onboardingNotes?.length) {
-        knowledgeContext += `Onboarding Notes:\n- ${context.knowledge.onboardingNotes.join('\n- ')}\n`;
+        knowledgeContext += `Onboarding Notes:\n- ${context.knowledge.onboardingNotes.join("\n- ")}\n`;
       }
     }
-    
+
     const scopeNote = (context as any)?.targetDirectory
       ? `\nImportant: Restrict your analysis to the target directory (${(context as any).targetDirectory}). Only reference files outside this directory if they are immediately required dependencies.\n`
       : "";
@@ -505,9 +548,11 @@ Provide a concise, high-level summary of the modules, components, and responsibi
   ): string {
     // Truncate code to ~150000 characters to prevent API 400 Context Overflow
     const MAX_CODE_LENGTH = 150000;
-    const truncatedCode = code.length > MAX_CODE_LENGTH 
-      ? code.substring(0, MAX_CODE_LENGTH) + "\n...[Code truncated due to length limits]" 
-      : code;
+    const truncatedCode =
+      code.length > MAX_CODE_LENGTH
+        ? code.substring(0, MAX_CODE_LENGTH) +
+          "\n...[Code truncated due to length limits]"
+        : code;
 
     const basePrompt = `Language: ${language}\n${context ? `Context: ${context}\n` : ""}\n\nCode:\n\`\`\`${language}\n${truncatedCode}\n\`\`\`\n\n`;
 
@@ -587,16 +632,19 @@ Provide refactored code examples.`;
           prompt += `Project Description: ${context.knowledge.projectDescription}\n`;
         }
         if (context.knowledge.architecturePrinciples?.length) {
-          prompt += `Architecture Principles:\n- ${context.knowledge.architecturePrinciples.join('\n- ')}\n`;
+          prompt += `Architecture Principles:\n- ${context.knowledge.architecturePrinciples.join("\n- ")}\n`;
         }
-        if (context.knowledge.glossary && Object.keys(context.knowledge.glossary).length > 0) {
+        if (
+          context.knowledge.glossary &&
+          Object.keys(context.knowledge.glossary).length > 0
+        ) {
           prompt += `Glossary:\n`;
           Object.entries(context.knowledge.glossary).forEach(([k, v]) => {
             prompt += `- ${k}: ${v}\n`;
           });
         }
         if (context.knowledge.onboardingNotes?.length) {
-          prompt += `Onboarding Notes:\n- ${context.knowledge.onboardingNotes.join('\n- ')}\n`;
+          prompt += `Onboarding Notes:\n- ${context.knowledge.onboardingNotes.join("\n- ")}\n`;
         }
       }
       prompt += "\n";
