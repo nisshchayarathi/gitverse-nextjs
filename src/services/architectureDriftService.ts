@@ -79,10 +79,14 @@ export const getSummaryMetrics = (snapshot: ArchitectureSnapshot) => {
 export const getRecommendedActions = (
   report: DriftReport,
 ): Array<{ action: string; priority: "High" | "Medium" | "Low" }> => {
+<<<<<<< HEAD
   const actions: Array<{
     action: string;
     priority: "High" | "Medium" | "Low";
   }> = [];
+=======
+  const actions: Array<{ action: string; priority: "High" | "Medium" | "Low" }> = [];
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
   if (report.riskLevel === "High") {
     actions.push({

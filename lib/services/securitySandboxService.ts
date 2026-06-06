@@ -352,9 +352,15 @@ export async function runSecuritySandbox(params: {
 
       if (repo && repo.user.githubAccount && pr) {
         try {
+<<<<<<< HEAD
           const githubService = new GitHubService(
             repo.user.githubAccount.accessToken,
           );
+=======
+          const token = await getDecryptedGitHubToken(repo.user.id);
+          if (!token) throw new Error("Failed to get decrypted GitHub token");
+          const githubService = new GitHubService(token);
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
           const parts = repo.url.split("/");
           const owner = parts[parts.length - 2];
           const name = parts[parts.length - 1];

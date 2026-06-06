@@ -774,4 +774,94 @@ describe("POST /api/upload/avatar", () => {
       expect(data).toHaveProperty("message");
     });
   });
+
+  describe("HTTP URL validation integration", () => {
+    beforeEach(() => {
+      (validateHttpAvatarUrl as jest.Mock).mockResolvedValue({ valid: true });
+    });
+
+    it("validates URL before storing", async () => {
+      const url = "https://avatars.example.com/user.jpg";
+      await POST(new NextRequest("http://localhost/api/upload/avatar", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url }),
+      }));
+
+      expect(validateHttpAvatarUrl).toHaveBeenCalledWith(url);
+    });
+
+    it("does not call validateHttpAvatarUrl for dataUrl requests", async () => {
+      (validateDataUrl as jest.Mock).mockReturnValue({ valid: true });
+      (parseDataUrl as jest.Mock).mockReturnValue({
+        buffer: Buffer.from("img"),
+        mimeType: "image/png",
+      });
+
+      await POST(new NextRequest("http://localhost/api/upload/avatar", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dataUrl: "data:image/png;base64,abc" }),
+      }));
+
+      expect(validateHttpAvatarUrl).not.toHaveBeenCalled();
+    });
+
+    it("does not call validateHttpAvatarUrl when only dataUrl is present even if url is empty", async () => {
+      (validateDataUrl as jest.Mock).mockReturnValue({ valid: true });
+      (parseDataUrl as jest.Mock).mockReturnValue({
+        buffer: Buffer.from("img"),
+        mimeType: "image/png",
+      });
+
+      await POST(new NextRequest("http://localhost/api/upload/avatar", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dataUrl: "data:image/png;base64,abc", url: "" }),
+      }));
+
+      expect(validateHttpAvatarUrl).not.toHaveBeenCalled();
+    });
+
+    it("passes through mockResolvedValue behavior for async validation", async () => {
+      (validateHttpAvatarUrl as jest.Mock).mockResolvedValue({ valid: false, error: "Blocked" });
+
+      const response = await POST(new NextRequest("http://localhost/api/upload/avatar", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: "http://169.254.169.254/latest/meta-data/" }),
+      }));
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.message).toContain("Blocked");
+    });
+
+    it("rejects when url validation returns false (async flow)", async () => {
+      (validateHttpAvatarUrl as jest.Mock).mockResolvedValue({ valid: false, error: "Invalid URL" });
+
+      const response = await POST(new NextRequest("http://localhost/api/upload/avatar", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: "invalid" }),
+      }));
+
+      expect(response.status).toBe(400);
+      expect(storeAvatar).not.toHaveBeenCalled();
+    });
+
+    it("stores the exact URL returned by validation", async () => {
+      const testUrl = "https://cdn.example.com/avatars/img.jpg";
+      (validateHttpAvatarUrl as jest.Mock).mockResolvedValue({ valid: true });
+
+      const response = await POST(new NextRequest("http://localhost/api/upload/avatar", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: testUrl }),
+      }));
+
+      const data = await response.json();
+      expect(data.avatarUrl).toBe(testUrl);
+    });
+  });
 });

@@ -95,6 +95,15 @@ function prismaIntIdAdapter(): Adapter {
         ...account,
         userId: intUserId(account.userId),
       } as any;
+
+      if (data.access_token || data.refresh_token || data.id_token) {
+        const { encryptToken } = await import("@/lib/utils/envelopeEncryption");
+        if (data.access_token) data.access_token = await encryptToken(data.access_token);
+        if (data.refresh_token) data.refresh_token = await encryptToken(data.refresh_token);
+        if (data.id_token) data.id_token = await encryptToken(data.id_token);
+        data.tokenEncrypted = true;
+      }
+
       await prisma.account.create({ data });
       return account;
     },
@@ -321,6 +330,11 @@ async function getFreshTokenVersion(
   return fallback;
 }
 
+// Pre-computed dummy hash for timing-safe comparison.
+// Generated via bcrypt.hashSync("dummy", 10) - must be exactly 60 characters.
+const DUMMY_BCRYPT_HASH =
+  "$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqZR2r0Y2ILi7z1tPzC6mXi7TE7.K";
+
 export const authOptions: NextAuthOptions = {
   debug: process.env.NEXTAUTH_DEBUG === "true",
   logger: {
@@ -395,6 +409,7 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
         });
 
+<<<<<<< HEAD
         if (!user) {
           throw new Error("Invalid email or password");
         }
@@ -419,9 +434,29 @@ export const authOptions: NextAuthOptions = {
         const isValidPassword = await bcrypt.compare(
           credentials.password,
           user.passwordHash,
+=======
+        // To prevent timing attacks, always run bcrypt.compare with a dummy hash if user/hash is missing.
+        const passwordHashToCompare = user?.passwordHash || DUMMY_BCRYPT_HASH;
+        const isValidPassword = await bcrypt.compare(
+          credentials.password,
+          passwordHashToCompare,
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
         );
 
-        if (!isValidPassword) {
+        if (!user || !user.passwordHash || !isValidPassword) {
+          if (!user) {
+            console.info(
+              `[auth-config] Credentials login failed: User not found for email ${credentials.email}`,
+            );
+          } else if (!user.passwordHash) {
+            console.info(
+              `[auth-config] Credentials login failed: User ${user.id} has no password hash`,
+            );
+          } else {
+            console.info(
+              `[auth-config] Credentials login failed: Incorrect password for user ${user.id}`,
+            );
+          }
           throw new Error("Invalid email or password");
         }
 

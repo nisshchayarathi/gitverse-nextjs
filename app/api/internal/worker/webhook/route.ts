@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
 import { isInternalWorkerAuthorized } from "@/lib/utils/internalAuth";
+<<<<<<< HEAD
 import { GitHubAppService } from "@/lib/services/githubAppService";
 import { GitHubService } from "@/lib/services/githubService";
 import {
@@ -30,49 +30,56 @@ import {
   rateLimitResponse,
   RATE_LIMITS,
 } from "@/lib/middleware/rateLimit";
+=======
+import { webhookQueue } from "@/lib/queue/webhookQueue";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // 5 minutes max duration for Vercel
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
-  if (!isInternalWorkerAuthorized(request.headers.get("authorization"))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authHeader = request.headers.get("authorization");
+  const isAuthorized = isInternalWorkerAuthorized(authHeader);
+
+  if (!isAuthorized) {
+    return NextResponse.json(
+      {
+        error: "Unauthorized",
+        message: "You do not have permission to access this internal webhook endpoint.",
+        code: "AUTH_FAILED"
+      },
+      { status: 401 }
+    );
   }
 
   const rl = await checkRateLimit("webhook-worker", RATE_LIMITS.WORKER_WEBHOOK);
   if (!rl.allowed) return rateLimitResponse(rl, "Worker rate limit exceeded");
 
+<<<<<<< HEAD
   const baseUrl =
     process.env.NEXTAUTH_URL ||
     `http://${request.headers.get("host") || "localhost:3000"}`;
 
+=======
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
   try {
-    return await handlePost(request);
-  } finally {
-    // Crucial: Drain the queue by picking up the next pending jobs
-    webhookQueue.triggerWorkers(baseUrl).catch((err: any) => {
-      console.error("[Worker] Failed to trigger next jobs:", err);
+    const { eventId } = await request.json().catch(() => ({}));
+
+    if (!eventId) {
+      return NextResponse.json({ error: "eventId is required" }, { status: 400 });
+    }
+
+    await webhookQueue.add("webhook_event", { eventId }, {
+      attempts: 5,
+      backoff: {
+        type: "exponential",
+        delay: 5000,
+      },
     });
-  }
-}
 
-async function handlePost(request: NextRequest) {
-  const { eventId } = await request.json().catch(() => ({}));
-
-  if (!eventId) {
-    return NextResponse.json({ error: "eventId is required" }, { status: 400 });
-  }
-
-  const webhookEvent = await prisma.webhookEvent.findUnique({
-    where: { id: eventId },
-  });
-
-  if (!webhookEvent) {
-    return NextResponse.json({ error: "Event not found" }, { status: 404 });
-  }
-
-  if (webhookEvent.status !== "pending") {
     return NextResponse.json(
+<<<<<<< HEAD
       { ok: true, ignored: true, reason: "already_processed" },
       { status: 200 },
     );
@@ -517,6 +524,16 @@ async function handlePost(request: NextRequest) {
     return NextResponse.json(
       { error: "Failed to process event", details: errorDetails },
       { status: 500 },
+=======
+      { ok: true, message: "Webhook event enqueued for distributed processing" },
+      { status: 202 }
+    );
+  } catch (error) {
+    console.error("[WorkerWebhookRoute] Failed to enqueue webhook event:", error);
+    return NextResponse.json(
+      { error: "Failed to enqueue webhook event" },
+      { status: 500 }
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     );
   }
 }

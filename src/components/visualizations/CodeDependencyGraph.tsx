@@ -518,9 +518,15 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         if (d.type === "file") {
           return changedFiles.has(d.path) ? 1 : 0.2;
         }
+<<<<<<< HEAD
         if (d.type === "folder") {
           for (const [path] of changedFiles.entries()) {
             if ((path as string).startsWith(d.path + "/")) return 1;
+=======
+        if (d.type === 'folder') {
+          for (const [path] of changedFiles.entries() as Iterable<[string, string]>) {
+            if (path.startsWith(d.path + '/')) return 1;
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
           }
           return 0.2;
         }

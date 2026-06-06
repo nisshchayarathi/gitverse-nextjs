@@ -8,11 +8,16 @@ import { SafeHttpClient } from "@/services/security/safe-http-client";
 import { webhookQueue } from "@/lib/services/webhook-queue";
 import { dbHealthService } from "@/lib/services/db-health";
 import { webhookRetryService } from "@/lib/services/webhook-retry";
+<<<<<<< HEAD
 import {
   checkRateLimit,
   rateLimitResponse,
   RATE_LIMITS,
 } from "@/lib/middleware/rateLimit";
+=======
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import { generateWebhookKey, tryAcquireIdempotency, releaseIdempotency } from "@/lib/utils/idempotency";
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
 export const runtime = "nodejs";
 
@@ -56,9 +61,27 @@ function shouldHandleIssueAction(action: string | undefined): boolean {
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
   const rl = await checkRateLimit(ip, RATE_LIMITS.GITHUB_WEBHOOK);
-  if (!rl.allowed) return rateLimitResponse(rl, "Webhook rate limit exceeded");
 
   const rawBody = await request.text();
+
+  if (rl.fallbackFailed) {
+    console.error("[WebhookRoute] Rate limiters completely failed. DLQing webhook.");
+    try {
+      await prisma.webhookEvent.create({
+        data: {
+          event: request.headers.get("x-github-event") || "unknown",
+          payload: rawBody,
+          status: "dlq",
+          error: "Rate limiter and fallback completely failed",
+        },
+      });
+    } catch (e) {
+      console.error("[WebhookRoute] Failed to write to DLQ!", e);
+    }
+    return NextResponse.json({ ok: true, message: "Webhook accepted and queued to DLQ due to severe outages" }, { status: 202 });
+  }
+
+  if (!rl.allowed) return rateLimitResponse(rl, "Webhook rate limit exceeded");
 
   const signature = request.headers.get("x-hub-signature-256");
   const event = request.headers.get("x-github-event");
@@ -75,6 +98,8 @@ export async function POST(request: NextRequest) {
   if (!isValid) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
+
+  const deliveryId = request.headers.get("x-github-delivery") || "";
 
   if (event !== "pull_request" && event !== "issues" && event !== "push") {
     return NextResponse.json(
@@ -140,12 +165,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Idempotency check: claim the delivery ID atomically
+  let idempotencyKey: string | null = null;
+  if (deliveryId) {
+    idempotencyKey = generateWebhookKey(deliveryId, event || "unknown", action);
+    const acquired = await tryAcquireIdempotency(idempotencyKey);
+    if (!acquired) {
+      return NextResponse.json(
+        { ok: true, ignored: true, reason: "duplicate_delivery" },
+        { status: 200 },
+      );
+    }
+  }
+
   // Store webhook event for async processing in-memory to prevent pool exhaustion
   try {
+<<<<<<< HEAD
     const baseUrl =
       process.env.NEXTAUTH_URL ||
       `http://${request.headers.get("host") || "localhost:3000"}`;
     webhookQueue.enqueueWebhook(payload, event || "unknown", action, baseUrl);
+=======
+    const baseUrl = process.env.NEXTAUTH_URL || `http://${request.headers.get("host") || "localhost:3000"}`;
+    webhookQueue.enqueueWebhook(payload, event || "unknown", action, baseUrl, deliveryId);
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
     // Automatically retry any previously failed jobs occasionally
     webhookRetryService.requeueFailedJobs().catch(() => {});
@@ -156,6 +199,9 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error queueing webhook event:", error);
+    if (idempotencyKey) {
+      await releaseIdempotency(idempotencyKey);
+    }
     return NextResponse.json(
       { error: "Failed to queue webhook event" },
       { status: 500 },

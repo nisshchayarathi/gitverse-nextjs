@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { validateSafeUrl } from "@/lib/utils/ssrfValidator";
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -94,8 +95,9 @@ export function validateDataUrl(dataUrl: string): ImageValidationResult {
 
 /**
  * Validates an HTTP(S) URL for avatar.
+ * Rejects URLs that resolve to private, loopback, or link-local IP ranges.
  */
-export function validateHttpAvatarUrl(url: string): ImageValidationResult {
+export async function validateHttpAvatarUrl(url: string): Promise<ImageValidationResult> {
   try {
     const parsedUrl = new URL(url);
 
@@ -105,6 +107,11 @@ export function validateHttpAvatarUrl(url: string): ImageValidationResult {
 
     if (!parsedUrl.hostname || !parsedUrl.hostname.includes(".")) {
       return { valid: false, error: "Invalid URL hostname" };
+    }
+
+    const safe = await validateSafeUrl(url);
+    if (!safe) {
+      return { valid: false, error: "URL resolves to a restricted address" };
     }
 
     return { valid: true };

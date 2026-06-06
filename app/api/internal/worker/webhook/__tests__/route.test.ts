@@ -28,29 +28,20 @@ jest.mock("@/lib/utils/internalAuth", () => ({
   isInternalWorkerAuthorized: jest.fn().mockReturnValue(true),
 }));
 
-jest.mock("@/lib/services/webhook-queue", () => ({
-  webhookQueue: {
-    triggerWorkers: jest.fn().mockResolvedValue(undefined),
-  },
-}));
-
-jest.mock("@/lib/prisma", () => ({
-  __esModule: true,
-  default: {
-    webhookEvent: {
-      findUnique: jest.fn(),
-      update: jest.fn(),
+jest.mock("@/lib/queue/webhookQueue", () => {
+  const mockAdd = jest.fn().mockResolvedValue(undefined);
+  return {
+    webhookQueue: {
+      add: mockAdd,
     },
-    gitHubRepo: {
-      findFirst: jest.fn(),
-    },
-  },
-}));
+    WEBHOOK_QUEUE_NAME: "webhook-events",
+  };
+});
 
 import { POST } from "../route";
 import { isInternalWorkerAuthorized } from "@/lib/utils/internalAuth";
 import { checkRateLimit } from "@/lib/middleware/rateLimit";
-import { webhookQueue } from "@/lib/services/webhook-queue";
+import { webhookQueue } from "@/lib/queue/webhookQueue";
 import { NextRequest } from "next/server";
 
 function mockRequest(overrides?: {
@@ -97,52 +88,28 @@ function rateLimitedResult(
   };
 }
 
-const validEvent = {
-  id: "evt-001",
-  status: "pending",
-  retryCount: 0,
-  maxRetries: 3,
-  payload: {
-    repository: { owner: { login: "owner" }, name: "repo" },
-    pull_request: { number: 42 },
-    installation: { id: 123 },
-  },
-  event: "pull_request",
-  action: "opened",
-};
-
-const processingEvent = {
-  ...validEvent,
-  id: "evt-002",
-  status: "processing",
-};
-
-const completedEvent = {
-  ...validEvent,
-  id: "evt-003",
-  status: "completed",
-};
-
 describe("POST /api/internal/worker/webhook", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.INTERNAL_WORKER_SECRET = "test-secret";
+<<<<<<< HEAD
     process.env.NEXTAUTH_URL = "http://localhost:3000";
 
     asMock(checkRateLimit).mockResolvedValue(
       rateLimitedResult({ allowed: true }),
     );
+=======
+    asMock(checkRateLimit).mockResolvedValue(rateLimitedResult({ allowed: true }));
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
   });
 
   afterEach(() => {
     delete process.env.INTERNAL_WORKER_SECRET;
-    delete process.env.NEXTAUTH_URL;
   });
 
-  describe("authentication ordering", () => {
+  describe("authentication", () => {
     it("returns 401 when no auth header is provided", async () => {
       asMock(isInternalWorkerAuthorized).mockReturnValueOnce(false);
-
       const res = await POST(mockRequest());
       const body = await res.json();
 
@@ -152,10 +119,14 @@ describe("POST /api/internal/worker/webhook", () => {
 
     it("returns 401 when auth header is invalid", async () => {
       asMock(isInternalWorkerAuthorized).mockReturnValueOnce(false);
+<<<<<<< HEAD
 
       const res = await POST(
         mockRequest({ authHeader: "Bearer invalid-secret" }),
       );
+=======
+      const res = await POST(mockRequest({ authHeader: "Bearer invalid-secret" }));
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
       const body = await res.json();
 
       expect(res.status).toBe(401);
@@ -164,46 +135,27 @@ describe("POST /api/internal/worker/webhook", () => {
 
     it("authenticates before checking rate limit", async () => {
       asMock(isInternalWorkerAuthorized).mockReturnValueOnce(false);
-
       await POST(mockRequest());
-
       expect(asMock(checkRateLimit)).not.toHaveBeenCalled();
     });
 
-    it("does not consume rate limit on auth failure", async () => {
+    it("does not enqueue on auth failure", async () => {
       asMock(isInternalWorkerAuthorized).mockReturnValueOnce(false);
-
-      const res = await POST(mockRequest());
-
-      expect(res.status).toBe(401);
-      expect(asMock(checkRateLimit)).not.toHaveBeenCalled();
-    });
-
-    it("does not call triggerWorkers on auth failure", async () => {
-      asMock(isInternalWorkerAuthorized).mockReturnValueOnce(false);
-
       await POST(mockRequest());
-
-      expect(asMock(webhookQueue.triggerWorkers)).not.toHaveBeenCalled();
+      expect(asMock(webhookQueue.add)).not.toHaveBeenCalled();
     });
 
     it("isInternalWorkerAuthorized is called with the authorization header", async () => {
       asMock(isInternalWorkerAuthorized).mockReturnValueOnce(false);
-
       await POST(mockRequest({ authHeader: "Bearer some-token" }));
+<<<<<<< HEAD
 
       expect(asMock(isInternalWorkerAuthorized)).toHaveBeenCalledWith(
         "Bearer some-token",
       );
-    });
-
-    it("returns 401 when INTERNAL_WORKER_SECRET is not set", async () => {
-      delete process.env.INTERNAL_WORKER_SECRET;
-      asMock(isInternalWorkerAuthorized).mockReturnValueOnce(false);
-
-      const res = await POST(mockRequest({ authHeader: "Bearer test-secret" }));
-
-      expect(res.status).toBe(401);
+=======
+      expect(asMock(isInternalWorkerAuthorized)).toHaveBeenCalledWith("Bearer some-token");
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     });
   });
 
@@ -212,16 +164,13 @@ describe("POST /api/internal/worker/webhook", () => {
       asMock(checkRateLimit).mockResolvedValueOnce(
         rateLimitedResult({ allowed: false, remaining: 0 }),
       );
-
       const res = await POST(mockRequest({ authHeader: "Bearer valid-token" }));
-
       expect(res.status).toBe(429);
-      const body = await res.json();
-      expect(body.error).toBe(true);
     });
 
-    it("passes through when rate limit is within bounds", async () => {
+    it("does not enqueue when rate limited", async () => {
       asMock(checkRateLimit).mockResolvedValueOnce(
+<<<<<<< HEAD
         rateLimitedResult({ allowed: true, remaining: 30 }),
       );
 
@@ -241,11 +190,16 @@ describe("POST /api/internal/worker/webhook", () => {
       );
 
       expect(res.status).toBe(200);
+=======
+        rateLimitedResult({ allowed: false, remaining: 0 })
+      );
+      await POST(mockRequest({ authHeader: "Bearer valid-token" }));
+      expect(asMock(webhookQueue.add)).not.toHaveBeenCalled();
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     });
 
     it("uses the correct rate limit key", async () => {
       await POST(mockRequest({ authHeader: "Bearer valid-token" }));
-
       expect(asMock(checkRateLimit)).toHaveBeenCalledWith(
         "webhook-worker",
         expect.objectContaining({
@@ -255,6 +209,7 @@ describe("POST /api/internal/worker/webhook", () => {
         }),
       );
     });
+<<<<<<< HEAD
 
     it("does not use x-worker-id header for rate limiting", async () => {
       await POST(
@@ -316,10 +271,12 @@ describe("POST /api/internal/worker/webhook", () => {
       expect(body).toHaveProperty("message");
       expect(body).toHaveProperty("code", 429);
     });
+=======
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
   });
 
-  describe("event validation", () => {
-    it("returns 400 when eventId is missing from body", async () => {
+  describe("eventId validation", () => {
+    it("returns 400 when eventId is missing", async () => {
       const res = await POST(mockRequest({ authHeader: "Bearer valid-token" }));
       const body = await res.json();
 
@@ -340,6 +297,7 @@ describe("POST /api/internal/worker/webhook", () => {
       expect(body.error).toBe("eventId is required");
     });
 
+<<<<<<< HEAD
     it("returns 400 when eventId is empty string", async () => {
       const res = await POST(
         mockRequest({
@@ -353,22 +311,23 @@ describe("POST /api/internal/worker/webhook", () => {
       expect(body.error).toBe("eventId is required");
     });
 
+=======
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     it("returns 400 when body is malformed JSON", async () => {
       const req = mockRequest({ authHeader: "Bearer valid-token" });
       asMock(req.json).mockRejectedValueOnce(new Error("Unexpected token"));
-
       const res = await POST(req);
       const body = await res.json();
 
       expect(res.status).toBe(400);
       expect(body.error).toBe("eventId is required");
     });
+  });
 
-    it("returns 404 when event is not found", async () => {
-      const prisma = require("@/lib/prisma").default;
-      asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(null);
-
+  describe("successful enqueue", () => {
+    it("returns 202 and enqueues to BullMQ when eventId is provided", async () => {
       const res = await POST(
+<<<<<<< HEAD
         mockRequest({
           authHeader: "Bearer valid-token",
           body: { eventId: "nonexistent" },
@@ -391,14 +350,23 @@ describe("POST /api/internal/worker/webhook", () => {
           authHeader: "Bearer valid-token",
           body: { eventId: "evt-003" },
         }),
+=======
+        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } })
       );
       const body = await res.json();
 
-      expect(res.status).toBe(200);
-      expect(body.ignored).toBe(true);
-      expect(body.reason).toBe("already_processed");
+      expect(res.status).toBe(202);
+      expect(body.ok).toBe(true);
+      expect(body.message).toBe("Webhook event enqueued for distributed processing");
+      expect(asMock(webhookQueue.add)).toHaveBeenCalledWith(
+        "webhook_event",
+        { eventId: "evt-001" },
+        expect.objectContaining({ attempts: 5 })
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
+      );
     });
 
+<<<<<<< HEAD
     it("returns 200 with ignored when event is currently processing", async () => {
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(
@@ -443,6 +411,9 @@ describe("POST /api/internal/worker/webhook", () => {
       });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
+=======
+    it("enqueues to BullMQ with exponential backoff", async () => {
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
       await POST(
         mockRequest({
           authHeader: "Bearer valid-token",
@@ -450,15 +421,23 @@ describe("POST /api/internal/worker/webhook", () => {
         }),
       );
 
-      expect(asMock(prisma.webhookEvent.update)).toHaveBeenCalledWith(
+      expect(asMock(webhookQueue.add)).toHaveBeenCalledWith(
+        "webhook_event",
+        { eventId: "evt-001" },
         expect.objectContaining({
+<<<<<<< HEAD
           where: { id: "evt-001" },
           data: { status: "processing" },
         }),
+=======
+          backoff: { type: "exponential", delay: 5000 },
+        })
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
       );
     });
   });
 
+<<<<<<< HEAD
   describe("triggerWorkers behavior", () => {
     it("calls triggerWorkers after successful authentication and processing", async () => {
       const prisma = require("@/lib/prisma").default;
@@ -645,6 +624,11 @@ describe("POST /api/internal/worker/webhook", () => {
         ...eventWithInvalidPayload,
         status: "processing",
       });
+=======
+  describe("error handling", () => {
+    it("returns 500 when BullMQ add fails", async () => {
+      asMock(webhookQueue.add).mockRejectedValueOnce(new Error("Redis connection failed"));
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
       const res = await POST(
         mockRequest({
@@ -655,6 +639,7 @@ describe("POST /api/internal/worker/webhook", () => {
       const body = await res.json();
 
       expect(res.status).toBe(500);
+<<<<<<< HEAD
       expect(body.error).toBe("Failed to process event");
     });
 
@@ -709,11 +694,15 @@ describe("POST /api/internal/worker/webhook", () => {
       expect(res.status).toBe(500);
       expect(body.error).toBe("Failed to process event");
       expect(body.details).toBeDefined();
+=======
+      expect(body.error).toBe("Failed to enqueue webhook event");
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     });
 
     it("sets the correct runtime and maxDuration exports", () => {
       const route = require("../route");
       expect(route.runtime).toBe("nodejs");
+<<<<<<< HEAD
       expect(route.maxDuration).toBe(300);
     });
   });
@@ -884,6 +873,9 @@ describe("POST /api/internal/worker/webhook", () => {
       const res = await POST(mockRequest({ authHeader: "" }));
 
       expect(res.status).toBe(401);
+=======
+      expect(route.maxDuration).toBe(30);
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     });
   });
 });

@@ -2,7 +2,7 @@ import "@/lib/env";
 import { ReactNode } from "react";
 import { Metadata } from "next";
 import { Inter, Source_Sans_3 } from "next/font/google";
-import { ThemeProvider } from "@/context/ThemeContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
 import { Toaster } from "@/components/ui/toaster";

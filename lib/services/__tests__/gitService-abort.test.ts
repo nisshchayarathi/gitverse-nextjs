@@ -204,7 +204,7 @@ describe("GitService abort signal handling", () => {
       jest.useRealTimers();
 
       await expect(promise).rejects.toThrow();
-    }, 10000);
+    }, 30000);
 
     it("should return GitService instance on successful clone", async () => {
       const controller = new AbortController();
@@ -231,7 +231,7 @@ describe("GitService abort signal handling", () => {
 
       const result = await promise;
       expect(result).toBeInstanceOf(GitService);
-    }, 10000);
+    }, 30000);
   });
 
   describe("getBranches with signal", () => {

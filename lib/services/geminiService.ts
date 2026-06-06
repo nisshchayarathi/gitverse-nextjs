@@ -7,6 +7,38 @@ import { buildCacheKey } from "../utils/cacheKey";
 
 const CURRENT_MODEL_VERSION = "gemini-2.5-flash";
 
+const HIGH_CONFIDENCE_SECRETS = [
+  { name: 'GitHub Token', pattern: /(?:gh[pousr]_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})/g },
+  { name: 'Google API Key', pattern: /AIza[0-9A-Za-z\-_]{35}/g },
+  { name: 'AWS Access Key', pattern: /AKIA[0-9A-Z]{16}/g },
+  { name: 'Slack Token', pattern: /xox[baprs]-[0-9]{12}-[0-9]{12}-[a-zA-Z0-9]{24}/g },
+  { name: 'RSA Private Key', pattern: /-----BEGIN RSA PRIVATE KEY-----[\s\S]*?-----END RSA PRIVATE KEY-----/g },
+];
+
+const SUSPECTED_SECRETS = [
+  { name: 'Generic Secret', pattern: /(?:secret|key|token|password|passwd|pwd)[\s:=]+['"]?([a-zA-Z0-9\-_=]{16,})['"]?/gi },
+  { name: 'Bearer Token', pattern: /bearer\s+([a-zA-Z0-9\-\._~+\/]+=*)/gi }
+];
+
+export function scanAndRedactPayload(payload: string): string {
+  // 1. Check for high-confidence secrets
+  for (const rule of HIGH_CONFIDENCE_SECRETS) {
+    if (rule.pattern.test(payload)) {
+      throw new Error(`High-confidence secret detected: ${rule.name}. Halting PR review to prevent secret leak to AI provider.`);
+    }
+  }
+
+  // 2. Redact suspected tokens
+  let redactedPayload = payload;
+  for (const rule of SUSPECTED_SECRETS) {
+    redactedPayload = redactedPayload.replace(rule.pattern, (match, secretToken) => {
+      return match.replace(secretToken, '[REDACTED_SECRET]');
+    });
+  }
+
+  return redactedPayload;
+}
+
 export interface AIAnalysisRequest {
   repositoryId: number;
   type:
@@ -79,6 +111,7 @@ export class GeminiService {
     const { type, context } = request;
 
     let prompt = this.buildRepositoryAnalysisPrompt(type, context);
+    prompt = scanAndRedactPayload(prompt);
 
     try {
       const result = await this.model.generateContent(prompt);
@@ -126,7 +159,12 @@ export class GeminiService {
       analysisType,
       context,
     );
+<<<<<<< HEAD
 
+=======
+    prompt = scanAndRedactPayload(prompt);
+    
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     let cacheKey: ReturnType<typeof buildCacheKey> | null = null;
     if (repositoryId && commitHash) {
       cacheKey = buildCacheKey({
@@ -193,6 +231,7 @@ export class GeminiService {
       conversationHistory,
       context,
     );
+    prompt = scanAndRedactPayload(prompt);
 
     try {
       const result = await this.model.generateContent(prompt);
@@ -266,9 +305,9 @@ export class GeminiService {
         const contents = [
           ...recentHistory.map((msg) => ({
             role: msg.role === "assistant" ? "model" : "user",
-            parts: [{ text: msg.content }],
+            parts: [{ text: scanAndRedactPayload(msg.content) }],
           })),
-          { role: "user", parts: [{ text: prompt }] },
+          { role: "user", parts: [{ text: scanAndRedactPayload(prompt) }] },
         ];
 
         const result = await withAbort(
@@ -281,8 +320,13 @@ export class GeminiService {
           Math.ceil((prompt.length + text.length) / 4);
         return { text, tokensConsumed };
       } else {
+<<<<<<< HEAD
         const result = await withAbort(this.model.generateContent(prompt));
         const response = result.response;
+=======
+        const result = await this.model.generateContent(scanAndRedactPayload(prompt));
+        const response = await result.response;
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
         const text = response.text();
         const tokensConsumed =
           response.usageMetadata?.totalTokenCount ||
@@ -337,7 +381,7 @@ export class GeminiService {
         : changes.diff
       : "";
 
-    const prompt = `
+    let prompt = `
 Generate 3 conventional commit messages for the following code changes:
 
 Added files: ${changes.added.join(", ") || "none"}
@@ -351,6 +395,7 @@ Examples: feat(auth): add login endpoint, fix(ui): resolve button alignment
 
 Provide only the commit messages, one per line.
 `;
+    prompt = scanAndRedactPayload(prompt);
 
     try {
       const result = await this.model.generateContent(prompt);

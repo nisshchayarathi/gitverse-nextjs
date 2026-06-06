@@ -14,6 +14,7 @@ import {
 import Image from "next/image";
 import { Card } from "@/components/ui";
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 
 interface Contributor {
   id: string;

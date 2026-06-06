@@ -3,10 +3,15 @@ import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { GitHubService } from "@/lib/services/githubService";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
+<<<<<<< HEAD
 import {
   encryptToken,
   validateEncryptionConfig,
 } from "@/lib/utils/tokenEncryption";
+=======
+import { validateEncryptionConfig } from "@/lib/utils/tokenEncryption";
+import { encryptToken } from "@/lib/utils/envelopeEncryption";
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 import { RedactSensitiveFields } from "@/services/security/redact-sensitive-fields";
 import {
   checkRateLimit,
@@ -47,7 +52,7 @@ export async function POST(request: NextRequest) {
     const github = new GitHubService(token);
     const me = await github.getAuthenticatedUser();
 
-    const encryptedToken = encryptToken(token);
+    const encryptedToken = await encryptToken(token);
 
     const account = await prisma.gitHubAccount.upsert({
       where: { userId: user.userId },

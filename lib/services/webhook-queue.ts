@@ -1,15 +1,13 @@
 import prisma from "../prisma";
 import { WebhookQueueStatus } from "../../types/database-health";
-import { SafeHttpClient } from "@/services/security/safe-http-client";
-import { deriveBearerToken } from "@/lib/utils/internalAuth";
-
-const MAX_CONCURRENT_WEBHOOKS = 5;
+import { webhookQueueInstance } from "../queue/webhookQueue";
 
 type QueuedWebhook = {
   event: string;
   action: string | undefined;
   payload: any;
   status: string;
+  deliveryId?: string;
 };
 
 const globalForQueue = globalThis as unknown as {
@@ -28,17 +26,22 @@ export class WebhookQueueService {
   /**
    * Enqueues a webhook event in memory and schedules a background flush.
    */
+<<<<<<< HEAD
   enqueueWebhook(
     payload: any,
     event: string,
     action: string | undefined,
     baseUrl: string,
   ) {
+=======
+  enqueueWebhook(payload: any, event: string, action: string | undefined, baseUrl: string, deliveryId?: string) {
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     globalForQueue.webhookBuffer.push({
       event: event || "unknown",
       action: action,
       payload,
       status: "pending",
+      deliveryId,
     });
 
     if (!globalForQueue.webhookFlushTimeout) {
@@ -58,13 +61,20 @@ export class WebhookQueueService {
     if (batch.length === 0) return;
 
     try {
-      await prisma.webhookEvent.createMany({
-        data: batch,
-      });
-      // After flushing, trigger workers
-      this.triggerWorkers(baseUrl).catch((err: any) => {
-        console.error("[WebhookQueue] Failed to trigger queue workers:", err);
-      });
+      // Use transaction to create rows and get their IDs back
+      const createdEvents = await prisma.$transaction(
+        batch.map((data) =>
+          prisma.webhookEvent.create({
+            data,
+            select: { id: true },
+          })
+        )
+      );
+
+      // After flushing, enqueue to BullMQ
+      for (const event of createdEvents) {
+        await webhookQueueInstance.add("process-webhook", { eventId: event.id });
+      }
     } catch (error) {
       console.error("[WebhookQueue] Failed to flush webhooks:", error);
       // Push back to queue on failure
@@ -78,20 +88,21 @@ export class WebhookQueueService {
       }
     }
   }
+
   /**
    * Attempts to trigger pending webhooks up to the maximum concurrent capacity.
-   * If the capacity is reached, it exits silently.
+   * @deprecated Triggering is now handled by BullMQ workers automatically.
    */
   async triggerWorkers(baseUrl: string): Promise<WebhookQueueStatus> {
-    try {
-      const activeWorkers = await prisma.webhookEvent.count({
-        where: { status: "processing" },
-      });
+    const activeWorkers = await prisma.webhookEvent.count({
+      where: { status: "processing" },
+    });
 
-      const pendingJobs = await prisma.webhookEvent.count({
-        where: { status: "pending" },
-      });
+    const pendingJobs = await prisma.webhookEvent.count({
+      where: { status: "pending" },
+    });
 
+<<<<<<< HEAD
       if (activeWorkers >= MAX_CONCURRENT_WEBHOOKS) {
         console.log(
           `[WebhookQueue] Throttled. ${activeWorkers}/${MAX_CONCURRENT_WEBHOOKS} active workers. ${pendingJobs} jobs pending.`,
@@ -151,6 +162,9 @@ export class WebhookQueueService {
       console.error("[WebhookQueue] Error in triggerWorkers:", error);
       return { activeWorkers: 0, pendingJobs: 0, isThrottled: true };
     }
+=======
+    return { activeWorkers, pendingJobs, isThrottled: false };
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
   }
 }
 

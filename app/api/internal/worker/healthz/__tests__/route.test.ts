@@ -4,10 +4,14 @@
 
 var mockCheckEncryptionHealth: jest.Mock;
 
-jest.mock("@/lib/utils/tokenEncryption", () => {
+jest.mock("@/lib/utils/envelopeEncryption", () => {
   mockCheckEncryptionHealth = jest.fn();
   return {
     checkEncryptionHealth: mockCheckEncryptionHealth,
+    encryptToken: jest.fn(),
+    decryptToken: jest.fn(),
+    isTokenEncrypted: jest.fn(),
+    isKmsConfigured: jest.fn(),
   };
 });
 
@@ -31,7 +35,7 @@ describe("GET /api/internal/worker/healthz – encryption check", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.INTERNAL_WORKER_SECRET = "test-secret-value";
-    mockCheckEncryptionHealth.mockReturnValue({
+    mockCheckEncryptionHealth.mockResolvedValue({
       healthy: true,
       message: "Encryption is properly configured",
     });
