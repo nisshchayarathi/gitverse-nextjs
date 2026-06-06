@@ -466,7 +466,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           return changedFiles.has(d.path) ? 1 : 0.2;
         }
         if (d.type === 'folder') {
-          for (const [path] of changedFiles.entries()) {
+          for (const [path] of changedFiles.entries() as Iterable<[string, string]>) {
             if (path.startsWith(d.path + '/')) return 1;
           }
           return 0.2;

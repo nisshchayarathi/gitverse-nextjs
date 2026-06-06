@@ -20,6 +20,14 @@ jest.mock("@/lib/middleware", () => ({
   sanitizeError: jest.fn((err) => err?.message || "Unknown error"),
 }));
 
+jest.mock("@/lib/middleware/rateLimit", () => ({
+  checkRateLimit: jest.fn().mockResolvedValue({ allowed: true, remaining: 5, limit: 5, windowSec: 60, resetInSec: 60 }),
+  rateLimitResponse: jest.fn(),
+  RATE_LIMITS: {
+    GITHUB_CONNECT: { namespace: "github:connect", maxRequests: 5, windowMs: 60_000 },
+  },
+}));
+
 jest.mock("@/lib/prisma", () => ({
   __esModule: true,
   default: {

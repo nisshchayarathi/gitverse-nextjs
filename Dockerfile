@@ -16,17 +16,15 @@ RUN apt-get update \
 
 FROM base AS deps
 
-# Install devDependencies too (Tailwind/PostCSS live there), regardless of NODE_ENV.
-ENV NPM_CONFIG_INCLUDE=dev
-
 # Install dependencies (incl. dev deps for build)
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --include=dev
 
 
 FROM base AS builder
 
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

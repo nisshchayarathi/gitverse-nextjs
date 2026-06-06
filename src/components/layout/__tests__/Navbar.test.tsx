@@ -1,11 +1,10 @@
-// @vitest-environment jsdom
+import React from "react";
 import { render, screen } from "@testing-library/react";
 
 jest.mock("next/link", () => ({
   __esModule: true,
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
-  ),
+  default: ({ children, href, ...props }: any) =>
+    React.createElement("a", { href, ...props }, children),
 }));
 
 jest.mock("lucide-react", () => ({
@@ -24,15 +23,16 @@ import { Navbar } from "../Navbar";
 
 describe("Navbar", () => {
   it("renders without crashing", () => {
-    render(<Navbar />);
+    const { container } = render(<Navbar />);
+    expect(container.querySelector("nav")).toBeTruthy();
     expect(screen.getAllByText((content, node) => node?.textContent === "GitVerse").length).toBeGreaterThan(0);
   });
 
   it("renders navigation links", () => {
     render(<Navbar />);
-    expect(screen.getByText("Features")).toBeDefined();
-    expect(screen.getByText("How it Works")).toBeDefined();
-    expect(screen.getByText("Pricing")).toBeDefined();
+    expect(screen.getByText((content) => content.includes("Features"))).toBeDefined();
+    expect(screen.getByText((content) => content.includes("How it Works"))).toBeDefined();
+    expect(screen.getByText((content) => content.includes("Pricing"))).toBeDefined();
   });
 
   it("renders sign in and get started buttons", () => {

@@ -62,14 +62,6 @@ export default function CompareRepositories() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [hasCompared, setHasCompared] = useState(false);
 
-  useEffect(() => {
-    if (!isAuthLoading && !isAuthenticated) {
-      router.push("/login");
-      return;
-    }
-    fetchRepositories();
-  }, [isAuthLoading, isAuthenticated, router, fetchRepositories]);
-
   const fetchRepositories = useCallback(async () => {
     try {
       setIsListLoading(true);
@@ -82,15 +74,16 @@ export default function CompareRepositories() {
       setRepoList(Array.isArray(repos) ? repos : []);
     } catch (error) {
       console.error("Failed to fetch repositories:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load repositories list",
-        variant: "destructive",
-      });
-    } finally {
-      setIsListLoading(false);
     }
-  }, [toast]);
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push("/login");
+      return;
+    }
+    fetchRepositories();
+  }, [isAuthLoading, isAuthenticated, router, fetchRepositories]);
 
   const handleToggleSelect = (id: number) => {
     setSelectedIds((prev) => {

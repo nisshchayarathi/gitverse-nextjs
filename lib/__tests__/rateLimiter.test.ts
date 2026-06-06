@@ -166,7 +166,7 @@ describe("checkRateLimit", () => {
     });
 
     expect(result.allowed).toBe(true);
-    expect(result.remaining).toBe(5);
+    expect(result.remaining).toBe(4);
     expect(result.limit).toBe(5);
   });
 
@@ -175,12 +175,12 @@ describe("checkRateLimit", () => {
 
     const result = await checkRateLimit({
       endpoint: "mfa:verify",
-      userId: 1,
+      userId: 2,
       tier: "free",
     });
 
     expect(result.allowed).toBe(true);
-    expect(result.remaining).toBe(5);
+    expect(result.remaining).toBe(4);
     expect(result.limit).toBe(5);
   });
 

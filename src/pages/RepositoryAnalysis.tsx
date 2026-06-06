@@ -45,7 +45,8 @@ type TabType =
   | "commits"
   | "contributors"
   | "mentor"
-  | "insights";
+  | "insights"
+  | "dead-code";
 
 interface Tab {
   id: TabType;
@@ -126,7 +127,7 @@ export default function RepositoryAnalysis() {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [repository, setRepository] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isAnalyzing, _setIsAnalyzing] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [job, setJob] = useState<any>(null);
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);

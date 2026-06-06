@@ -7,7 +7,7 @@ import Image from "next/image";
 import { User, Lock, Shield, Trash2, AlertCircle, Sun, Moon, Cpu } from "lucide-react";
 import { Save } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useTheme } from "@/context/ThemeContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Card,
   CardHeader,

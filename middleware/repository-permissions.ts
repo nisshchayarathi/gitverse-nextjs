@@ -16,7 +16,7 @@ export interface EnforcedPermissionResult {
 export async function enforceRepositoryPermission(
   request: NextRequest,
   repositoryId: number,
-  requiredAction: 'read' | 'write'
+  requiredAction: 'read' | 'write' | 'settings_read' | 'settings_write' | 'billing_read' | 'billing_write'
 ): Promise<EnforcedPermissionResult> {
   try {
     const user = await requireAuth(request);
@@ -44,12 +44,35 @@ export async function enforceRepositoryPermission(
       };
     }
 
-    // 2. Perform RBAC validation
+    // 2. Perform RBAC validation based on the required action
     let hasPermission = false;
-    if (requiredAction === 'write') {
-      hasPermission = RBAC.canModifyPolicy(check.role);
-    } else {
-      hasPermission = RBAC.canReadPolicy(check.role);
+    let auditAction: 'policy_read' | 'policy_write' | 'settings_read' | 'settings_write' | 'billing_read' | 'billing_write' | 'unauthorized_attempt';
+
+    switch (requiredAction) {
+      case 'settings_read':
+        hasPermission = RBAC.canViewSettings(check.role);
+        auditAction = 'settings_read';
+        break;
+      case 'settings_write':
+        hasPermission = RBAC.canModifySettings(check.role);
+        auditAction = 'settings_write';
+        break;
+      case 'billing_read':
+        hasPermission = RBAC.canViewBilling(check.role);
+        auditAction = 'billing_read';
+        break;
+      case 'billing_write':
+        hasPermission = RBAC.canModifyBilling(check.role);
+        auditAction = 'billing_write';
+        break;
+      case 'write':
+        hasPermission = RBAC.canModifyPolicy(check.role);
+        auditAction = 'policy_write';
+        break;
+      default:
+        hasPermission = RBAC.canReadPolicy(check.role);
+        auditAction = 'policy_read';
+        break;
     }
 
     if (!hasPermission) {
@@ -76,7 +99,7 @@ export async function enforceRepositoryPermission(
     AuthorizationAudit.log({
       userId: user.userId,
       repositoryId,
-      action: requiredAction === 'write' ? 'policy_write' : 'policy_read',
+      action: auditAction,
       success: true,
       role: check.role,
     });

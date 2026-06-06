@@ -115,7 +115,7 @@ const findMatchingFilePath = (
     const normalizedCandidate = normalizePath(candidatePath);
     const exact = filePaths.find((filePath) => filePath === normalizedCandidate);
     if (exact) return exact;
-    return filePaths.find((filePath) => filePath.endsWith(`/${normalizedCandidate}`));
+    return filePaths.find((filePath) => filePath.endsWith(`/${normalizedCandidate}`)) ?? null;
   };
 
   if (cleaned.startsWith(".")) {

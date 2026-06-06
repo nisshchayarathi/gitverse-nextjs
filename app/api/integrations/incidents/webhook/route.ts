@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getIncidentIngestionService } from "@/lib/services/incident-ingestion";
+import prisma from "@/lib/prisma";
 import { getDeploymentAnalysisService } from "@/lib/services/deployment-analysis";
 import { getIncidentCorrelationService } from "@/lib/services/incident-correlation";
 import { getRollbackPrService } from "@/lib/services/rollback-pr";
@@ -15,9 +16,28 @@ export async function POST(req: NextRequest) {
   try {
     const ip = getClientIp(req as any);
     const rl = await checkRateLimit(ip, RATE_LIMITS.INCIDENT_WEBHOOK);
-    if (!rl.allowed) return rateLimitResponse(rl, "Webhook rate limit exceeded");
 
     const rawBody = await req.text();
+
+    if (rl.fallbackFailed) {
+      console.error("[WebhookRoute] Rate limiters completely failed. DLQing incident webhook.");
+      try {
+        await prisma.webhookEvent.create({
+          data: {
+            event: "incident",
+            payload: rawBody,
+            status: "dlq",
+            error: "Rate limiter and fallback completely failed",
+          },
+        });
+      } catch (e) {
+        console.error("[WebhookRoute] Failed to write to DLQ!", e);
+      }
+      return NextResponse.json({ ok: true, message: "Webhook accepted and queued to DLQ due to severe outages" }, { status: 202 });
+    }
+
+    if (!rl.allowed) return rateLimitResponse(rl, "Webhook rate limit exceeded");
+
     const isAuthorized = verifyIncidentWebhookSignature({
       rawBody,
       signatureHeader: req.headers.get("x-incident-signature-256"),

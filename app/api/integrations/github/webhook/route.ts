@@ -52,9 +52,27 @@ function shouldHandleIssueAction(action: string | undefined): boolean {
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
   const rl = await checkRateLimit(ip, RATE_LIMITS.GITHUB_WEBHOOK);
-  if (!rl.allowed) return rateLimitResponse(rl, "Webhook rate limit exceeded");
 
   const rawBody = await request.text();
+
+  if (rl.fallbackFailed) {
+    console.error("[WebhookRoute] Rate limiters completely failed. DLQing webhook.");
+    try {
+      await prisma.webhookEvent.create({
+        data: {
+          event: request.headers.get("x-github-event") || "unknown",
+          payload: rawBody,
+          status: "dlq",
+          error: "Rate limiter and fallback completely failed",
+        },
+      });
+    } catch (e) {
+      console.error("[WebhookRoute] Failed to write to DLQ!", e);
+    }
+    return NextResponse.json({ ok: true, message: "Webhook accepted and queued to DLQ due to severe outages" }, { status: 202 });
+  }
+
+  if (!rl.allowed) return rateLimitResponse(rl, "Webhook rate limit exceeded");
 
   const signature = request.headers.get("x-hub-signature-256");
   const event = request.headers.get("x-github-event");

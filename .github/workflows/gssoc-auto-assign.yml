@@ -318,7 +318,7 @@ jobs:
                   ``,
                   `1. 🍴 **Fork** the repo: [nisshchayarathi/gitverse-nextjs](https://github.com/${owner}/${repo}/fork)`,
                   `2. 🌿 **Create a branch**: \`git checkout -b fix/issue-${issueNum}\``,
-                  `3. 📖 **Read the docs**: [CONTRIBUTING.md](https://github.com/${owner}/${repo}/blob/main/CONTRIBUTING.md) | [Setup Guide](https://github.com/${owner}/${repo}/blob/main/docs/SETUP.md)`,
+                   `3. 📖 **Read the docs**: [CONTRIBUTING.md](https://github.com/${owner}/${repo}/blob/main/CONTRIBUTING.md)`,
                   `4. 💻 **Work on the fix** and commit your changes`,
                   `5. 🔀 **Open a PR** with \`closes #${issueNum}\` in the description`,
                   ``,
