@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sanitizeError, isHttpError } from "@/lib/middleware";
 import { enforceRepositoryPermission } from "@/middleware/repository-permissions";
 import { SettingsAuditService } from "@/services/security/settings-audit";
+import { QuotaService } from "@/lib/services/quotaService";
 import prisma from "@/lib/prisma";
 
 const securityHeaders = {
@@ -33,31 +34,67 @@ export async function GET(
       return permission.errorResponse;
     }
 
-    // Look up the organization assignment and any associated AI quota
+    // Look up the organization assignment
     const assignment = await prisma.repositoryPolicyAssignment.findUnique({
       where: { repositoryId },
       select: { organizationId: true },
     });
 
-    let quotaInfo = null;
-    if (assignment) {
-      // Find installation linked to the org for quota data
-      const installation = await prisma.gitHubInstallation.findFirst({
-        where: { organizationId: assignment.organizationId },
-        select: { id: true },
-      });
+    const repository = await prisma.repository.findUnique({
+      where: { id: repositoryId },
+      select: { url: true },
+    });
 
-      if (installation) {
-        quotaInfo = await prisma.aiQuota.findUnique({
-          where: { installationId: installation.id },
-          select: {
-            tokensUsed: true,
-            tokenLimit: true,
-            windowStart: true,
-            warningPosted: true,
-          },
-        });
-      }
+    if (!repository) {
+      return NextResponse.json(
+        { error: "Repository not found" },
+        { status: 404, headers: securityHeaders }
+      );
+    }
+
+    const match = repository.url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+    if (!match) {
+      return NextResponse.json(
+        { error: "Invalid repository URL format" },
+        { status: 400, headers: securityHeaders }
+      );
+    }
+
+    const owner = match[1];
+    const repoName = match[2].replace(/\.git$/, "");
+    const repoFullName = `${owner}/${repoName}`;
+
+    const githubRepo = await prisma.gitHubRepo.findFirst({
+      where: { repoFullName },
+      select: { installationId: true },
+    });
+
+    if (!githubRepo || !githubRepo.installationId) {
+      return NextResponse.json(
+        { error: "No GitHub installation found for this repository" },
+        { status: 404, headers: securityHeaders }
+      );
+    }
+
+    const installationId = githubRepo.installationId;
+    let quotaInfo = null;
+
+    const quota = await prisma.aiQuota.findUnique({
+      where: { installationId },
+      select: {
+        tokensConsumed: true,
+        quotaWindowStart: true,
+        warningPosted: true,
+      },
+    });
+
+    if (quota) {
+      quotaInfo = {
+        tokensUsed: quota.tokensConsumed,
+        tokenLimit: QuotaService.getQuotaMax(),
+        windowStart: quota.quotaWindowStart,
+        warningPosted: quota.warningPosted,
+      };
     }
 
     return NextResponse.json(
@@ -133,34 +170,63 @@ export async function PUT(
       );
     }
 
-    const installation = await prisma.gitHubInstallation.findFirst({
-      where: { organizationId: assignment.organizationId },
-      select: { id: true },
+    const repository = await prisma.repository.findUnique({
+      where: { id: repositoryId },
+      select: { url: true },
     });
 
-    if (!installation) {
+    if (!repository) {
       return NextResponse.json(
-        { error: "No GitHub installation found for this organization" },
+        { error: "Repository not found" },
         { status: 404, headers: securityHeaders }
       );
     }
 
-    // Fetch current quota for audit trail
-    const currentQuota = await prisma.aiQuota.findUnique({
-      where: { installationId: installation.id },
+    const match = repository.url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+    if (!match) {
+      return NextResponse.json(
+        { error: "Invalid repository URL format" },
+        { status: 400, headers: securityHeaders }
+      );
+    }
+
+    const owner = match[1];
+    const repoName = match[2].replace(/\.git$/, "");
+    const repoFullName = `${owner}/${repoName}`;
+
+    const githubRepo = await prisma.gitHubRepo.findFirst({
+      where: { repoFullName },
+      select: { installationId: true },
     });
 
-    const previousLimit = currentQuota?.tokenLimit ?? null;
+    if (!githubRepo || !githubRepo.installationId) {
+      return NextResponse.json(
+        { error: "No GitHub installation found for this repository" },
+        { status: 404, headers: securityHeaders }
+      );
+    }
 
-    // Update or create quota record
+    const installationId = githubRepo.installationId;
+
+    // Fetch current quota for audit trail
+    const currentQuota = await prisma.aiQuota.findUnique({
+      where: { installationId },
+    });
+
+    const previousLimit = QuotaService.getQuotaMax();
+
+    // Update or create quota record (saving tokenLimit is not supported in schema, so we keep warningPosted reset)
     await prisma.aiQuota.upsert({
-      where: { installationId: installation.id },
-      update: { tokenLimit },
+      where: { installationId },
+      update: {
+        warningPosted: false,
+      },
       create: {
-        installationId: installation.id,
-        tokenLimit,
-        tokensUsed: 0,
-        windowStart: new Date(),
+        installationId,
+        requestsUsed: 0,
+        tokensConsumed: 0,
+        quotaWindowStart: new Date(),
+        quotaWindowEnd: new Date(Date.now() + 24 * 60 * 60 * 1000),
         warningPosted: false,
       },
     });
@@ -171,7 +237,7 @@ export async function PUT(
       repositoryId,
       organizationId: assignment.organizationId,
       action: "billing_quota_update",
-      previousValue: previousLimit !== null ? String(previousLimit) : "unset",
+      previousValue: String(previousLimit),
       newValue: String(tokenLimit),
       ipAddress: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || undefined,
     });

@@ -619,8 +619,8 @@ model RateLimit {
   points    Int      @default(0)
   expiresAt DateTime @map("expires_at")
 
-  @@index([key])
   @@unique([key, expiresAt])
+  @@index([key])
   @@index([expiresAt], name: "rate_limits_expires_at_idx")
   @@map("rate_limits")
 }
@@ -764,11 +764,11 @@ model RepositoryKnowledge {
 /// MFA configuration for TOTP-based Multi-Factor Authentication.
 /// Stores the encrypted TOTP secret and hashed backup codes per user.
 model MfaConfig {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @unique @map("user_id")
+  id             Int       @id @default(autoincrement())
+  userId         Int       @unique @map("user_id")
   /// Base32-encoded TOTP secret (encrypted at rest via application-layer encryption)
-  totpSecret    String   @map("totp_secret") @db.Text
-  tokenEncrypted Boolean @default(false) @map("token_encrypted")
+  totpSecret     String    @map("totp_secret") @db.Text
+  tokenEncrypted Boolean   @default(false) @map("token_encrypted")
   /// Whether TOTP MFA is active for this user
   isEnabled      Boolean   @default(false) @map("is_enabled")
   /// One-time backup codes (stored as bcrypt hashes, comma-separated)

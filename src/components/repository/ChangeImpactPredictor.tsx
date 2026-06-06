@@ -84,7 +84,7 @@ export function ChangeImpactPredictor({ repository, selectedFile, loading }: Cha
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={Zap}
+            icon={<Zap className="h-8 w-8" />}
             title="Select a file"
             description="The predictor analyzes dependency relationships and highlights risk when you choose a file."
           />

@@ -524,7 +524,7 @@ export default function Dashboard() {
                 </div>
               ) : repositories.length === 0 ? (
                 <EmptyState
-                  icon={GitBranch}
+                  icon={<GitBranch className="h-8 w-8" />}
                   title="No Repositories Yet"
                   description="You haven't analyzed any repositories yet. Enter a GitHub URL above to get started!"
                   actionLabel="Analyze Repository"

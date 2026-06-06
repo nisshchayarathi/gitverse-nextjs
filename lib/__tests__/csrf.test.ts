@@ -44,7 +44,7 @@ describe("validateCsrfOrigin", () => {
   });
 
   it("allows matching Origin host", () => {
-    process.env.NODE_ENV = "production";
+    (process.env as any).NODE_ENV = "production";
     process.env.NEXTAUTH_URL = "https://gitverse.com";
 
     const req = mockRequest("POST", {
@@ -54,7 +54,7 @@ describe("validateCsrfOrigin", () => {
   });
 
   it("allows matching Referer host", () => {
-    process.env.NODE_ENV = "production";
+    (process.env as any).NODE_ENV = "production";
     process.env.NEXTAUTH_URL = "https://gitverse.com";
 
     const req = mockRequest("POST", {
@@ -64,7 +64,7 @@ describe("validateCsrfOrigin", () => {
   });
 
   it("allows matching Origin when NEXT_PUBLIC_APP_URL is used", () => {
-    process.env.NODE_ENV = "production";
+    (process.env as any).NODE_ENV = "production";
     delete process.env.NEXTAUTH_URL;
     process.env.NEXT_PUBLIC_APP_URL = "https://gitverse-app.com";
 
@@ -75,7 +75,7 @@ describe("validateCsrfOrigin", () => {
   });
 
   it("blocks mismatched Origin host in production", () => {
-    process.env.NODE_ENV = "production";
+    (process.env as any).NODE_ENV = "production";
     process.env.NEXTAUTH_URL = "https://gitverse.com";
 
     const req = mockRequest("POST", {
@@ -85,7 +85,7 @@ describe("validateCsrfOrigin", () => {
   });
 
   it("blocks mismatched Origin scheme in production", () => {
-    process.env.NODE_ENV = "production";
+    (process.env as any).NODE_ENV = "production";
     process.env.NEXTAUTH_URL = "https://gitverse.com";
 
     const req = mockRequest("POST", {
@@ -95,7 +95,7 @@ describe("validateCsrfOrigin", () => {
   });
 
   it("blocks mismatched Referer host in production", () => {
-    process.env.NODE_ENV = "production";
+    (process.env as any).NODE_ENV = "production";
     process.env.NEXTAUTH_URL = "https://gitverse.com";
 
     const req = mockRequest("POST", {
@@ -105,7 +105,7 @@ describe("validateCsrfOrigin", () => {
   });
 
   it("blocks missing Origin and Referer in production", () => {
-    process.env.NODE_ENV = "production";
+    (process.env as any).NODE_ENV = "production";
     process.env.NEXTAUTH_URL = "https://gitverse.com";
 
     const req = mockRequest("POST", {});
@@ -113,7 +113,7 @@ describe("validateCsrfOrigin", () => {
   });
 
   it("allows missing Origin and Referer in development", () => {
-    process.env.NODE_ENV = "development";
+    (process.env as any).NODE_ENV = "development";
     process.env.NEXTAUTH_URL = "http://localhost:3000";
 
     const req = mockRequest("POST", {});
@@ -121,7 +121,7 @@ describe("validateCsrfOrigin", () => {
   });
 
   it("blocks missing NEXTAUTH_URL and NEXT_PUBLIC_APP_URL in production", () => {
-    process.env.NODE_ENV = "production";
+    (process.env as any).NODE_ENV = "production";
     delete process.env.NEXTAUTH_URL;
     delete process.env.NEXT_PUBLIC_APP_URL;
 
@@ -132,7 +132,7 @@ describe("validateCsrfOrigin", () => {
   });
 
   it("allows missing NEXTAUTH_URL and NEXT_PUBLIC_APP_URL in development", () => {
-    process.env.NODE_ENV = "development";
+    (process.env as any).NODE_ENV = "development";
     delete process.env.NEXTAUTH_URL;
     delete process.env.NEXT_PUBLIC_APP_URL;
 

@@ -146,7 +146,7 @@ export function ModuleComparisonTool() {
           </div>
         ) : (
           <EmptyState
-            icon={GitCompare}
+            icon={<GitCompare className="h-8 w-8" />}
             title="Select two modules to compare"
             description="Choose two different modules to see their purpose, complexity, and how they differ in your repository architecture."
           />

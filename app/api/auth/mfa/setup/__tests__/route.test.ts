@@ -15,6 +15,7 @@ const mockRateLimitResponse = jest.fn();
 const mockGetClientIp = jest.fn();
 
 const mockUserFindUnique = jest.fn();
+const mockMfaConfigFindUnique = jest.fn();
 
 jest.mock("@/lib/middleware", () => ({
   requireAuth: (...args: any[]) => mockRequireAuth(...args),

@@ -276,7 +276,7 @@ finally {
           searchQuery ? (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <EmptyState
-                icon={Search}
+                icon={<Search className="h-8 w-8" />}
                 title="No repositories found"
                 description={`We couldn't find any repositories matching "${searchQuery}". Try adjusting your search term.`}
                 suggestions={[
@@ -362,7 +362,7 @@ finally {
             </div>
           ) : (
             <EmptyState
-              icon={GitBranch}
+              icon={<GitBranch className="h-8 w-8" />}
               title="No Repositories Yet"
               description="You haven't analyzed any repositories. Head to the dashboard to get started!"
               actionLabel="Go to Dashboard"

@@ -1,3 +1,4 @@
+import { AnalysisJobService } from "../services/analysisJobService";
 var mockPrisma: any;
 jest.mock("../prisma", () => ({
   __esModule: true,
@@ -35,8 +36,6 @@ jest.mock("ioredis", () => {
 function asMock<T>(fn: T): jest.Mock {
   return fn as any;
 }
-
-const { AnalysisJobService } = require("../services/analysisJobService");
 
 beforeEach(() => {
   jest.clearAllMocks();

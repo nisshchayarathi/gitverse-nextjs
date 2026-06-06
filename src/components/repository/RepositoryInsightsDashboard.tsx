@@ -36,7 +36,7 @@ export function RepositoryInsightsDashboard({
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={BarChart3}
+            icon={<BarChart3 className="h-8 w-8" />}
             title="No insights available"
             description="Repository data is still being analyzed. Check back soon."
           />

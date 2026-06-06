@@ -20,7 +20,7 @@ import {
   EmptyState,
   Modal,
 } from "@/components/ui";
-import { Label } from "@/components/ui/label";
+
 import { useAuth } from "@/contexts/AuthContext";
 import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
 import { buildApiUrl } from "@/services/apiConfig";
@@ -398,7 +398,7 @@ export default function Settings() {
           </div>
 
           <EmptyState
-            icon={AlertCircle}
+            icon={<AlertCircle className="h-8 w-8" />}
             title="Unable to load account"
             description="There was an error loading your account information. Check your connection and try again."
             actionLabel="Retry"
@@ -421,7 +421,7 @@ export default function Settings() {
           </div>
 
           <EmptyState
-            icon={User}
+            icon={<User className="h-8 w-8" />}
             title="No account found"
             description="We couldn't find user data for this account. Try signing in again or contact support."
             actionLabel="Reload"

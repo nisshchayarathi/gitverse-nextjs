@@ -105,7 +105,7 @@ export function DeadCodePanel({ files, findings, className = "" }: DeadCodePanel
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={FileX2}
+            icon={<FileX2 className="h-8 w-8" />}
             title="No dead code found"
             description="All exported symbols in this repository appear to be in use. Great job keeping things clean!"
           />

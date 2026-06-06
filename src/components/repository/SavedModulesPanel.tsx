@@ -62,7 +62,7 @@ export function SavedModulesPanel({
           </div>
         ) : (
           <EmptyState
-            icon={Star}
+            icon={<Star className="h-8 w-8" />}
             title="No bookmarked modules"
             description="Bookmark important repository areas to revisit them later."
           />

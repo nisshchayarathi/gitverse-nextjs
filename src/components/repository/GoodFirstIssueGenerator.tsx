@@ -253,7 +253,7 @@ export function GoodFirstIssueGenerator({
   repository,
   loading = false,
 }: GoodFirstIssueGeneratorProps) {
-  const files = (repository?.files || []) as RepositoryFile[];
+  const files = useMemo(() => (repository?.files || []) as RepositoryFile[], [repository?.files]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyCategory | "all">("all");
   const [showTips, setShowTips] = useState(true);
 
@@ -317,7 +317,7 @@ export function GoodFirstIssueGenerator({
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={Lightbulb}
+            icon={<Lightbulb className="h-8 w-8" />}
             title="No Repository Data"
             description="Complete a repository analysis to generate good first issues"
           />
@@ -340,7 +340,7 @@ export function GoodFirstIssueGenerator({
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={Sparkles}
+            icon={<Sparkles className="h-8 w-8" />}
             title="No Issues Found"
             description="Repository appears to be in good shape! No immediate opportunities detected."
           />
@@ -427,7 +427,7 @@ export function GoodFirstIssueGenerator({
 
       {issues.length === 0 ? (
         <EmptyState
-          icon={Filter}
+          icon={<Filter className="h-8 w-8" />}
           title="No Issues in This Category"
           description={`No ${selectedDifficulty.toLowerCase()} level issues found. Try selecting a different difficulty level.`}
         />
