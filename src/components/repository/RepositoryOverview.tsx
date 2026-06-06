@@ -56,6 +56,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/hooks/use-toast";
 import { buildApiUrl } from "@/services/apiConfig";
@@ -940,7 +942,11 @@ export const RepositoryOverview = ({
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-3">
             {isAnalyzing && !hasUsableReadme ? (
-              <div className="bg-background/50 border border-border/50 rounded-lg p-4 space-y-4" aria-busy="true" aria-label="Loading README">
+              <div
+                className="bg-background/50 border border-border/50 rounded-lg p-4 space-y-4"
+                aria-busy="true"
+                aria-label="Loading README"
+              >
                 <Skeleton className="h-8 w-1/3 sm:w-1/4" />
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-full" />
@@ -1029,7 +1035,9 @@ export const RepositoryOverview = ({
                       );
                     },
                     code: ({ className, children, ...props }) => {
-                      const isBlock = Boolean(className);
+                      const match = /language-(\w+)/.exec(className || "");
+                      const isBlock = Boolean(match);
+
                       if (!isBlock) {
                         return (
                           <code
@@ -1042,12 +1050,14 @@ export const RepositoryOverview = ({
                       }
 
                       return (
-                        <code
-                          className={`block whitespace-pre-wrap text-xs leading-relaxed ${className || ""}`}
-                          {...props}
+                        <SyntaxHighlighter
+                          style={oneDark}
+                          language={match?.[1]}
+                          PreTag="div"
+                          className="rounded-lg text-xs leading-relaxed"
                         >
-                          {children}
-                        </code>
+                          {String(children).replace(/\n$/, "")}
+                        </SyntaxHighlighter>
                       );
                     },
                     pre: ({ children, ...props }) => {
