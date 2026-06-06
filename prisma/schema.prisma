@@ -225,7 +225,7 @@ model Repository {
   forks                        Int                           @default(0)
   size                         Int                           @default(0) // Size in bytes
   lastAnalyzedAt               DateTime?                     @map("last_analyzed_at")
-  status              String                      @default("pending") // pending, analyzing, completed, failed
+  status                       String                        @default("pending") // pending, analyzing, completed, failed
   userId                       Int                           @map("user_id")
   user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
   parentId                     Int?                          @map("parent_id")
@@ -333,13 +333,13 @@ model AnalysisJob {
   @@index([status, lockExpiresAt, nextRunAt])
   // GET /api/repositories/[id]: WHERE repositoryId + userId ORDER BY createdAt DESC
   @@index([repositoryId, userId, createdAt(sort: Desc)])
-  @@map("analysis_jobs")
   // List all jobs for a repository sorted by newest first
   @@index([repositoryId, createdAt(sort: Desc)])
   // List all jobs for a user sorted by newest first
   @@index([userId, createdAt(sort: Desc)])
   // Filter active jobs per repository
   @@index([repositoryId, status])
+  @@map("analysis_jobs")
 }
 
 model Branch {
@@ -699,7 +699,7 @@ model AuditLog {
   details        Json
   createdAt      DateTime @default(now()) @map("created_at")
 
-  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([organizationId, createdAt(sort: Desc)])
@@ -761,20 +761,20 @@ model RepositoryKnowledge {
 /// MFA configuration for TOTP-based Multi-Factor Authentication.
 /// Stores the encrypted TOTP secret and hashed backup codes per user.
 model MfaConfig {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @unique @map("user_id")
+  id             Int       @id @default(autoincrement())
+  userId         Int       @unique @map("user_id")
   /// Base32-encoded TOTP secret (should be encrypted at rest via application-layer encryption)
-  totpSecret    String   @map("totp_secret") @db.Text
+  totpSecret     String    @map("totp_secret") @db.Text
   /// Whether TOTP MFA is active for this user
-  isEnabled     Boolean  @default(false) @map("is_enabled")
+  isEnabled      Boolean   @default(false) @map("is_enabled")
   /// One-time backup codes (stored as bcrypt hashes, comma-separated)
-  backupCodes   String?  @map("backup_codes") @db.Text
+  backupCodes    String?   @map("backup_codes") @db.Text
   /// Timestamp of the last successful MFA verification
   lastVerifiedAt DateTime? @map("last_verified_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("mfa_configs")

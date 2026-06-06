@@ -35,17 +35,19 @@ DROP INDEX "repositories_parent_id_idx";
 DROP INDEX "verification_tokens_expires_idx";
 
 -- AlterTable
-ALTER TABLE "accounts" ADD COLUMN     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN     "updated_at" TIMESTAMP(3) NOT NULL;
+ALTER TABLE "accounts" ADD COLUMN "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 -- AlterTable
-ALTER TABLE "file_changes" DROP COLUMN "change_type",
-ADD COLUMN     "change_type" "FileChangeType" NOT NULL;
+ALTER TABLE "file_changes" ALTER COLUMN "change_type" TYPE "FileChangeType" USING "change_type"::text::"FileChangeType";
+
+-- Clear cache to prevent unique constraint collisions
+DELETE FROM "gemini_analysis_cache";
 
 -- AlterTable
 ALTER TABLE "gemini_analysis_cache" DROP COLUMN "model",
-ADD COLUMN     "analysis_scope" TEXT NOT NULL DEFAULT 'full',
-ADD COLUMN     "model_version" TEXT NOT NULL DEFAULT 'unknown';
+ADD COLUMN "analysis_scope" TEXT NOT NULL DEFAULT 'full',
+ADD COLUMN "model_version" TEXT NOT NULL DEFAULT 'unknown';
 
 -- AlterTable
 ALTER TABLE "repositories" ADD COLUMN     "inherited_region" "DataResidencyRegion",
@@ -492,3 +494,6 @@ ALTER TABLE "mfa_configs" ADD CONSTRAINT "mfa_configs_user_id_fkey" FOREIGN KEY 
 
 -- RenameIndex
 ALTER INDEX "repositories_user_url_target_directory_idx" RENAME TO "repositories_user_id_url_target_directory_idx";
+
+-- CreateIndex for unique provider + providerAccountId
+CREATE UNIQUE INDEX "accounts_provider_provider_account_id_key" ON "accounts"("provider", "provider_account_id");

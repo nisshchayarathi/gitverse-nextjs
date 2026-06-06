@@ -109,7 +109,7 @@ function prismaIntIdAdapter(): Adapter {
             `[auth] Account linking prevented: The ${account.provider} account is already linked elsewhere.`,
           );
           // Throwing a specific error string NextAuth understands
-          throw new Error("OAuthAccountAlreadyLinked");
+          throw new Error("OAuthAccountNotLinked");
         }
 
         // If it's a different random database error, let it throw normally
