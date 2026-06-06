@@ -3,7 +3,7 @@ import connection from "../redis";
 
 export const WEBHOOK_QUEUE_NAME = "webhook-events";
 
-export const webhookQueueInstance = new Queue(WEBHOOK_QUEUE_NAME, {
+export const webhookQueue = new Queue(WEBHOOK_QUEUE_NAME, {
   connection: connection as any,
   defaultJobOptions: {
     attempts: 5,
@@ -12,6 +12,9 @@ export const webhookQueueInstance = new Queue(WEBHOOK_QUEUE_NAME, {
       delay: 5000,
     },
     removeOnComplete: true,
-    removeOnFail: false, // Acts as a DLQ by keeping failed jobs
+    removeOnFail: false,
   },
 });
+
+// Alias for backwards compatibility with webhook-queue service
+export const webhookQueueInstance = webhookQueue;

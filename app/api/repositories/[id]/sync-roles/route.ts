@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { GitHubService } from "@/lib/services/githubService";
 import { requireAuth, isHttpError } from "@/lib/middleware";
+import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
 
 export async function POST(
   request: NextRequest,
@@ -30,9 +31,11 @@ export async function POST(
       );
     }
 
-    const githubService = new GitHubService(
-      repo.user.githubAccount.accessToken,
-    );
+    const token = await getDecryptedGitHubToken(repo.user.id);
+    if (!token) {
+      return NextResponse.json({ error: "Failed to get GitHub token" }, { status: 500 });
+    }
+    const githubService = new GitHubService(token);
     const parts = repo.url.split("/");
     const owner = parts[parts.length - 2];
     const name = parts[parts.length - 1];

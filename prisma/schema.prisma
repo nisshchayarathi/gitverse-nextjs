@@ -167,6 +167,7 @@ model Account {
   providerAccountId String   @map("provider_account_id")
   refresh_token     String?  @db.Text
   access_token      String?  @db.Text
+  tokenEncrypted    Boolean  @default(false) @map("token_encrypted")
   expires_at        Int?
   token_type        String?
   scope             String?
@@ -543,12 +544,14 @@ model WebhookEvent {
   payload     Json
   status      String    @default("pending") // pending, processing, completed, failed, rate_limited
   error       String?   @db.Text
+  deliveryId  String?   @map("delivery_id") // X-GitHub-Delivery header for idempotency
   retryCount  Int       @default(0) @map("retry_count")
   maxRetries  Int       @default(3) @map("max_retries")
   nextRetryAt DateTime? @map("next_retry_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
+  @@index([deliveryId])
   @@index([status, createdAt])
   @@index([status, nextRetryAt])
   @@map("webhook_events")
@@ -617,7 +620,7 @@ model RateLimit {
   expiresAt DateTime @map("expires_at")
 
   @@index([key])
-  @@index([key, expiresAt])
+  @@unique([key, expiresAt])
   @@index([expiresAt], name: "rate_limits_expires_at_idx")
   @@map("rate_limits")
 }
@@ -761,10 +764,11 @@ model RepositoryKnowledge {
 /// MFA configuration for TOTP-based Multi-Factor Authentication.
 /// Stores the encrypted TOTP secret and hashed backup codes per user.
 model MfaConfig {
-  id             Int       @id @default(autoincrement())
-  userId         Int       @unique @map("user_id")
-  /// Base32-encoded TOTP secret (should be encrypted at rest via application-layer encryption)
-  totpSecret     String    @map("totp_secret") @db.Text
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique @map("user_id")
+  /// Base32-encoded TOTP secret (encrypted at rest via application-layer encryption)
+  totpSecret    String   @map("totp_secret") @db.Text
+  tokenEncrypted Boolean @default(false) @map("token_encrypted")
   /// Whether TOTP MFA is active for this user
   isEnabled      Boolean   @default(false) @map("is_enabled")
   /// One-time backup codes (stored as bcrypt hashes, comma-separated)

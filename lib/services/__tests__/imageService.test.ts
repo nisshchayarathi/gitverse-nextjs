@@ -5,6 +5,11 @@ import {
   generateAvatarFilename,
   fileToBuffer,
 } from "../imageService";
+import { validateSafeUrl } from "@/lib/utils/ssrfValidator";
+
+jest.mock("@/lib/utils/ssrfValidator", () => ({
+  validateSafeUrl: jest.fn(),
+}));
 
 describe("imageService", () => {
   describe("validateImageFile", () => {
@@ -110,36 +115,144 @@ describe("imageService", () => {
   });
 
   describe("validateHttpAvatarUrl", () => {
-    it("accepts valid HTTPS URLs", () => {
-      const result = validateHttpAvatarUrl(
+    beforeEach(() => {
+      (validateSafeUrl as jest.Mock).mockReset();
+      (validateSafeUrl as jest.Mock).mockResolvedValue(true);
+    });
+
+    it("accepts valid HTTPS URLs", async () => {
+      const result = await validateHttpAvatarUrl(
         "https://example.com/avatars/user123.jpg"
       );
       expect(result.valid).toBe(true);
     });
 
-    it("accepts valid HTTP URLs", () => {
-      const result = validateHttpAvatarUrl(
+    it("accepts valid HTTP URLs", async () => {
+      const result = await validateHttpAvatarUrl(
         "http://example.com/avatars/user123.jpg"
       );
       expect(result.valid).toBe(true);
     });
 
-    it("rejects non-HTTP protocols", () => {
-      const result = validateHttpAvatarUrl("ftp://example.com/image.jpg");
+    it("accepts URLs with ports", async () => {
+      const result = await validateHttpAvatarUrl(
+        "https://example.com:8080/avatars/user.jpg"
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it("accepts URLs with query parameters", async () => {
+      const result = await validateHttpAvatarUrl(
+        "https://example.com/avatar.jpg?w=200&h=200&fit=crop"
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it("rejects non-HTTP protocols", async () => {
+      const result = await validateHttpAvatarUrl("ftp://example.com/image.jpg");
       expect(result.valid).toBe(false);
       expect(result.error).toContain("HTTP or HTTPS");
     });
 
-    it("rejects invalid URLs", () => {
-      const result = validateHttpAvatarUrl("not-a-url");
+    it("rejects file protocol", async () => {
+      const result = await validateHttpAvatarUrl("file:///etc/passwd");
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("HTTP or HTTPS");
+    });
+
+    it("rejects javascript protocol", async () => {
+      const result = await validateHttpAvatarUrl("javascript:alert(1)");
+      expect(result.valid).toBe(false);
+    });
+
+    it("rejects invalid URLs", async () => {
+      const result = await validateHttpAvatarUrl("not-a-url");
       expect(result.valid).toBe(false);
       expect(result.error).toContain("Invalid URL");
     });
 
-    it("rejects URLs without valid hostname", () => {
-      const result = validateHttpAvatarUrl("http://localhost/image.jpg");
+    it("rejects empty strings", async () => {
+      const result = await validateHttpAvatarUrl("");
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("Invalid URL");
+    });
+
+    it("rejects URLs without valid hostname", async () => {
+      const result = await validateHttpAvatarUrl("http://localhost/image.jpg");
       expect(result.valid).toBe(false);
       expect(result.error).toContain("Invalid URL hostname");
+    });
+
+    it("rejects URLs without hostname", async () => {
+      const result = await validateHttpAvatarUrl("http:///path");
+      expect(result.valid).toBe(false);
+    });
+
+    it("rejects URLs that fail SSRF validation", async () => {
+      (validateSafeUrl as jest.Mock).mockResolvedValue(false);
+
+      const result = await validateHttpAvatarUrl(
+        "http://169.254.169.254/latest/meta-data/"
+      );
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("restricted address");
+    });
+
+    it("rejects IPv6 literal URLs (no dot in hostname)", async () => {
+      const result = await validateHttpAvatarUrl("http://[::1]/config");
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("Invalid URL hostname");
+    });
+
+    it("rejects URLs when validateSafeUrl throws", async () => {
+      (validateSafeUrl as jest.Mock).mockRejectedValue(new Error("DNS error"));
+
+      const result = await validateHttpAvatarUrl(
+        "https://example.com/avatar.jpg"
+      );
+      expect(result.valid).toBe(false);
+    });
+
+    it("calls validateSafeUrl with the avatar URL", async () => {
+      const url = "https://avatars.example.com/user.jpg";
+      await validateHttpAvatarUrl(url);
+      expect(validateSafeUrl).toHaveBeenCalledWith(url);
+    });
+
+    it("does not call validateSafeUrl for non-HTTP URLs", async () => {
+      await validateHttpAvatarUrl("ftp://example.com/file.jpg");
+      expect(validateSafeUrl).not.toHaveBeenCalled();
+    });
+
+    it("does not call validateSafeUrl for invalid URLs", async () => {
+      await validateHttpAvatarUrl("not-a-url");
+      expect(validateSafeUrl).not.toHaveBeenCalled();
+    });
+
+    it("does not call validateSafeUrl for URLs without valid hostname", async () => {
+      await validateHttpAvatarUrl("http://localhost/image.jpg");
+      expect(validateSafeUrl).not.toHaveBeenCalled();
+    });
+
+    it("handles HTTPS URLs with authentication credentials", async () => {
+      const result = await validateHttpAvatarUrl(
+        "https://user:pass@example.com/avatar.jpg"
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it("handles URLs with fragments", async () => {
+      const result = await validateHttpAvatarUrl(
+        "https://example.com/avatar.jpg#section"
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it("handles URL-encoded characters in path", async () => {
+      const result = await validateHttpAvatarUrl(
+        "https://example.com/avatars/user%20avatar.jpg"
+      );
+      expect(result.valid).toBe(true);
     });
   });
 

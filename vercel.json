@@ -9,6 +9,10 @@
     {
       "path": "/api/cron/analysis-job-cleanup",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/db-backup",
+      "schedule": "0 6 * * *"
     }
   ]
 }

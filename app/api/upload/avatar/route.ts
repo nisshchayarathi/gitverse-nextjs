@@ -86,7 +86,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
       logger.info({ userId: user.userId }, "Avatar uploaded via data URL");
     } else if (url) {
-      const validation = validateHttpAvatarUrl(url);
+      const validation = await validateHttpAvatarUrl(url);
       if (!validation.valid) {
         return NextResponse.json(
           { error: true, message: validation.error, code: 400 },

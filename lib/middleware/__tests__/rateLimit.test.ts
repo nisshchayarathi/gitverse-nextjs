@@ -1,18 +1,14 @@
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS, addRateLimitHeaders } from "../rateLimit";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS, addRateLimitHeaders, getWindowExpiry, _resetStateForTesting } from "../rateLimit";
 import { NextResponse } from "next/server";
 
-const mockCount = jest.fn();
-const mockCreate = jest.fn();
-const mockFindFirst = jest.fn();
-const mockDeleteMany = jest.fn();
+const mockUpsert = jest.fn();
+const mockDeleteMany = jest.fn().mockResolvedValue({ count: 0 });
 
 jest.mock("@/lib/prisma", () => ({
   __esModule: true,
   default: {
     rateLimit: {
-      count: (...args: any[]) => mockCount(...args),
-      create: (...args: any[]) => mockCreate(...args),
-      findFirst: (...args: any[]) => mockFindFirst(...args),
+      upsert: (...args: any[]) => mockUpsert(...args),
       deleteMany: (...args: any[]) => mockDeleteMany(...args),
     },
   },
@@ -22,49 +18,86 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers();
   jest.setSystemTime(new Date("2026-06-04T12:00:00Z"));
+  _resetStateForTesting();
 });
 
 afterEach(() => {
   jest.useRealTimers();
 });
 
+function windowExpiry(windowMs: number): Date {
+  return getWindowExpiry(Date.parse("2026-06-04T12:00:00Z"), windowMs);
+}
+
+describe("getWindowExpiry", () => {
+  it("rounds to the next window boundary for 60s windows", () => {
+    const result = getWindowExpiry(Date.parse("2026-06-04T12:00:03.500Z"), 60_000);
+    expect(result.toISOString()).toBe("2026-06-04T12:01:00.000Z");
+  });
+
+  it("rounds to the next window boundary for 120s windows", () => {
+    const result = getWindowExpiry(Date.parse("2026-06-04T12:01:45.000Z"), 120_000);
+    expect(result.toISOString()).toBe("2026-06-04T12:02:00.000Z");
+  });
+
+  it("handles exact window boundary", () => {
+    const result = getWindowExpiry(Date.parse("2026-06-04T12:00:00.000Z"), 60_000);
+    expect(result.toISOString()).toBe("2026-06-04T12:01:00.000Z");
+  });
+
+  it("handles 1-hour windows", () => {
+    const result = getWindowExpiry(Date.parse("2026-06-04T12:30:00.000Z"), 3_600_000);
+    expect(result.toISOString()).toBe("2026-06-04T13:00:00.000Z");
+  });
+
+  it("handles 5-minute windows", () => {
+    const result = getWindowExpiry(Date.parse("2026-06-04T12:07:23.000Z"), 300_000);
+    expect(result.toISOString()).toBe("2026-06-04T12:10:00.000Z");
+  });
+
+  it("produces consistent expiry for requests in the same clock window", () => {
+    const t1 = Date.parse("2026-06-04T12:00:03.000Z");
+    const t2 = Date.parse("2026-06-04T12:00:45.000Z");
+    expect(getWindowExpiry(t1, 60_000).toISOString()).toBe(
+      getWindowExpiry(t2, 60_000).toISOString()
+    );
+  });
+});
+
 describe("checkRateLimit", () => {
   it("allows request when under limit", async () => {
-    mockCount.mockResolvedValue(0);
-    mockCreate.mockResolvedValue({ id: "1", key: "test:user1", points: 1 });
+    mockUpsert.mockResolvedValue({ points: 1, key: "repo:analyze:user1" });
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(4);
     expect(result.limit).toBe(5);
-    expect(result.resetAt).toBeGreaterThan(Date.now());
+    expect(result.resetAt).toBe(windowExpiry(60_000).getTime());
   });
 
   it("allows request at boundary of limit", async () => {
-    mockCount.mockResolvedValue(4);
-    mockCreate.mockResolvedValue({ id: "2", key: "test:user1", points: 1 });
+    mockUpsert.mockResolvedValue({ points: 5, key: "repo:analyze:user1" });
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(0);
+    expect(result.limit).toBe(5);
   });
 
-  it("rejects request when at limit", async () => {
-    mockCount.mockResolvedValue(5);
-    mockFindFirst.mockResolvedValue({ expiresAt: new Date(Date.now() + 30000) });
+  it("rejects request when points exceed limit", async () => {
+    mockUpsert.mockResolvedValue({ points: 6, key: "repo:analyze:user1" });
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
     expect(result.allowed).toBe(false);
     expect(result.remaining).toBe(0);
-    expect(mockCreate).not.toHaveBeenCalled();
+    expect(result.limit).toBe(5);
   });
 
-  it("rejects request when over limit", async () => {
-    mockCount.mockResolvedValue(10);
-    mockFindFirst.mockResolvedValue({ expiresAt: new Date(Date.now() + 60000) });
+  it("rejects request when points far exceed limit", async () => {
+    mockUpsert.mockResolvedValue({ points: 20, key: "repo:analyze:user1" });
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
@@ -72,148 +105,141 @@ describe("checkRateLimit", () => {
     expect(result.remaining).toBe(0);
   });
 
-  it("handles P2002 unique constraint error as rate limited", async () => {
-    mockCount.mockResolvedValue(4);
+  it("handles P2002 unique constraint violation as rate limited", async () => {
     const p2002Error = new Error("Unique constraint");
     (p2002Error as any).code = "P2002";
-    mockCreate.mockRejectedValue(p2002Error);
+    mockUpsert.mockRejectedValue(p2002Error);
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
     expect(result.allowed).toBe(false);
     expect(result.remaining).toBe(0);
+    expect(result.resetAt).toBe(windowExpiry(60_000).getTime());
   });
 
-  it("handles database errors gracefully (fail-open)", async () => {
-    mockCount.mockRejectedValue(new Error("DB connection failed"));
+  it("falls back to LRU on database errors", async () => {
+    mockUpsert.mockRejectedValue(new Error("DB connection failed"));
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
     expect(result.allowed).toBe(true);
+    expect(result.remaining).toBe(4);
+    expect(result.limit).toBe(5);
   });
 
-  it("tracks different users independently", async () => {
-    mockCount.mockImplementation(({ where: { key } }: any) => {
-      if (key === "file:content:user-a") return Promise.resolve(0);
-      if (key === "file:content:user-b") return Promise.resolve(100);
-      return Promise.resolve(0);
+  it("LRU tracks count across successive fallback requests", async () => {
+    mockUpsert.mockRejectedValue(new Error("DB timeout"));
+
+    const r1 = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    expect(r1.allowed).toBe(true);
+    expect(r1.remaining).toBe(4);
+
+    const r2 = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    expect(r2.allowed).toBe(true);
+    expect(r2.remaining).toBe(3);
+
+    const r3 = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    expect(r3.allowed).toBe(true);
+    expect(r3.remaining).toBe(2);
+  });
+
+  it("LRU enforces limit during prolonged DB failure", async () => {
+    mockUpsert.mockRejectedValue(new Error("DB timeout"));
+
+    for (let i = 0; i < 5; i++) {
+      const r = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+      expect(r.allowed).toBe(true);
+    }
+
+    const r6 = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    expect(r6.allowed).toBe(false);
+    expect(r6.remaining).toBe(0);
+  });
+
+  it("handles distinct users independently", async () => {
+    mockUpsert.mockImplementation(({ where: { key_expiresAt } }: any) => {
+      const k = key_expiresAt.key;
+      if (k === "file:content:user-a") return Promise.resolve({ points: 1, key: k });
+      if (k === "file:content:user-b") return Promise.resolve({ points: 101, key: k });
+      return Promise.resolve({ points: 0, key: k });
     });
-    mockCreate.mockResolvedValue({ id: "x", key: "file:content:user-a", points: 1 });
 
     const resultA = await checkRateLimit("user-a", RATE_LIMITS.FILE_CONTENT);
     expect(resultA.allowed).toBe(true);
     expect(resultA.remaining).toBe(99);
 
-    mockFindFirst.mockResolvedValue({ expiresAt: new Date(Date.now() + 30000) });
     const resultB = await checkRateLimit("user-b", RATE_LIMITS.FILE_CONTENT);
     expect(resultB.allowed).toBe(false);
     expect(resultB.remaining).toBe(0);
   });
 
-  it("does not create duplicate records for same user in same window", async () => {
-    mockCount.mockResolvedValue(1);
-    mockCreate.mockResolvedValue({ id: "2", key: "test:user1", points: 1 });
+  it("calls upsert with the correct composite key", async () => {
+    mockUpsert.mockResolvedValue({ points: 1 });
 
-    const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
-
-    expect(result.allowed).toBe(true);
-    expect(result.remaining).toBe(3);
-  });
-
-  it("queries with correct key format", async () => {
-    mockCount.mockResolvedValue(0);
-    mockCreate.mockResolvedValue({ id: "1", key: "repo:analyze:alice", points: 1 });
-
+    const expiry = windowExpiry(60_000);
     await checkRateLimit("alice", { namespace: "repo:analyze", maxRequests: 5, windowMs: 60_000 });
 
-    expect(mockCount).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          key: "repo:analyze:alice",
-        }),
-      })
-    );
+    expect(mockUpsert).toHaveBeenCalledWith({
+      where: { key_expiresAt: { key: "repo:analyze:alice", expiresAt: expiry } },
+      update: { points: { increment: 1 } },
+      create: { key: "repo:analyze:alice", points: 1, expiresAt: expiry },
+    });
   });
 
-  it("creates record with correct expiry", async () => {
-    mockCount.mockResolvedValue(0);
-    mockCreate.mockResolvedValue({ id: "1", key: "test:user1", points: 1 });
+  it("uses fixed-window expiry rather than per-request expiry", async () => {
+    mockUpsert.mockResolvedValue({ points: 1 });
 
     const windowMs = 120_000;
     await checkRateLimit("user1", { namespace: "test", maxRequests: 3, windowMs });
 
-    expect(mockCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        key: "test:user1",
-        points: 1,
-        expiresAt: new Date(Date.now() + windowMs),
-      }),
-    });
+    const expectedExpiry = windowExpiry(windowMs);
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { key_expiresAt: { key: "test:user1", expiresAt: expectedExpiry } },
+        update: { points: { increment: 1 } },
+        create: expect.objectContaining({ expiresAt: expectedExpiry }),
+      })
+    );
   });
 
-  it("sanitizes special characters in identifier", async () => {
-    mockCount.mockResolvedValue(0);
-    mockCreate.mockResolvedValue({ id: "1", key: "test:user_x_y", points: 1 });
+  it("sanitizes special characters in the identifier", async () => {
+    mockUpsert.mockResolvedValue({ points: 1 });
 
     await checkRateLimit("user@x.y", { namespace: "test", maxRequests: 3, windowMs: 60_000 });
 
-    expect(mockCount).toHaveBeenCalledWith(
+    expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
-          key: "test:user@x.y",
-        }),
+        where: { key_expiresAt: { key: "test:user@x.y", expiresAt: expect.any(Date) } },
       })
     );
   });
 
-  it("sanitizes SQL-like characters in identifier", async () => {
-    mockCount.mockResolvedValue(0);
-    mockCreate.mockResolvedValue({ id: "1", key: "test:a_b", points: 1 });
+  it("sanitizes SQL metacharacters in the identifier", async () => {
+    mockUpsert.mockResolvedValue({ points: 1 });
 
     await checkRateLimit("a;b", { namespace: "test", maxRequests: 3, windowMs: 60_000 });
 
-    expect(mockCount).toHaveBeenCalledWith(
+    expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
-          key: "test:a_b",
-        }),
+        where: { key_expiresAt: { key: "test:a_b", expiresAt: expect.any(Date) } },
       })
     );
   });
 
-  it("handles very long identifier", async () => {
-    mockCount.mockResolvedValue(0);
-    mockCreate.mockResolvedValue({ id: "1", key: expect.stringContaining("test:"), points: 1 });
+  it("truncates excessively long identifiers", async () => {
+    mockUpsert.mockResolvedValue({ points: 1 });
 
     const longId = "a".repeat(1000);
     await checkRateLimit(longId, { namespace: "test", maxRequests: 3, windowMs: 60_000 });
 
-    expect(mockCount).toHaveBeenCalled();
-    expect(mockCreate).toHaveBeenCalledWith(
+    expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          key: expect.stringContaining("test:"),
-        }),
+        where: { key_expiresAt: { key: expect.stringContaining("test:"), expiresAt: expect.any(Date) } },
       })
     );
   });
 
-  it("uses expiresAt in where clause for count", async () => {
-    mockCount.mockResolvedValue(1);
-    mockCreate.mockResolvedValue({ id: "1", key: "test:user", points: 1 });
-
-    await checkRateLimit("user", { namespace: "test", maxRequests: 3, windowMs: 60_000 });
-
-    expect(mockCount).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          expiresAt: expect.objectContaining({ gte: expect.any(Date) }),
-        }),
-      })
-    );
-  });
-
-  it("enforces all RATE_LIMITS configs have valid values", () => {
+  it("validates all RATE_LIMITS configs have sensible values", () => {
     for (const [name, config] of Object.entries(RATE_LIMITS)) {
       expect(config.namespace).toBeDefined();
       expect(config.maxRequests).toBeGreaterThan(0);
@@ -226,7 +252,7 @@ describe("checkRateLimit", () => {
 });
 
 describe("rateLimitResponse", () => {
-  it("returns 429 with correct headers", () => {
+  it("returns 429 with correct headers and body", () => {
     const result = {
       allowed: false,
       remaining: 0,
@@ -244,7 +270,7 @@ describe("rateLimitResponse", () => {
     );
   });
 
-  it("includes custom message when provided", () => {
+  it("includes a custom message when one is provided", () => {
     const result = {
       allowed: false,
       remaining: 0,
@@ -255,11 +281,9 @@ describe("rateLimitResponse", () => {
     const response = rateLimitResponse(result, "Custom rate limit message");
 
     expect(response.status).toBe(429);
-    expect(response.headers.get("X-RateLimit-Limit")).toBe("5");
-    expect(response.headers.get("X-RateLimit-Remaining")).toBe("0");
   });
 
-  it("sets default error message when not provided", () => {
+  it("uses the default message when none is given", () => {
     const result = {
       allowed: false,
       remaining: 0,
@@ -270,13 +294,11 @@ describe("rateLimitResponse", () => {
     const response = rateLimitResponse(result);
 
     expect(response.status).toBe(429);
-    expect(response.headers.get("X-RateLimit-Limit")).toBe("5");
-    expect(response.headers.get("X-RateLimit-Remaining")).toBe("0");
   });
 });
 
 describe("addRateLimitHeaders", () => {
-  it("adds rate limit headers to existing response", () => {
+  it("adds rate limit headers to an existing response", () => {
     const response = NextResponse.json({ data: "test" });
     const result = {
       allowed: true,
@@ -295,8 +317,8 @@ describe("addRateLimitHeaders", () => {
   });
 });
 
-describe("rate limit headers", () => {
-  it("rateLimitResponse includes all standard headers", () => {
+describe("rate limit headers edge cases", () => {
+  it("rateLimitResponse includes all three standard headers", () => {
     const result = {
       allowed: false,
       remaining: 0,
@@ -309,7 +331,7 @@ describe("rate limit headers", () => {
     expect(response.headers.get("X-RateLimit-Reset")).toBe("1000000000");
   });
 
-  it("addRateLimitHeaders preserves existing body", () => {
+  it("addRateLimitHeaders preserves the original response body", () => {
     const response = NextResponse.json({ hello: "world" });
     const result = {
       allowed: true,
@@ -323,7 +345,7 @@ describe("rate limit headers", () => {
 });
 
 describe("RATE_LIMITS configuration", () => {
-  it("has REPOSITORY_ANALYZE with correct values", () => {
+  it("defines REPOSITORY_ANALYZE correctly", () => {
     expect(RATE_LIMITS.REPOSITORY_ANALYZE).toEqual({
       namespace: "repo:analyze",
       maxRequests: 5,
@@ -331,7 +353,7 @@ describe("RATE_LIMITS configuration", () => {
     });
   });
 
-  it("has AI_GLOBAL with 50 req/min cap", () => {
+  it("defines AI_GLOBAL with 50 req/min", () => {
     expect(RATE_LIMITS.AI_GLOBAL).toEqual({
       namespace: "ai:global",
       maxRequests: 50,
@@ -339,7 +361,7 @@ describe("RATE_LIMITS configuration", () => {
     });
   });
 
-  it("has GITHUB_IMPORT with 10 per hour", () => {
+  it("defines GITHUB_IMPORT with 10 per hour", () => {
     expect(RATE_LIMITS.GITHUB_IMPORT).toEqual({
       namespace: "github:import",
       maxRequests: 10,
@@ -347,7 +369,7 @@ describe("RATE_LIMITS configuration", () => {
     });
   });
 
-  it("has FILE_CONTENT with 100 per minute", () => {
+  it("defines FILE_CONTENT with 100 per minute", () => {
     expect(RATE_LIMITS.FILE_CONTENT).toEqual({
       namespace: "file:content",
       maxRequests: 100,
@@ -355,7 +377,7 @@ describe("RATE_LIMITS configuration", () => {
     });
   });
 
-  it("has ANNOTATION_SYNC with 10 req/min", () => {
+  it("defines ANNOTATION_SYNC with 10 req/min", () => {
     expect(RATE_LIMITS.ANNOTATION_SYNC).toEqual({
       namespace: "annotation:sync",
       maxRequests: 10,
@@ -363,7 +385,7 @@ describe("RATE_LIMITS configuration", () => {
     });
   });
 
-  it("has GITHUB_SELECT_REPOS with 10 req/min", () => {
+  it("defines GITHUB_SELECT_REPOS with 10 req/min", () => {
     expect(RATE_LIMITS.GITHUB_SELECT_REPOS).toEqual({
       namespace: "github:select-repos",
       maxRequests: 10,
@@ -371,7 +393,7 @@ describe("RATE_LIMITS configuration", () => {
     });
   });
 
-  it("has WORKER_HEALTHZ with 20 req/min", () => {
+  it("defines WORKER_HEALTHZ with 20 req/min", () => {
     expect(RATE_LIMITS.WORKER_HEALTHZ).toEqual({
       namespace: "worker:healthz",
       maxRequests: 20,
@@ -379,7 +401,7 @@ describe("RATE_LIMITS configuration", () => {
     });
   });
 
-  it("has ANALYZE_REPOSITORY with 5 req/min", () => {
+  it("defines ANALYZE_REPOSITORY with 5 req/min", () => {
     expect(RATE_LIMITS.ANALYZE_REPOSITORY).toEqual({
       namespace: "repo:submission",
       maxRequests: 5,
@@ -387,7 +409,7 @@ describe("RATE_LIMITS configuration", () => {
     });
   });
 
-  it("has GITHUB_CONNECTED_REPOS with 30 req/min", () => {
+  it("defines GITHUB_CONNECTED_REPOS with 30 req/min", () => {
     expect(RATE_LIMITS.GITHUB_CONNECTED_REPOS).toEqual({
       namespace: "github:connected-repos",
       maxRequests: 30,

@@ -7,12 +7,15 @@ node_modules/
 coverage/
 test-results/
 playwright-report/
+test-output.txt
 
 # next.js
 .next/
 out/
 
 # build artifacts
+build/
+dist/
 dist-worker/
 tsconfig.tsbuildinfo
 .swc/
@@ -30,6 +33,8 @@ tsconfig.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
 
 # typescript
 *.tsbuildinfo
@@ -44,3 +49,4 @@ next-env.d.ts
 *.swp
 *.swo
 *~
+

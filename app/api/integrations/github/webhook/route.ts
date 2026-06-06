@@ -9,6 +9,7 @@ import { webhookQueue } from "@/lib/services/webhook-queue";
 import { dbHealthService } from "@/lib/services/db-health";
 import { webhookRetryService } from "@/lib/services/webhook-retry";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import { generateWebhookKey, tryAcquireIdempotency, releaseIdempotency } from "@/lib/utils/idempotency";
 
 export const runtime = "nodejs";
 
@@ -88,6 +89,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
+  const deliveryId = request.headers.get("x-github-delivery") || "";
+
   if (event !== "pull_request" && event !== "issues" && event !== "push") {
     return NextResponse.json(
       { ok: true, ignored: true, event },
@@ -152,10 +155,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Idempotency check: claim the delivery ID atomically
+  let idempotencyKey: string | null = null;
+  if (deliveryId) {
+    idempotencyKey = generateWebhookKey(deliveryId, event || "unknown", action);
+    const acquired = await tryAcquireIdempotency(idempotencyKey);
+    if (!acquired) {
+      return NextResponse.json(
+        { ok: true, ignored: true, reason: "duplicate_delivery" },
+        { status: 200 },
+      );
+    }
+  }
+
   // Store webhook event for async processing in-memory to prevent pool exhaustion
   try {
     const baseUrl = process.env.NEXTAUTH_URL || `http://${request.headers.get("host") || "localhost:3000"}`;
-    webhookQueue.enqueueWebhook(payload, event || "unknown", action, baseUrl);
+    webhookQueue.enqueueWebhook(payload, event || "unknown", action, baseUrl, deliveryId);
 
     // Automatically retry any previously failed jobs occasionally
     webhookRetryService.requeueFailedJobs().catch(() => {});
@@ -166,6 +182,9 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error queueing webhook event:", error);
+    if (idempotencyKey) {
+      await releaseIdempotency(idempotencyKey);
+    }
     return NextResponse.json(
       { error: "Failed to queue webhook event" },
       { status: 500 }

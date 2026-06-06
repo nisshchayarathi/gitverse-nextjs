@@ -7,6 +7,7 @@ type QueuedWebhook = {
   action: string | undefined;
   payload: any;
   status: string;
+  deliveryId?: string;
 };
 
 const globalForQueue = globalThis as unknown as {
@@ -25,12 +26,13 @@ export class WebhookQueueService {
   /**
    * Enqueues a webhook event in memory and schedules a background flush.
    */
-  enqueueWebhook(payload: any, event: string, action: string | undefined, baseUrl: string) {
+  enqueueWebhook(payload: any, event: string, action: string | undefined, baseUrl: string, deliveryId?: string) {
     globalForQueue.webhookBuffer.push({
       event: event || "unknown",
       action: action,
       payload,
       status: "pending",
+      deliveryId,
     });
 
     if (!globalForQueue.webhookFlushTimeout) {

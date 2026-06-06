@@ -3,20 +3,38 @@ import prisma from "@/lib/prisma";
 import CircuitBreaker from "opossum";
 import { LRUCache } from "lru-cache";
 
+/**
+ * Configuration for a single rate limit definition.
+ * Each endpoint group uses one of these to define its limit window.
+ */
 export interface RateLimitConfig {
+  /** Namespace prefix for the rate limit key, e.g. "repo:analyze" */
   namespace: string;
+  /** Maximum number of requests allowed within the window */
   maxRequests: number;
+  /** Window duration in milliseconds */
   windowMs: number;
 }
 
+/**
+ * Returned by checkRateLimit.  Callers should check the `allowed` field
+ * before proceeding with the guarded operation and use the remaining/resetAt
+ * fields to set response headers.
+ */
 export interface RateLimitResult {
+  /** true if the request is within the configured limit */
   allowed: boolean;
+  /** How many requests the caller can still make in this window */
   remaining: number;
+  /** Unix timestamp (ms) when the current window resets */
   resetAt: number;
+  /** The configured maxRequests for this rate limit */
   limit: number;
+  /** Set to true when both the DB upsert and the LRU fallback have failed */
   fallbackFailed?: boolean;
 }
 
+/** Pre-defined rate limit configurations used across the API routes. */
 export const RATE_LIMITS = {
   REPOSITORY_ANALYZE: { namespace: "repo:analyze", maxRequests: 5, windowMs: 60_000 },
   REPOSITORY_ARCHITECTURE: { namespace: "repo:architecture", maxRequests: 3, windowMs: 60_000 },
@@ -52,7 +70,7 @@ async function maybeCleanupExpired(): Promise<void> {
       where: { expiresAt: { lt: new Date() } },
     });
   } catch {
-    // Best-effort cleanup
+    // Best-effort cleanup, never block a rate limit check for this
   }
 }
 
@@ -61,73 +79,70 @@ function buildRateLimitKey(namespace: string, identifier: string): string {
   return `${namespace}:${sanitized}`;
 }
 
-// 1. LRU Cache Fallback
+/**
+ * Compute the fixed-window expiry for a given timestamp.
+ * All requests within the same clock interval (floor(now / windowMs)) share
+ * the same expiry, which is what allows the upsert to work atomically.
+ */
+export function getWindowExpiry(now: number, windowMs: number): Date {
+  const windowStart = Math.floor(now / windowMs) * windowMs;
+  return new Date(windowStart + windowMs);
+}
+
 const fallbackCache = new LRUCache<string, { count: number; resetAt: number }>({
   max: 10000,
   ttl: 1000 * 60 * 60,
 });
 
-// 2. Circuit Breaker for DB operations
 const dbLimiterCircuit = new CircuitBreaker(
-  async ({ key, config, now, expiresAt }: { key: string, config: RateLimitConfig, now: Date, expiresAt: Date }) => {
+  async ({ key, config, expiresAt }: { key: string, config: RateLimitConfig, expiresAt: Date }) => {
     void maybeCleanupExpired();
-    const count = await prisma.rateLimit.count({
-      where: {
-        key,
-        expiresAt: { gte: now },
-      },
+
+    const result = await prisma.rateLimit.upsert({
+      where: { key_expiresAt: { key, expiresAt } },
+      update: { points: { increment: 1 } },
+      create: { key, points: 1, expiresAt },
     });
 
-    if (count >= config.maxRequests) {
-      const oldestEntry = await prisma.rateLimit.findFirst({
-        where: { key, expiresAt: { gte: now } },
-        orderBy: { expiresAt: "asc" },
-        select: { expiresAt: true },
-      });
-      return {
-        allowed: false,
-        remaining: 0,
-        resetAt: oldestEntry ? oldestEntry.expiresAt.getTime() : now.getTime() + config.windowMs,
-        limit: config.maxRequests,
-      };
-    }
-
-    await prisma.rateLimit.create({
-      data: { key, points: 1, expiresAt },
-    });
-
+    const allowed = result.points <= config.maxRequests;
     return {
-      allowed: true,
-      remaining: config.maxRequests - count - 1,
+      allowed,
+      remaining: Math.max(0, config.maxRequests - result.points),
       resetAt: expiresAt.getTime(),
       limit: config.maxRequests,
     };
   },
   {
-    timeout: 3000,       // 3s timeout
+    timeout: 3000,
     errorThresholdPercentage: 50,
-    resetTimeout: 10000, // 10s wait before retry
+    resetTimeout: 10000,
   }
 );
 
+/**
+ * Check whether `identifier` has exceeded the rate limit described by `config`.
+ *
+ * Uses a three-layer approach:
+ *   1. Atomic prisma.rateLimit.upsert (DB — relies on @@unique([key, expiresAt]))
+ *   2. opossum circuit breaker (fault isolation, 3 s timeout)
+ *   3. In-memory LRU cache fallback (10 k entries, fail-open)
+ */
 export async function checkRateLimit(
   identifier: string,
   config: RateLimitConfig,
 ): Promise<RateLimitResult> {
   const key = buildRateLimitKey(config.namespace, identifier);
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + config.windowMs);
+  const now = Date.now();
+  const expiresAt = getWindowExpiry(now, config.windowMs);
 
   try {
-    // 3. Fire circuit breaker
-    return await dbLimiterCircuit.fire({ key, config, now, expiresAt }) as RateLimitResult;
+    return await dbLimiterCircuit.fire({ key, config, expiresAt }) as RateLimitResult;
   } catch (error: any) {
     if (error?.code === "P2002") {
-      // Normal race condition handling, not a circuit failure
       return {
         allowed: false,
         remaining: 0,
-        resetAt: Date.now() + config.windowMs,
+        resetAt: expiresAt.getTime(),
         limit: config.maxRequests,
       };
     }
@@ -135,7 +150,6 @@ export async function checkRateLimit(
     console.error("[RateLimit DB] Circuit Breaker opened or DB failed, falling back to LRU:", error.message);
 
     try {
-      // 4. Fallback to LRU Cache
       const timeNow = Date.now();
       let record = fallbackCache.get(key);
 
@@ -158,16 +172,32 @@ export async function checkRateLimit(
     } catch (fallbackErr) {
       console.error("[RateLimit DB] LRU Fallback also failed:", fallbackErr);
       return {
-        allowed: false, // Default to fail closed
+        allowed: false,
         remaining: 0,
         resetAt: Date.now() + config.windowMs,
         limit: config.maxRequests,
-        fallbackFailed: true, // Signal to webhook to DLQ
+        fallbackFailed: true,
       };
     }
   }
 }
 
+/**
+ * Reset module-level state between tests.
+ * Clears the LRU cache, closes the circuit breaker, and resets the
+ * cleanup interval guard so that the next call to maybeCleanupExpired
+ * will run.
+ */
+export function _resetStateForTesting(): void {
+  lastCleanupAt = 0;
+  fallbackCache.clear();
+  dbLimiterCircuit.close();
+}
+
+/**
+ * Build a 429 JSON response with standard rate-limit headers and a human-
+ * readable message.
+ */
 export function rateLimitResponse(
   result: RateLimitResult,
   message?: string,
@@ -189,6 +219,11 @@ export function rateLimitResponse(
   );
 }
 
+/**
+ * Attach X-RateLimit-* headers to an existing NextResponse.
+ * This is useful when the route wants to return a non-429 response
+ * (e.g. 200 OK) but still inform the client of their rate-limit status.
+ */
 export function addRateLimitHeaders(
   response: NextResponse,
   result: RateLimitResult,
