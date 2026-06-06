@@ -352,11 +352,7 @@ export const authOptions: NextAuthOptions = {
           GoogleProvider({
             clientId: googleClientId!,
             clientSecret: googleClientSecret!,
-            // If the PKCE code_verifier cookie is lost/mismatched (common in some dev setups),
-            // Google returns invalid_grant at the token exchange step.
-            // Using state-only is sufficient for local dev and avoids that failure mode.
-            checks: ["state"],
-            allowDangerousEmailAccountLinking: true,
+            checks: ["state", "pkce"],
           }),
         ]
       : []),
@@ -370,7 +366,6 @@ export const authOptions: NextAuthOptions = {
                 scope: "read:user user:email repo",
               },
             },
-            allowDangerousEmailAccountLinking: true,
           }),
         ]
       : []),
@@ -429,7 +424,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async session({ session, token, user }) {
+    async session({ session, token, user }: { session: any; token: any; user: any }) {
       if (!session.user) return session;
 
       // Always set a stable id for our app code.
@@ -521,19 +516,15 @@ export const authOptions: NextAuthOptions = {
 
       return safeToken as any;
     },
-    async signIn({ user, account, profile }) {
-      // If signing in with OAuth and user exists, allow linking
+    async signIn({ user, account, profile }): Promise<string | boolean> {
       if (account?.provider === "google") {
         try {
-          // Security: always verify Google ID token server-side.
-          // NextAuth handles the OAuth code exchange, but we still validate the returned id_token.
           const idToken = (account as any).id_token as string | undefined;
           if (!idToken) {
             throw new Error("Missing Google id_token");
           }
 
           const ticket = await verifyGoogleIdToken(idToken);
-
           const payload = ticket.getPayload();
           const googleEmail = payload?.email;
           const googleSub = payload?.sub;
@@ -546,7 +537,6 @@ export const authOptions: NextAuthOptions = {
             throw new Error("Google token email mismatch");
           }
 
-          // providerAccountId should be the Google subject. If it exists and doesn't match, reject.
           if (
             googleSub &&
             account.providerAccountId &&
@@ -560,7 +550,22 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (existingUser) {
-            // Update avatar if from Google
+            const linkedAccounts = await prisma.account.findMany({
+              where: { userId: existingUser.id },
+            });
+            const hasCredentialsOnly =
+              linkedAccounts.length === 0 ||
+              (linkedAccounts.every((a: { provider: string }) => a.provider === "credentials") &&
+                !linkedAccounts.some((a: { provider: string }) => a.provider === "google"));
+
+            if (hasCredentialsOnly && !(existingUser as any).emailVerified) {
+              console.warn(
+                "[auth] OAuth sign-in blocked: unverified credentials account exists for",
+                user.email
+              );
+              return "/login?error=OAuthAccountNotLinked";
+            }
+
             const googleProfile = profile as { picture?: string } | undefined;
             if (googleProfile?.picture && !(existingUser as any).image) {
               await prisma.user.update({
@@ -570,7 +575,6 @@ export const authOptions: NextAuthOptions = {
             }
           }
         } catch (err: any) {
-          // Avoid logging secrets/tokens. Provide enough context to diagnose.
           console.error("[auth] google oauth callback failed", {
             message: err?.message,
             code: err?.code,
