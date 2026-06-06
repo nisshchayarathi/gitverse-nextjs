@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import dns from "dns";
 import { OAuth2Client } from "google-auth-library";
+import { Prisma } from "@prisma/client";
 import type {
   Adapter,
   AdapterAccount,
@@ -95,8 +96,25 @@ function prismaIntIdAdapter(): Adapter {
         ...account,
         userId: intUserId(account.userId),
       } as any;
-      await prisma.account.create({ data });
-      return account;
+
+      try {
+        await prisma.account.create({ data });
+        return account;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          console.warn(
+            `[auth] Account linking prevented: The ${account.provider} account is already linked elsewhere.`,
+          );
+          // Throwing a specific error string NextAuth understands
+          throw new Error("OAuthAccountNotLinked");
+        }
+
+        // If it's a different random database error, let it throw normally
+        throw error;
+      }
     },
 
     async unlinkAccount({
@@ -264,13 +282,13 @@ async function verifyGoogleIdToken(idToken: string) {
 if ((googleClientId || googleClientSecret) && !isGoogleConfigured) {
   // Intentionally do not log secrets.
   console.warn(
-    "[auth] Google OAuth is not fully configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to real values (not placeholders), then restart the dev server."
+    "[auth] Google OAuth is not fully configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to real values (not placeholders), then restart the dev server.",
   );
 }
 
 if ((githubClientId || githubClientSecret) && !isGithubConfigured) {
   console.warn(
-    "[auth] GitHub OAuth is not fully configured. Set GITHUB_ID and GITHUB_SECRET to real values (not placeholders), then restart the dev server."
+    "[auth] GitHub OAuth is not fully configured. Set GITHUB_ID and GITHUB_SECRET to real values (not placeholders), then restart the dev server.",
   );
 }
 
@@ -279,12 +297,15 @@ if ((githubClientId || githubClientSecret) && !isGithubConfigured) {
 if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
   console.warn(
     "[auth][warning] NEXTAUTH_URL environment variable is not set in production. " +
-    "This will likely cause Google OAuth 'redirect_uri_mismatch' errors because the " +
-    "callback URL cannot be reliably inferred. Please set NEXTAUTH_URL to your exact production domain (e.g., https://yourdomain.com)."
+      "This will likely cause Google OAuth 'redirect_uri_mismatch' errors because the " +
+      "callback URL cannot be reliably inferred. Please set NEXTAUTH_URL to your exact production domain (e.g., https://yourdomain.com).",
   );
 }
 
-const tokenVersionCache = new Map<string, { version: number; fetchedAt: number }>();
+const tokenVersionCache = new Map<
+  string,
+  { version: number; fetchedAt: number }
+>();
 const CACHE_TTL_MS = 60_000;
 
 async function getFreshTokenVersion(
@@ -306,7 +327,10 @@ async function getFreshTokenVersion(
       select: { tokenVersion: true },
     });
     if (dbUser) {
-      tokenVersionCache.set(sub, { version: dbUser.tokenVersion, fetchedAt: Date.now() });
+      tokenVersionCache.set(sub, {
+        version: dbUser.tokenVersion,
+        fetchedAt: Date.now(),
+      });
       return dbUser.tokenVersion;
     }
   } catch {
@@ -403,7 +427,7 @@ export const authOptions: NextAuthOptions = {
 
           if (hasOAuthAccount) {
             throw new Error(
-              "Email already exists. Please sign in with your linked social account."
+              "Email already exists. Please sign in with your linked social account.",
             );
           }
 
@@ -412,7 +436,7 @@ export const authOptions: NextAuthOptions = {
 
         const isValidPassword = await bcrypt.compare(
           credentials.password,
-          user.passwordHash
+          user.passwordHash,
         );
 
         if (!isValidPassword) {
@@ -444,7 +468,12 @@ export const authOptions: NextAuthOptions = {
         try {
           const fresh = await prisma.user.findUnique({
             where: { id },
-            select: { name: true, email: true, image: true, tokenVersion: true },
+            select: {
+              name: true,
+              email: true,
+              image: true,
+              tokenVersion: true,
+            },
           });
 
           if (fresh) {
@@ -454,7 +483,9 @@ export const authOptions: NextAuthOptions = {
 
             // Validate tokenVersion: if the JWT tokenVersion doesn't match
             // the DB, the session has been invalidated (password change/logout).
-            const jwtTokenVersion = (token as any).tokenVersion as number | undefined;
+            const jwtTokenVersion = (token as any).tokenVersion as
+              | number
+              | undefined;
             if (
               jwtTokenVersion != null &&
               fresh.tokenVersion !== jwtTokenVersion
@@ -513,7 +544,7 @@ export const authOptions: NextAuthOptions = {
 
       if (process.env.NEXTAUTH_DEBUG === "true") {
         const keys = Object.keys(safeToken).filter(
-          (k) => safeToken[k] !== undefined
+          (k) => safeToken[k] !== undefined,
         );
         const size = JSON.stringify(safeToken).length;
         console.debug("[auth] jwt payload bytes", { size, keys });
