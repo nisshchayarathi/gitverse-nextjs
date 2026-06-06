@@ -1,6 +1,6 @@
-import React from 'react'
-import Link from 'next/link'
-import { GitBranch, Github, Linkedin, Mail } from 'lucide-react'
+import React from "react";
+import Link from "next/link";
+import { GitBranch, Github, Linkedin, Mail } from "lucide-react";
 
 export const Footer: React.FC = () => {
   return (
@@ -27,22 +27,36 @@ export const Footer: React.FC = () => {
             <h3 className="font-semibold text-foreground mb-4">Product</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/#features" className="hover:text-primary transition-colors">
+                <Link
+                  href="/#features"
+                  className="hover:text-primary transition-colors"
+                >
                   Features
                 </Link>
               </li>
               <li>
-                <Link href="/#pricing" className="hover:text-primary transition-colors">
+                <Link
+                  href="/#pricing"
+                  className="hover:text-primary transition-colors"
+                >
                   Pricing
                 </Link>
               </li>
               <li>
-                <Link href="/#how-it-works" className="hover:text-primary transition-colors">
+                <Link
+                  href="/#how-it-works"
+                  className="hover:text-primary transition-colors"
+                >
                   How it Works
                 </Link>
               </li>
               <li>
-                <span title="Coming soon" className="cursor-not-allowed opacity-50 hover:text-current">Documentation</span>
+                <span
+                  title="Coming soon"
+                  className="cursor-not-allowed opacity-50 hover:text-current"
+                >
+                  Documentation
+                </span>
               </li>
             </ul>
           </div>
@@ -52,16 +66,36 @@ export const Footer: React.FC = () => {
             <h3 className="font-semibold text-foreground mb-4">Company</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <span title="Coming soon" className="cursor-not-allowed opacity-50">About</span>
+                <span
+                  title="Coming soon"
+                  className="cursor-not-allowed opacity-50"
+                >
+                  About
+                </span>
               </li>
               <li>
-                <span title="Coming soon" className="cursor-not-allowed opacity-50">Blog</span>
+                <span
+                  title="Coming soon"
+                  className="cursor-not-allowed opacity-50"
+                >
+                  Blog
+                </span>
               </li>
               <li>
-                <span title="Coming soon" className="cursor-not-allowed opacity-50">Careers</span>
+                <span
+                  title="Coming soon"
+                  className="cursor-not-allowed opacity-50"
+                >
+                  Careers
+                </span>
               </li>
               <li>
-                <span title="Coming soon" className="cursor-not-allowed opacity-50">Contact</span>
+                <span
+                  title="Coming soon"
+                  className="cursor-not-allowed opacity-50"
+                >
+                  Contact
+                </span>
               </li>
             </ul>
           </div>
@@ -71,25 +105,54 @@ export const Footer: React.FC = () => {
             <h3 className="font-semibold text-foreground mb-4">Legal</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <span title="Coming soon" className="cursor-not-allowed opacity-50 hover:text-current">Privacy Policy</span>
+                <span
+                  title="Coming soon"
+                  className="cursor-not-allowed opacity-50 hover:text-current"
+                >
+                  Privacy Policy
+                </span>
               </li>
               <li>
-                <span title="Coming soon" className="cursor-not-allowed opacity-50 hover:text-current">Terms of Service</span>
-                <Link href="/privacy-policy" className="hover:text-primary transition-colors">
+                <span
+                  title="Coming soon"
+                  className="cursor-not-allowed opacity-50 hover:text-current"
+                >
+                  Terms of Service
+                </span>
+                <Link
+                  href="/privacy-policy"
+                  className="hover:text-primary transition-colors"
+                >
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="/terms-of-service" className="hover:text-primary transition-colors">
+                <Link
+                  href="/terms-of-service"
+                  className="hover:text-primary transition-colors"
+                >
                   Terms of Service
                 </Link>
               </li>
               <li>
-                <span title="Coming soon" className="cursor-not-allowed opacity-50 hover:text-current">Security</span>
+                <span
+                  title="Coming soon"
+                  className="cursor-not-allowed opacity-50 hover:text-current"
+                >
+                  Security
+                </span>
               </li>
               <li>
-                <span title="Coming soon" className="cursor-not-allowed opacity-50 hover:text-current">Cookie Policy</span>
-                <Link href="/cookie-policy" className="hover:text-primary transition-colors">
+                <span
+                  title="Coming soon"
+                  className="cursor-not-allowed opacity-50 hover:text-current"
+                >
+                  Cookie Policy
+                </span>
+                <Link
+                  href="/cookie-policy"
+                  className="hover:text-primary transition-colors"
+                >
                   Cookie Policy
                 </Link>
               </li>
@@ -108,8 +171,14 @@ export const Footer: React.FC = () => {
               aria-label="X (formerly Twitter)"
               className="hover:text-primary transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622Zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622Zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
             </a>
             <a
@@ -130,12 +199,16 @@ export const Footer: React.FC = () => {
             >
               <Linkedin size={20} />
             </a>
-            <a href="mailto:hello@gitverse.com" aria-label="Email" className="hover:text-primary transition-colors">
+            <a
+              href="mailto:hello@gitverse.com"
+              aria-label="Email"
+              className="hover:text-primary transition-colors"
+            >
               <Mail size={20} />
             </a>
           </div>
         </div>
       </div>
     </footer>
-  )
-}
+  );
+};

@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
-import Image from 'next/image';
-import { MapAnnotation } from '@/services/annotationService';
-import { MessageSquare, AlertTriangle, Bug, Wrench, FileText, Link as LinkIcon, Search, Filter, X } from 'lucide-react';
+import React, { useState } from "react";
+import Image from "next/image";
+import { MapAnnotation } from "@/services/annotationService";
+import {
+  MessageSquare,
+  AlertTriangle,
+  Bug,
+  Wrench,
+  FileText,
+  Link as LinkIcon,
+  Search,
+  Filter,
+  X,
+} from "lucide-react";
 
 interface AnnotationPanelProps {
   annotations: MapAnnotation[];
@@ -11,23 +21,29 @@ interface AnnotationPanelProps {
 }
 
 const typeIcons = {
-  'comment': MessageSquare,
-  'warning': AlertTriangle,
-  'technical-debt': Bug,
-  'refactor': Wrench,
-  'documentation': FileText,
-  'issue-link': LinkIcon,
+  comment: MessageSquare,
+  warning: AlertTriangle,
+  "technical-debt": Bug,
+  refactor: Wrench,
+  documentation: FileText,
+  "issue-link": LinkIcon,
 };
 
-export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({ annotations, isOpen, onClose, onSelect }) => {
-  const [filter, setFilter] = useState<string>('all');
-  const [search, setSearch] = useState('');
+export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
+  annotations,
+  isOpen,
+  onClose,
+  onSelect,
+}) => {
+  const [filter, setFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
 
   if (!isOpen) return null;
 
-  const filtered = annotations.filter(a => {
-    if (filter !== 'all' && a.annotationType !== filter) return false;
-    if (search && !a.content.toLowerCase().includes(search.toLowerCase())) return false;
+  const filtered = annotations.filter((a) => {
+    if (filter !== "all" && a.annotationType !== filter) return false;
+    if (search && !a.content.toLowerCase().includes(search.toLowerCase()))
+      return false;
     return true;
   });
 
@@ -42,19 +58,22 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({ annotations, i
 
       <div className="p-4 space-y-3 border-b border-white/10 bg-black/20">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 text-gray-400" size={16} />
-          <input 
-            type="text" 
-            placeholder="Search annotations..." 
+          <Search
+            className="absolute left-2.5 top-2.5 text-gray-400"
+            size={16}
+          />
+          <input
+            type="text"
+            placeholder="Search annotations..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-[#0f172a] text-white border border-white/10 rounded pl-9 pr-3 py-2 text-sm outline-none focus:border-primary"
           />
         </div>
-        
+
         <div className="flex gap-2">
           <Filter className="text-gray-400 mt-2" size={16} />
-          <select 
+          <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="flex-1 bg-[#0f172a] text-white border border-white/10 rounded px-2 py-1.5 text-sm outline-none focus:border-primary"
@@ -76,10 +95,10 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({ annotations, i
             No annotations found.
           </div>
         ) : (
-          filtered.map(annotation => {
+          filtered.map((annotation) => {
             const Icon = typeIcons[annotation.annotationType] || MessageSquare;
             return (
-              <div 
+              <div
                 key={annotation.id}
                 onClick={() => onSelect(annotation)}
                 className="bg-white/5 border border-white/10 rounded-lg p-3 hover:bg-white/10 cursor-pointer transition-colors"
@@ -88,29 +107,33 @@ export const AnnotationPanel: React.FC<AnnotationPanelProps> = ({ annotations, i
                   <div className="flex items-center gap-2">
                     <Icon size={14} className="text-primary" />
                     <span className="text-xs font-medium capitalize text-gray-300">
-                      {annotation.annotationType.replace('-', ' ')}
+                      {annotation.annotationType.replace("-", " ")}
                     </span>
                   </div>
                   <span className="text-[10px] text-gray-500">
                     {new Date(annotation.createdAt).toLocaleDateString()}
                   </span>
                 </div>
-                <p className="text-sm line-clamp-3 text-gray-200">{annotation.content}</p>
+                <p className="text-sm line-clamp-3 text-gray-200">
+                  {annotation.content}
+                </p>
                 <div className="mt-2 flex items-center gap-2">
                   {annotation.author?.image ? (
-                    <Image 
-                      src={annotation.author.image} 
-                      alt="author" 
+                    <Image
+                      src={annotation.author.image}
+                      alt="author"
                       width={20}
                       height={20}
-                      className="w-5 h-5 rounded-full object-cover" 
+                      className="w-5 h-5 rounded-full object-cover"
                     />
                   ) : (
                     <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] text-primary">
-                      {annotation.author?.name?.[0] || 'U'}
+                      {annotation.author?.name?.[0] || "U"}
                     </div>
                   )}
-                  <span className="text-xs text-gray-400">{annotation.author?.name || 'Unknown User'}</span>
+                  <span className="text-xs text-gray-400">
+                    {annotation.author?.name || "Unknown User"}
+                  </span>
                 </div>
               </div>
             );

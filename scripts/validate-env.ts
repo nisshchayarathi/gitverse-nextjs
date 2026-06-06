@@ -1,9 +1,7 @@
 import dotenv from "dotenv";
 import fs from "node:fs";
 import path from "node:path";
-import {
-  validateRequiredAnalysisSecrets,
-} from "../lib/utils/internalAuth";
+import { validateRequiredAnalysisSecrets } from "../lib/utils/internalAuth";
 
 type ValidationResult = {
   key: string;
@@ -110,14 +108,17 @@ function runValidation() {
   const loadedPath = loadEnvironmentFile();
 
   if (!loadedPath) {
-    console.warn(colorize("⚠️ No environment file found, relying on process.env", 33));
+    console.warn(
+      colorize("⚠️ No environment file found, relying on process.env", 33),
+    );
   } else {
     console.log(colorize(`Loaded environment from: ${loadedPath}\n`, 36));
   }
 
   const results: (ValidationResult | null)[] = [
     validateRequiredValue("JWT_SECRET", process.env.JWT_SECRET, (value) => {
-      const isValid = Buffer.byteLength(value, "utf8") >= 32 && !isPlaceholder(value);
+      const isValid =
+        Buffer.byteLength(value, "utf8") >= 32 && !isPlaceholder(value);
 
       return {
         isValid,
@@ -126,40 +127,55 @@ function runValidation() {
           : "Should be at least 32 bytes/characters for adequate security",
       };
     }),
-    validateRequiredValue("GEMINI_API_KEY", process.env.GEMINI_API_KEY, (value) => {
-      const isValid = !isPlaceholder(value);
+    validateRequiredValue(
+      "GEMINI_API_KEY",
+      process.env.GEMINI_API_KEY,
+      (value) => {
+        const isValid = !isPlaceholder(value);
 
-      return {
-        isValid,
-        message: isValid ? "Configured" : "Must not be a placeholder value",
-      };
-    }),
-    validateRequiredValue("NEXTAUTH_SECRET", process.env.NEXTAUTH_SECRET, (value) => {
-      const isValid = Buffer.byteLength(value, "utf8") >= 32 && !isPlaceholder(value);
+        return {
+          isValid,
+          message: isValid ? "Configured" : "Must not be a placeholder value",
+        };
+      },
+    ),
+    validateRequiredValue(
+      "NEXTAUTH_SECRET",
+      process.env.NEXTAUTH_SECRET,
+      (value) => {
+        const isValid =
+          Buffer.byteLength(value, "utf8") >= 32 && !isPlaceholder(value);
 
-      return {
-        isValid,
-        message: isValid
-          ? "Meets the 32-byte minimum"
-          : "Should be non-placeholder and at least 32 bytes/characters",
-      };
-    }),
+        return {
+          isValid,
+          message: isValid
+            ? "Meets the 32-byte minimum"
+            : "Should be non-placeholder and at least 32 bytes/characters",
+        };
+      },
+    ),
     validateRequiredValue("NEXTAUTH_URL", process.env.NEXTAUTH_URL, (value) => {
       const isValid = isAbsoluteUrl(value) && !isPlaceholder(value);
 
       return {
         isValid,
-        message: isValid ? "Valid absolute URL" : "Must be a valid absolute http(s) URL and not a placeholder",
+        message: isValid
+          ? "Valid absolute URL"
+          : "Must be a valid absolute http(s) URL and not a placeholder",
       };
     }),
-    validateOptionalValue("GITHUB_APP_ID", process.env.GITHUB_APP_ID, (value) => {
-      const isValid = !isPlaceholder(value);
+    validateOptionalValue(
+      "GITHUB_APP_ID",
+      process.env.GITHUB_APP_ID,
+      (value) => {
+        const isValid = !isPlaceholder(value);
 
-      return {
-        isValid,
-        message: isValid ? "Configured" : "Should not be a placeholder value",
-      };
-    }),
+        return {
+          isValid,
+          message: isValid ? "Configured" : "Should not be a placeholder value",
+        };
+      },
+    ),
     validateOptionalValue(
       "GITHUB_APP_PRIVATE_KEY",
       process.env.GITHUB_APP_PRIVATE_KEY,
@@ -179,7 +195,9 @@ function runValidation() {
         const isValid =
           Buffer.byteLength(value, "utf8") >= 16 &&
           !isPlaceholder(value) &&
-          !["secret", "changeme", "password"].includes(value.trim().toLowerCase());
+          !["secret", "changeme", "password"].includes(
+            value.trim().toLowerCase(),
+          );
 
         return {
           isValid,
@@ -191,7 +209,9 @@ function runValidation() {
     ),
   ];
 
-  const activeResults = results.filter((result): result is ValidationResult => result !== null);
+  const activeResults = results.filter(
+    (result): result is ValidationResult => result !== null,
+  );
   const failures = activeResults.filter((result) => !result.isValid);
 
   activeResults.forEach((result) => {
@@ -221,7 +241,10 @@ function runValidation() {
 
   if (failures.length > 0) {
     console.error(
-      colorize(`\nEnvironment validation failed with ${failures.length} issue(s).`, 31),
+      colorize(
+        `\nEnvironment validation failed with ${failures.length} issue(s).`,
+        31,
+      ),
     );
     process.exit(1);
   }

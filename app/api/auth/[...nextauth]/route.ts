@@ -10,4 +10,3 @@ const handler = async (req: any, ctx: any) => {
 };
 
 export { handler as GET, handler as POST };
-

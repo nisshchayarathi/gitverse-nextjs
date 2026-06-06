@@ -7,7 +7,9 @@ async function main() {
   console.log("Seeding database...");
 
   if (process.env.NODE_ENV === "production") {
-    console.error("⚠️  Safety Guard: Cannot run seed script in production environment.");
+    console.error(
+      "⚠️  Safety Guard: Cannot run seed script in production environment.",
+    );
     console.error("Aborting to prevent accidental data loss.");
     process.exit(1);
   }
@@ -18,7 +20,7 @@ async function main() {
 
   console.log("Creating users...");
   const users = [];
-  
+
   // Create a predictable test user
   const hashedPassword = await bcrypt.hash("password123", 10);
   const testUser = await prisma.user.create({
@@ -51,7 +53,7 @@ async function main() {
   for (let i = 0; i < 20; i++) {
     const user = faker.helpers.arrayElement(users);
     const repoName = `${faker.word.adjective()}-${faker.word.noun()}`;
-    
+
     // Create repository
     const repository = await prisma.repository.create({
       data: {
@@ -63,7 +65,12 @@ async function main() {
         stars: faker.number.int({ min: 0, max: 1000 }),
         forks: faker.number.int({ min: 0, max: 200 }),
         size: faker.number.int({ min: 1000, max: 1000000 }),
-        status: faker.helpers.arrayElement(["pending", "analyzing", "completed", "failed"]),
+        status: faker.helpers.arrayElement([
+          "pending",
+          "analyzing",
+          "completed",
+          "failed",
+        ]),
         userId: user.id,
       },
     });
@@ -122,8 +129,19 @@ async function main() {
     }
 
     // Create languages
-    const langs = ["TypeScript", "JavaScript", "HTML", "CSS", "Python", "Rust", "Go"];
-    const repoLangs = faker.helpers.arrayElements(langs, faker.number.int({ min: 1, max: 3 }));
+    const langs = [
+      "TypeScript",
+      "JavaScript",
+      "HTML",
+      "CSS",
+      "Python",
+      "Rust",
+      "Go",
+    ];
+    const repoLangs = faker.helpers.arrayElements(
+      langs,
+      faker.number.int({ min: 1, max: 3 }),
+    );
     for (const lang of repoLangs) {
       await prisma.language.create({
         data: {

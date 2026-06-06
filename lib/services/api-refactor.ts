@@ -10,7 +10,7 @@ export class APIRefactorService {
     fileContent: string,
     packageName: string,
     fromVersion: string,
-    toVersion: string
+    toVersion: string,
   ): Promise<{ newContent: string; confidenceScore: number } | null> {
     const gemini = getGeminiService();
 
@@ -48,24 +48,30 @@ Return ONLY valid JSON matching this schema (no markdown, no extra text):
 
     try {
       const response = await gemini.chatRaw(prompt);
-      
+
       const rawText = response.text.trim();
       let jsonText = rawText;
       if (rawText.startsWith("```json")) {
-        jsonText = rawText.replace(/^```json/, "").replace(/```$/, "").trim();
+        jsonText = rawText
+          .replace(/^```json/, "")
+          .replace(/```$/, "")
+          .trim();
       } else if (rawText.startsWith("```")) {
         jsonText = rawText.replace(/^```/, "").replace(/```$/, "").trim();
       }
 
       const parsed = JSON.parse(jsonText);
-      
+
       if (!parsed.requiresChanges || !parsed.newContent) {
         return null;
       }
 
       return {
         newContent: parsed.newContent,
-        confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 50,
+        confidenceScore:
+          typeof parsed.confidenceScore === "number"
+            ? parsed.confidenceScore
+            : 50,
       };
     } catch (error) {
       console.error(`[APIRefactor] Failed to refactor ${filePath}:`, error);

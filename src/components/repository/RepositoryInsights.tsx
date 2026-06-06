@@ -1,11 +1,11 @@
-import { CommitActivityHeatmap } from '@/components/visualizations/CommitActivityHeatmap'
-import { CodeDependencyGraph } from '@/components/visualizations/CodeDependencyGraph'
-import { LanguageDistributionChart } from '@/components/visualizations/LanguageDistributionChart'
-import { CodeMetrics } from './CodeMetrics'
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { useState } from 'react'
-import { toast } from '@/hooks/use-toast'
-import axios from 'axios'
+import { CommitActivityHeatmap } from "@/components/visualizations/CommitActivityHeatmap";
+import { CodeDependencyGraph } from "@/components/visualizations/CodeDependencyGraph";
+import { LanguageDistributionChart } from "@/components/visualizations/LanguageDistributionChart";
+import { CodeMetrics } from "./CodeMetrics";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { useState } from "react";
+import { toast } from "@/hooks/use-toast";
+import axios from "axios";
 
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -43,9 +43,7 @@ interface RepositoryInsightsProps {
   repository?: RepositoryData;
 }
 
-export function RepositoryInsights({
-  repository,
-}: RepositoryInsightsProps) {
+export function RepositoryInsights({ repository }: RepositoryInsightsProps) {
   const [isGeneratingMd, setIsGeneratingMd] = useState(false);
   const [progressMessage, setProgressMessage] = useState("");
   const [progressPercent, setProgressPercent] = useState(0);
@@ -89,9 +87,14 @@ export function RepositoryInsights({
   const generateArchitectureMarkdown = async () => {
     if (!repository?.id) return;
 
-    const totalFiles = repository.files?.reduce((acc, curr) => acc + curr.count, 0) || 0;
+    const totalFiles =
+      repository.files?.reduce((acc, curr) => acc + curr.count, 0) || 0;
     if (totalFiles > 200) {
-      if (!window.confirm(`This repository has ${totalFiles} files. Generating the architecture document will process in chunks and may take several minutes. Do you want to continue?`)) {
+      if (
+        !window.confirm(
+          `This repository has ${totalFiles} files. Generating the architecture document will process in chunks and may take several minutes. Do you want to continue?`,
+        )
+      ) {
         return;
       }
     }
@@ -102,39 +105,40 @@ export function RepositoryInsights({
 
     try {
       const token = localStorage.getItem("gitverse_token");
-      
+
       // 1. Queue the background job
       const postResponse = await axios.post(
         `/api/repositories/${repository.id}/generate-architecture`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      
+
       const jobId = postResponse.data.jobId;
 
       // 2. Poll for job completion
       const pollInterval = setInterval(async () => {
         try {
           const statusRes = await axios.get(`/api/analysis-jobs/${jobId}`, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           });
-          
+
           const job = statusRes.data;
-          
+
           if (job.status === "FAILED") {
             clearInterval(pollInterval);
             setIsGeneratingMd(false);
             toast({
               title: "Export failed",
-              description: job.error || "Failed to generate architecture document.",
-              variant: "destructive"
+              description:
+                job.error || "Failed to generate architecture document.",
+              variant: "destructive",
             });
             return;
           }
-          
+
           if (job.status === "DONE") {
             clearInterval(pollInterval);
-            
+
             // 3. Download the finished document
             setProgressMessage("Downloading document...");
             const getResponse = await axios.get(
@@ -142,19 +146,22 @@ export function RepositoryInsights({
               {
                 headers: { Authorization: `Bearer ${token}` },
                 responseType: "text",
-              }
+              },
             );
 
-            const blob = new Blob([getResponse.data], { type: "text/markdown;charset=utf-8;" });
+            const blob = new Blob([getResponse.data], {
+              type: "text/markdown;charset=utf-8;",
+            });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
 
             link.href = url;
-            const sanitizedName = (repository.name || "")
-              .trim()
-              .replace(/[\/\\?%*:|"<>]/g, "-")
-              .replace(/-{2,}/g, "-")
-              .replace(/^-|-$/g, "") || "repository";
+            const sanitizedName =
+              (repository.name || "")
+                .trim()
+                .replace(/[\/\\?%*:|"<>]/g, "-")
+                .replace(/-{2,}/g, "-")
+                .replace(/^-|-$/g, "") || "repository";
             link.download = `${sanitizedName}-ARCHITECTURE.md`;
             document.body.appendChild(link);
             link.click();
@@ -165,7 +172,7 @@ export function RepositoryInsights({
             setIsGeneratingMd(false);
             toast({
               title: "Success",
-              description: "ARCHITECTURE.md Downloaded successfully!"
+              description: "ARCHITECTURE.md Downloaded successfully!",
             });
           } else {
             // Update progress
@@ -176,13 +183,14 @@ export function RepositoryInsights({
           console.error("Error polling job", pollErr);
         }
       }, 3000);
-
     } catch (error: any) {
       console.error("MD Generation Error", error);
       toast({
         title: "Export failed",
-        description: error.response?.data?.error || "Failed to start architecture generation.",
-        variant: "destructive"
+        description:
+          error.response?.data?.error ||
+          "Failed to start architecture generation.",
+        variant: "destructive",
       });
       setIsGeneratingMd(false);
     }
@@ -190,14 +198,10 @@ export function RepositoryInsights({
 
   return (
     <div id="repo-analysis" className="space-y-6">
-
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-
         <div>
-          <h2 className="text-2xl font-bold">
-            Repository Insights
-          </h2>
+          <h2 className="text-2xl font-bold">Repository Insights</h2>
 
           <p className="text-sm text-muted-foreground mt-1">
             Advanced visualizations and metrics powered by D3.js
@@ -206,7 +210,6 @@ export function RepositoryInsights({
 
         {/* Export Buttons */}
         <div className="flex gap-2">
-
           <button
             onClick={generateArchitectureMarkdown}
             disabled={isGeneratingMd || !repository?.id}
@@ -235,7 +238,6 @@ export function RepositoryInsights({
           >
             Export PDF
           </button>
-
         </div>
       </div>
 
@@ -256,7 +258,6 @@ export function RepositoryInsights({
 
       {/* Code Metrics Section */}
       <CodeMetrics repository={repository} />
-
     </div>
-  )
+  );
 }

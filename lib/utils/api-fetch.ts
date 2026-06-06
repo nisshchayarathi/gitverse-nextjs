@@ -6,7 +6,7 @@ import { signOut } from "next-auth/react";
  */
 export async function apiFetch(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<Response> {
   const response = await fetch(input, init);
 
@@ -18,7 +18,7 @@ export async function apiFetch(
       // Redirect to login using next-auth signOut or directly via location
       const currentPath = window.location.pathname;
       const redirectUrl = `/login?from=${encodeURIComponent(currentPath)}`;
-      
+
       // Trigger NextAuth signout and redirect
       signOut({ callbackUrl: redirectUrl });
     }

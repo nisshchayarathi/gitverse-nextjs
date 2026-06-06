@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as http from "http";
 
 const mockDisconnectPrisma = vi.fn().mockResolvedValue(undefined);
-const mockGetPoolHealth = vi.fn().mockReturnValue({ healthy: true, totalConnections: 5, idleConnections: 3, waitingClients: 0 });
+const mockGetPoolHealth = vi.fn().mockReturnValue({
+  healthy: true,
+  totalConnections: 5,
+  idleConnections: 3,
+  waitingClients: 0,
+});
 const mockGetPoolMetrics = vi.fn().mockReturnValue([]);
 
 vi.mock("../../lib/prisma", () => ({
@@ -58,7 +63,10 @@ describe("Drain method coordination", () => {
     }
 
     expect(mockMarkDrainReleased).toHaveBeenCalledWith(
-      expect.objectContaining({ jobId: "job-coord-1", workerId: "worker-drain" }),
+      expect.objectContaining({
+        jobId: "job-coord-1",
+        workerId: "worker-drain",
+      }),
     );
     expect(mockReleaseLock).not.toHaveBeenCalled();
   });

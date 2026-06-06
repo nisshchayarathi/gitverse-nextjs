@@ -37,7 +37,9 @@ try {
     cwd: ROOT,
     stdio: "pipe",
   });
-  fail("dist-worker/ is still tracked by git — run git rm -r --cached dist-worker/");
+  fail(
+    "dist-worker/ is still tracked by git — run git rm -r --cached dist-worker/",
+  );
 } catch {
   ok("dist-worker/ is not tracked by git");
 }
@@ -98,7 +100,9 @@ try {
 }
 
 // Check 7: Verify the build scripts reference the correct paths
-const packageJson = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8"));
+const packageJson = JSON.parse(
+  readFileSync(join(ROOT, "package.json"), "utf-8"),
+);
 const workerScript = packageJson.scripts?.worker || "";
 if (workerScript.includes("dist-worker/")) {
   ok("npm run worker targets dist-worker/");

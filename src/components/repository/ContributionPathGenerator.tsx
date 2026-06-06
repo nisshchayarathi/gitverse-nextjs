@@ -13,6 +13,7 @@ import {
   Input,
 } from "@/components/ui";
 import { LoadingSpinner } from "@/components/ui/Spinner";
+import { FolderOpen } from "lucide-react";
 import { buildContributionPathPlan } from "@/services/contributionPathService";
 import {
   ContributionPreference,
@@ -27,8 +28,18 @@ interface ContributionPathGeneratorProps {
   loading?: boolean;
 }
 
-const experienceLevels: ExperienceLevel[] = ["Beginner", "Intermediate", "Advanced"];
-const focusAreas: FocusArea[] = ["Frontend", "Backend", "Full Stack", "AI/ML", "DevOps"];
+const experienceLevels: ExperienceLevel[] = [
+  "Beginner",
+  "Intermediate",
+  "Advanced",
+];
+const focusAreas: FocusArea[] = [
+  "Frontend",
+  "Backend",
+  "Full Stack",
+  "AI/ML",
+  "DevOps",
+];
 
 const defaultPreference: ContributionPreference = {
   name: "Contributor",
@@ -36,8 +47,12 @@ const defaultPreference: ContributionPreference = {
   focusArea: "Frontend",
 };
 
-export function ContributionPathGenerator({ repository, loading = false }: ContributionPathGeneratorProps) {
-  const [preference, setPreference] = useState<ContributionPreference>(defaultPreference);
+export function ContributionPathGenerator({
+  repository,
+  loading = false,
+}: ContributionPathGeneratorProps) {
+  const [preference, setPreference] =
+    useState<ContributionPreference>(defaultPreference);
   const [name, setName] = useState(defaultPreference.name);
 
   const plan: ContributionPathPlan | null = useMemo(() => {
@@ -51,7 +66,10 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
       <Card>
         <CardHeader>
           <CardTitle>Contribution Path Generator</CardTitle>
-          <CardDescription>Create a contributor onboarding roadmap based on repository analysis.</CardDescription>
+          <CardDescription>
+            Create a contributor onboarding roadmap based on repository
+            analysis.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center py-16">
           <LoadingSpinner message="Building your contribution path…" />
@@ -65,10 +83,13 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
       <Card>
         <CardHeader>
           <CardTitle>Contribution Path Generator</CardTitle>
-          <CardDescription>Get a personalized contribution roadmap for this repository.</CardDescription>
+          <CardDescription>
+            Get a personalized contribution roadmap for this repository.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <EmptyState
+            icon={FolderOpen}
             title="No repository selected"
             description="Open a repository to generate a contribution path tailored to your experience and focus."
           />
@@ -84,7 +105,8 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
       <CardHeader>
         <CardTitle>Contribution Path Generator</CardTitle>
         <CardDescription>
-          Create a personalized contributor onboarding roadmap for this repository.
+          Create a personalized contributor onboarding roadmap for this
+          repository.
         </CardDescription>
       </CardHeader>
 
@@ -93,7 +115,9 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Your name</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Your name
+                </label>
                 <Input
                   value={name}
                   onChange={(event) => setName(event.target.value)}
@@ -101,7 +125,9 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Experience Level</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Experience Level
+                </label>
                 <select
                   value={preference.experienceLevel}
                   onChange={(event) =>
@@ -120,7 +146,9 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
                 </select>
               </div>
               <div className="sm:col-span-2">
-                <label className="text-sm font-medium text-muted-foreground">Focus Area</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Focus Area
+                </label>
                 <select
                   value={preference.focusArea}
                   onChange={(event) =>
@@ -142,12 +170,22 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-lg border border-border p-4">
-                <p className="text-sm text-muted-foreground">Contributor Profile</p>
-                <h3 className="mt-2 text-xl font-semibold">{activePlan?.profile.name}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{activePlan?.profile.experienceLevel} • {activePlan?.profile.focusArea}</p>
+                <p className="text-sm text-muted-foreground">
+                  Contributor Profile
+                </p>
+                <h3 className="mt-2 text-xl font-semibold">
+                  {activePlan?.profile.name}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {activePlan?.profile.experienceLevel} •{" "}
+                  {activePlan?.profile.focusArea}
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {activePlan?.badges.map((badge) => (
-                    <span key={badge} className="rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-foreground">
+                    <span
+                      key={badge}
+                      className="rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-foreground"
+                    >
                       {badge}
                     </span>
                   ))}
@@ -156,12 +194,18 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
               <div className="rounded-lg border border-border p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Completion Score</p>
-                    <p className="mt-2 text-3xl font-semibold">{activePlan?.completionScore}%</p>
+                    <p className="text-sm text-muted-foreground">
+                      Completion Score
+                    </p>
+                    <p className="mt-2 text-3xl font-semibold">
+                      {activePlan?.completionScore}%
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Progress</p>
-                    <p className="mt-2 text-3xl font-semibold">{activePlan?.progress}%</p>
+                    <p className="mt-2 text-3xl font-semibold">
+                      {activePlan?.progress}%
+                    </p>
                   </div>
                 </div>
                 <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-white/10">
@@ -183,12 +227,21 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
             </p>
             <div className="mt-4 space-y-2">
               <div className="rounded-2xl border border-border p-3 bg-background">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">AI readiness</p>
-                <p className="mt-2 text-sm text-foreground">Future AI integration support is enabled for personalized learning plans.</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  AI readiness
+                </p>
+                <p className="mt-2 text-sm text-foreground">
+                  Future AI integration support is enabled for personalized
+                  learning plans.
+                </p>
               </div>
               <div className="rounded-2xl border border-border p-3 bg-background">
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Hint</p>
-                <p className="mt-2 text-sm text-foreground">{activePlan?.aiAssistantHint}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Hint
+                </p>
+                <p className="mt-2 text-sm text-foreground">
+                  {activePlan?.aiAssistantHint}
+                </p>
               </div>
             </div>
           </div>
@@ -200,15 +253,24 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
               <h3 className="text-base font-semibold">Multi-day Roadmap</h3>
               <div className="mt-4 space-y-4">
                 {activePlan?.roadmap.map((item) => (
-                  <div key={item.day} className="rounded-2xl border border-border/60 bg-background p-4">
+                  <div
+                    key={item.day}
+                    className="rounded-2xl border border-border/60 bg-background p-4"
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold">{item.day}</span>
-                      <span className="text-xs uppercase text-muted-foreground">{item.goals.length} goals</span>
+                      <span className="text-xs uppercase text-muted-foreground">
+                        {item.goals.length} goals
+                      </span>
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">{item.summary}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {item.summary}
+                    </p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Tasks</p>
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                          Tasks
+                        </p>
                         <ul className="mt-2 list-disc pl-5 text-sm text-foreground space-y-1">
                           {item.tasks.map((task) => (
                             <li key={task}>{task}</li>
@@ -216,7 +278,9 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
                         </ul>
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Goals</p>
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                          Goals
+                        </p>
                         <ul className="mt-2 list-disc pl-5 text-sm text-foreground space-y-1">
                           {item.goals.map((goal) => (
                             <li key={goal}>{goal}</li>
@@ -235,17 +299,26 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
                 <div className="mt-4 space-y-3">
                   {activePlan?.recommendedFiles.length ? (
                     activePlan.recommendedFiles.map((file) => (
-                      <div key={file.path} className="rounded-xl border border-white/10 p-3 bg-background">
+                      <div
+                        key={file.path}
+                        className="rounded-xl border border-white/10 p-3 bg-background"
+                      >
                         <p className="font-medium">{file.path}</p>
-                        <p className="text-xs text-muted-foreground">{file.reason}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {file.reason}
+                        </p>
                         <div className="mt-2 flex items-center gap-2 text-xs text-foreground">
-                          <span className="rounded-full bg-primary/10 px-2 py-1">{file.confidence}%</span>
+                          <span className="rounded-full bg-primary/10 px-2 py-1">
+                            {file.confidence}%
+                          </span>
                           <span>Focus area match</span>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-muted-foreground">No file recommendations available yet.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No file recommendations available yet.
+                    </p>
                   )}
                 </div>
               </div>
@@ -255,12 +328,20 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
                 <div className="mt-4 space-y-3">
                   {activePlan?.recommendedIssues.length ? (
                     activePlan.recommendedIssues.map((issue) => (
-                      <div key={issue.id} className="rounded-xl border border-white/10 p-3 bg-background">
+                      <div
+                        key={issue.id}
+                        className="rounded-xl border border-white/10 p-3 bg-background"
+                      >
                         <p className="font-medium">{issue.title}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{issue.path} • {issue.estimate}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {issue.path} • {issue.estimate}
+                        </p>
                         <div className="mt-2 flex flex-wrap gap-2 text-xs">
                           {issue.labels.map((label) => (
-                            <span key={label} className="rounded-full bg-accent/10 px-2 py-1 text-muted-foreground">
+                            <span
+                              key={label}
+                              className="rounded-full bg-accent/10 px-2 py-1 text-muted-foreground"
+                            >
                               {label}
                             </span>
                           ))}
@@ -268,7 +349,10 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-muted-foreground">No issues detected. Browse the issue board for first contribution opportunities.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No issues detected. Browse the issue board for first
+                      contribution opportunities.
+                    </p>
                   )}
                 </div>
               </div>
@@ -280,14 +364,24 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
               <h3 className="text-base font-semibold">Learning Milestones</h3>
               <div className="mt-4 space-y-3">
                 {activePlan?.milestones.map((milestone) => (
-                  <div key={milestone.title} className="rounded-2xl border border-white/10 p-4 bg-background">
+                  <div
+                    key={milestone.title}
+                    className="rounded-2xl border border-white/10 p-4 bg-background"
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-medium">{milestone.title}</p>
-                      <span className="text-xs text-muted-foreground">{milestone.progress}%</span>
+                      <span className="text-xs text-muted-foreground">
+                        {milestone.progress}%
+                      </span>
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">{milestone.description}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {milestone.description}
+                    </p>
                     <div className="mt-3 h-2 w-full rounded-full bg-white/10">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${milestone.progress}%` }} />
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ width: `${milestone.progress}%` }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -295,11 +389,15 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
             </section>
 
             <section className="rounded-lg border border-border p-4">
-              <h3 className="text-base font-semibold">First Contribution Opportunities</h3>
+              <h3 className="text-base font-semibold">
+                First Contribution Opportunities
+              </h3>
               <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-foreground">
-                {activePlan?.firstContributionOpportunities.map((opportunity) => (
-                  <li key={opportunity}>{opportunity}</li>
-                ))}
+                {activePlan?.firstContributionOpportunities.map(
+                  (opportunity) => (
+                    <li key={opportunity}>{opportunity}</li>
+                  ),
+                )}
               </ul>
             </section>
 
@@ -307,9 +405,14 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
               <h3 className="text-base font-semibold">Learning Concepts</h3>
               <div className="mt-4 space-y-3">
                 {activePlan?.learningConcepts.map((concept) => (
-                  <div key={concept.title} className="rounded-xl border border-white/10 p-3 bg-background">
+                  <div
+                    key={concept.title}
+                    className="rounded-xl border border-white/10 p-3 bg-background"
+                  >
                     <p className="font-medium">{concept.title}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{concept.description}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {concept.description}
+                    </p>
                     <span className="mt-2 inline-flex rounded-full bg-accent/10 px-2 py-1 text-xs text-muted-foreground">
                       {concept.category}
                     </span>
@@ -322,8 +425,12 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
       </CardContent>
       <CardFooter className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">Progress Tracking</p>
-          <p className="text-sm text-foreground">Use this plan to track your onboarding progress and milestones.</p>
+          <p className="text-sm font-medium text-muted-foreground">
+            Progress Tracking
+          </p>
+          <p className="text-sm text-foreground">
+            Use this plan to track your onboarding progress and milestones.
+          </p>
         </div>
         <Button onClick={() => {}}>Export roadmap</Button>
       </CardFooter>

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/middleware";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,11 +33,11 @@ export async function GET(request: NextRequest) {
           nextRetryAt: true,
           createdAt: true,
           updatedAt: true,
-        }
+        },
       }),
       prisma.webhookEvent.count({
-        where: { status: "dlq" }
-      })
+        where: { status: "dlq" },
+      }),
     ]);
 
     await prisma.auditLog.create({
@@ -42,7 +46,7 @@ export async function GET(request: NextRequest) {
         action: "ACCESS_DLQ",
         resource: "admin/dlq",
         details: { take, skip, returnedCount: events.length },
-      }
+      },
     });
 
     return NextResponse.json({ events, total }, { status: 200 });

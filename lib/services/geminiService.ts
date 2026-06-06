@@ -1,5 +1,8 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
-import { getGeminiAnalysisCache, setGeminiAnalysisCache } from "./geminiAnalysisCacheService";
+import {
+  getGeminiAnalysisCache,
+  setGeminiAnalysisCache,
+} from "./geminiAnalysisCacheService";
 import { buildCacheKey } from "../utils/cacheKey";
 
 const CURRENT_MODEL_VERSION = "gemini-2.5-flash";
@@ -7,13 +10,13 @@ const CURRENT_MODEL_VERSION = "gemini-2.5-flash";
 export interface AIAnalysisRequest {
   repositoryId: number;
   type:
-  | "overview"
-  | "code-quality"
-  | "security"
-  | "architecture"
-  | "suggestions"
-  | "architecture-document"
-  | "architecture-chunk";
+    | "overview"
+    | "code-quality"
+    | "security"
+    | "architecture"
+    | "suggestions"
+    | "architecture-document"
+    | "architecture-chunk";
   context?: {
     files?: Array<{ path: string; content: string }>;
     fileTree?: string;
@@ -64,7 +67,7 @@ export class GeminiService {
     if (!key || key === "dummy-key-for-build") {
       // Defer throwing to runtime if possible, or warn. For now, use a dummy key during init.
     }
-    
+
     this.client = new GoogleGenerativeAI(key);
     this.model = this.client.getGenerativeModel({ model: "gemini-2.5-flash" });
   }
@@ -93,15 +96,17 @@ export class GeminiService {
       ) {
         throw new Error("Gemini API quota exceeded. Please try again later.");
       }
-      
+
       if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
+        message.includes("400 bad request") ||
+        message.includes("token limit") ||
         message.includes("maximum context length") ||
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.");
+        throw new Error(
+          "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.",
+        );
       }
 
       throw new Error(`AI analysis failed: ${error.message}`);
@@ -112,7 +117,8 @@ export class GeminiService {
    * Analyze code snippet
    */
   async analyzeCode(request: AICodeAnalysisRequest): Promise<string> {
-    const { code, language, analysisType, context, repositoryId, commitHash } = request;
+    const { code, language, analysisType, context, repositoryId, commitHash } =
+      request;
 
     let prompt = this.buildCodeAnalysisPrompt(
       code,
@@ -120,7 +126,7 @@ export class GeminiService {
       analysisType,
       context,
     );
-    
+
     let cacheKey: ReturnType<typeof buildCacheKey> | null = null;
     if (repositoryId && commitHash) {
       cacheKey = buildCacheKey({
@@ -159,15 +165,17 @@ export class GeminiService {
       ) {
         throw new Error("Gemini API quota exceeded. Please try again later.");
       }
-      
+
       if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
+        message.includes("400 bad request") ||
+        message.includes("token limit") ||
         message.includes("maximum context length") ||
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.");
+        throw new Error(
+          "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.",
+        );
       }
 
       throw new Error(`AI analysis failed: ${error.message}`);
@@ -202,15 +210,17 @@ export class GeminiService {
       ) {
         throw new Error("Gemini API quota exceeded. Please try again later.");
       }
-      
+
       if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
+        message.includes("400 bad request") ||
+        message.includes("token limit") ||
         message.includes("maximum context length") ||
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Context is too large for AI chat. Please try again with a smaller scope.");
+        throw new Error(
+          "Context is too large for AI chat. Please try again with a smaller scope.",
+        );
       }
 
       throw new Error(`AI chat failed: ${error.message}`);
@@ -218,19 +228,38 @@ export class GeminiService {
   }
 
   /**
-   * Chat using a pre-built prompt (free-form)
+   * Chat using a pre-built prompt (free-form).
+   * Pass an AbortSignal to cancel mid-flight — the Gemini SDK doesn't natively
+   * support AbortSignal, so we race the generateContent promise against an
+   * abort-triggered rejection.
    */
   async chatRaw(
     prompt: string,
     history?: Array<{ role: "user" | "assistant"; content: string }>,
+    signal?: AbortSignal,
   ): Promise<{ text: string; tokensConsumed: number }> {
     if (!prompt?.trim()) {
       throw new Error("Prompt is required");
     }
 
+    // Helper: wraps a promise so it rejects immediately if the signal fires
+    const withAbort = <T>(promise: Promise<T>): Promise<T> => {
+      if (!signal) return promise;
+      if (signal.aborted) return Promise.reject(new Error("Request aborted"));
+      return Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+          signal.addEventListener(
+            "abort",
+            () => reject(new Error("Request aborted")),
+            { once: true },
+          );
+        }),
+      ]);
+    };
+
     try {
       if (history && history.length > 0) {
-        // Cap history to prevent context limit failures
         const MAX_HISTORY_LENGTH = 10;
         const recentHistory = history.slice(-MAX_HISTORY_LENGTH);
 
@@ -242,19 +271,27 @@ export class GeminiService {
           { role: "user", parts: [{ text: prompt }] },
         ];
 
-        const result = await this.model.generateContent({ contents });
-        const response = await result.response;
+        const result = await withAbort(
+          this.model.generateContent({ contents }),
+        );
+        const response = result.response;
         const text = response.text();
-        const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
+        const tokensConsumed =
+          response.usageMetadata?.totalTokenCount ||
+          Math.ceil((prompt.length + text.length) / 4);
         return { text, tokensConsumed };
       } else {
-        const result = await this.model.generateContent(prompt);
-        const response = await result.response;
+        const result = await withAbort(this.model.generateContent(prompt));
+        const response = result.response;
         const text = response.text();
-        const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
+        const tokensConsumed =
+          response.usageMetadata?.totalTokenCount ||
+          Math.ceil((prompt.length + text.length) / 4);
         return { text, tokensConsumed };
       }
     } catch (error: any) {
+      if (error?.message === "Request aborted") throw error;
+
       console.error("Gemini chat error:", error);
 
       const message = error?.message?.toLowerCase() || "";
@@ -268,13 +305,15 @@ export class GeminiService {
       }
 
       if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
+        message.includes("400 bad request") ||
+        message.includes("token limit") ||
         message.includes("maximum context length") ||
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Prompt is too large for AI context limit. Please try again with a smaller scope.");
+        throw new Error(
+          "Prompt is too large for AI context limit. Please try again with a smaller scope.",
+        );
       }
 
       throw new Error(`AI chat failed: ${error.message}`);
@@ -292,8 +331,10 @@ export class GeminiService {
   }): Promise<string[]> {
     // Truncate diff to fit safely within context limits (approx 100k chars ~ 25k tokens)
     const MAX_DIFF_LENGTH = 100000;
-    const safeDiff = changes.diff 
-      ? (changes.diff.length > MAX_DIFF_LENGTH ? changes.diff.substring(0, MAX_DIFF_LENGTH) + "\n...[Diff truncated]" : changes.diff)
+    const safeDiff = changes.diff
+      ? changes.diff.length > MAX_DIFF_LENGTH
+        ? changes.diff.substring(0, MAX_DIFF_LENGTH) + "\n...[Diff truncated]"
+        : changes.diff
       : "";
 
     const prompt = `
@@ -323,7 +364,7 @@ Provide only the commit messages, one per line.
       console.error("Commit message suggestion error:", error);
 
       throw new Error(
-        error?.message || "Failed to generate commit message suggestions"
+        error?.message || "Failed to generate commit message suggestions",
       );
     }
   }
@@ -349,19 +390,22 @@ ${context?.fileTree ? `\nFile Structure:\n${context.fileTree}\n` : ""}`;
         knowledgeContext += `Project Description: ${context.knowledge.projectDescription}\n`;
       }
       if (context.knowledge.architecturePrinciples?.length) {
-        knowledgeContext += `Architecture Principles:\n- ${context.knowledge.architecturePrinciples.join('\n- ')}\n`;
+        knowledgeContext += `Architecture Principles:\n- ${context.knowledge.architecturePrinciples.join("\n- ")}\n`;
       }
-      if (context.knowledge.glossary && Object.keys(context.knowledge.glossary).length > 0) {
+      if (
+        context.knowledge.glossary &&
+        Object.keys(context.knowledge.glossary).length > 0
+      ) {
         knowledgeContext += `Glossary:\n`;
         Object.entries(context.knowledge.glossary).forEach(([k, v]) => {
           knowledgeContext += `- ${k}: ${v}\n`;
         });
       }
       if (context.knowledge.onboardingNotes?.length) {
-        knowledgeContext += `Onboarding Notes:\n- ${context.knowledge.onboardingNotes.join('\n- ')}\n`;
+        knowledgeContext += `Onboarding Notes:\n- ${context.knowledge.onboardingNotes.join("\n- ")}\n`;
       }
     }
-    
+
     const scopeNote = (context as any)?.targetDirectory
       ? `\nImportant: Restrict your analysis to the target directory (${(context as any).targetDirectory}). Only reference files outside this directory if they are immediately required dependencies.\n`
       : "";
@@ -469,9 +513,11 @@ Provide a concise, high-level summary of the modules, components, and responsibi
   ): string {
     // Truncate code to ~150000 characters to prevent API 400 Context Overflow
     const MAX_CODE_LENGTH = 150000;
-    const truncatedCode = code.length > MAX_CODE_LENGTH 
-      ? code.substring(0, MAX_CODE_LENGTH) + "\n...[Code truncated due to length limits]" 
-      : code;
+    const truncatedCode =
+      code.length > MAX_CODE_LENGTH
+        ? code.substring(0, MAX_CODE_LENGTH) +
+          "\n...[Code truncated due to length limits]"
+        : code;
 
     const basePrompt = `Language: ${language}\n${context ? `Context: ${context}\n` : ""}\n\nCode:\n\`\`\`${language}\n${truncatedCode}\n\`\`\`\n\n`;
 
@@ -551,16 +597,19 @@ Provide refactored code examples.`;
           prompt += `Project Description: ${context.knowledge.projectDescription}\n`;
         }
         if (context.knowledge.architecturePrinciples?.length) {
-          prompt += `Architecture Principles:\n- ${context.knowledge.architecturePrinciples.join('\n- ')}\n`;
+          prompt += `Architecture Principles:\n- ${context.knowledge.architecturePrinciples.join("\n- ")}\n`;
         }
-        if (context.knowledge.glossary && Object.keys(context.knowledge.glossary).length > 0) {
+        if (
+          context.knowledge.glossary &&
+          Object.keys(context.knowledge.glossary).length > 0
+        ) {
           prompt += `Glossary:\n`;
           Object.entries(context.knowledge.glossary).forEach(([k, v]) => {
             prompt += `- ${k}: ${v}\n`;
           });
         }
         if (context.knowledge.onboardingNotes?.length) {
-          prompt += `Onboarding Notes:\n- ${context.knowledge.onboardingNotes.join('\n- ')}\n`;
+          prompt += `Onboarding Notes:\n- ${context.knowledge.onboardingNotes.join("\n- ")}\n`;
         }
       }
       prompt += "\n";

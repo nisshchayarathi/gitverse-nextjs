@@ -7,7 +7,10 @@ interface BeginnerModeToggleProps {
   onToggle: () => void;
 }
 
-export function BeginnerModeToggle({ enabled, onToggle }: BeginnerModeToggleProps) {
+export function BeginnerModeToggle({
+  enabled,
+  onToggle,
+}: BeginnerModeToggleProps) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm transition-all duration-300 sm:flex-row sm:items-center sm:justify-between">
       <div className="space-y-2">

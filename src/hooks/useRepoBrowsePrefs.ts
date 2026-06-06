@@ -24,7 +24,9 @@ function loadPrefs(): RepoBrowsePrefs {
 
     const parsed = JSON.parse(stored) as Partial<RepoBrowsePrefs>;
 
-    const viewMode: ViewMode = VALID_VIEW_MODES.includes(parsed.viewMode as ViewMode)
+    const viewMode: ViewMode = VALID_VIEW_MODES.includes(
+      parsed.viewMode as ViewMode,
+    )
       ? (parsed.viewMode as ViewMode)
       : DEFAULTS.viewMode;
 

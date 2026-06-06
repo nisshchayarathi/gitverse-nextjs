@@ -70,7 +70,7 @@ export default function DeadCodePageClient() {
         err.response?.data?.error ||
           err.response?.data?.message ||
           err.message ||
-          "Failed to load repository data."
+          "Failed to load repository data.",
       );
       setLoading(false);
     }
@@ -87,7 +87,7 @@ export default function DeadCodePageClient() {
       await axios.post(
         buildApiUrl(`/api/repositories/${id}/analyze`),
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       await fetchRepository();
     } catch (err: any) {
@@ -136,7 +136,8 @@ export default function DeadCodePageClient() {
             <div>
               <h3 className="font-semibold text-lg">No files available</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Repository files have not been loaded yet. Run an analysis first.
+                Repository files have not been loaded yet. Run an analysis
+                first.
               </p>
             </div>
             <div className="flex gap-3">
@@ -171,9 +172,9 @@ export default function DeadCodePageClient() {
                   Dead Code Analysis
                 </h1>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                  {repository?.name || "Repository"} —{" "}
-                  {findings.length} finding{findings.length !== 1 ? "s" : ""} across{" "}
-                  {files.length} file{files.length !== 1 ? "s" : ""}
+                  {repository?.name || "Repository"} — {findings.length} finding
+                  {findings.length !== 1 ? "s" : ""} across {files.length} file
+                  {files.length !== 1 ? "s" : ""}
                 </p>
               </div>
 

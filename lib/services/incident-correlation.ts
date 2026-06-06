@@ -1,6 +1,9 @@
 import { getGeminiService } from "./geminiService";
 import { sanitizeTextContent } from "@/lib/utils/promptSanitization";
-import { IncidentPayload, IncidentCorrelation } from "@/types/incident-response";
+import {
+  IncidentPayload,
+  IncidentCorrelation,
+} from "@/types/incident-response";
 
 export class IncidentCorrelationService {
   /**
@@ -8,16 +11,22 @@ export class IncidentCorrelationService {
    */
   public async correlateIncident(
     incident: IncidentPayload,
-    repositoryContext: string
+    repositoryContext: string,
   ): Promise<IncidentCorrelation> {
-    console.log(`[IncidentCorrelation] Starting correlation for incident: ${incident.title}`);
+    console.log(
+      `[IncidentCorrelation] Starting correlation for incident: ${incident.title}`,
+    );
 
     const safeTitle = sanitizeTextContent(incident.title);
     const safeSeverity = sanitizeTextContent(incident.severity);
-    const safeService = sanitizeTextContent(incident.affectedService || "Unknown");
+    const safeService = sanitizeTextContent(
+      incident.affectedService || "Unknown",
+    );
     const safeTimestamp = sanitizeTextContent(incident.timestamp);
     const safeEnvironment = sanitizeTextContent(incident.environment);
-    const safeStackTrace = sanitizeTextContent(incident.stackTrace || "None provided");
+    const safeStackTrace = sanitizeTextContent(
+      incident.stackTrace || "None provided",
+    );
     const safeRepoContext = sanitizeTextContent(repositoryContext);
 
     const prompt = `
@@ -58,13 +67,19 @@ Provide ONLY the valid JSON object and nothing else.
     const geminiService = getGeminiService();
     try {
       const response = await geminiService.chatRaw(prompt);
-      
+
       // Attempt to parse JSON response. Gemini might wrap it in ```json
       let responseText = response.text.trim();
       if (responseText.startsWith("\`\`\`json")) {
-        responseText = responseText.replace(/^\`\`\`json/, "").replace(/\`\`\`$/, "").trim();
+        responseText = responseText
+          .replace(/^\`\`\`json/, "")
+          .replace(/\`\`\`$/, "")
+          .trim();
       } else if (responseText.startsWith("\`\`\`")) {
-        responseText = responseText.replace(/^\`\`\`/, "").replace(/\`\`\`$/, "").trim();
+        responseText = responseText
+          .replace(/^\`\`\`/, "")
+          .replace(/\`\`\`$/, "")
+          .trim();
       }
 
       const parsed = JSON.parse(responseText);
@@ -75,10 +90,14 @@ Provide ONLY the valid JSON object and nothing else.
         impactedFiles: parsed.impactedFiles || [],
         impactedServices: parsed.impactedServices || [],
         confidenceScore: parsed.confidenceScore || 0,
-        analysisDetails: parsed.analysisDetails || "No detailed analysis provided.",
+        analysisDetails:
+          parsed.analysisDetails || "No detailed analysis provided.",
       };
     } catch (error) {
-      console.error("[IncidentCorrelation] Failed to correlate incident:", error);
+      console.error(
+        "[IncidentCorrelation] Failed to correlate incident:",
+        error,
+      );
       return {
         impactedFiles: [],
         impactedServices: [],

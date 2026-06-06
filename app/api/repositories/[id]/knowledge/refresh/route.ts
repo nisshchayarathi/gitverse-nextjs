@@ -9,25 +9,41 @@ import * as crypto from "crypto";
 import * as fs from "fs/promises";
 import { gitverseConfigParser } from "@/lib/parsers/gitverseConfigParser";
 import { repositoryKnowledgeService } from "@/lib/services/repositoryKnowledgeService";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const user = await requireAuth(request);
-    const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.REPOSITORY_KNOWLEDGE_REFRESH);
+    const rl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.REPOSITORY_KNOWLEDGE_REFRESH,
+    );
     if (!rl.allowed) return rateLimitResponse(rl);
     const repositoryId = parseInt(params.id, 10);
 
     if (isNaN(repositoryId)) {
-      return NextResponse.json({ error: "Invalid repository ID" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid repository ID" },
+        { status: 400 },
+      );
     }
 
-    const repository = await repositoryService.getRepository(repositoryId, user.userId);
+    const repository = await repositoryService.getRepository(
+      repositoryId,
+      user.userId,
+    );
     if (!repository) {
-      return NextResponse.json({ error: "Repository not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Repository not found" },
+        { status: 404 },
+      );
     }
 
     // Clone the repo just to read the knowledge configs
@@ -42,7 +58,10 @@ export async function POST(
 
     try {
       const refreshController = new AbortController();
-      const refreshTimeout = setTimeout(() => refreshController.abort(), 5 * 60 * 1000);
+      const refreshTimeout = setTimeout(
+        () => refreshController.abort(),
+        5 * 60 * 1000,
+      );
 
       try {
         const token = await getGithubAccessToken(user.userId);
@@ -55,31 +74,42 @@ export async function POST(
       } finally {
         clearTimeout(refreshTimeout);
       }
-      
+
       let knowledgeJson = undefined;
       let knowledgeMd = undefined;
-      
+
       try {
         const jsonPath = path.join(tempDir, ".gitverse.json");
         const jsonContent = await fs.readFile(jsonPath, "utf8");
         knowledgeJson = gitverseConfigParser.parseJson(jsonContent);
-      } catch (e) { /* Ignore */ }
-      
+      } catch (e) {
+        /* Ignore */
+      }
+
       try {
         const mdPath = path.join(tempDir, ".gitverse.md");
         const mdContent = await fs.readFile(mdPath, "utf8");
         knowledgeMd = gitverseConfigParser.parseMarkdown(mdContent);
-      } catch (e) { /* Ignore */ }
-      
-      parsedKnowledge = gitverseConfigParser.mergeKnowledge(knowledgeJson, knowledgeMd);
-      
-      await repositoryKnowledgeService.upsertKnowledge(repositoryId, parsedKnowledge);
-      
+      } catch (e) {
+        /* Ignore */
+      }
+
+      parsedKnowledge = gitverseConfigParser.mergeKnowledge(
+        knowledgeJson,
+        knowledgeMd,
+      );
+
+      await repositoryKnowledgeService.upsertKnowledge(
+        repositoryId,
+        parsedKnowledge,
+      );
     } finally {
       if (gitService) {
         await gitService.cleanup();
       } else {
-        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null);
+        await fs
+          .rm(tempDir, { recursive: true, force: true })
+          .catch(() => null);
       }
     }
 
@@ -93,6 +123,9 @@ export async function POST(
     return NextResponse.json({ success: true, knowledge: formattedKnowledge });
   } catch (error: any) {
     console.error("Failed to refresh repository knowledge:", error);
-    return NextResponse.json({ error: "Failed to refresh repository knowledge" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to refresh repository knowledge" },
+      { status: 500 },
+    );
   }
 }

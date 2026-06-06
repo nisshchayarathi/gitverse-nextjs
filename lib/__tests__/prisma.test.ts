@@ -86,7 +86,7 @@ describe("Prisma connection lifecycle", () => {
 
   beforeAll(() => {
     process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
-    process.env.NODE_ENV = "test";
+    (process.env as any).NODE_ENV = "test";
     process.env.PRISMA_ADAPTER = "pg";
 
     jest.isolateModules(() => {
@@ -96,7 +96,7 @@ describe("Prisma connection lifecycle", () => {
 
   afterAll(() => {
     process.env.DATABASE_URL = ORIGINAL_DB_URL;
-    process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    (process.env as any).NODE_ENV = ORIGINAL_NODE_ENV;
     process.removeAllListeners("beforeExit");
   });
 
@@ -204,7 +204,7 @@ describe("Prisma connection lifecycle", () => {
     it("respects timeout option and falls back to force close", async () => {
       prismaModule.getPrisma();
       mockDisconnect.mockImplementationOnce(
-        () => new Promise((resolve) => setTimeout(resolve, 5000))
+        () => new Promise((resolve) => setTimeout(resolve, 5000)),
       );
 
       await prismaModule.disconnectPrisma({ timeoutMs: 50 });
@@ -235,7 +235,9 @@ describe("Prisma connection lifecycle", () => {
   describe("proxy default export", () => {
     it("forwards method calls to the underlying Prisma client", () => {
       const client = prismaModule.getPrisma();
-      (client.analysisJob.findFirst as jest.Mock).mockReturnValueOnce({ id: "job-1" });
+      (client.analysisJob.findFirst as jest.Mock).mockReturnValueOnce({
+        id: "job-1",
+      });
 
       const prisma = prismaModule.default;
       const result = prisma.analysisJob.findFirst({ where: { id: "test" } });
@@ -358,7 +360,9 @@ describe("Prisma connection lifecycle", () => {
       expect(health.metrics.length).toBe(directMetrics.length);
       for (let i = 0; i < health.metrics.length; i++) {
         expect(health.metrics[i].adapter).toBe(directMetrics[i].adapter);
-        expect(health.metrics[i].totalConnections).toBe(directMetrics[i].totalConnections);
+        expect(health.metrics[i].totalConnections).toBe(
+          directMetrics[i].totalConnections,
+        );
       }
     });
 

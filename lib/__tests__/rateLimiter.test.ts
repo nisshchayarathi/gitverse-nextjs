@@ -1,3 +1,5 @@
+export {};
+
 let mockPipelineInc: jest.Mock;
 let mockPipelineTtl: jest.Mock;
 let mockPipelineExec: jest.Mock;
@@ -120,7 +122,10 @@ describe("checkRateLimit", () => {
       tier: "free",
     });
 
-    expect(mockExpire).toHaveBeenCalledWith(expect.stringContaining("rl:mfa:verify:"), 60);
+    expect(mockExpire).toHaveBeenCalledWith(
+      expect.stringContaining("rl:mfa:verify:"),
+      60,
+    );
   });
 
   it("returns correct resetInSec from TTL", async () => {
@@ -312,8 +317,7 @@ describe("getClientIp", () => {
   it("falls back to x-real-ip", () => {
     const req = {
       headers: {
-        get: (name: string) =>
-          name === "x-real-ip" ? "198.51.100.1" : null,
+        get: (name: string) => (name === "x-real-ip" ? "198.51.100.1" : null),
       },
     } as any;
 

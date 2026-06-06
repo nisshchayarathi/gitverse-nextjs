@@ -6,8 +6,8 @@ vi.mock("../../lib/prisma", () => ({
   default: {
     repository: {
       findMany: vi.fn(),
-    }
-  }
+    },
+  },
 }));
 
 describe("Repository Pagination", () => {
@@ -24,16 +24,18 @@ describe("Repository Pagination", () => {
       name: `Repo ${i + 1}`,
       userId: 1,
     }));
-    
+
     (prisma.repository.findMany as any).mockResolvedValue(mockRepos);
 
     const result = await repositoryService.listRepositories(1, 10);
 
-    expect(prisma.repository.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { userId: 1 },
-      take: 11,
-      orderBy: { id: "desc" },
-    }));
+    expect(prisma.repository.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 1 },
+        take: 11,
+        orderBy: { id: "desc" },
+      }),
+    );
 
     expect(result.data).toHaveLength(10);
     expect(result.nextCursor).toBe(11);
@@ -46,18 +48,20 @@ describe("Repository Pagination", () => {
       name: `Repo ${i + 12}`,
       userId: 1,
     }));
-    
+
     (prisma.repository.findMany as any).mockResolvedValue(mockRepos);
 
     const result = await repositoryService.listRepositories(1, 10, 11);
 
-    expect(prisma.repository.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { userId: 1 },
-      take: 11,
-      cursor: { id: 11 },
-      skip: 1,
-      orderBy: { id: "desc" },
-    }));
+    expect(prisma.repository.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 1 },
+        take: 11,
+        cursor: { id: 11 },
+        skip: 1,
+        orderBy: { id: "desc" },
+      }),
+    );
 
     expect(result.data).toHaveLength(5);
     expect(result.nextCursor).toBeUndefined();

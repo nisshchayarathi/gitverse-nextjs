@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { GitHubService } from "@/lib/services/githubService";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
-import { encryptToken, validateEncryptionConfig } from "@/lib/utils/tokenEncryption";
+import {
+  encryptToken,
+  validateEncryptionConfig,
+} from "@/lib/utils/tokenEncryption";
 import { RedactSensitiveFields } from "@/services/security/redact-sensitive-fields";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,14 +21,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: "ENCRYPTION_UNAVAILABLE",
-          message: "Token encryption is not configured. Contact the administrator.",
+          message:
+            "Token encryption is not configured. Contact the administrator.",
         },
         { status: 503 },
       );
     }
 
     const user = await requireAuth(request);
-    const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.GITHUB_CONNECT);
+    const rl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.GITHUB_CONNECT,
+    );
     if (!rl.allowed) return rateLimitResponse(rl);
     const body = await request.json();
     const token = (body?.token as string | undefined)?.trim();

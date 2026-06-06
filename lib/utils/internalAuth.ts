@@ -7,7 +7,7 @@ export function deriveBearerToken(secret: string): string {
 
 export function validateAuthorizationHeader(
   authHeader: string | null,
-  secret: string | undefined
+  secret: string | undefined,
 ): boolean {
   if (!secret) return false;
 
@@ -23,9 +23,7 @@ export function validateAuthorizationHeader(
   }
 }
 
-export function isInternalWorkerAuthorized(
-  authHeader: string | null
-): boolean {
+export function isInternalWorkerAuthorized(authHeader: string | null): boolean {
   const secret = process.env.INTERNAL_WORKER_SECRET;
   return validateAuthorizationHeader(authHeader, secret);
 }
@@ -34,8 +32,7 @@ export function isCronAuthorized(authHeader: string | null): boolean {
   const secret = process.env.CRON_SECRET || process.env.ANALYSIS_RUNNER_SECRET;
   if (!secret) return false;
 
-  const directMatch =
-    authHeader != null && authHeader === `Bearer ${secret}`;
+  const directMatch = authHeader != null && authHeader === `Bearer ${secret}`;
   if (directMatch) return true;
 
   return validateAuthorizationHeader(authHeader, secret);
@@ -51,7 +48,7 @@ export function isAnalysisRunnerTokenValid(
   try {
     return crypto.timingSafeEqual(
       Buffer.from(headerSecret),
-      Buffer.from(secret)
+      Buffer.from(secret),
     );
   } catch {
     return false;
@@ -87,19 +84,19 @@ export function validateRequiredAnalysisSecrets(): {
     if (process.env.NODE_ENV === "production") {
       errors.push(
         "ANALYSIS_RUNNER_SECRET is required in production. " +
-        "Set it to a random value generated with: openssl rand -hex 32"
+          "Set it to a random value generated with: openssl rand -hex 32",
       );
     } else {
       warnings.push(
         "ANALYSIS_RUNNER_SECRET is not set. " +
-        "The /api/internal/run-analysis endpoint will reject all requests."
+          "The /api/internal/run-analysis endpoint will reject all requests.",
       );
     }
   } else {
     if (runnerSecret.length < 16) {
       warnings.push(
         "ANALYSIS_RUNNER_SECRET is shorter than 16 characters. " +
-        "Use a longer secret for better security."
+          "Use a longer secret for better security.",
       );
     }
 
@@ -110,7 +107,7 @@ export function validateRequiredAnalysisSecrets(): {
     ) {
       warnings.push(
         "ANALYSIS_RUNNER_SECRET is set to a placeholder value. " +
-        "Generate a strong random value with: openssl rand -hex 32"
+          "Generate a strong random value with: openssl rand -hex 32",
       );
     }
 
@@ -118,7 +115,7 @@ export function validateRequiredAnalysisSecrets(): {
     if (workerSecret && runnerSecret === workerSecret) {
       warnings.push(
         "ANALYSIS_RUNNER_SECRET should differ from INTERNAL_WORKER_SECRET. " +
-        "Using the same secret for multiple purposes weakens security."
+          "Using the same secret for multiple purposes weakens security.",
       );
     }
 
@@ -126,7 +123,7 @@ export function validateRequiredAnalysisSecrets(): {
     if (cronSecret && runnerSecret === cronSecret) {
       warnings.push(
         "ANALYSIS_RUNNER_SECRET should differ from CRON_SECRET. " +
-        "Each internal service should use its own secret."
+          "Each internal service should use its own secret.",
       );
     }
 
@@ -134,7 +131,7 @@ export function validateRequiredAnalysisSecrets(): {
     if (jwtSecret && runnerSecret === jwtSecret) {
       warnings.push(
         "ANALYSIS_RUNNER_SECRET should differ from JWT_SECRET. " +
-        "Using the same secret for authentication and internal services weakens security."
+          "Using the same secret for authentication and internal services weakens security.",
       );
     }
   }
@@ -153,38 +150,30 @@ export function validateSecretIsolation(): string[] {
 
   if (workerSecret && webhookSecret && workerSecret === webhookSecret) {
     warnings.push(
-      "INTERNAL_WORKER_SECRET should differ from GITHUB_WEBHOOK_SECRET"
+      "INTERNAL_WORKER_SECRET should differ from GITHUB_WEBHOOK_SECRET",
     );
   }
 
   if (workerSecret && jwtSecret && workerSecret === jwtSecret) {
-    warnings.push(
-      "INTERNAL_WORKER_SECRET should differ from JWT_SECRET"
-    );
+    warnings.push("INTERNAL_WORKER_SECRET should differ from JWT_SECRET");
   }
 
   if (cronSecret && workerSecret && cronSecret === workerSecret) {
-    warnings.push(
-      "CRON_SECRET should differ from INTERNAL_WORKER_SECRET"
-    );
+    warnings.push("CRON_SECRET should differ from INTERNAL_WORKER_SECRET");
   }
 
   if (runnerSecret && workerSecret && runnerSecret === workerSecret) {
     warnings.push(
-      "ANALYSIS_RUNNER_SECRET should differ from INTERNAL_WORKER_SECRET"
+      "ANALYSIS_RUNNER_SECRET should differ from INTERNAL_WORKER_SECRET",
     );
   }
 
   if (runnerSecret && cronSecret && runnerSecret === cronSecret) {
-    warnings.push(
-      "ANALYSIS_RUNNER_SECRET should differ from CRON_SECRET"
-    );
+    warnings.push("ANALYSIS_RUNNER_SECRET should differ from CRON_SECRET");
   }
 
   if (runnerSecret && jwtSecret && runnerSecret === jwtSecret) {
-    warnings.push(
-      "ANALYSIS_RUNNER_SECRET should differ from JWT_SECRET"
-    );
+    warnings.push("ANALYSIS_RUNNER_SECRET should differ from JWT_SECRET");
   }
 
   return warnings;

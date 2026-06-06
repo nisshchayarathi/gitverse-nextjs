@@ -24,11 +24,12 @@ export class ImpactAnalysisService {
 
     // 1. Fetch changed files from PR
     const prFiles = await github.getPullRequestFiles(owner, repo, pullNumber);
-    
+
     // Filter to only care about source code files
-    const sourceFiles = prFiles.filter(f => 
-      ['.ts', '.tsx', '.js', '.jsx'].includes(path.extname(f.filename)) &&
-      f.status !== 'removed'
+    const sourceFiles = prFiles.filter(
+      (f) =>
+        [".ts", ".tsx", ".js", ".jsx"].includes(path.extname(f.filename)) &&
+        f.status !== "removed",
     );
 
     if (sourceFiles.length === 0) {
@@ -36,12 +37,12 @@ export class ImpactAnalysisService {
       return;
     }
 
-    const changedFileNames = sourceFiles.map(f => f.filename);
+    const changedFileNames = sourceFiles.map((f) => f.filename);
 
     const tempDir = path.join(
       os.tmpdir(),
       "gitverse-impact",
-      `${repo}-${crypto.randomBytes(4).toString("hex")}`
+      `${repo}-${crypto.randomBytes(4).toString("hex")}`,
     );
 
     let gitService: GitService | null = null;
@@ -49,7 +50,10 @@ export class ImpactAnalysisService {
       // 2. Clone repository shallowly to get the dependency structure
       const repoUrl = `https://github.com/${owner}/${repo}.git`;
       const impactController = new AbortController();
-      const impactTimeout = setTimeout(() => impactController.abort(), 10 * 60 * 1000);
+      const impactTimeout = setTimeout(
+        () => impactController.abort(),
+        10 * 60 * 1000,
+      );
       try {
         gitService = await GitService.cloneRepository(repoUrl, tempDir, {
           depth: 1,
@@ -64,7 +68,10 @@ export class ImpactAnalysisService {
       const graph = await this.graphService.buildGraph(tempDir);
 
       // 4. Find dependents
-      const affectedFiles = this.graphService.getDownstreamDependents(graph, changedFileNames);
+      const affectedFiles = this.graphService.getDownstreamDependents(
+        graph,
+        changedFileNames,
+      );
 
       // 5. Gather file contents for Gemini from the PR itself
       const changedFilesContent = [];
@@ -75,26 +82,43 @@ export class ImpactAnalysisService {
         // But since we just need to assess risk, passing the base file content or PR modified content?
         // Let's fetch using the PR branch ref.
         try {
-          const prDetails = await github.getPullRequest(owner, repo, pullNumber);
+          const prDetails = await github.getPullRequest(
+            owner,
+            repo,
+            pullNumber,
+          );
           const prBranch = prDetails.head.ref;
-          
-          const apiContent = await github.getFileContent(owner, repo, f.filename, prBranch);
+
+          const apiContent = await github.getFileContent(
+            owner,
+            repo,
+            f.filename,
+            prBranch,
+          );
           if (apiContent) {
             changedFilesContent.push({ path: f.filename, content: apiContent });
           }
         } catch (e) {
-           console.warn(`[ImpactAnalysis] Failed to fetch PR content for ${f.filename}, falling back to local.`);
-           try {
-              const content = await fs.readFile(path.join(tempDir, f.filename), "utf-8");
-              changedFilesContent.push({ path: f.filename, content });
-           } catch(e2) {
-              // ignore
-           }
+          console.warn(
+            `[ImpactAnalysis] Failed to fetch PR content for ${f.filename}, falling back to local.`,
+          );
+          try {
+            const content = await fs.readFile(
+              path.join(tempDir, f.filename),
+              "utf-8",
+            );
+            changedFilesContent.push({ path: f.filename, content });
+          } catch (e2) {
+            // ignore
+          }
         }
       }
 
       // 6. Risk Assessment
-      const risk = await this.riskService.assessRisk(changedFilesContent, affectedFiles);
+      const risk = await this.riskService.assessRisk(
+        changedFilesContent,
+        affectedFiles,
+      );
 
       // 7. Format Comment
       const report = {
@@ -103,22 +127,25 @@ export class ImpactAnalysisService {
         riskLevel: risk.riskLevel,
         reasoning: risk.reasoning,
         suggestedFollowUpChecks: risk.suggestedFollowUpChecks,
-        confidenceScore: risk.confidenceScore
+        confidenceScore: risk.confidenceScore,
       };
 
       const markdown = this.commentService.generateMarkdownReport(report);
 
       // 8. Post Comment
       await github.postPullRequestComment(owner, repo, pullNumber, markdown);
-      console.log(`[ImpactAnalysis] Successfully posted impact report to PR #${pullNumber}`);
-
+      console.log(
+        `[ImpactAnalysis] Successfully posted impact report to PR #${pullNumber}`,
+      );
     } catch (error) {
       console.error("[ImpactAnalysis] Failed:", error);
     } finally {
       if (gitService) {
         await gitService.cleanup();
       } else {
-        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null);
+        await fs
+          .rm(tempDir, { recursive: true, force: true })
+          .catch(() => null);
       }
     }
   }

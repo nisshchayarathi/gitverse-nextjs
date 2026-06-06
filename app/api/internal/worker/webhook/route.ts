@@ -25,7 +25,11 @@ import { webhookQueue } from "@/lib/services/webhook-queue";
 import { PRImpactAnalysisService } from "@/lib/services/prImpactAnalysisService";
 import { RepositorySyncQueue } from "@/lib/services/repositorySyncQueue";
 import { classifyRetry } from "@/lib/utils/retry";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 minutes max duration for Vercel
@@ -38,8 +42,10 @@ export async function POST(request: NextRequest) {
   const rl = await checkRateLimit("webhook-worker", RATE_LIMITS.WORKER_WEBHOOK);
   if (!rl.allowed) return rateLimitResponse(rl, "Worker rate limit exceeded");
 
-  const baseUrl = process.env.NEXTAUTH_URL || `http://${request.headers.get("host") || "localhost:3000"}`;
-  
+  const baseUrl =
+    process.env.NEXTAUTH_URL ||
+    `http://${request.headers.get("host") || "localhost:3000"}`;
+
   try {
     return await handlePost(request);
   } finally {
@@ -68,7 +74,7 @@ async function handlePost(request: NextRequest) {
   if (webhookEvent.status !== "pending") {
     return NextResponse.json(
       { ok: true, ignored: true, reason: "already_processed" },
-      { status: 200 }
+      { status: 200 },
     );
   }
 
@@ -79,7 +85,7 @@ async function handlePost(request: NextRequest) {
   });
 
   const timeoutEstimator = new TimeoutEstimatorService();
-  
+
   let globalCheckRunId: number | null = null;
   let globalOwner: string | null = null;
   let globalRepo: string | null = null;
@@ -94,7 +100,12 @@ async function handlePost(request: NextRequest) {
     const number = pullNumber || issueNumber;
     const installationId = payload.installation?.id;
 
-    if (!owner || !repo || (!number && webhookEvent.event !== "push") || !installationId) {
+    if (
+      !owner ||
+      !repo ||
+      (!number && webhookEvent.event !== "push") ||
+      !installationId
+    ) {
       throw new Error("Missing required fields in payload");
     }
 
@@ -114,13 +125,18 @@ async function handlePost(request: NextRequest) {
         where: { id: eventId },
         data: { status: "completed", error: "Repo not enabled" },
       });
-      return NextResponse.json({ ok: true, ignored: true, reason: "repo_not_enabled" });
+      return NextResponse.json({
+        ok: true,
+        ignored: true,
+        reason: "repo_not_enabled",
+      });
     }
 
     const app = new GitHubAppService();
-    const installationToken = await app.getInstallationAccessToken(installationId);
+    const installationToken =
+      await app.getInstallationAccessToken(installationId);
     const github = new GitHubService(installationToken);
-    
+
     globalOwner = owner;
     globalRepo = repo;
     globalGithubToken = installationToken;
@@ -129,22 +145,34 @@ async function handlePost(request: NextRequest) {
     if (process.env.DISABLE_AI_ANALYSIS === "true") {
       await prisma.webhookEvent.update({
         where: { id: eventId },
-        data: { status: "completed", error: "AI analysis is globally disabled" },
+        data: {
+          status: "completed",
+          error: "AI analysis is globally disabled",
+        },
       });
-      return NextResponse.json({ ok: true, ignored: true, reason: "ai_disabled" });
+      return NextResponse.json({
+        ok: true,
+        ignored: true,
+        reason: "ai_disabled",
+      });
     }
 
     // 2. Installation Quota Enforcement
-    const hasQuota = await QuotaService.checkAndReserveQuota(BigInt(installationId));
+    const hasQuota = await QuotaService.checkAndReserveQuota(
+      BigInt(installationId),
+    );
     if (!hasQuota) {
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "rate_limited", error: "AI usage quota exhausted" },
       });
 
-      const warningPosted = await QuotaService.hasWarningBeenPosted(BigInt(installationId));
+      const warningPosted = await QuotaService.hasWarningBeenPosted(
+        BigInt(installationId),
+      );
       if (!warningPosted) {
-        const comment = "⚠️ **GitVerse AI Quota Exhausted**\n\nThe AI analysis quota has been temporarily exhausted for this installation. Automatic PR reviews will resume when the quota window resets.";
+        const comment =
+          "⚠️ **GitVerse AI Quota Exhausted**\n\nThe AI analysis quota has been temporarily exhausted for this installation. Automatic PR reviews will resume when the quota window resets.";
         try {
           await github.postPullRequestComment(owner, repo, number, comment);
           await QuotaService.markWarningPosted(BigInt(installationId));
@@ -152,18 +180,28 @@ async function handlePost(request: NextRequest) {
           console.error("Failed to post quota warning comment:", e);
         }
       }
-      return NextResponse.json({ ok: true, ignored: true, reason: "quota_exhausted" });
+      return NextResponse.json({
+        ok: true,
+        ignored: true,
+        reason: "quota_exhausted",
+      });
     }
 
     if (webhookEvent.event === "push") {
-      const enqueued = await RepositorySyncQueue.enqueueSyncJob(enabledRepo.id, "push");
-      
+      const enqueued = await RepositorySyncQueue.enqueueSyncJob(
+        enabledRepo.id,
+        "push",
+      );
+
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "completed" },
       });
 
-      return NextResponse.json({ ok: true, message: enqueued ? "Sync job enqueued" : "Duplicate sync job ignored" });
+      return NextResponse.json({
+        ok: true,
+        message: enqueued ? "Sync job enqueued" : "Duplicate sync job ignored",
+      });
     }
 
     if (webhookEvent.event === "issues") {
@@ -205,7 +243,7 @@ async function handlePost(request: NextRequest) {
     const githubChecks = new GitHubChecksService(github);
     const checkRunId = await githubChecks.createCheckRun(owner, repo, headSha);
     globalCheckRunId = checkRunId;
-    
+
     const policyEngine = new PremergePolicyEngine();
 
     // Upsert PR record.
@@ -252,7 +290,11 @@ async function handlePost(request: NextRequest) {
           where: { id: eventId },
           data: { status: "completed", error: "Already reviewed (deduped)" },
         });
-        return NextResponse.json({ ok: true, ignored: true, reason: "already_reviewed" });
+        return NextResponse.json({
+          ok: true,
+          ignored: true,
+          reason: "already_reviewed",
+        });
       }
       throw e;
     }
@@ -263,19 +305,31 @@ async function handlePost(request: NextRequest) {
       const allSecrets = [];
       for (const file of prFiles) {
         if (!file.patch) continue;
-        const fileSecrets = await secretDetector.scanFile(file.filename, file.patch);
+        const fileSecrets = await secretDetector.scanFile(
+          file.filename,
+          file.patch,
+        );
         allSecrets.push(...fileSecrets);
       }
 
       if (allSecrets.length > 0) {
-        await securityAlerts.handleExposure(String(enabledRepo.id), headSha, allSecrets, number);
+        await securityAlerts.handleExposure(
+          String(enabledRepo.id),
+          headSha,
+          allSecrets,
+          number,
+        );
         policyEngine.addEvaluation({
           category: "secret_scanning",
           status: "FAIL",
-          message: `Critical secret exposure detected in ${allSecrets.length} file(s).`
+          message: `Critical secret exposure detected in ${allSecrets.length} file(s).`,
         });
       } else {
-        policyEngine.addEvaluation({ category: "secret_scanning", status: "PASS", message: "No secrets detected." });
+        policyEngine.addEvaluation({
+          category: "secret_scanning",
+          status: "PASS",
+          message: "No secrets detected.",
+        });
       }
     } catch (secretError) {
       console.error("Secret detection pipeline failed:", secretError);
@@ -292,7 +346,10 @@ async function handlePost(request: NextRequest) {
       });
 
       if (tokensConsumed) {
-        await QuotaService.recordTokenUsage(BigInt(installationId), tokensConsumed);
+        await QuotaService.recordTokenUsage(
+          BigInt(installationId),
+          tokensConsumed,
+        );
       }
 
       const comment = formatPRReviewMarkdown({ review, prUrl });
@@ -300,7 +357,12 @@ async function handlePost(request: NextRequest) {
       let postError: any = null;
 
       try {
-        const posted = await github.postPullRequestComment(owner, repo, number, comment);
+        const posted = await github.postPullRequestComment(
+          owner,
+          repo,
+          number,
+          comment,
+        );
         postedUrl = posted?.html_url || null;
       } catch (err: unknown) {
         if (isAxiosError(err)) {
@@ -327,13 +389,21 @@ async function handlePost(request: NextRequest) {
           reviewText: comment,
           rawJson: {
             ...(review as any),
-            _githubPost: { ok: Boolean(postedUrl), postedUrl, error: postError },
+            _githubPost: {
+              ok: Boolean(postedUrl),
+              postedUrl,
+              error: postError,
+            },
           } as any,
         },
       });
 
       // Pass AI review result
-      policyEngine.addEvaluation({ category: "ai_review", status: "PASS", message: "AI Analysis completed without critical issues." });
+      policyEngine.addEvaluation({
+        category: "ai_review",
+        status: "PASS",
+        message: "AI Analysis completed without critical issues.",
+      });
 
       // Execute dependency impact analysis
       try {
@@ -350,7 +420,7 @@ async function handlePost(request: NextRequest) {
           repoFullName,
           number,
           prRecord.id,
-          enabledRepo.id
+          enabledRepo.id,
         );
       } catch (impactErr) {
         console.error("Dependency impact analysis failed:", impactErr);
@@ -372,14 +442,33 @@ async function handlePost(request: NextRequest) {
       }
 
       // Mock additional policies
-      policyEngine.addEvaluation({ category: "blackout_window", status: "PASS", message: "No active blackout window." });
-      policyEngine.addEvaluation({ category: "dependency_security", status: "PASS", message: "No vulnerable dependencies introduced." });
-      policyEngine.addEvaluation({ category: "organization_policies", status: "PASS", message: "All organization policies met." });
+      policyEngine.addEvaluation({
+        category: "blackout_window",
+        status: "PASS",
+        message: "No active blackout window.",
+      });
+      policyEngine.addEvaluation({
+        category: "dependency_security",
+        status: "PASS",
+        message: "No vulnerable dependencies introduced.",
+      });
+      policyEngine.addEvaluation({
+        category: "organization_policies",
+        status: "PASS",
+        message: "All organization policies met.",
+      });
 
       // Finalize check run
       const finalPolicyOutput = policyEngine.evaluate();
-      const checkSummary = CheckSummaryService.generateSummary(finalPolicyOutput);
-      await githubChecks.completeCheckRun(owner, repo, checkRunId, finalPolicyOutput.status, checkSummary);
+      const checkSummary =
+        CheckSummaryService.generateSummary(finalPolicyOutput);
+      await githubChecks.completeCheckRun(
+        owner,
+        repo,
+        checkRunId,
+        finalPolicyOutput.status,
+        checkSummary,
+      );
 
       await prisma.webhookEvent.update({
         where: { id: eventId },
@@ -389,21 +478,23 @@ async function handlePost(request: NextRequest) {
       return NextResponse.json({ ok: true, posted: postedUrl, postError });
     } catch (innerError: any) {
       if (reviewRow) {
-        await prisma.pRReview.delete({ where: { id: reviewRow.id } }).catch(() => null);
+        await prisma.pRReview
+          .delete({ where: { id: reviewRow.id } })
+          .catch(() => null);
       }
       throw innerError;
     }
   } catch (error: any) {
     const errorDetails = sanitizeError(error);
     console.error("Worker processing error:", errorDetails);
-    
+
     if (globalCheckRunId && globalOwner && globalRepo && globalGithubToken) {
       await CheckRecoveryService.recoverStuckCheck(
         globalOwner,
         globalRepo,
         globalCheckRunId,
         globalGithubToken,
-        error
+        error,
       );
     }
 
@@ -425,7 +516,7 @@ async function handlePost(request: NextRequest) {
 
     return NextResponse.json(
       { error: "Failed to process event", details: errorDetails },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

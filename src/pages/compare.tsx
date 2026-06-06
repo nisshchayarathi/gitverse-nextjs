@@ -62,21 +62,16 @@ export default function CompareRepositories() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [hasCompared, setHasCompared] = useState(false);
 
-  useEffect(() => {
-    if (!isAuthLoading && !isAuthenticated) {
-      router.push("/login");
-      return;
-    }
-    fetchRepositories();
-  }, [isAuthLoading, isAuthenticated, router, fetchRepositories]);
-
   const fetchRepositories = useCallback(async () => {
     try {
       setIsListLoading(true);
       const token = localStorage.getItem("gitverse_token");
-      const response = await axios.get(buildApiUrl("/api/repositories?limit=100"), {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const response = await axios.get(
+        buildApiUrl("/api/repositories?limit=100"),
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
       const repos = response.data.data?.repositories || [];
       // Filter only analyzed/complete repositories
       setRepoList(Array.isArray(repos) ? repos : []);
@@ -91,6 +86,14 @@ export default function CompareRepositories() {
       setIsListLoading(false);
     }
   }, [toast]);
+
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push("/login");
+      return;
+    }
+    fetchRepositories();
+  }, [isAuthLoading, isAuthenticated, router, fetchRepositories]);
 
   const handleToggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -131,7 +134,10 @@ export default function CompareRepositories() {
 
       // 1. Fetch detailed information for each selected repository
       const detailsPromises = selectedIds.map(async (id) => {
-        const response = await axios.get(buildApiUrl(`/api/repositories/${id}`), { headers });
+        const response = await axios.get(
+          buildApiUrl(`/api/repositories/${id}`),
+          { headers },
+        );
         return response.data;
       });
       const detailedData = await Promise.all(detailsPromises);
@@ -141,14 +147,15 @@ export default function CompareRepositories() {
       const aiResponse = await axios.post(
         buildApiUrl("/api/ai/compare"),
         { repositoryIds: selectedIds },
-        { headers }
+        { headers },
       );
       setAiSummary(aiResponse.data?.comparison || "");
     } catch (error: any) {
       console.error("Failed to compare repositories:", error);
       toast({
         title: "Comparison Error",
-        description: error.response?.data?.error || "Failed to compare codebases.",
+        description:
+          error.response?.data?.error || "Failed to compare codebases.",
         variant: "destructive",
       });
     } finally {
@@ -193,7 +200,9 @@ export default function CompareRepositories() {
               Compare <span className="text-gradient">Repositories</span>
             </h1>
             <p className="text-muted-foreground mt-2 max-w-2xl">
-              Select two or three analyzed codebases to analyze tech stack overlaps, contrast codebase activities, and generate principal architect AI summary comparisons.
+              Select two or three analyzed codebases to analyze tech stack
+              overlaps, contrast codebase activities, and generate principal
+              architect AI summary comparisons.
             </p>
           </div>
           {hasCompared && (
@@ -233,14 +242,19 @@ export default function CompareRepositories() {
               {isListLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
                   <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                  <p className="text-sm text-muted-foreground">Loading analyzed codebases...</p>
+                  <p className="text-sm text-muted-foreground">
+                    Loading analyzed codebases...
+                  </p>
                 </div>
               ) : repoList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center glass rounded-xl border border-dashed border-border/50">
                   <Info className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="font-semibold text-lg text-foreground">No Repositories Available</h3>
+                  <h3 className="font-semibold text-lg text-foreground">
+                    No Repositories Available
+                  </h3>
                   <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                    You haven&apos;t added or analyzed any repositories yet. Head to the visualize page to analyze one!
+                    You haven&apos;t added or analyzed any repositories yet.
+                    Head to the visualize page to analyze one!
                   </p>
                 </div>
               ) : (
@@ -334,10 +348,15 @@ export default function CompareRepositories() {
         {hasCompared && (
           <div className="space-y-8">
             {/* Top Side-by-Side Metadata Cards */}
-            <div className={`grid grid-cols-1 md:grid-cols-${detailedRepos.length || 2} gap-6`}>
+            <div
+              className={`grid grid-cols-1 md:grid-cols-${detailedRepos.length || 2} gap-6`}
+            >
               {detailedRepos.length === 0
                 ? Array.from({ length: selectedIds.length }).map((_, idx) => (
-                    <div key={idx} className="glass border border-border/50 rounded-2xl p-6 h-64 animate-pulse" />
+                    <div
+                      key={idx}
+                      className="glass border border-border/50 rounded-2xl p-6 h-64 animate-pulse"
+                    />
                   ))
                 : detailedRepos.map((repo) => (
                     <div
@@ -349,7 +368,9 @@ export default function CompareRepositories() {
 
                       <div className="relative">
                         <div className="flex items-center justify-between gap-3 mb-2">
-                          <h2 className="text-2xl font-bold text-foreground truncate">{repo.name}</h2>
+                          <h2 className="text-2xl font-bold text-foreground truncate">
+                            {repo.name}
+                          </h2>
                           <a
                             href={repo.url}
                             target="_blank"
@@ -361,7 +382,8 @@ export default function CompareRepositories() {
                           </a>
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem] mb-6">
-                          {repo.description || "No repository description listed."}
+                          {repo.description ||
+                            "No repository description listed."}
                         </p>
 
                         {/* Benchmark grid */}
@@ -373,7 +395,9 @@ export default function CompareRepositories() {
                                 Commits
                               </span>
                               <span className="text-lg font-bold text-foreground">
-                                {repo.commits?.length || repo._count?.commits || 0}
+                                {repo.commits?.length ||
+                                  repo._count?.commits ||
+                                  0}
                               </span>
                             </div>
                           </div>
@@ -385,7 +409,9 @@ export default function CompareRepositories() {
                                 Contributors
                               </span>
                               <span className="text-lg font-bold text-foreground">
-                                {repo.contributors?.length || repo._count?.contributors || 0}
+                                {repo.contributors?.length ||
+                                  repo._count?.contributors ||
+                                  0}
                               </span>
                             </div>
                           </div>
@@ -409,7 +435,9 @@ export default function CompareRepositories() {
                                 Branches
                               </span>
                               <span className="text-lg font-bold text-foreground">
-                                {repo.branches?.length || repo._count?.branches || 0}
+                                {repo.branches?.length ||
+                                  repo._count?.branches ||
+                                  0}
                               </span>
                             </div>
                           </div>
@@ -429,20 +457,29 @@ export default function CompareRepositories() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {detailedRepos.length === 0
                   ? Array.from({ length: selectedIds.length }).map((_, idx) => (
-                      <div key={idx} className="h-32 bg-white/5 animate-pulse rounded-xl" />
+                      <div
+                        key={idx}
+                        className="h-32 bg-white/5 animate-pulse rounded-xl"
+                      />
                     ))
                   : detailedRepos.map((repo) => (
                       <div key={repo.id} className="space-y-4">
-                        <h4 className="font-bold text-sm text-foreground">{repo.name} Languages</h4>
+                        <h4 className="font-bold text-sm text-foreground">
+                          {repo.name} Languages
+                        </h4>
                         <div className="space-y-3">
                           {repo.languages?.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">No language stats available.</p>
+                            <p className="text-xs text-muted-foreground">
+                              No language stats available.
+                            </p>
                           ) : (
                             repo.languages.map((l) => (
                               <div key={l.name} className="space-y-1">
                                 <div className="flex justify-between text-xs font-medium">
                                   <span>{l.name}</span>
-                                  <span className="text-muted-foreground">{l.percentage.toFixed(1)}%</span>
+                                  <span className="text-muted-foreground">
+                                    {l.percentage.toFixed(1)}%
+                                  </span>
                                 </div>
                                 <div className="h-2 w-full bg-white/5 border border-border/20 rounded-full overflow-hidden">
                                   <div
@@ -469,14 +506,21 @@ export default function CompareRepositories() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {detailedRepos.length === 0
                   ? Array.from({ length: selectedIds.length }).map((_, idx) => (
-                      <div key={idx} className="h-48 bg-white/5 animate-pulse rounded-xl" />
+                      <div
+                        key={idx}
+                        className="h-48 bg-white/5 animate-pulse rounded-xl"
+                      />
                     ))
                   : detailedRepos.map((repo) => (
                       <div key={repo.id} className="space-y-3">
-                        <h4 className="font-bold text-sm text-foreground mb-2">{repo.name} Contributors</h4>
+                        <h4 className="font-bold text-sm text-foreground mb-2">
+                          {repo.name} Contributors
+                        </h4>
                         <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                           {repo.contributors?.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">No contributor details recorded.</p>
+                            <p className="text-xs text-muted-foreground">
+                              No contributor details recorded.
+                            </p>
                           ) : (
                             repo.contributors.slice(0, 5).map((c, i) => (
                               <div
@@ -487,7 +531,9 @@ export default function CompareRepositories() {
                                   <div className="h-6 w-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 font-bold text-primary text-[10px]">
                                     {i + 1}
                                   </div>
-                                  <span className="font-medium text-foreground truncate">{c.name}</span>
+                                  <span className="font-medium text-foreground truncate">
+                                    {c.name}
+                                  </span>
                                 </div>
                                 <span className="font-semibold text-muted-foreground shrink-0">
                                   {c.commits} commits
@@ -511,9 +557,12 @@ export default function CompareRepositories() {
                     <Sparkles className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-foreground">Principal AI Architecture Comparison</h3>
+                    <h3 className="text-xl font-bold text-foreground">
+                      Principal AI Architecture Comparison
+                    </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Gemini&apos;s deep side-by-side codebase architectural summary and integration potential assessments.
+                      Gemini&apos;s deep side-by-side codebase architectural
+                      summary and integration potential assessments.
                     </p>
                   </div>
                 </div>
@@ -534,7 +583,9 @@ export default function CompareRepositories() {
                     className="p-2 rounded-lg bg-white/5 border border-border/50 hover:bg-white/10 disabled:opacity-50 text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5 text-xs font-semibold"
                     title="Refresh AI Analysis"
                   >
-                    <RotateCw className={`h-4 w-4 ${isAiLoading ? "animate-spin" : ""}`} />
+                    <RotateCw
+                      className={`h-4 w-4 ${isAiLoading ? "animate-spin" : ""}`}
+                    />
                     Refresh
                   </button>
                 </div>
@@ -544,7 +595,10 @@ export default function CompareRepositories() {
                 <div className="space-y-4 py-8">
                   <div className="flex items-center gap-2.5 text-sm text-primary">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Architect AI is synthesizing comparisons and code patterns...</span>
+                    <span>
+                      Architect AI is synthesizing comparisons and code
+                      patterns...
+                    </span>
                   </div>
                   <div className="space-y-2">
                     <div className="h-4 bg-white/5 animate-pulse rounded-lg w-full" />
@@ -575,7 +629,9 @@ export default function CompareRepositories() {
                           {children}
                         </h3>
                       ),
-                      p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
+                      p: ({ children }) => (
+                        <p className="mb-4 leading-relaxed">{children}</p>
+                      ),
                       a: ({ href, children, ...props }) => (
                         <a
                           href={href}
@@ -588,12 +644,18 @@ export default function CompareRepositories() {
                         </a>
                       ),
                       ul: ({ children }) => (
-                        <ul className="list-disc pl-5 space-y-2 my-4">{children}</ul>
+                        <ul className="list-disc pl-5 space-y-2 my-4">
+                          {children}
+                        </ul>
                       ),
                       ol: ({ children }) => (
-                        <ol className="list-decimal pl-5 space-y-2 my-4">{children}</ol>
+                        <ol className="list-decimal pl-5 space-y-2 my-4">
+                          {children}
+                        </ol>
                       ),
-                      li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                      li: ({ children }) => (
+                        <li className="leading-relaxed">{children}</li>
+                      ),
                       code: ({ className, children, ...props }) => {
                         return (
                           <code
@@ -606,7 +668,8 @@ export default function CompareRepositories() {
                       },
                     }}
                   >
-                    {aiSummary || "No AI architectural summary is generated yet. Please refresh the comparison."}
+                    {aiSummary ||
+                      "No AI architectural summary is generated yet. Please refresh the comparison."}
                   </ReactMarkdown>
                 </div>
               )}

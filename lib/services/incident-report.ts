@@ -1,4 +1,7 @@
-import { IncidentPayload, IncidentCorrelation } from "@/types/incident-response";
+import {
+  IncidentPayload,
+  IncidentCorrelation,
+} from "@/types/incident-response";
 
 export class IncidentReportService {
   /**
@@ -7,7 +10,7 @@ export class IncidentReportService {
    */
   public generatePrDescription(
     incident: IncidentPayload,
-    correlation: IncidentCorrelation
+    correlation: IncidentCorrelation,
   ): string {
     return `
 ## GitVerse Incident Response

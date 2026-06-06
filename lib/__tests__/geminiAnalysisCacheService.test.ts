@@ -114,7 +114,9 @@ describe("setGeminiAnalysisCache", () => {
 
   it("updates existing cache entry", async () => {
     asMock(mockPrisma.geminiAnalysisCache.count).mockResolvedValue(0);
-    asMock(mockPrisma.geminiAnalysisCache.findFirst).mockResolvedValue({ id: 5 });
+    asMock(mockPrisma.geminiAnalysisCache.findFirst).mockResolvedValue({
+      id: 5,
+    });
     asMock(mockPrisma.geminiAnalysisCache.update).mockResolvedValue({ id: 5 });
 
     await setGeminiAnalysisCache(cacheKey, "updated analysis");
@@ -147,7 +149,9 @@ describe("invalidation functions", () => {
   });
 
   it("invalidateCacheForCommit deletes entries for specific commit", async () => {
-    asMock(mockPrisma.geminiAnalysisCache.deleteMany).mockResolvedValue({ count: 3 });
+    asMock(mockPrisma.geminiAnalysisCache.deleteMany).mockResolvedValue({
+      count: 3,
+    });
     const deleted = await invalidateCacheForCommit(1, "abc123");
     expect(deleted).toBe(3);
     expect(mockPrisma.geminiAnalysisCache.deleteMany).toHaveBeenCalledWith({
@@ -156,24 +160,32 @@ describe("invalidation functions", () => {
   });
 
   it("invalidateCacheForBranch deletes entries for branch commit", async () => {
-    asMock(mockPrisma.geminiAnalysisCache.deleteMany).mockResolvedValue({ count: 2 });
+    asMock(mockPrisma.geminiAnalysisCache.deleteMany).mockResolvedValue({
+      count: 2,
+    });
     const deleted = await invalidateCacheForBranch(1, "def456");
     expect(deleted).toBe(2);
   });
 
   it("invalidateExpiredCacheEntries deletes only expired rows", async () => {
-    asMock(mockPrisma.geminiAnalysisCache.deleteMany).mockResolvedValue({ count: 5 });
+    asMock(mockPrisma.geminiAnalysisCache.deleteMany).mockResolvedValue({
+      count: 5,
+    });
     const deleted = await invalidateExpiredCacheEntries(1);
     expect(deleted).toBe(5);
-    const call = asMock(mockPrisma.geminiAnalysisCache.deleteMany).mock.calls[0][0];
+    const call = asMock(mockPrisma.geminiAnalysisCache.deleteMany).mock
+      .calls[0][0];
     expect(call.where.repositoryId).toBe(1);
     expect(call.where.expiresAt).toEqual({ lte: expect.any(Date) });
   });
 
   it("invalidateGeminiAnalysisCacheForRepository keeps specified commit", async () => {
-    asMock(mockPrisma.geminiAnalysisCache.deleteMany).mockResolvedValue({ count: 10 });
+    asMock(mockPrisma.geminiAnalysisCache.deleteMany).mockResolvedValue({
+      count: 10,
+    });
     await invalidateGeminiAnalysisCacheForRepository(1, "keep-commit");
-    const call = asMock(mockPrisma.geminiAnalysisCache.deleteMany).mock.calls[0][0];
+    const call = asMock(mockPrisma.geminiAnalysisCache.deleteMany).mock
+      .calls[0][0];
     expect(call.where.repositoryId).toBe(1);
     expect(call.where.commitHash).toEqual({ not: "keep-commit" });
   });

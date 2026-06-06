@@ -34,7 +34,7 @@ function validateEnv() {
 
   if (skipReasons.length > 0) {
     console.log(
-      `⚠️ Skipping environment validation: ${skipReasons.join(" | ")}`
+      `⚠️ Skipping environment validation: ${skipReasons.join(" | ")}`,
     );
 
     return;
@@ -48,7 +48,7 @@ function validateEnv() {
 
   if (missingVars.length > 0) {
     throw new Error(
-      `❌ Missing required environment variables: ${missingVars.join(", ")}`
+      `❌ Missing required environment variables: ${missingVars.join(", ")}`,
     );
   }
 

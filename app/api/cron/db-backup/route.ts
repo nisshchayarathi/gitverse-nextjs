@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     // In a real implementation, we would use pg_dump or the Neon API to trigger a backup
     // and upload it to an S3 bucket or equivalent.
     console.log("[BackupCron] Triggering automated database backup...");
-    
+
     // Simulating backup process
     const backupId = `backup-${Date.now()}`;
     const mockBackupTask = new Promise((resolve) => setTimeout(resolve, 1000));
@@ -23,14 +23,20 @@ export async function GET(request: NextRequest) {
 
     console.log(`[BackupCron] Backup ${backupId} completed successfully.`);
 
-    return NextResponse.json({ 
-      success: true, 
-      backupId, 
-      message: "Database backup snapshot triggered and uploaded successfully." 
-    }, { status: 200 });
-
+    return NextResponse.json(
+      {
+        success: true,
+        backupId,
+        message:
+          "Database backup snapshot triggered and uploaded successfully.",
+      },
+      { status: 200 },
+    );
   } catch (error: any) {
     console.error("[BackupCron] Failed to execute database backup:", error);
-    return NextResponse.json({ error: "Failed to process backup" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to process backup" },
+      { status: 500 },
+    );
   }
 }

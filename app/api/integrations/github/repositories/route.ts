@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { GitHubService } from "@/lib/services/githubService";
 import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
 import prisma from "@/lib/prisma";
@@ -11,9 +11,7 @@ export async function POST(request: NextRequest) {
     const tokenFromBody = (body?.token as string | undefined)?.trim();
     const username = (body?.username as string | undefined)?.trim();
 
-    const token =
-      tokenFromBody ||
-      (await getDecryptedGitHubToken(user.userId));
+    const token = tokenFromBody || (await getDecryptedGitHubToken(user.userId));
 
     if (token) {
       const github = new GitHubService(token);

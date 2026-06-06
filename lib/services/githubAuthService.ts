@@ -1,17 +1,19 @@
 import prisma from "@/lib/prisma";
 
-export async function getGithubAccessToken(userId: number): Promise<string | undefined> {
+export async function getGithubAccessToken(
+  userId: number,
+): Promise<string | undefined> {
   try {
     const account = await prisma.account.findFirst({
       where: {
         userId,
-        provider: "github"
+        provider: "github",
       },
       select: {
-        access_token: true
-      }
+        access_token: true,
+      },
     });
-    
+
     return account?.access_token ?? undefined;
   } catch (err) {
     console.error(`Failed to get GitHub access token for user ${userId}:`, err);

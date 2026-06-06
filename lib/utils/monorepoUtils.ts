@@ -4,7 +4,10 @@ import * as path from "path";
 /**
  * Finds all directories matching simple wildcard globs like "packages/*" or "apps/*"
  */
-async function resolveWorkspaceGlobs(baseDir: string, globs: string[]): Promise<string[]> {
+async function resolveWorkspaceGlobs(
+  baseDir: string,
+  globs: string[],
+): Promise<string[]> {
   const packages = new Set<string>();
 
   for (const pattern of globs) {
@@ -38,7 +41,9 @@ async function resolveWorkspaceGlobs(baseDir: string, globs: string[]): Promise<
   return Array.from(packages);
 }
 
-export async function detectMonorepoPackages(repoTempDir: string): Promise<string[]> {
+export async function detectMonorepoPackages(
+  repoTempDir: string,
+): Promise<string[]> {
   const globs = new Set<string>();
 
   // 1. Check package.json for npm/yarn workspaces
@@ -50,7 +55,10 @@ export async function detectMonorepoPackages(repoTempDir: string): Promise<strin
     if (pkg.workspaces) {
       if (Array.isArray(pkg.workspaces)) {
         pkg.workspaces.forEach((w: string) => globs.add(w));
-      } else if (pkg.workspaces.packages && Array.isArray(pkg.workspaces.packages)) {
+      } else if (
+        pkg.workspaces.packages &&
+        Array.isArray(pkg.workspaces.packages)
+      ) {
         pkg.workspaces.packages.forEach((w: string) => globs.add(w));
       }
     }

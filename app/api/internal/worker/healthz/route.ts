@@ -5,7 +5,11 @@ import {
   validateSecretIsolation,
 } from "@/lib/utils/internalAuth";
 import { checkEncryptionHealth } from "@/lib/utils/tokenEncryption";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -70,6 +74,6 @@ export async function GET(request: NextRequest) {
       checks,
       timestamp: new Date().toISOString(),
     },
-    { status: healthy ? 200 : 503 }
+    { status: healthy ? 200 : 503 },
   );
 }

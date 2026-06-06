@@ -1,4 +1,8 @@
-import { FinalPolicyOutput, CheckOutput, PolicyEvaluationResult } from "@/types/github-checks";
+import {
+  FinalPolicyOutput,
+  CheckOutput,
+  PolicyEvaluationResult,
+} from "@/types/github-checks";
 
 export class CheckSummaryService {
   /**
@@ -7,22 +11,27 @@ export class CheckSummaryService {
    */
   static generateSummary(policyOutput: FinalPolicyOutput): CheckOutput {
     const isSuccess = policyOutput.status === "success";
-    const title = isSuccess ? "GitVerse Security & Compliance Passed" : "GitVerse Security & Compliance Blocked";
-    
+    const title = isSuccess
+      ? "GitVerse Security & Compliance Passed"
+      : "GitVerse Security & Compliance Blocked";
+
     let text = "## GitVerse Compliance Report\n\n";
 
     const formatCategory = (category: string) => {
       return category
         .split("_")
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(" ");
     };
 
     const getStatusIcon = (status: "PASS" | "WARN" | "FAIL") => {
       switch (status) {
-        case "PASS": return "✅ Passed";
-        case "WARN": return "⚠️ Warning";
-        case "FAIL": return "❌ Failed";
+        case "PASS":
+          return "✅ Passed";
+        case "WARN":
+          return "⚠️ Warning";
+        case "FAIL":
+          return "❌ Failed";
       }
     };
 
@@ -38,7 +47,7 @@ export class CheckSummaryService {
     // Final Result Section
     text += `### Final Result\n\n`;
     text += `${isSuccess ? "✅ Merge Allowed" : "❌ Merge Blocked"}\n\n`;
-    
+
     if (!isSuccess) {
       text += `**Reason:**\n${policyOutput.reason}\n`;
     }

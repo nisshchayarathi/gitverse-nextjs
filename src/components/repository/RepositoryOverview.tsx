@@ -62,7 +62,6 @@ import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { FavoriteButton } from "./FavoriteButton";
 
-
 interface RepositoryData {
   id: string;
   name: string;
@@ -108,7 +107,7 @@ export const RepositoryOverview = ({
       const response = await axios.post(
         buildApiUrl("/api/ai/generate-readme"),
         { repositoryId: Number(repository.id) },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       const readme = response.data.markdown;
@@ -118,7 +117,9 @@ export const RepositoryOverview = ({
       console.error("Error generating README:", error);
       toast({
         title: "Generation failed",
-        description: error.response?.data?.error || "Failed to generate README using Gemini.",
+        description:
+          error.response?.data?.error ||
+          "Failed to generate README using Gemini.",
         variant: "destructive",
       });
       setIsReadmeModalOpen(false);
@@ -152,7 +153,7 @@ export const RepositoryOverview = ({
       await axios.put(
         buildApiUrl(`/api/repositories/${repository.id}/readme`),
         { readmeText: editorText, readmePath: readmePath || "README.md" },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       toast({
@@ -172,7 +173,8 @@ export const RepositoryOverview = ({
       console.error("Error saving README:", error);
       toast({
         title: "Save failed",
-        description: error.response?.data?.error || "Failed to save README changes.",
+        description:
+          error.response?.data?.error || "Failed to save README changes.",
         variant: "destructive",
       });
     } finally {
@@ -252,18 +254,21 @@ export const RepositoryOverview = ({
 
   const issueToSimulate = selectedIssue || sampleIssue;
 
-  const repositoryMetadata = useMemo<RepositoryAnalysisData>(() => ({
-    id: repositoryData?.id,
-    name: repositoryData?.name,
-    description: repositoryData?.description,
-    url: repositoryData?.url,
-    size: repositoryData?.size,
-    files: repositoryData?.files,
-    languages: repositoryData?.languages,
-    commits: repositoryData?.commits,
-    contributors: repositoryData?.contributors,
-    issues: repositoryData?.issues,
-  }), [repositoryData]);
+  const repositoryMetadata = useMemo<RepositoryAnalysisData>(
+    () => ({
+      id: repositoryData?.id,
+      name: repositoryData?.name,
+      description: repositoryData?.description,
+      url: repositoryData?.url,
+      size: repositoryData?.size,
+      files: repositoryData?.files,
+      languages: repositoryData?.languages,
+      commits: repositoryData?.commits,
+      contributors: repositoryData?.contributors,
+      issues: repositoryData?.issues,
+    }),
+    [repositoryData],
+  );
 
   const hasIssueInput = Boolean(issueTitle.trim() || issueBody.trim());
 
@@ -290,52 +295,58 @@ export const RepositoryOverview = ({
     setSelectedIssue(null);
   };
 
-  const MODULE_GUIDANCE = useMemo<Record<
-    string,
-    {
-      description: string;
-      recommendation: string;
-      difficulty: "beginner" | "intermediate" | "advanced";
-    }
-  >>(() => ({
-    components: {
-      description:
-        "Contains reusable UI building blocks used throughout the application.",
-      recommendation: "Recommended starting point for frontend contributors.",
-      difficulty: "beginner",
-    },
-    services: {
-      description: "Handles business logic and API communication.",
-      recommendation: "Changes here may affect multiple features.",
-      difficulty: "intermediate",
-    },
-    hooks: {
-      description: "Reusable React logic shared across components.",
-      recommendation: "Good place to learn application behavior.",
-      difficulty: "beginner",
-    },
-    utils: {
-      description: "Shared helper functions and utilities.",
-      recommendation: "Usually safe for small contributions.",
-      difficulty: "beginner",
-    },
-    pages: {
-      description: "Application routes and screens.",
-      recommendation: "Useful for understanding navigation flow.",
-      difficulty: "intermediate",
-    },
-    auth: {
-      description: "Authentication and access control.",
-      recommendation: "Requires understanding of security flows.",
-      difficulty: "advanced",
-    },
-  }), []);
+  const MODULE_GUIDANCE = useMemo<
+    Record<
+      string,
+      {
+        description: string;
+        recommendation: string;
+        difficulty: "beginner" | "intermediate" | "advanced";
+      }
+    >
+  >(
+    () => ({
+      components: {
+        description:
+          "Contains reusable UI building blocks used throughout the application.",
+        recommendation: "Recommended starting point for frontend contributors.",
+        difficulty: "beginner",
+      },
+      services: {
+        description: "Handles business logic and API communication.",
+        recommendation: "Changes here may affect multiple features.",
+        difficulty: "intermediate",
+      },
+      hooks: {
+        description: "Reusable React logic shared across components.",
+        recommendation: "Good place to learn application behavior.",
+        difficulty: "beginner",
+      },
+      utils: {
+        description: "Shared helper functions and utilities.",
+        recommendation: "Usually safe for small contributions.",
+        difficulty: "beginner",
+      },
+      pages: {
+        description: "Application routes and screens.",
+        recommendation: "Useful for understanding navigation flow.",
+        difficulty: "intermediate",
+      },
+      auth: {
+        description: "Authentication and access control.",
+        recommendation: "Requires understanding of security flows.",
+        difficulty: "advanced",
+      },
+    }),
+    [],
+  );
 
   const ARCHITECTURE_GUIDANCE: Record<string, string> = {
     services:
       "Service layer responsible for API communication and business logic.",
     hooks: "Custom React logic reused across multiple components.",
-    components: "Reusable visual building blocks used throughout the application.",
+    components:
+      "Reusable visual building blocks used throughout the application.",
     utils: "Utility helpers that keep the app consistent and reusable.",
     pages: "Route and screen organization that controls navigation flow.",
     auth: "Authentication logic that secures access and identity flows.",
@@ -345,7 +356,9 @@ export const RepositoryOverview = ({
     const segments = new Set<string>();
 
     (repositoryData?.files || []).forEach((file: any) => {
-      const parts = String(file.path || "").split("/").filter(Boolean);
+      const parts = String(file.path || "")
+        .split("/")
+        .filter(Boolean);
       parts.slice(0, -1).forEach((segment) => {
         if (segment) {
           segments.add(segment);
@@ -644,13 +657,16 @@ export const RepositoryOverview = ({
           <CardHeader>
             <CardTitle>First PR Simulator</CardTitle>
             <CardDescription>
-              Generate a recommended first PR plan from a repository issue or a custom issue description.
+              Generate a recommended first PR plan from a repository issue or a
+              custom issue description.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 lg:grid-cols-[1fr_1.5fr]">
               <div className="space-y-3">
-                <label className="text-sm font-medium text-muted-foreground">Issue title</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Issue title
+                </label>
                 <Input
                   value={issueTitle}
                   onChange={(event) => setIssueTitle(event.target.value)}
@@ -658,7 +674,9 @@ export const RepositoryOverview = ({
                 />
               </div>
               <div className="space-y-3">
-                <label className="text-sm font-medium text-muted-foreground">Issue description</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Issue description
+                </label>
                 <textarea
                   value={issueBody}
                   onChange={(event) => setIssueBody(event.target.value)}
@@ -669,10 +687,7 @@ export const RepositoryOverview = ({
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap gap-2">
-                <Button
-                  onClick={handleRunSimulation}
-                  disabled={!hasIssueInput}
-                >
+                <Button onClick={handleRunSimulation} disabled={!hasIssueInput}>
                   Simulate issue
                 </Button>
                 {sampleIssue && (
@@ -683,21 +698,22 @@ export const RepositoryOverview = ({
                     Use first available issue
                   </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  onClick={handleResetSimulation}
-                >
+                <Button variant="ghost" onClick={handleResetSimulation}>
                   Reset
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground max-w-xl">
-                The simulator uses issue text and repository structure to recommend a starter file set, difficulty, and test focus.
+                The simulator uses issue text and repository structure to
+                recommend a starter file set, difficulty, and test focus.
               </p>
             </div>
           </CardContent>
         </Card>
 
-        <FirstPRSimulator issue={issueToSimulate} repository={repositoryMetadata} />
+        <FirstPRSimulator
+          issue={issueToSimulate}
+          repository={repositoryMetadata}
+        />
 
         <ContributionPathGenerator repository={repositoryMetadata} />
 
@@ -738,7 +754,9 @@ export const RepositoryOverview = ({
               {hotspotGuidance.length > 0 && (
                 <Card className="glass border border-border/60">
                   <CardHeader>
-                    <CardTitle className="text-base">Hotspot Guidance</CardTitle>
+                    <CardTitle className="text-base">
+                      Hotspot Guidance
+                    </CardTitle>
                     <CardDescription>
                       Contextual warnings for areas that may require extra care.
                     </CardDescription>
@@ -792,7 +810,8 @@ export const RepositoryOverview = ({
               Monorepo Workspaces
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              This repository contains multiple packages. Select one to view its isolated analysis.
+              This repository contains multiple packages. Select one to view its
+              isolated analysis.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-2">
@@ -940,7 +959,11 @@ export const RepositoryOverview = ({
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-3">
             {isAnalyzing && !hasUsableReadme ? (
-              <div className="bg-background/50 border border-border/50 rounded-lg p-4 space-y-4" aria-busy="true" aria-label="Loading README">
+              <div
+                className="bg-background/50 border border-border/50 rounded-lg p-4 space-y-4"
+                aria-busy="true"
+                aria-label="Loading README"
+              >
                 <Skeleton className="h-8 w-1/3 sm:w-1/4" />
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-full" />
@@ -1135,7 +1158,9 @@ export const RepositoryOverview = ({
       {/* AI README Builder Modal */}
       <Modal
         isOpen={isReadmeModalOpen}
-        onClose={() => !isGeneratingReadme && !isSavingReadme && setIsReadmeModalOpen(false)}
+        onClose={() =>
+          !isGeneratingReadme && !isSavingReadme && setIsReadmeModalOpen(false)
+        }
         title="AI README Builder"
         size="xl"
       >
@@ -1146,9 +1171,12 @@ export const RepositoryOverview = ({
               <Sparkles className="h-6 w-6 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-2">Analyzing Repository & Drafting README</h3>
+              <h3 className="text-xl font-bold mb-2">
+                Analyzing Repository & Drafting README
+              </h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Gemini is analyzing the file structure and manifest dependencies to build a highly accurate, technical README for your project...
+                Gemini is analyzing the file structure and manifest dependencies
+                to build a highly accurate, technical README for your project...
               </p>
             </div>
           </div>
@@ -1159,20 +1187,22 @@ export const RepositoryOverview = ({
               <div className="flex bg-secondary-100 dark:bg-secondary-900 p-1 rounded-lg self-start">
                 <button
                   onClick={() => setEditorMode("preview")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${editorMode === "preview"
-                    ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    editorMode === "preview"
+                      ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
                 >
                   <Eye className="h-3.5 w-3.5" />
                   Preview
                 </button>
                 <button
                   onClick={() => setEditorMode("edit")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${editorMode === "edit"
-                    ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    editorMode === "edit"
+                      ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
                 >
                   <Edit2 className="h-3.5 w-3.5" />
                   Edit Markdown
@@ -1241,13 +1271,36 @@ export const RepositoryOverview = ({
                       [rehypeSanitize, readmeSanitizeSchema],
                     ]}
                     components={{
-                      h1: (props) => <h1 className="text-xl sm:text-2xl font-bold mt-2 mb-3 border-b border-border/45 pb-2" {...props} />,
-                      h2: (props) => <h2 className="text-lg sm:text-xl font-semibold mt-5 mb-2 border-b border-border/25 pb-1" {...props} />,
-                      h3: (props) => <h3 className="text-base sm:text-lg font-semibold mt-4 mb-2" {...props} />,
-                      p: (props) => <p className="my-2 text-sm leading-relaxed text-muted-foreground" {...props} />,
+                      h1: (props) => (
+                        <h1
+                          className="text-xl sm:text-2xl font-bold mt-2 mb-3 border-b border-border/45 pb-2"
+                          {...props}
+                        />
+                      ),
+                      h2: (props) => (
+                        <h2
+                          className="text-lg sm:text-xl font-semibold mt-5 mb-2 border-b border-border/25 pb-1"
+                          {...props}
+                        />
+                      ),
+                      h3: (props) => (
+                        <h3
+                          className="text-base sm:text-lg font-semibold mt-4 mb-2"
+                          {...props}
+                        />
+                      ),
+                      p: (props) => (
+                        <p
+                          className="my-2 text-sm leading-relaxed text-muted-foreground"
+                          {...props}
+                        />
+                      ),
                       a: ({ href, children, ...props }) => (
                         <a
-                          href={resolveRepoRelativeUrl(String(href || ""), "link")}
+                          href={resolveRepoRelativeUrl(
+                            String(href || ""),
+                            "link",
+                          )}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary underline underline-offset-2 hover:text-primary/85 transition-colors"
@@ -1257,34 +1310,95 @@ export const RepositoryOverview = ({
                         </a>
                       ),
                       img: ({ src, alt, title, ...props }) => {
-                        const resolved = resolveRepoRelativeUrl(String(src || ""), "image");
+                        const resolved = resolveRepoRelativeUrl(
+                          String(src || ""),
+                          "image",
+                        );
                         // eslint-disable-next-line @next/next/no-img-element
-                        return <img src={resolved} alt={alt || ""} title={title} loading="lazy" className="max-w-full h-auto rounded-md my-3" {...props} />;
+                        return (
+                          <img
+                            src={resolved}
+                            alt={alt || ""}
+                            title={title}
+                            loading="lazy"
+                            className="max-w-full h-auto rounded-md my-3"
+                            {...props}
+                          />
+                        );
                       },
                       code: ({ className, children, ...props }) => {
                         const isBlock = Boolean(className);
                         if (!isBlock) {
-                          return <code className="px-1.5 py-0.5 rounded bg-muted text-xs font-mono" {...props}>{children}</code>;
+                          return (
+                            <code
+                              className="px-1.5 py-0.5 rounded bg-muted text-xs font-mono"
+                              {...props}
+                            >
+                              {children}
+                            </code>
+                          );
                         }
-                        return <code className={`block whitespace-pre-wrap text-xs leading-relaxed font-mono ${className || ""}`} {...props}>{children}</code>;
+                        return (
+                          <code
+                            className={`block whitespace-pre-wrap text-xs leading-relaxed font-mono ${className || ""}`}
+                            {...props}
+                          >
+                            {children}
+                          </code>
+                        );
                       },
                       pre: ({ children, ...props }) => (
-                        <pre className="p-4 my-3 rounded-lg bg-black/25 border border-border/40 overflow-auto font-mono" {...props}>
+                        <pre
+                          className="p-4 my-3 rounded-lg bg-black/25 border border-border/40 overflow-auto font-mono"
+                          {...props}
+                        >
                           {children}
                         </pre>
                       ),
-                      ul: (props) => <ul className="list-disc pl-6 my-2 space-y-1 text-muted-foreground" {...props} />,
-                      ol: (props) => <ol className="list-decimal pl-6 my-2 space-y-1 text-muted-foreground" {...props} />,
-                      li: (props) => <li className="text-sm leading-relaxed" {...props} />,
-                      hr: (props) => <hr className="my-4 border-border/50" {...props} />,
-                      blockquote: (props) => <blockquote className="border-l-4 border-primary/40 pl-4 my-3 italic text-muted-foreground bg-muted/20 py-2 rounded-r-md" {...props} />,
+                      ul: (props) => (
+                        <ul
+                          className="list-disc pl-6 my-2 space-y-1 text-muted-foreground"
+                          {...props}
+                        />
+                      ),
+                      ol: (props) => (
+                        <ol
+                          className="list-decimal pl-6 my-2 space-y-1 text-muted-foreground"
+                          {...props}
+                        />
+                      ),
+                      li: (props) => (
+                        <li className="text-sm leading-relaxed" {...props} />
+                      ),
+                      hr: (props) => (
+                        <hr className="my-4 border-border/50" {...props} />
+                      ),
+                      blockquote: (props) => (
+                        <blockquote
+                          className="border-l-4 border-primary/40 pl-4 my-3 italic text-muted-foreground bg-muted/20 py-2 rounded-r-md"
+                          {...props}
+                        />
+                      ),
                       table: (props) => (
                         <div className="my-3 overflow-auto border border-border rounded-lg">
-                          <table className="min-w-full text-sm divide-y divide-border" {...props} />
+                          <table
+                            className="min-w-full text-sm divide-y divide-border"
+                            {...props}
+                          />
                         </div>
                       ),
-                      th: (props) => <th className="text-left font-semibold p-3 bg-muted text-foreground" {...props} />,
-                      td: (props) => <td className="p-3 border-t border-border/50 text-muted-foreground" {...props} />,
+                      th: (props) => (
+                        <th
+                          className="text-left font-semibold p-3 bg-muted text-foreground"
+                          {...props}
+                        />
+                      ),
+                      td: (props) => (
+                        <td
+                          className="p-3 border-t border-border/50 text-muted-foreground"
+                          {...props}
+                        />
+                      ),
                     }}
                   >
                     {editorText || "No markdown content yet."}

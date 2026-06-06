@@ -28,7 +28,12 @@ export class WebhookQueueService {
   /**
    * Enqueues a webhook event in memory and schedules a background flush.
    */
-  enqueueWebhook(payload: any, event: string, action: string | undefined, baseUrl: string) {
+  enqueueWebhook(
+    payload: any,
+    event: string,
+    action: string | undefined,
+    baseUrl: string,
+  ) {
     globalForQueue.webhookBuffer.push({
       event: event || "unknown",
       action: action,
@@ -44,7 +49,10 @@ export class WebhookQueueService {
   }
 
   private async flushWebhooks(baseUrl: string) {
-    const batch = globalForQueue.webhookBuffer.splice(0, globalForQueue.webhookBuffer.length);
+    const batch = globalForQueue.webhookBuffer.splice(
+      0,
+      globalForQueue.webhookBuffer.length,
+    );
     globalForQueue.webhookFlushTimeout = null;
 
     if (batch.length === 0) return;
@@ -61,7 +69,7 @@ export class WebhookQueueService {
       console.error("[WebhookQueue] Failed to flush webhooks:", error);
       // Push back to queue on failure
       globalForQueue.webhookBuffer.unshift(...batch);
-      
+
       // Retry in 5s
       if (!globalForQueue.webhookFlushTimeout) {
         globalForQueue.webhookFlushTimeout = setTimeout(() => {
@@ -85,7 +93,9 @@ export class WebhookQueueService {
       });
 
       if (activeWorkers >= MAX_CONCURRENT_WEBHOOKS) {
-        console.log(`[WebhookQueue] Throttled. ${activeWorkers}/${MAX_CONCURRENT_WEBHOOKS} active workers. ${pendingJobs} jobs pending.`);
+        console.log(
+          `[WebhookQueue] Throttled. ${activeWorkers}/${MAX_CONCURRENT_WEBHOOKS} active workers. ${pendingJobs} jobs pending.`,
+        );
         return { activeWorkers, pendingJobs, isThrottled: true };
       }
 
@@ -120,12 +130,15 @@ export class WebhookQueueService {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": internalToken,
+            Authorization: internalToken,
           },
           body: JSON.stringify({ eventId: job.id }),
           allowLocalhost: true, // Allow localhost since it is an internal route
         }).catch((err: any) => {
-          console.error(`[WebhookQueue] Failed to trigger worker for job ${job.id}:`, err);
+          console.error(
+            `[WebhookQueue] Failed to trigger worker for job ${job.id}:`,
+            err,
+          );
         });
       }
 

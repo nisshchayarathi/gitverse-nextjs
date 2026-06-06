@@ -7,12 +7,20 @@ jest.mock("@/lib/middleware/rateLimit", () => ({
   rateLimitResponse: jest.fn((_result: any, message?: string) => {
     const { NextResponse } = require("next/server");
     return NextResponse.json(
-      { error: true, message: message ?? "Too many requests. Please wait before retrying.", code: 429 },
-      { status: 429 }
+      {
+        error: true,
+        message: message ?? "Too many requests. Please wait before retrying.",
+        code: 429,
+      },
+      { status: 429 },
     );
   }),
   RATE_LIMITS: {
-    WORKER_WEBHOOK: { namespace: "worker:webhook", maxRequests: 50, windowMs: 60000 },
+    WORKER_WEBHOOK: {
+      namespace: "worker:webhook",
+      maxRequests: 50,
+      windowMs: 60000,
+    },
   },
 }));
 
@@ -68,12 +76,14 @@ function asMock<T>(fn: T): jest.Mock {
   return fn as any;
 }
 
-function rateLimitedResult(overrides?: Partial<{
-  allowed: boolean;
-  remaining: number;
-  resetAt: number;
-  limit: number;
-}>): {
+function rateLimitedResult(
+  overrides?: Partial<{
+    allowed: boolean;
+    remaining: number;
+    resetAt: number;
+    limit: number;
+  }>,
+): {
   allowed: boolean;
   remaining: number;
   resetAt: number;
@@ -119,7 +129,9 @@ describe("POST /api/internal/worker/webhook", () => {
     process.env.INTERNAL_WORKER_SECRET = "test-secret";
     process.env.NEXTAUTH_URL = "http://localhost:3000";
 
-    asMock(checkRateLimit).mockResolvedValue(rateLimitedResult({ allowed: true }));
+    asMock(checkRateLimit).mockResolvedValue(
+      rateLimitedResult({ allowed: true }),
+    );
   });
 
   afterEach(() => {
@@ -141,7 +153,9 @@ describe("POST /api/internal/worker/webhook", () => {
     it("returns 401 when auth header is invalid", async () => {
       asMock(isInternalWorkerAuthorized).mockReturnValueOnce(false);
 
-      const res = await POST(mockRequest({ authHeader: "Bearer invalid-secret" }));
+      const res = await POST(
+        mockRequest({ authHeader: "Bearer invalid-secret" }),
+      );
       const body = await res.json();
 
       expect(res.status).toBe(401);
@@ -178,7 +192,9 @@ describe("POST /api/internal/worker/webhook", () => {
 
       await POST(mockRequest({ authHeader: "Bearer some-token" }));
 
-      expect(asMock(isInternalWorkerAuthorized)).toHaveBeenCalledWith("Bearer some-token");
+      expect(asMock(isInternalWorkerAuthorized)).toHaveBeenCalledWith(
+        "Bearer some-token",
+      );
     });
 
     it("returns 401 when INTERNAL_WORKER_SECRET is not set", async () => {
@@ -194,7 +210,7 @@ describe("POST /api/internal/worker/webhook", () => {
   describe("rate limiting", () => {
     it("returns 429 when rate limit exceeded", async () => {
       asMock(checkRateLimit).mockResolvedValueOnce(
-        rateLimitedResult({ allowed: false, remaining: 0 })
+        rateLimitedResult({ allowed: false, remaining: 0 }),
       );
 
       const res = await POST(mockRequest({ authHeader: "Bearer valid-token" }));
@@ -206,16 +222,22 @@ describe("POST /api/internal/worker/webhook", () => {
 
     it("passes through when rate limit is within bounds", async () => {
       asMock(checkRateLimit).mockResolvedValueOnce(
-        rateLimitedResult({ allowed: true, remaining: 30 })
+        rateLimitedResult({ allowed: true, remaining: 30 }),
       );
 
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
-      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({ ...validEvent, status: "processing" });
+      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
+        ...validEvent,
+        status: "processing",
+      });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
       );
 
       expect(res.status).toBe(200);
@@ -230,7 +252,7 @@ describe("POST /api/internal/worker/webhook", () => {
           namespace: "worker:webhook",
           maxRequests: 50,
           windowMs: 60000,
-        })
+        }),
       );
     });
 
@@ -239,16 +261,16 @@ describe("POST /api/internal/worker/webhook", () => {
         mockRequest({
           authHeader: "Bearer valid-token",
           headers: { "x-worker-id": "attacker-controlled-value" },
-        })
+        }),
       );
 
       expect(asMock(checkRateLimit)).toHaveBeenCalledWith(
         "webhook-worker",
-        expect.any(Object)
+        expect.any(Object),
       );
       expect(asMock(checkRateLimit)).not.toHaveBeenCalledWith(
         "attacker-controlled-value",
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -265,17 +287,25 @@ describe("POST /api/internal/worker/webhook", () => {
 
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
-      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({ ...validEvent, status: "processing" });
+      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
+        ...validEvent,
+        status: "processing",
+      });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
-      await POST(mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } }));
+      await POST(
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
+      );
 
       expect(authOrder).toEqual(["auth", "rateLimit"]);
     });
 
     it("rate limited response includes error message", async () => {
       asMock(checkRateLimit).mockResolvedValueOnce(
-        rateLimitedResult({ allowed: false, remaining: 0 })
+        rateLimitedResult({ allowed: false, remaining: 0 }),
       );
 
       const res = await POST(mockRequest({ authHeader: "Bearer valid-token" }));
@@ -299,7 +329,10 @@ describe("POST /api/internal/worker/webhook", () => {
 
     it("returns 400 when eventId is null", async () => {
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: null } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: null },
+        }),
       );
       const body = await res.json();
 
@@ -309,7 +342,10 @@ describe("POST /api/internal/worker/webhook", () => {
 
     it("returns 400 when eventId is empty string", async () => {
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "" },
+        }),
       );
       const body = await res.json();
 
@@ -333,7 +369,10 @@ describe("POST /api/internal/worker/webhook", () => {
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(null);
 
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "nonexistent" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "nonexistent" },
+        }),
       );
       const body = await res.json();
 
@@ -343,10 +382,15 @@ describe("POST /api/internal/worker/webhook", () => {
 
     it("returns 200 with ignored when event already processed", async () => {
       const prisma = require("@/lib/prisma").default;
-      asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(completedEvent);
+      asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(
+        completedEvent,
+      );
 
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-003" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-003" },
+        }),
       );
       const body = await res.json();
 
@@ -357,10 +401,15 @@ describe("POST /api/internal/worker/webhook", () => {
 
     it("returns 200 with ignored when event is currently processing", async () => {
       const prisma = require("@/lib/prisma").default;
-      asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(processingEvent);
+      asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(
+        processingEvent,
+      );
 
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-002" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-002" },
+        }),
       );
       const body = await res.json();
 
@@ -374,7 +423,10 @@ describe("POST /api/internal/worker/webhook", () => {
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(null);
 
       await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "test-event-123" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "test-event-123" },
+        }),
       );
 
       expect(asMock(prisma.webhookEvent.findUnique)).toHaveBeenCalledWith({
@@ -385,18 +437,24 @@ describe("POST /api/internal/worker/webhook", () => {
     it("marks event as processing before proceeding", async () => {
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
-      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({ ...validEvent, status: "processing" });
+      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
+        ...validEvent,
+        status: "processing",
+      });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
       await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
       );
 
       expect(asMock(prisma.webhookEvent.update)).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "evt-001" },
           data: { status: "processing" },
-        })
+        }),
       );
     });
   });
@@ -405,10 +463,18 @@ describe("POST /api/internal/worker/webhook", () => {
     it("calls triggerWorkers after successful authentication and processing", async () => {
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
-      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({ ...validEvent, status: "processing" });
+      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
+        ...validEvent,
+        status: "processing",
+      });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
-      await POST(mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } }));
+      await POST(
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
+      );
 
       expect(asMock(webhookQueue.triggerWorkers)).toHaveBeenCalledTimes(1);
     });
@@ -419,36 +485,61 @@ describe("POST /api/internal/worker/webhook", () => {
       asMock(prisma.webhookEvent.findUnique).mockRejectedValueOnce(dbError);
 
       await expect(
-        POST(mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } }))
+        POST(
+          mockRequest({
+            authHeader: "Bearer valid-token",
+            body: { eventId: "evt-001" },
+          }),
+        ),
       ).rejects.toThrow("Database connection failed");
 
       expect(asMock(webhookQueue.triggerWorkers)).toHaveBeenCalledTimes(1);
     });
 
     it("does not throw when triggerWorkers itself fails", async () => {
-      asMock(webhookQueue.triggerWorkers).mockRejectedValueOnce(new Error("Queue error"));
+      asMock(webhookQueue.triggerWorkers).mockRejectedValueOnce(
+        new Error("Queue error"),
+      );
 
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
-      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({ ...validEvent, status: "processing" });
+      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
+        ...validEvent,
+        status: "processing",
+      });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
       await expect(
-        POST(mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } }))
+        POST(
+          mockRequest({
+            authHeader: "Bearer valid-token",
+            body: { eventId: "evt-001" },
+          }),
+        ),
       ).resolves.not.toThrow();
     });
 
     it("calls triggerWorkers with the correct base URL", async () => {
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
-      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({ ...validEvent, status: "processing" });
+      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
+        ...validEvent,
+        status: "processing",
+      });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
       process.env.NEXTAUTH_URL = "https://app.gitverse.ai";
 
-      await POST(mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } }));
+      await POST(
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
+      );
 
-      expect(asMock(webhookQueue.triggerWorkers)).toHaveBeenCalledWith("https://app.gitverse.ai");
+      expect(asMock(webhookQueue.triggerWorkers)).toHaveBeenCalledWith(
+        "https://app.gitverse.ai",
+      );
     });
 
     it("falls back to host header for base URL when NEXTAUTH_URL is not set", async () => {
@@ -456,7 +547,10 @@ describe("POST /api/internal/worker/webhook", () => {
 
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
-      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({ ...validEvent, status: "processing" });
+      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
+        ...validEvent,
+        status: "processing",
+      });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
       await POST(
@@ -464,10 +558,12 @@ describe("POST /api/internal/worker/webhook", () => {
           authHeader: "Bearer valid-token",
           body: { eventId: "evt-001" },
           headers: { host: "api.gitverse.ai" },
-        })
+        }),
       );
 
-      expect(asMock(webhookQueue.triggerWorkers)).toHaveBeenCalledWith("http://api.gitverse.ai");
+      expect(asMock(webhookQueue.triggerWorkers)).toHaveBeenCalledWith(
+        "http://api.gitverse.ai",
+      );
     });
 
     it("does not call triggerWorkers when auth fails", async () => {
@@ -480,7 +576,7 @@ describe("POST /api/internal/worker/webhook", () => {
 
     it("does not call triggerWorkers when rate limited", async () => {
       asMock(checkRateLimit).mockResolvedValueOnce(
-        rateLimitedResult({ allowed: false, remaining: 0 })
+        rateLimitedResult({ allowed: false, remaining: 0 }),
       );
 
       await POST(mockRequest({ authHeader: "Bearer valid-token" }));
@@ -499,7 +595,10 @@ describe("POST /api/internal/worker/webhook", () => {
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
       );
       const body = await res.json();
 
@@ -517,12 +616,15 @@ describe("POST /api/internal/worker/webhook", () => {
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
       await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
       );
 
       const updateCalls = asMock(prisma.webhookEvent.update).mock.calls;
       const completedUpdate = updateCalls.find(
-        (call: any) => call[0]?.data?.status === "completed"
+        (call: any) => call[0]?.data?.status === "completed",
       );
       expect(completedUpdate).toBeDefined();
       expect(completedUpdate[0].data.error).toBe("Repo not enabled");
@@ -536,14 +638,19 @@ describe("POST /api/internal/worker/webhook", () => {
         ...validEvent,
         payload: { installation: { id: 123 } },
       };
-      asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(eventWithInvalidPayload);
+      asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(
+        eventWithInvalidPayload,
+      );
       asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
         ...eventWithInvalidPayload,
         status: "processing",
       });
 
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
       );
       const body = await res.json();
 
@@ -560,14 +667,19 @@ describe("POST /api/internal/worker/webhook", () => {
           pull_request: { number: 42 },
         },
       };
-      asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(eventNoInstall);
+      asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(
+        eventNoInstall,
+      );
       asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
         ...eventNoInstall,
         status: "processing",
       });
 
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
       );
       const body = await res.json();
 
@@ -578,11 +690,19 @@ describe("POST /api/internal/worker/webhook", () => {
     it("returns 500 with error details when processing fails", async () => {
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
-      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({ ...validEvent, status: "processing" });
-      asMock(prisma.gitHubRepo.findFirst).mockRejectedValueOnce(new Error("Repo lookup failed"));
+      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
+        ...validEvent,
+        status: "processing",
+      });
+      asMock(prisma.gitHubRepo.findFirst).mockRejectedValueOnce(
+        new Error("Repo lookup failed"),
+      );
 
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
       );
       const body = await res.json();
 
@@ -607,18 +727,32 @@ describe("POST /api/internal/worker/webhook", () => {
       });
 
       asMock(isInternalWorkerAuthorized).mockReturnValueOnce(true);
-      asMock(checkRateLimit).mockResolvedValueOnce(rateLimitedResult({ allowed: true }));
+      asMock(checkRateLimit).mockResolvedValueOnce(
+        rateLimitedResult({ allowed: true }),
+      );
 
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
-      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({ ...validEvent, status: "processing" });
+      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
+        ...validEvent,
+        status: "processing",
+      });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
       await POST(req);
 
-      expect(asMock(checkRateLimit)).toHaveBeenCalledWith("webhook-worker", expect.any(Object));
-      expect(asMock(checkRateLimit)).not.toHaveBeenCalledWith("evil-worker", expect.any(Object));
-      expect(asMock(checkRateLimit)).not.toHaveBeenCalledWith("unknown", expect.any(Object));
+      expect(asMock(checkRateLimit)).toHaveBeenCalledWith(
+        "webhook-worker",
+        expect.any(Object),
+      );
+      expect(asMock(checkRateLimit)).not.toHaveBeenCalledWith(
+        "evil-worker",
+        expect.any(Object),
+      );
+      expect(asMock(checkRateLimit)).not.toHaveBeenCalledWith(
+        "unknown",
+        expect.any(Object),
+      );
     });
 
     it("rejects unauthenticated requests before any processing", async () => {
@@ -629,7 +763,7 @@ describe("POST /api/internal/worker/webhook", () => {
         mockRequest({
           authHeader: "Bearer wrong-token",
           body: { eventId: "evt-001" },
-        })
+        }),
       );
 
       expect(res.status).toBe(401);
@@ -640,17 +774,26 @@ describe("POST /api/internal/worker/webhook", () => {
 
     it("processes authenticated requests through full pipeline", async () => {
       asMock(isInternalWorkerAuthorized).mockReturnValueOnce(true);
-      asMock(checkRateLimit).mockResolvedValueOnce(rateLimitedResult({ allowed: true }));
+      asMock(checkRateLimit).mockResolvedValueOnce(
+        rateLimitedResult({ allowed: true }),
+      );
 
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
       asMock(prisma.webhookEvent.update)
         .mockResolvedValueOnce({ ...validEvent, status: "processing" })
-        .mockResolvedValueOnce({ ...validEvent, status: "completed", error: "Repo not enabled" });
+        .mockResolvedValueOnce({
+          ...validEvent,
+          status: "completed",
+          error: "Repo not enabled",
+        });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
       );
 
       expect(res.status).toBe(200);
@@ -672,7 +815,10 @@ describe("POST /api/internal/worker/webhook", () => {
     it("rate limit key does not contain any user-controlled input", async () => {
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
-      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({ ...validEvent, status: "processing" });
+      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
+        ...validEvent,
+        status: "processing",
+      });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
       await POST(
@@ -683,7 +829,7 @@ describe("POST /api/internal/worker/webhook", () => {
             "x-worker-id": "malicious-id",
             "x-forwarded-for": "1.2.3.4",
           },
-        })
+        }),
       );
 
       const keyArg = asMock(checkRateLimit).mock.calls[0][0];
@@ -698,11 +844,17 @@ describe("POST /api/internal/worker/webhook", () => {
 
       const prisma = require("@/lib/prisma").default;
       asMock(prisma.webhookEvent.findUnique).mockResolvedValueOnce(validEvent);
-      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({ ...validEvent, status: "processing" });
+      asMock(prisma.webhookEvent.update).mockResolvedValueOnce({
+        ...validEvent,
+        status: "processing",
+      });
       asMock(prisma.gitHubRepo.findFirst).mockResolvedValueOnce(null);
 
       const res = await POST(
-        mockRequest({ authHeader: "Bearer valid-token", body: { eventId: "evt-001" } })
+        mockRequest({
+          authHeader: "Bearer valid-token",
+          body: { eventId: "evt-001" },
+        }),
       );
 
       expect(res.status).toBe(200);
@@ -711,13 +863,17 @@ describe("POST /api/internal/worker/webhook", () => {
     it("isInternalWorkerAuthorized receives the raw auth header value", async () => {
       await POST(mockRequest({ authHeader: "Bearer abc123" }));
 
-      expect(asMock(isInternalWorkerAuthorized)).toHaveBeenCalledWith("Bearer abc123");
+      expect(asMock(isInternalWorkerAuthorized)).toHaveBeenCalledWith(
+        "Bearer abc123",
+      );
     });
 
     it("returns 401 when authorization header is malformed", async () => {
       asMock(isInternalWorkerAuthorized).mockReturnValueOnce(false);
 
-      const res = await POST(mockRequest({ authHeader: "NotBearer something" }));
+      const res = await POST(
+        mockRequest({ authHeader: "NotBearer something" }),
+      );
 
       expect(res.status).toBe(401);
     });

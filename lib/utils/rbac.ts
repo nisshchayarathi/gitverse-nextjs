@@ -11,7 +11,11 @@ export class RBACService {
   /**
    * Verifies if a user has the required role for a specific organization.
    */
-  public static async verifyOrgAccess(userId: number, organizationId: string, minimumRole: Role): Promise<boolean> {
+  public static async verifyOrgAccess(
+    userId: number,
+    organizationId: string,
+    minimumRole: Role,
+  ): Promise<boolean> {
     const membership = await prisma.organizationMember.findUnique({
       where: {
         organizationId_userId: {
@@ -33,7 +37,10 @@ export class RBACService {
   /**
    * Verifies if a user has access to a specific repository via tenant isolation rules.
    */
-  public static async verifyRepoAccess(userId: number, repositoryId: number): Promise<boolean> {
+  public static async verifyRepoAccess(
+    userId: number,
+    repositoryId: number,
+  ): Promise<boolean> {
     const repo = await prisma.repository.findUnique({
       where: { id: repositoryId },
       include: {
@@ -48,7 +55,11 @@ export class RBACService {
 
     // Check organization membership if assigned to a tenant
     if (repo.policyAssignment?.organizationId) {
-      return await this.verifyOrgAccess(userId, repo.policyAssignment.organizationId, Role.CONTRIBUTOR);
+      return await this.verifyOrgAccess(
+        userId,
+        repo.policyAssignment.organizationId,
+        Role.CONTRIBUTOR,
+      );
     }
 
     return false;

@@ -5,11 +5,11 @@ import { IPValidator } from "./ip-validator";
 export class DNSValidator {
   public static async resolveAndValidate(
     hostname: string,
-    allowLocalhost = false
+    allowLocalhost = false,
   ): Promise<DNSValidationResult> {
     // Block localhost/localhost.localdomain explicitly first
     const normalizedHost = hostname.trim().toLowerCase();
-    
+
     if (!allowLocalhost) {
       if (
         normalizedHost === "localhost" ||

@@ -25,14 +25,18 @@ jest.mock("@/lib/middleware", () => ({
 
 const { getAuthUser } = require("@/lib/middleware");
 
-function mockRequest(authHeader?: string, params?: { cursor?: string; limit?: string }): NextRequest {
+function mockRequest(
+  authHeader?: string,
+  params?: { cursor?: string; limit?: string },
+): NextRequest {
   const url = new URL("http://localhost:3000/api/auth/sessions");
   if (params?.cursor) url.searchParams.set("cursor", params.cursor);
   if (params?.limit) url.searchParams.set("limit", params.limit);
   return {
     url: url.toString(),
     headers: {
-      get: (name: string) => (name === "authorization" ? authHeader || null : null),
+      get: (name: string) =>
+        name === "authorization" ? authHeader || null : null,
     },
   } as unknown as NextRequest;
 }

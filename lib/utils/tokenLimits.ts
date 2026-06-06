@@ -44,7 +44,7 @@ export function buildTreeFromFiles(
     size?: number;
     lines?: number;
     language?: string | null;
-  }>
+  }>,
 ): FileNode[] {
   const rootMap: Record<string, any> = {};
 
@@ -113,7 +113,7 @@ export function buildTreeFromFiles(
  */
 export function truncateTree(
   tree: FileNode[],
-  maxTokens: number
+  maxTokens: number,
 ): { truncatedTree: FileNode[]; isTruncated: boolean } {
   const originalString = stringifyTree(tree);
   if (estimateTokens(originalString) <= maxTokens) {
@@ -129,7 +129,11 @@ export function truncateTree(
   };
 
   // Helper to prune a tree to a specific maximum depth
-  const pruneToDepth = (nodes: FileNode[], currentDepth: number, maxAllowedDepth: number): FileNode[] => {
+  const pruneToDepth = (
+    nodes: FileNode[],
+    currentDepth: number,
+    maxAllowedDepth: number,
+  ): FileNode[] => {
     if (currentDepth >= maxAllowedDepth) {
       return []; // Strip out all children beyond the allowed depth
     }
@@ -138,7 +142,11 @@ export function truncateTree(
       if (node.type === "directory" && node.children) {
         return {
           ...node,
-          children: pruneToDepth(node.children, currentDepth + 1, maxAllowedDepth),
+          children: pruneToDepth(
+            node.children,
+            currentDepth + 1,
+            maxAllowedDepth,
+          ),
         };
       }
       return node;

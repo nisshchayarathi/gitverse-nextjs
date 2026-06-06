@@ -23,7 +23,10 @@ describe("hashGeminiPromptSeed", () => {
   it("handles nested objects with Date", () => {
     const input = {
       name: "test",
-      dates: [new Date("2026-01-01T00:00:00Z"), new Date("2026-06-01T00:00:00Z")],
+      dates: [
+        new Date("2026-01-01T00:00:00Z"),
+        new Date("2026-06-01T00:00:00Z"),
+      ],
     };
     const result = hashGeminiPromptSeed(input);
     expect(typeof result).toBe("string");

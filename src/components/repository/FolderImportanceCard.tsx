@@ -1,6 +1,12 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui";
 import {
   FolderImportanceInfo,
   getCategoryColor,
@@ -21,12 +27,16 @@ export function FolderImportanceCard({
   const { bg, text, ring } = getCategoryColor(importance.label);
 
   return (
-    <Card className={`glass border border-border/70 transition-all duration-300 ${className}`}>
+    <Card
+      className={`glass border border-border/70 transition-all duration-300 ${className}`}
+    >
       <CardHeader className="pb-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1">
             <CardTitle className="text-base capitalize">{folderName}</CardTitle>
-            <CardDescription className="mt-1">{importance.description}</CardDescription>
+            <CardDescription className="mt-1">
+              {importance.description}
+            </CardDescription>
           </div>
           <div className="flex-shrink-0">
             <FolderImportanceBadge

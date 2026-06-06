@@ -1,6 +1,12 @@
-import React from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './index'
-import { Skeleton } from './Skeleton'
+import React from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "./index";
+import { Skeleton } from "./Skeleton";
 
 export const SettingsSkeleton: React.FC = () => {
   return (
@@ -75,7 +81,7 @@ export const SettingsSkeleton: React.FC = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default SettingsSkeleton
+export default SettingsSkeleton;

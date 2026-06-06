@@ -1,7 +1,11 @@
 import { PRReviewResponse } from "./prReviewService";
 import { TimeoutEstimatorService } from "./timeout-estimator";
 import { reviewAggregator } from "./review-aggregator";
-import { ChunkedReviewResult, PartialReviewStatus, PRReviewMode } from "../../types/review-processing";
+import {
+  ChunkedReviewResult,
+  PartialReviewStatus,
+  PRReviewMode,
+} from "../../types/review-processing";
 
 export interface ChunkedReviewOptions {
   files: Array<{
@@ -14,25 +18,36 @@ export interface ChunkedReviewOptions {
   }>;
   timeoutEstimator: TimeoutEstimatorService;
   chunkSize: number;
-  processChunk: (chunkFiles: any[], chunkIndex: number, totalChunks: number) => Promise<PRReviewResponse | null>;
+  processChunk: (
+    chunkFiles: any[],
+    chunkIndex: number,
+    totalChunks: number,
+  ) => Promise<PRReviewResponse | null>;
   mode: PRReviewMode;
 }
 
 export class ChunkedReviewService {
-  public async executeChunkedReview(options: ChunkedReviewOptions): Promise<{ result: ChunkedReviewResult, review: PRReviewResponse | null }> {
+  public async executeChunkedReview(
+    options: ChunkedReviewOptions,
+  ): Promise<{ result: ChunkedReviewResult; review: PRReviewResponse | null }> {
     const { files, timeoutEstimator, chunkSize, processChunk, mode } = options;
-    
+
     if (files.length === 0) {
       return {
-        result: { status: 'Completed', reviewedFileCount: 0, totalFileCount: 0, modeUsed: mode },
-        review: null
+        result: {
+          status: "Completed",
+          reviewedFileCount: 0,
+          totalFileCount: 0,
+          modeUsed: mode,
+        },
+        review: null,
       };
     }
 
     const reviews: PRReviewResponse[] = [];
     let reviewedCount = 0;
     const totalFiles = files.length;
-    let status: PartialReviewStatus = 'Processing';
+    let status: PartialReviewStatus = "Processing";
     let errorReason: string | undefined = undefined;
 
     const chunks = this.createChunks(files, chunkSize);
@@ -40,9 +55,11 @@ export class ChunkedReviewService {
 
     for (let i = 0; i < totalChunks; i++) {
       if (timeoutEstimator.isTimeExhausted()) {
-        status = 'Partial';
+        status = "Partial";
         errorReason = `Execution time budget exhausted. Stopped after ${reviewedCount} files.`;
-        console.warn(`[ChunkedReview] Bailing early due to time limits. Chunk ${i+1}/${totalChunks} aborted.`);
+        console.warn(
+          `[ChunkedReview] Bailing early due to time limits. Chunk ${i + 1}/${totalChunks} aborted.`,
+        );
         break;
       }
 
@@ -53,23 +70,26 @@ export class ChunkedReviewService {
         }
         reviewedCount += chunks[i].length;
       } catch (err: any) {
-        console.error(`[ChunkedReview] Error processing chunk ${i+1}:`, err);
-        status = 'Partial';
-        errorReason = err?.message || 'Chunk processing failed';
+        console.error(`[ChunkedReview] Error processing chunk ${i + 1}:`, err);
+        status = "Partial";
+        errorReason = err?.message || "Chunk processing failed";
         break;
       }
     }
 
-    if (status === 'Processing') {
-      status = 'Completed';
+    if (status === "Processing") {
+      status = "Completed";
     } else if (reviews.length === 0) {
-      status = 'Failed';
+      status = "Failed";
     }
 
-    const aggregatedReview = reviews.length > 0 ? reviewAggregator.aggregate(reviews) : null;
+    const aggregatedReview =
+      reviews.length > 0 ? reviewAggregator.aggregate(reviews) : null;
 
-    if (aggregatedReview && status === 'Partial') {
-      aggregatedReview.summary = `**[PARTIAL REVIEW]**\n*Notice: Due to PR size, only ${reviewedCount} out of ${totalFiles} files were reviewed to prevent timeouts.*\n\n` + aggregatedReview.summary;
+    if (aggregatedReview && status === "Partial") {
+      aggregatedReview.summary =
+        `**[PARTIAL REVIEW]**\n*Notice: Due to PR size, only ${reviewedCount} out of ${totalFiles} files were reviewed to prevent timeouts.*\n\n` +
+        aggregatedReview.summary;
     }
 
     return {
@@ -78,9 +98,9 @@ export class ChunkedReviewService {
         reviewedFileCount: reviewedCount,
         totalFileCount: totalFiles,
         modeUsed: mode,
-        errorReason
+        errorReason,
       },
-      review: aggregatedReview
+      review: aggregatedReview,
     };
   }
 

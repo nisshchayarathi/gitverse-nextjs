@@ -150,7 +150,9 @@ describe("POST /api/integrations/github/connect", () => {
 
     it("stores encrypted token with tokenEncrypted flag", async () => {
       (GitHubService as any).mockImplementation(() => ({
-        getAuthenticatedUser: jest.fn().mockResolvedValue({ id: 12345, login: "testuser" }),
+        getAuthenticatedUser: jest
+          .fn()
+          .mockResolvedValue({ id: 12345, login: "testuser" }),
       }));
 
       await POST(mockRequest({ token: "ghp_test" }));
@@ -165,7 +167,7 @@ describe("POST /api/integrations/github/connect", () => {
             accessToken: "encrypted:ghp_test",
             tokenEncrypted: true,
           }),
-        })
+        }),
       );
     });
   });

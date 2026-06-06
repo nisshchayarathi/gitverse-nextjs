@@ -7,9 +7,10 @@
  */
 export function isValidGithubUrl(url: string): boolean {
   if (!url || typeof url !== "string") return false;
-  
+
   // Strict regex accounting for subdomains (www.), optional trailing slashes, and optional .git extensions.
-  const githubRegex = /^https?:\/\/(www\.)?github\.com\/[a-zA-Z0-9-._]+\/[a-zA-Z0-9-._]+(\.git)?\/?$/;
+  const githubRegex =
+    /^https?:\/\/(www\.)?github\.com\/[a-zA-Z0-9-._]+\/[a-zA-Z0-9-._]+(\.git)?\/?$/;
   return githubRegex.test(url.trim());
 }
 

@@ -13,8 +13,8 @@ export class WebhookRetryService {
       const eligibleJobs = await prisma.webhookEvent.findMany({
         where: {
           status: "failed",
-          retryCount: { lt: MAX_RETRIES }
-        }
+          retryCount: { lt: MAX_RETRIES },
+        },
       });
 
       if (eligibleJobs.length === 0) return 0;
@@ -22,15 +22,17 @@ export class WebhookRetryService {
       // Batch update them back to pending
       await prisma.webhookEvent.updateMany({
         where: {
-          id: { in: eligibleJobs.map(job => job.id) }
+          id: { in: eligibleJobs.map((job) => job.id) },
         },
         data: {
           status: "pending",
-          retryCount: { increment: 1 }
-        }
+          retryCount: { increment: 1 },
+        },
       });
 
-      console.log(`[WebhookRetry] Requeued ${eligibleJobs.length} failed jobs for retry.`);
+      console.log(
+        `[WebhookRetry] Requeued ${eligibleJobs.length} failed jobs for retry.`,
+      );
       return eligibleJobs.length;
     } catch (error) {
       console.error("[WebhookRetry] Failed to requeue jobs:", error);

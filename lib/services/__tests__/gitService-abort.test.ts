@@ -57,15 +57,18 @@ describe("GitService abort signal handling", () => {
       const service = new GitService(tmpDir);
       const promise = (service as any).spawnGit(["status"]);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
 
       (proc.stdout as Readable).push("output data");
       (proc.stdout as Readable).push(null);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       proc.emit("close", 0);
 
-      await expect(promise).resolves.toEqual({ stdout: "output data", stderr: "" });
+      await expect(promise).resolves.toEqual({
+        stdout: "output data",
+        stderr: "",
+      });
     });
 
     it("should reject when abort signal fires during pending process", async () => {
@@ -76,7 +79,7 @@ describe("GitService abort signal handling", () => {
       const service = new GitService(tmpDir, controller.signal);
       const promise = (service as any).spawnGit(["clone", "."]);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       controller.abort();
       jest.advanceTimersByTime(6000);
@@ -95,7 +98,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getCommits("main", 100);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       controller.abort();
       jest.advanceTimersByTime(6000);
@@ -112,7 +115,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getCommits("main", 100, methodController.signal);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       methodController.abort();
       jest.advanceTimersByTime(6000);
@@ -129,13 +132,15 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getCommits("main", 100);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
 
       const stdout = proc.stdout as Readable;
-      stdout.push("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0|abc1234|Author|author@test.com|2024-01-01T00:00:00Z|Initial commit|||\n");
+      stdout.push(
+        "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0|abc1234|Author|author@test.com|2024-01-01T00:00:00Z|Initial commit|||\n",
+      );
       stdout.push(null);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       proc.emit("close", 0);
 
       const result = await promise;
@@ -150,7 +155,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getCommits("main", 100);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       proc.emit("error", new Error("ENOENT"));
       jest.advanceTimersByTime(6000);
@@ -172,7 +177,9 @@ describe("GitService abort signal handling", () => {
       jest.advanceTimersByTime(6000);
       jest.useRealTimers();
 
-      await expect(promise).rejects.toThrow("Failed to get commits: git exited with code 128");
+      await expect(promise).rejects.toThrow(
+        "Failed to get commits: git exited with code 128",
+      );
     });
   });
 
@@ -189,8 +196,8 @@ describe("GitService abort signal handling", () => {
         { signal: controller.signal },
       );
 
-      await new Promise(r => setImmediate(r));
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       controller.abort();
       jest.advanceTimersByTime(6000);
@@ -213,12 +220,12 @@ describe("GitService abort signal handling", () => {
 
       // Yield multiple times for the async function to reach spawn
       for (let i = 0; i < 10; i++) {
-        await new Promise(r => setImmediate(r));
+        await new Promise((r) => setImmediate(r));
       }
       (proc.stderr as Readable).push(null);
       (proc.stdout as Readable).push(null);
       for (let i = 0; i < 5; i++) {
-        await new Promise(r => setImmediate(r));
+        await new Promise((r) => setImmediate(r));
       }
       proc.emit("close", 0);
 
@@ -236,7 +243,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getBranches(methodController.signal);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       methodController.abort();
       jest.advanceTimersByTime(6000);
@@ -255,7 +262,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getContributors(methodController.signal);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       methodController.abort();
       jest.advanceTimersByTime(6000);
@@ -274,7 +281,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getFileTree(undefined, methodController.signal);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       methodController.abort();
       jest.advanceTimersByTime(6000);
@@ -289,10 +296,20 @@ describe("GitService abort signal handling", () => {
       const service = new GitService(tmpDir);
       const controller = new AbortController();
       const fileTreeSpy = jest.spyOn(service, "getFileTree").mockResolvedValue([
-        { path: "test.ts", name: "test.ts", size: 100, extension: ".ts", lines: 5, language: "TypeScript" },
+        {
+          path: "test.ts",
+          name: "test.ts",
+          size: 100,
+          extension: ".ts",
+          lines: 5,
+          language: "TypeScript",
+        },
       ]);
 
-      const result = await service.detectLanguages(undefined, controller.signal);
+      const result = await service.detectLanguages(
+        undefined,
+        controller.signal,
+      );
       expect(fileTreeSpy).toHaveBeenCalledWith(undefined, controller.signal);
       expect(result).toHaveLength(1);
     });
@@ -308,7 +325,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getCommits("main", 100, methodController.signal);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       methodController.abort();
       jest.advanceTimersByTime(6000);
@@ -325,7 +342,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getCommits("main", 100);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       instanceController.abort();
       jest.advanceTimersByTime(6000);
@@ -342,7 +359,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getBranches(instanceController.signal);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       instanceController.abort();
       jest.advanceTimersByTime(6000);
@@ -359,7 +376,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getContributors(instanceController.signal);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       instanceController.abort();
       jest.advanceTimersByTime(6000);
@@ -376,7 +393,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getFileTree(undefined, instanceController.signal);
 
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       jest.useFakeTimers();
       instanceController.abort();
       jest.advanceTimersByTime(6000);
@@ -394,7 +411,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getCommits("main", 100);
       (proc.stdout as Readable).push(null);
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       proc.emit("close", 0);
       proc.emit("exit", 0);
 
@@ -409,7 +426,7 @@ describe("GitService abort signal handling", () => {
 
       const promise = service.getCommits("main", 100, undefined);
       (proc.stdout as Readable).push(null);
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       proc.emit("close", 0);
       proc.emit("exit", 0);
 
@@ -423,10 +440,12 @@ describe("GitService abort signal handling", () => {
       mockSpawn.mockReturnValue(proc);
 
       const promise = service.getContributors(undefined as any);
-      await new Promise(r => setImmediate(r));
-      (proc.stdout as Readable).push("author|email@test.com|2024-01-01T00:00:00Z\n1\t0\tindex.ts\n");
+      await new Promise((r) => setImmediate(r));
+      (proc.stdout as Readable).push(
+        "author|email@test.com|2024-01-01T00:00:00Z\n1\t0\tindex.ts\n",
+      );
       (proc.stdout as Readable).push(null);
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       proc.emit("close", 0);
 
       const result = await promise;
@@ -442,7 +461,9 @@ describe("GitService abort signal handling", () => {
 
       jest.useFakeTimers();
       const service = new GitService(tmpDir);
-      const promise = (service as any).spawnGit(["slow-command"], { timeout: 50 });
+      const promise = (service as any).spawnGit(["slow-command"], {
+        timeout: 50,
+      });
 
       jest.advanceTimersByTime(100);
       jest.useRealTimers();
@@ -469,11 +490,13 @@ describe("GitService abort signal handling", () => {
       mockSpawn.mockReturnValue(proc);
 
       const service = new GitService(tmpDir);
-      const promise = (service as any).spawnGit(["quick-command"], { timeout: 5000 });
+      const promise = (service as any).spawnGit(["quick-command"], {
+        timeout: 5000,
+      });
 
       (proc.stdout as Readable).push("done");
       (proc.stdout as Readable).push(null);
-      await new Promise(r => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
       proc.emit("close", 0);
 
       await expect(promise).resolves.toEqual({ stdout: "done", stderr: "" });

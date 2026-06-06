@@ -1,6 +1,6 @@
-import React from 'react';
-import { LucideIcon } from 'lucide-react';
-import { Button } from './Button';
+import React from "react";
+import { LucideIcon } from "lucide-react";
+import { Button } from "./Button";
 
 interface EmptyStateProps {
   icon: LucideIcon;
@@ -45,7 +45,9 @@ export function EmptyState({
           <ul className="space-y-2 text-sm text-muted-foreground">
             {suggestions.map((suggestion, idx) => (
               <li key={idx} className="flex items-start gap-2">
-                <span className="text-primary font-bold mt-0.5 select-none">•</span>
+                <span className="text-primary font-bold mt-0.5 select-none">
+                  •
+                </span>
                 <span>{suggestion}</span>
               </li>
             ))}
@@ -54,8 +56,8 @@ export function EmptyState({
       )}
 
       {actionLabel && onAction && (
-        <Button 
-          onClick={onAction} 
+        <Button
+          onClick={onAction}
           className="bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 px-6 shadow-md hover:shadow-lg active:scale-95"
         >
           {actionLabel}

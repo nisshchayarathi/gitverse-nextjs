@@ -18,7 +18,8 @@ jest.mock("dns", () => {
 describe("SSRF Vulnerability & Protection Engine", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.ALLOWED_WEBHOOK_DOMAINS = "github.com,api.github.com,hooks.slack.com";
+    process.env.ALLOWED_WEBHOOK_DOMAINS =
+      "github.com,api.github.com,hooks.slack.com";
   });
 
   describe("IPValidator", () => {
@@ -76,8 +77,10 @@ describe("SSRF Vulnerability & Protection Engine", () => {
 
   describe("DNSValidator & SafeHttpClient Validation Flow", () => {
     it("Scenario 1: allows https://api.github.com", async () => {
-      (dns.promises.lookup as jest.Mock).mockResolvedValue([{ address: "140.82.113.4", family: 4 }]);
-      
+      (dns.promises.lookup as jest.Mock).mockResolvedValue([
+        { address: "140.82.113.4", family: 4 },
+      ]);
+
       const dnsResult = await DNSValidator.resolveAndValidate("api.github.com");
       expect(dnsResult.isValid).toBe(true);
     });
@@ -93,28 +96,40 @@ describe("SSRF Vulnerability & Protection Engine", () => {
     });
 
     it("Scenario 4: blocks http://localhost", async () => {
-      const dnsResult = await DNSValidator.resolveAndValidate("localhost", false);
+      const dnsResult = await DNSValidator.resolveAndValidate(
+        "localhost",
+        false,
+      );
       expect(dnsResult.isValid).toBe(false);
     });
 
     it("Scenario 5: blocks metadata.google.internal", async () => {
-      const dnsResult = await DNSValidator.resolveAndValidate("metadata.google.internal");
+      const dnsResult = await DNSValidator.resolveAndValidate(
+        "metadata.google.internal",
+      );
       expect(dnsResult.isValid).toBe(false);
       expect(dnsResult.reason).toContain("Metadata hostname blocked");
     });
 
     it("Scenario 6: blocks when DNS resolves to a private IP", async () => {
       // Mock resolve to loopback/private
-      (dns.promises.lookup as jest.Mock).mockResolvedValue([{ address: "192.168.1.1", family: 4 }]);
+      (dns.promises.lookup as jest.Mock).mockResolvedValue([
+        { address: "192.168.1.1", family: 4 },
+      ]);
 
-      const dnsResult = await DNSValidator.resolveAndValidate("api.github.com", false);
+      const dnsResult = await DNSValidator.resolveAndValidate(
+        "api.github.com",
+        false,
+      );
       expect(dnsResult.isValid).toBe(false);
       expect(dnsResult.reason).toContain("Private IP range blocked");
     });
 
     it("Scenario 7: allows a valid allowlisted domain", async () => {
       process.env.ALLOWED_WEBHOOK_DOMAINS = "api.github.com";
-      (dns.promises.lookup as jest.Mock).mockResolvedValue([{ address: "140.82.113.4", family: 4 }]);
+      (dns.promises.lookup as jest.Mock).mockResolvedValue([
+        { address: "140.82.113.4", family: 4 },
+      ]);
 
       expect(DomainAllowlist.isAllowed("api.github.com")).toBe(true);
       const dnsResult = await DNSValidator.resolveAndValidate("api.github.com");

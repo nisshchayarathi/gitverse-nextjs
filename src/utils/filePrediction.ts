@@ -58,11 +58,17 @@ const parseImportsFromContent = (content?: string) => {
     return [];
   }
 
-  const importMatches = Array.from(content.matchAll(/import\s+(?:.*?from\s+)?["'](.+?)["']/gi));
+  const importMatches = Array.from(
+    content.matchAll(/import\s+(?:.*?from\s+)?["'](.+?)["']/gi),
+  );
   return importMatches.map((match) => match[1]);
 };
 
-const resolveImportPath = (source: string, originPath: string, filePaths: Set<string>) => {
+const resolveImportPath = (
+  source: string,
+  originPath: string,
+  filePaths: Set<string>,
+) => {
   const normalizedSource = source.replace(/\.[jt]sx?$/, "");
   if (normalizedSource.startsWith("./") || normalizedSource.startsWith("../")) {
     const originParts = originPath.split("/").slice(0, -1);
@@ -105,7 +111,10 @@ export const buildRepositoryGraph = (files: RepositoryFile[]) => {
       .filter(Boolean)
       .map((source) => normalizePath(source));
 
-    graph.set(originPath, new Set(resolvedImports.filter((path) => filePaths.has(path))));
+    graph.set(
+      originPath,
+      new Set(resolvedImports.filter((path) => filePaths.has(path))),
+    );
   });
 
   return graph;
@@ -135,15 +144,30 @@ export const predictFiles = (
     const importScore = graph.get(normalizePath(file.path))?.size ?? 0;
     const fileSizeScore = Math.min((file.lines ?? file.size ?? 0) / 100, 8);
 
-    let totalScore = keywordScore + moduleScore + depthScore + importScore + fileSizeScore;
+    let totalScore =
+      keywordScore + moduleScore + depthScore + importScore + fileSizeScore;
 
-    if (issueAnalysis.affectedAreas.some((area) => normalizePath(area).includes("api")) && file.path.match(/api\//i)) {
+    if (
+      issueAnalysis.affectedAreas.some((area) =>
+        normalizePath(area).includes("api"),
+      ) &&
+      file.path.match(/api\//i)
+    ) {
       totalScore += 12;
     }
-    if (issueAnalysis.affectedAreas.some((area) => normalizePath(area).includes("ui")) && file.path.match(/components\//i)) {
+    if (
+      issueAnalysis.affectedAreas.some((area) =>
+        normalizePath(area).includes("ui"),
+      ) &&
+      file.path.match(/components\//i)
+    ) {
       totalScore += 10;
     }
-    if (repository?.languages?.some((lang) => lang.name.toLowerCase().includes("typescript"))) {
+    if (
+      repository?.languages?.some((lang) =>
+        lang.name.toLowerCase().includes("typescript"),
+      )
+    ) {
       totalScore += 2;
     }
 

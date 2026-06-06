@@ -1,4 +1,7 @@
-import { KnowledgeGraphNode, CrossRepoDependency } from "../../types/distributed-rag";
+import {
+  KnowledgeGraphNode,
+  CrossRepoDependency,
+} from "../../types/distributed-rag";
 
 export class OrgKnowledgeGraph {
   private nodes: Map<string, KnowledgeGraphNode> = new Map();
@@ -10,10 +13,12 @@ export class OrgKnowledgeGraph {
 
   addDependency(dependency: CrossRepoDependency): void {
     this.edges.push(dependency);
-    
+
     // Update node relationships
     const sourceId = `${dependency.sourceRepo}/${dependency.sourceFile}`;
-    const targetId = dependency.targetFile ? `${dependency.targetRepo}/${dependency.targetFile}` : dependency.targetRepo;
+    const targetId = dependency.targetFile
+      ? `${dependency.targetRepo}/${dependency.targetFile}`
+      : dependency.targetRepo;
 
     const sourceNode = this.nodes.get(sourceId);
     const targetNode = this.nodes.get(targetId);
@@ -32,7 +37,9 @@ export class OrgKnowledgeGraph {
 
   getDownstreamDependents(nodeId: string, maxDepth: number = 3): string[] {
     const affected = new Set<string>();
-    const queue: Array<{ id: string, depth: number }> = [{ id: nodeId, depth: 0 }];
+    const queue: Array<{ id: string; depth: number }> = [
+      { id: nodeId, depth: 0 },
+    ];
 
     while (queue.length > 0) {
       const { id, depth } = queue.shift()!;

@@ -2,11 +2,8 @@ import { PrismaClient } from "@prisma/client";
 import { Pool as PgPool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaNeonHttp, PrismaNeon } from "@prisma/adapter-neon";
-import { Pool as NeonPool, neonConfig } from "@neondatabase/serverless";
+import { Pool as NeonPool } from "@neondatabase/serverless";
 import ws from "ws";
-
-// Set webSocketConstructor so @neondatabase/serverless works via WebSockets in Node.js/serverless environments
-neonConfig.webSocketConstructor = ws;
 
 type PrismaAdapterChoice = "pg" | "neon-http" | "neon-ws";
 
@@ -26,6 +23,9 @@ function getAdapterChoice(connectionString: string): PrismaAdapterChoice {
   const isNeonHost =
     host.endsWith(".neon.tech") || connectionString.includes("neon.tech");
 
+  // Default to neon-ws for Neon hosts: WebSocket pooling supports transactions.
+  // Requires experimental.serverComponentsExternalPackages in next.config.js to
+  // prevent webpack from bundling ws/neon packages (which breaks the WS constructor).
   if (isNeonHost) return "neon-ws";
   return "pg";
 }
@@ -42,19 +42,21 @@ function withRetry(client: PrismaClient) {
               return await query(args);
             } catch (error: any) {
               const isColdStartError =
-                error?.code === 'P1001' ||
-                error?.code === 'P2024' ||
-                error?.message?.toLowerCase().includes('timeout') ||
-                error?.message?.toLowerCase().includes('connection pool') ||
-                error?.message?.toLowerCase().includes('connect') ||
-                error?.message?.toLowerCase().includes('fetch failed');
+                error?.code === "P1001" ||
+                error?.code === "P2024" ||
+                error?.message?.toLowerCase().includes("timeout") ||
+                error?.message?.toLowerCase().includes("connection pool") ||
+                error?.message?.toLowerCase().includes("connect") ||
+                error?.message?.toLowerCase().includes("fetch failed");
 
               if (!isColdStartError || retries >= maxRetries) {
                 throw error;
               }
               retries++;
               const backoff = Math.pow(2, retries) * 500; // 1s, 2s, 4s
-              console.warn(`[Prisma Retry] DB connection error (attempt ${retries}/${maxRetries}). Retrying in ${backoff}ms...`);
+              console.warn(
+                `[Prisma Retry] DB connection error (attempt ${retries}/${maxRetries}). Retrying in ${backoff}ms...`,
+              );
               await new Promise((r) => setTimeout(r, backoff));
             }
           }
@@ -66,6 +68,7 @@ function withRetry(client: PrismaClient) {
 
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL;
+  console.log(connectionString);
 
   if (!connectionString) {
     throw new Error("DATABASE_URL is required");
@@ -91,30 +94,27 @@ function createPrismaClient() {
       : 30000;
 
   if (adapterChoice === "neon-ws") {
-    // 1. WebSocket-based pooled adapter for Neon in serverless environment
-    const pool = new NeonPool({
+    // PrismaNeon (v7) is a factory — its connect() creates the pool internally.
+    // Pass the pool config directly so it constructs the pool with the correct
+    // connectionString and webSocketConstructor.
+    const adapter = new PrismaNeon({
       connectionString,
+      webSocketConstructor: ws,
       connectionTimeoutMillis: normalizedConnectionTimeoutMs,
       idleTimeoutMillis: process.env.NODE_ENV === "production" ? 30000 : 10000,
       max: normalizedPoolMax,
-    });
-
-    pool.on("error", (err: any) => {
-      console.error("Unexpected Neon WebSocket pool error:", err);
-    });
-
-    registerPool(pool as any, "neon-ws");
-
-    const adapter = new PrismaNeon(pool as any);
-    return withRetry(new PrismaClient({
-      adapter,
-      log: ["error", "warn"],
-    }));
+    } as any);
+    return withRetry(
+      new PrismaClient({
+        adapter,
+        log: ["error", "warn"],
+      }),
+    );
   }
 
   if (adapterChoice === "neon-http") {
-    // 2. HTTP-based fetch adapter for Neon (no pooling)
-    const adapter = new PrismaNeonHttp(connectionString, {} as any);
+    // 2. HTTP-based fetch adapter for Neon (no WebSocket, works in all bundled environments)
+    const adapter = new PrismaNeonHttp(connectionString, {});
     return withRetry(new PrismaClient({ adapter, log: ["error", "warn"] }));
   }
 
@@ -135,10 +135,12 @@ function createPrismaClient() {
 
   const adapter = new PrismaPg(pool);
 
-  return withRetry(new PrismaClient({
-    adapter,
-    log: ["error", "warn"],
-  }));
+  return withRetry(
+    new PrismaClient({
+      adapter,
+      log: ["error", "warn"],
+    }),
+  );
 }
 
 export type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
@@ -157,7 +159,7 @@ export function getPrisma(): ExtendedPrismaClient {
   return globalThis.prismaGlobal;
 }
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   // Ensure the variable is declared so that the getter can use it
   if (!globalThis.prismaGlobal) {
     try {
@@ -210,9 +212,9 @@ let disconnectInProgress = false;
 
 const defaultDisconnectTimeoutMs = 10_000;
 
-export async function disconnectPrisma(
-  options?: { timeoutMs?: number }
-): Promise<void> {
+export async function disconnectPrisma(options?: {
+  timeoutMs?: number;
+}): Promise<void> {
   if (disconnectInProgress) return;
   disconnectInProgress = true;
 
@@ -222,18 +224,22 @@ export async function disconnectPrisma(
     try {
       const timeoutMs = options?.timeoutMs ?? defaultDisconnectTimeoutMs;
       const disconnect = client.$disconnect();
-      const timer = timeoutMs > 0
-        ? new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("disconnect timed out")), timeoutMs)
-          )
-        : null;
+      const timer =
+        timeoutMs > 0
+          ? new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error("disconnect timed out")),
+                timeoutMs,
+              ),
+            )
+          : null;
       await (timer ? Promise.race([disconnect, timer]) : disconnect);
     } catch (err: any) {
       const isTimeout = err?.message === "disconnect timed out";
       console.warn(
         isTimeout
           ? "[Prisma] disconnect timed out — forcing cleanup"
-          : `[Prisma] disconnect error: ${err?.message ?? err}`
+          : `[Prisma] disconnect error: ${err?.message ?? err}`,
       );
     }
   }

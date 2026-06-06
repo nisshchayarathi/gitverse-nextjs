@@ -1,9 +1,9 @@
 export class DomainAllowlist {
   private static defaultDomains = [
-    'github.com',
-    'api.github.com',
-    'hooks.slack.com',
-    'raw.githubusercontent.com'
+    "github.com",
+    "api.github.com",
+    "hooks.slack.com",
+    "raw.githubusercontent.com",
   ];
 
   /**
@@ -19,7 +19,7 @@ export class DomainAllowlist {
     if (envVar) {
       allowedList = envVar
         .split(/[,\s]+/)
-        .map(d => d.trim().toLowerCase())
+        .map((d) => d.trim().toLowerCase())
         .filter(Boolean);
     }
 
@@ -36,13 +36,13 @@ export class DomainAllowlist {
    * Checks if a domain matches a pattern, supporting wildcards (e.g. *.github.com).
    */
   private static matchDomain(domain: string, pattern: string): boolean {
-    if (pattern === '*') {
+    if (pattern === "*") {
       return true;
     }
 
-    if (pattern.startsWith('*.')) {
+    if (pattern.startsWith("*.")) {
       const baseDomain = pattern.substring(2);
-      return domain === baseDomain || domain.endsWith('.' + baseDomain);
+      return domain === baseDomain || domain.endsWith("." + baseDomain);
     }
 
     return domain === pattern;

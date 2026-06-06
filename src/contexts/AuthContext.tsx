@@ -23,7 +23,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (retries?: number) => Promise<void>;
   updateUser: (data: Partial<User>) => void;
 }
 
@@ -54,7 +54,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return; // Still loading session
       }
 
-      if (session?.user && session.expires && new Date(session.expires).getTime() > Date.now()) {
+      if (
+        session?.user &&
+        session.expires &&
+        new Date(session.expires).getTime() > Date.now()
+      ) {
         setUser({
           id: session.user.id || "",
           name: session.user.name || "",

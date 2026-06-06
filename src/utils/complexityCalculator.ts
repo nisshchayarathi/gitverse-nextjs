@@ -1,19 +1,32 @@
-import { ArchitectureSnapshot, ArchitecturalHealthMetrics } from "@/types/architectureDrift";
+import {
+  ArchitectureSnapshot,
+  ArchitecturalHealthMetrics,
+} from "@/types/architectureDrift";
 
-export const calculateComplexityScore = (snapshot: ArchitectureSnapshot): number => {
+export const calculateComplexityScore = (
+  snapshot: ArchitectureSnapshot,
+): number => {
   const { metrics } = snapshot;
-  
+
   const moduleComplexity = Math.min(metrics.moduleCount / 100, 1) * 25;
   const dependencyComplexity = Math.min(metrics.dependencyCount / 200, 1) * 25;
   const couplingComplexity = Math.min(metrics.averageCoupling / 3, 1) * 25;
-  const circularComplexity = Math.min(metrics.circularDependencyCount / 5, 1) * 25;
+  const circularComplexity =
+    Math.min(metrics.circularDependencyCount / 5, 1) * 25;
 
-  return Math.round(moduleComplexity + dependencyComplexity + couplingComplexity + circularComplexity);
+  return Math.round(
+    moduleComplexity +
+      dependencyComplexity +
+      couplingComplexity +
+      circularComplexity,
+  );
 };
 
-export const calculateModularityScore = (snapshot: ArchitectureSnapshot): number => {
+export const calculateModularityScore = (
+  snapshot: ArchitectureSnapshot,
+): number => {
   const { modules } = snapshot;
-  
+
   if (modules.length === 0) return 0;
 
   const modulesByType = new Map<string, number>();
@@ -29,9 +42,11 @@ export const calculateModularityScore = (snapshot: ArchitectureSnapshot): number
   return Math.round((typeBalance + dependencyBalance) / 2);
 };
 
-export const calculateCohesionScore = (snapshot: ArchitectureSnapshot): number => {
+export const calculateCohesionScore = (
+  snapshot: ArchitectureSnapshot,
+): number => {
   const { modules, metrics } = snapshot;
-  
+
   if (modules.length === 0) return 100;
 
   const internalDeps = modules.filter((m) => m.dependents.length > 0).length;
@@ -41,25 +56,36 @@ export const calculateCohesionScore = (snapshot: ArchitectureSnapshot): number =
   return Math.round(internalDepPercentage - couplingPenalty);
 };
 
-export const calculateCouplingScore = (snapshot: ArchitectureSnapshot): number => {
+export const calculateCouplingScore = (
+  snapshot: ArchitectureSnapshot,
+): number => {
   const { metrics, modules } = snapshot;
-  
+
   const baseCoupling = Math.min((metrics.averageCoupling / 3) * 100, 100);
   const circularPenalty = metrics.circularDependencyCount * 5;
-  const highDepModules = modules.filter((m) => m.dependencies.length > 5).length;
+  const highDepModules = modules.filter(
+    (m) => m.dependencies.length > 5,
+  ).length;
   const highDepPenalty = (highDepModules / modules.length) * 20;
 
-  return Math.round(Math.min(100, baseCoupling + circularPenalty + highDepPenalty));
+  return Math.round(
+    Math.min(100, baseCoupling + circularPenalty + highDepPenalty),
+  );
 };
 
-export const calculateRepositoryHealth = (snapshot: ArchitectureSnapshot): ArchitecturalHealthMetrics => {
+export const calculateRepositoryHealth = (
+  snapshot: ArchitectureSnapshot,
+): ArchitecturalHealthMetrics => {
   const complexity = calculateComplexityScore(snapshot);
   const modularity = calculateModularityScore(snapshot);
   const cohesion = calculateCohesionScore(snapshot);
   const coupling = calculateCouplingScore(snapshot);
 
   const healthScore = Math.round(
-    (modularity * 0.3 + (100 - coupling) * 0.3 + cohesion * 0.2 + (100 - complexity) * 0.2),
+    modularity * 0.3 +
+      (100 - coupling) * 0.3 +
+      cohesion * 0.2 +
+      (100 - complexity) * 0.2,
   );
 
   return {

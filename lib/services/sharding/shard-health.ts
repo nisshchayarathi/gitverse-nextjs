@@ -22,7 +22,7 @@ export class ShardHealthMonitor {
         const client = prismaShardRouter.getClientForShard(shard.id);
         // Simple ping query using raw SQL to test connection
         await client.$queryRaw`SELECT 1`;
-        
+
         latencyMs = Date.now() - startTime;
         isAvailable = true;
       } catch (error) {
@@ -34,16 +34,16 @@ export class ShardHealthMonitor {
         shardId: shard.id,
         isAvailable,
         latencyMs,
-        lastChecked: new Date().toISOString()
+        lastChecked: new Date().toISOString(),
       };
 
       healthStatuses.push(status);
 
       // Automatically update registry with the health status
       this.registry.updateShardStatus(
-        shard.id, 
-        isAvailable, 
-        isAvailable ? "ACTIVE" : "OFFLINE"
+        shard.id,
+        isAvailable,
+        isAvailable ? "ACTIVE" : "OFFLINE",
       );
     }
 

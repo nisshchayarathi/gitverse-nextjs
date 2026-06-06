@@ -1,7 +1,13 @@
-import { RemediationSuggestion, SecretDetectionResult } from "../../types/security-secrets";
+import {
+  RemediationSuggestion,
+  SecretDetectionResult,
+} from "../../types/security-secrets";
 
 export class SecretReviewCommentsService {
-  public generateCommentBody(result: SecretDetectionResult, remediation: RemediationSuggestion): string {
+  public generateCommentBody(
+    result: SecretDetectionResult,
+    remediation: RemediationSuggestion,
+  ): string {
     return `### 🚨 Secret Exposure Detected
 
 **Provider:** ${result.provider}
@@ -15,7 +21,7 @@ ${remediation.recommendation}
 \`\`\`
 
 **Additional Steps Required:**
-${remediation.additionalSteps.map(step => `- ${step}`).join('\n')}
+${remediation.additionalSteps.map((step) => `- ${step}`).join("\n")}
 
 *If this is a false positive (e.g., a dummy value), please safely ignore this warning.*`;
   }

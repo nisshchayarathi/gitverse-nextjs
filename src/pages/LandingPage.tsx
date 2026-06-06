@@ -29,7 +29,6 @@ import {
   CardContent,
 } from "@/components/ui";
 
-
 export default function LandingPage() {
   const router = useRouter();
   const [repoUrl, setRepoUrl] = useState("");
@@ -40,7 +39,7 @@ export default function LandingPage() {
   const [isCarouselPaused, setIsCarouselPaused] = useState(false);
   const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
   const isAnalyzeDisabled = !repoUrl.trim() || isLoading;
-  
+
   const { addRepo } = useRecentRepos();
 
   const mentorMessages = useMemo(
@@ -145,12 +144,17 @@ export default function LandingPage() {
 
     // Strict GitHub URL validation on submission
     if (!isValidGithubUrl(repoUrl)) {
-      setError("Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo).");
+      setError(
+        "Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo).",
+      );
       return;
     }
 
     // Extract repository owner and name from the URL
-    const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
+    const cleanUrl = repoUrl
+      .trim()
+      .replace(/\/$/, "")
+      .replace(/\.git$/, "");
     const urlParts = cleanUrl.split("/");
     const name = urlParts[urlParts.length - 1] || "";
     const owner = urlParts[urlParts.length - 2] || "";
@@ -479,12 +483,10 @@ export default function LandingPage() {
               <p className="text-sm text-muted-foreground mt-3">
                 Demo UI only — real analysis happens after install/sign up.
               </p>
-
             </form>
 
             {/* Recent Repositories */}
             <RecentReposList />
-
 
             {/* Demos */}
             <div
@@ -653,10 +655,10 @@ export default function LandingPage() {
             onTouchCancel={() => setIsCarouselPaused(false)}
           >
             <button
-  className="feature-carousel__nav feature-carousel__nav--left transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-2xl cursor-pointer"
-  aria-label="Previous feature"
-  onClick={goPrev}
->
+              className="feature-carousel__nav feature-carousel__nav--left transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-2xl cursor-pointer"
+              aria-label="Previous feature"
+              onClick={goPrev}
+            >
               <ChevronLeft className="h-5 w-5" />
             </button>
             <div className="feature-carousel__viewport">
@@ -664,19 +666,27 @@ export default function LandingPage() {
                 {features.map((feature, index) => (
                   <div
                     key={feature.title}
-                    ref={(el) => { slideRefs.current[index] = el; }}
+                    ref={(el) => {
+                      slideRefs.current[index] = el;
+                    }}
                     className={`feature-carousel__slide ${
                       index === activeFeatureIndex ? "active" : ""
                     } cursor-pointer`}
-                    aria-current={index === activeFeatureIndex ? "true" : undefined}
+                    aria-current={
+                      index === activeFeatureIndex ? "true" : undefined
+                    }
                     aria-label={`${feature.title} (${index + 1} of ${totalFeatures})`}
                     role="button"
                     tabIndex={0}
                     onClick={() => {
                       setActiveFeatureIndex(index);
                       const el = slideRefs.current[index];
-                      if (el && typeof el.scrollIntoView === 'function') {
-                        el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                      if (el && typeof el.scrollIntoView === "function") {
+                        el.scrollIntoView({
+                          behavior: "smooth",
+                          inline: "center",
+                          block: "nearest",
+                        });
                       }
                     }}
                     onKeyDown={(e) => {
@@ -684,8 +694,12 @@ export default function LandingPage() {
                         e.preventDefault();
                         setActiveFeatureIndex(index);
                         const el = slideRefs.current[index];
-                        if (el && typeof el.scrollIntoView === 'function') {
-                          el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        if (el && typeof el.scrollIntoView === "function") {
+                          el.scrollIntoView({
+                            behavior: "smooth",
+                            inline: "center",
+                            block: "nearest",
+                          });
                         }
                       }
                     }}
@@ -710,14 +724,17 @@ export default function LandingPage() {
               </div>
             </div>
             <button
-  className="feature-carousel__nav feature-carousel__nav--right transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-2xl cursor-pointer"
-  aria-label="Next feature"
-  onClick={goNext}
->
+              className="feature-carousel__nav feature-carousel__nav--right transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-2xl cursor-pointer"
+              aria-label="Next feature"
+              onClick={goNext}
+            >
               <ChevronRight className="h-5 w-5" />
             </button>
 
-            <div className="feature-carousel__controls" aria-label="Feature navigation">
+            <div
+              className="feature-carousel__controls"
+              aria-label="Feature navigation"
+            >
               <div className="flex items-center justify-center gap-2">
                 {features.map((feature, index) => (
                   <button
@@ -725,7 +742,9 @@ export default function LandingPage() {
                     type="button"
                     onClick={() => setActiveFeatureIndex(index)}
                     aria-label={`Show ${feature.title}`}
-                    aria-current={index === activeFeatureIndex ? "true" : "false"}
+                    aria-current={
+                      index === activeFeatureIndex ? "true" : "false"
+                    }
                     className={`feature-carousel__dot ${
                       index === activeFeatureIndex
                         ? "bg-primary"

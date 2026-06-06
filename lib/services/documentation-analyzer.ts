@@ -6,7 +6,10 @@ export class DocumentationAnalyzerService {
   /**
    * Analyzes source code content for documentation drift.
    */
-  async analyzeDrift(filePath: string, content: string): Promise<DriftAnalysisResult> {
+  async analyzeDrift(
+    filePath: string,
+    content: string,
+  ): Promise<DriftAnalysisResult> {
     const gemini = getGeminiService();
 
     const safePath = sanitizeTextContent(filePath);
@@ -41,28 +44,44 @@ Return a JSON object matching this schema exactly (no markdown formatting, no co
 
     try {
       const response = await gemini.chatRaw(prompt);
-      
+
       // Clean up potential markdown formatting around the JSON
       const rawText = response.text.trim();
       let jsonText = rawText;
       if (rawText.startsWith("```json")) {
-        jsonText = rawText.replace(/^```json/, "").replace(/```$/, "").trim();
+        jsonText = rawText
+          .replace(/^```json/, "")
+          .replace(/```$/, "")
+          .trim();
       } else if (rawText.startsWith("```")) {
         jsonText = rawText.replace(/^```/, "").replace(/```$/, "").trim();
       }
 
       const parsed = JSON.parse(jsonText) as DriftAnalysisResult;
-      
+
       // Ensure all fields are present
       return {
         hasDrift: Boolean(parsed.hasDrift),
-        driftConfidence: typeof parsed.driftConfidence === 'number' ? parsed.driftConfidence : 0,
-        outdatedDescriptions: Array.isArray(parsed.outdatedDescriptions) ? parsed.outdatedDescriptions : [],
-        missingParameters: Array.isArray(parsed.missingParameters) ? parsed.missingParameters : [],
-        removedParameters: Array.isArray(parsed.removedParameters) ? parsed.removedParameters : [],
-        incorrectReturnValues: Array.isArray(parsed.incorrectReturnValues) ? parsed.incorrectReturnValues : [],
-        staleExamples: Array.isArray(parsed.staleExamples) ? parsed.staleExamples : [],
-        reasoning: parsed.reasoning || "No reasoning provided."
+        driftConfidence:
+          typeof parsed.driftConfidence === "number"
+            ? parsed.driftConfidence
+            : 0,
+        outdatedDescriptions: Array.isArray(parsed.outdatedDescriptions)
+          ? parsed.outdatedDescriptions
+          : [],
+        missingParameters: Array.isArray(parsed.missingParameters)
+          ? parsed.missingParameters
+          : [],
+        removedParameters: Array.isArray(parsed.removedParameters)
+          ? parsed.removedParameters
+          : [],
+        incorrectReturnValues: Array.isArray(parsed.incorrectReturnValues)
+          ? parsed.incorrectReturnValues
+          : [],
+        staleExamples: Array.isArray(parsed.staleExamples)
+          ? parsed.staleExamples
+          : [],
+        reasoning: parsed.reasoning || "No reasoning provided.",
       };
     } catch (error) {
       console.error("[DocumentationAnalyzer] Failed to analyze drift:", error);
@@ -75,7 +94,7 @@ Return a JSON object matching this schema exactly (no markdown formatting, no co
         removedParameters: [],
         incorrectReturnValues: [],
         staleExamples: [],
-        reasoning: "Failed to parse analysis result."
+        reasoning: "Failed to parse analysis result.",
       };
     }
   }

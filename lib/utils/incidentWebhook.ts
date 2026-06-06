@@ -12,7 +12,8 @@ export function verifyIncidentWebhookSignature(params: {
   if (!signatureHeader?.startsWith("sha256=")) return false;
 
   const expected =
-    "sha256=" + crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+    "sha256=" +
+    crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
 
   const expectedBuffer = Buffer.from(expected);
   const providedBuffer = Buffer.from(signatureHeader);
@@ -24,9 +25,9 @@ export function verifyIncidentWebhookSignature(params: {
   return crypto.timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
-export function parseIncidentTarget(searchParams: URLSearchParams):
-  | { installationId: number; owner: string; repo: string }
-  | null {
+export function parseIncidentTarget(
+  searchParams: URLSearchParams,
+): { installationId: number; owner: string; repo: string } | null {
   const installationId = Number(searchParams.get("installationId"));
   const owner = (searchParams.get("owner") || "").trim();
   const repo = (searchParams.get("repo") || "").trim();

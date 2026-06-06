@@ -13,8 +13,6 @@ export type JobProgressUpdate = {
 const DEFAULT_LOCK_MS = 5 * 60 * 1000;
 
 export class AnalysisJobService {
-
-
   async getAnalysisStats(params: { userId: number }): Promise<{
     total: number;
     processing: number;
@@ -23,29 +21,28 @@ export class AnalysisJobService {
     failed: number;
     stuck: number;
   }> {
-    const [total, processing, queued, done, failed, stuck] =
-      await Promise.all([
-        prisma.analysisJob.count({ where: { userId: params.userId } }),
-        prisma.analysisJob.count({
-          where: { userId: params.userId, status: "PROCESSING" },
-        }),
-        prisma.analysisJob.count({
-          where: { userId: params.userId, status: "QUEUED" },
-        }),
-        prisma.analysisJob.count({
-          where: { userId: params.userId, status: "DONE" },
-        }),
-        prisma.analysisJob.count({
-          where: { userId: params.userId, status: "FAILED" },
-        }),
-        prisma.analysisJob.count({
-          where: {
-            userId: params.userId,
-            status: "PROCESSING",
-            lockExpiresAt: { lt: new Date() },
-          },
-        }),
-      ]);
+    const [total, processing, queued, done, failed, stuck] = await Promise.all([
+      prisma.analysisJob.count({ where: { userId: params.userId } }),
+      prisma.analysisJob.count({
+        where: { userId: params.userId, status: "PROCESSING" },
+      }),
+      prisma.analysisJob.count({
+        where: { userId: params.userId, status: "QUEUED" },
+      }),
+      prisma.analysisJob.count({
+        where: { userId: params.userId, status: "DONE" },
+      }),
+      prisma.analysisJob.count({
+        where: { userId: params.userId, status: "FAILED" },
+      }),
+      prisma.analysisJob.count({
+        where: {
+          userId: params.userId,
+          status: "PROCESSING",
+          lockExpiresAt: { lt: new Date() },
+        },
+      }),
+    ]);
     return { total, processing, queued, done, failed, stuck };
   }
 
@@ -77,7 +74,10 @@ export class AnalysisJobService {
             maxAttempts: params.maxAttempts ?? 3,
           },
         });
-        await analysisQueue.add("repository_analysis", { jobId: job.id, userId: params.userId });
+        await analysisQueue.add("repository_analysis", {
+          jobId: job.id,
+          userId: params.userId,
+        });
         return job;
       } catch (error: any) {
         if (
@@ -126,7 +126,10 @@ export class AnalysisJobService {
             maxAttempts: params.maxAttempts ?? 3,
           },
         });
-        await analysisQueue.add("architecture_generation", { jobId: job.id, userId: params.userId });
+        await analysisQueue.add("architecture_generation", {
+          jobId: job.id,
+          userId: params.userId,
+        });
         return job;
       } catch (error: any) {
         if (
@@ -169,11 +172,11 @@ export class AnalysisJobService {
     // 1. User is the creator of the job
     if (job.userId === params.userId) {
       hasAccess = true;
-    } 
+    }
     // 2. User is the owner of the repository
     else if (job.repository.userId === params.userId) {
       hasAccess = true;
-    } 
+    }
     // 3. User has access via organization membership
     else {
       const orgAccess = await prisma.repositoryPolicyAssignment.findFirst({
@@ -209,9 +212,10 @@ export class AnalysisJobService {
   }): Promise<void> {
     const lockExtension = params.extendLockMs ?? DEFAULT_LOCK_MS;
 
-    const pct = params.update.progressPercent !== undefined
-      ? Math.max(0, Math.min(100, Math.round(params.update.progressPercent)))
-      : undefined;
+    const pct =
+      params.update.progressPercent !== undefined
+        ? Math.max(0, Math.min(100, Math.round(params.update.progressPercent)))
+        : undefined;
 
     const where: any = { id: params.jobId };
     if (params.workerId) {
@@ -267,8 +271,7 @@ export class AnalysisJobService {
     }
 
     const shouldRetry =
-      params.attempts < params.maxAttempts &&
-      isRetryableError(params.error);
+      params.attempts < params.maxAttempts && isRetryableError(params.error);
     if (shouldRetry) {
       const delay = computeBackoffMs(params.attempts);
       await prisma.analysisJob.update({
@@ -426,14 +429,13 @@ export class AnalysisJobService {
     });
   }
 
-  async cleanupStaleJobs(gracePeriodMs: number = 10 * 60 * 1000): Promise<number> {
+  async cleanupStaleJobs(
+    gracePeriodMs: number = 10 * 60 * 1000,
+  ): Promise<number> {
     const stale = await prisma.analysisJob.updateMany({
       where: {
         status: "PROCESSING",
-        OR: [
-          { lockExpiresAt: { lt: new Date() } },
-          { lockExpiresAt: null }
-        ],
+        OR: [{ lockExpiresAt: { lt: new Date() } }, { lockExpiresAt: null }],
         updatedAt: { lt: new Date(Date.now() - gracePeriodMs) },
       },
       data: {

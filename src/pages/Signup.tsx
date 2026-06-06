@@ -178,7 +178,7 @@ export default function Signup() {
       toast({
         title: "Error",
         description:
-        "Password must be at least 8 characters and include uppercase, lowercase and a number",
+          "Password must be at least 8 characters and include uppercase, lowercase and a number",
         variant: "destructive",
       });
       return;
@@ -318,7 +318,9 @@ export default function Signup() {
                 />
               </div>
               <div className="mt-2 space-y-1.5 text-xs transition-all duration-300 ease-in-out">
-                <p className="font-medium text-muted-foreground mb-1">Password must include:</p>
+                <p className="font-medium text-muted-foreground mb-1">
+                  Password must include:
+                </p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                   <div className="flex items-center gap-1.5 transition-colors">
                     {password.length >= 8 ? (
@@ -326,7 +328,13 @@ export default function Signup() {
                     ) : (
                       <Circle className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                     )}
-                    <span className={password.length >= 8 ? "text-emerald-500 font-medium" : "text-muted-foreground"}>
+                    <span
+                      className={
+                        password.length >= 8
+                          ? "text-emerald-500 font-medium"
+                          : "text-muted-foreground"
+                      }
+                    >
                       8+ characters
                     </span>
                   </div>
@@ -336,7 +344,13 @@ export default function Signup() {
                     ) : (
                       <Circle className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                     )}
-                    <span className={/[A-Z]/.test(password) ? "text-emerald-500 font-medium" : "text-muted-foreground"}>
+                    <span
+                      className={
+                        /[A-Z]/.test(password)
+                          ? "text-emerald-500 font-medium"
+                          : "text-muted-foreground"
+                      }
+                    >
                       Uppercase letter
                     </span>
                   </div>
@@ -346,7 +360,13 @@ export default function Signup() {
                     ) : (
                       <Circle className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                     )}
-                    <span className={/[a-z]/.test(password) ? "text-emerald-500 font-medium" : "text-muted-foreground"}>
+                    <span
+                      className={
+                        /[a-z]/.test(password)
+                          ? "text-emerald-500 font-medium"
+                          : "text-muted-foreground"
+                      }
+                    >
                       Lowercase letter
                     </span>
                   </div>
@@ -356,7 +376,13 @@ export default function Signup() {
                     ) : (
                       <Circle className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                     )}
-                    <span className={/\d/.test(password) ? "text-emerald-500 font-medium" : "text-muted-foreground"}>
+                    <span
+                      className={
+                        /\d/.test(password)
+                          ? "text-emerald-500 font-medium"
+                          : "text-muted-foreground"
+                      }
+                    >
                       One number
                     </span>
                   </div>

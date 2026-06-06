@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Loader2, Send, Sparkles } from "lucide-react";
+import { Bot, Send, Sparkles, StopCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -192,6 +192,15 @@ export function AIRepoMentorSection(props: {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const stopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const pinnedToBottomRef = useRef(true);
@@ -218,6 +227,9 @@ export function AIRepoMentorSection(props: {
     setInput("");
     setIsLoading(true);
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       const prompt = buildMentorPrompt({
         repoName: props.repoName,
@@ -236,6 +248,7 @@ export function AIRepoMentorSection(props: {
 
       const res = await fetch(buildApiUrl("/api/ai/chat"), {
         method: "POST",
+        signal: abortController.signal,
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -260,6 +273,15 @@ export function AIRepoMentorSection(props: {
       ]);
       pinnedToBottomRef.current = true;
     } catch (e: any) {
+      // Aborted by user — show a neutral stopped message, not an error
+      if (e?.name === "AbortError" || abortController.signal.aborted) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: "Generation stopped." },
+        ]);
+        pinnedToBottomRef.current = true;
+        return;
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -269,6 +291,7 @@ export function AIRepoMentorSection(props: {
       ]);
       pinnedToBottomRef.current = true;
     } finally {
+      abortControllerRef.current = null;
       setIsLoading(false);
     }
   };
@@ -318,27 +341,28 @@ export function AIRepoMentorSection(props: {
           >
             {messages.length === 1 && !isLoading && (
               <div className="flex flex-col items-center justify-center text-center py-8 px-4">
-  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">
-    <Sparkles className="h-6 w-6 text-primary" />
-  </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">
+                  <Sparkles className="h-6 w-6 text-primary" />
+                </div>
 
-  <h3 className="text-sm font-semibold mb-2">
-    No repository questions yet
-  </h3>
+                <h3 className="text-sm font-semibold mb-2">
+                  No repository questions yet
+                </h3>
 
-  <p className="text-xs text-muted-foreground max-w-sm mb-4">
-    Ask about setup, architecture, contributors, scripts, or repository structure to start using the AI mentor.
-  </p>
+                <p className="text-xs text-muted-foreground max-w-sm mb-4">
+                  Ask about setup, architecture, contributors, scripts, or
+                  repository structure to start using the AI mentor.
+                </p>
 
-  <Button
-    type="button"
-    variant="outline"
-    onClick={() => send("How do I set this up locally?")}
-    disabled={props.disabled || isLoading}
-  >
-    Try Example Question
-  </Button>
-</div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => send("How do I set this up locally?")}
+                  disabled={props.disabled || isLoading}
+                >
+                  Try Example Question
+                </Button>
+              </div>
             )}
             {messages.map((m, idx) => (
               <div
@@ -351,10 +375,11 @@ export function AIRepoMentorSection(props: {
                   </div>
                 )}
                 <div
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${m.role === "user"
-                    ? "bg-primary/15"
-                    : "bg-white/5 border border-white/10"
-                    }`}
+                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                    m.role === "user"
+                      ? "bg-primary/15"
+                      : "bg-white/5 border border-white/10"
+                  }`}
                 >
                   {m.role === "assistant" ? (
                     <MentorMarkdown content={m.content} />
@@ -365,19 +390,19 @@ export function AIRepoMentorSection(props: {
               </div>
             ))}
             {isLoading && (
-  <div className="flex gap-2 justify-start" aria-live="polite">
-    <div className="mt-0.5 h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 animate-pulse">
-      <Bot className="h-4 w-4 text-primary/50" aria-hidden="true" />
-    </div>
+              <div className="flex gap-2 justify-start" aria-live="polite">
+                <div className="mt-0.5 h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 animate-pulse">
+                  <Bot className="h-4 w-4 text-primary/50" aria-hidden="true" />
+                </div>
 
-    <div className="max-w-[85%] w-full sm:w-2/3 rounded-lg px-3 py-3 bg-white/5 border border-white/10 space-y-2 animate-pulse">
-      <div className="h-3 w-3/4 rounded bg-white/10" />
-      <div className="h-3 w-full rounded bg-white/10" />
-      <div className="h-3 w-5/6 rounded bg-white/10" />
-      <div className="h-3 w-1/2 rounded bg-white/10" />
-    </div>
-  </div>
-)}
+                <div className="max-w-[85%] w-full sm:w-2/3 rounded-lg px-3 py-3 bg-white/5 border border-white/10 space-y-2 animate-pulse">
+                  <div className="h-3 w-3/4 rounded bg-white/10" />
+                  <div className="h-3 w-full rounded bg-white/10" />
+                  <div className="h-3 w-5/6 rounded bg-white/10" />
+                  <div className="h-3 w-1/2 rounded bg-white/10" />
+                </div>
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
 
@@ -396,19 +421,27 @@ export function AIRepoMentorSection(props: {
                 className="flex-1 glass px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                 disabled={isLoading || props.disabled}
               />
-              <Button
-                type="submit"
-                disabled={!input.trim() || isLoading || props.disabled}
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
+              {isLoading ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={stopGeneration}
+                  aria-label="Stop generation"
+                >
+                  <StopCircle className="h-4 w-4" />
+                  <span className="hidden sm:inline ml-2">Stop</span>
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={!input.trim() || props.disabled}
+                >
                   <span className="inline-flex items-center gap-2">
                     <Send className="h-4 w-4" />
                     <span className="hidden sm:inline">Send</span>
                   </span>
-                )}
-              </Button>
+                </Button>
+              )}
             </form>
           </div>
         </div>

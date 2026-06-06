@@ -8,18 +8,18 @@ import {
   fetchGitHubFileContent,
   GitHubService,
 } from "@/lib/services/githubService";
-import prisma from "@/lib/prisma";
-import {
-  validateContentType,
-  AI_REQUEST_LIMITS,
-} from "@/lib/utils/aiRequestValidation";
+import { validateContentType } from "@/lib/utils/aiRequestValidation";
 import { orgRagIndex } from "@/lib/services/org-rag-index";
 import {
   buildSafetySystemPrompt,
   sanitizeTextContent,
   assembleChatPrompt,
 } from "@/lib/utils/promptSanitization";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 // Allowed roles in the conversation history
 const ALLOWED_MESSAGE_ROLES = new Set(["user", "model", "assistant"]);
@@ -40,10 +40,22 @@ function parseKnowledgeArray(value: any): string[] {
 }
 
 export async function POST(request: NextRequest) {
+  const signal = request.signal;
+
+  // Helper used throughout to bail out early if the client disconnected
+  function checkAbort() {
+    if (signal.aborted) throw new Error("Request aborted");
+  }
+
   try {
+    checkAbort();
     const user = await requireAuth(request);
 
-    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    checkAbort();
+    const globalRl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.AI_GLOBAL,
+    );
     if (!globalRl.allowed) return rateLimitResponse(globalRl);
 
     const contentTypeError = validateContentType(request);
@@ -61,6 +73,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    checkAbort();
     // Per-user rate limiting (DB-backed, shared across serverless containers)
     const allowed = await checkAiRateLimit(
       String(user.userId),
@@ -118,6 +131,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    checkAbort();
     // Ownership check: getRepository returns null if the repository does not
     // belong to the requesting user, so unauthorized access returns 404.
     const repository = await repositoryService.getRepository(
@@ -183,6 +197,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
+        checkAbort();
         const gemini = getGeminiService();
         const safeRepoName = sanitizeTextContent(repository.name);
         const safePaths = sanitizeTextContent(candidatePaths.join("\n"));
@@ -200,7 +215,11 @@ Return ONLY a valid JSON array of strings containing the selected file paths, e.
 Do not include any Markdown formatting like \`\`\`json, explanation, or extra characters. Just the JSON array.
 `;
 
-        const selectionResult = await gemini.chatRaw(fileSelectionPrompt);
+        const selectionResult = await gemini.chatRaw(
+          fileSelectionPrompt,
+          undefined,
+          signal,
+        );
         let selectedPaths: string[] = [];
         try {
           const cleanedJson = selectionResult.text
@@ -214,6 +233,7 @@ Do not include any Markdown formatting like \`\`\`json, explanation, or extra ch
         // Fetch actual file contents
         const retrievedFiles = [];
         for (const path of selectedPaths) {
+          checkAbort();
           if (filePaths.includes(path)) {
             try {
               const content = await fetchGitHubFileContent(
@@ -242,6 +262,7 @@ Do not include any Markdown formatting like \`\`\`json, explanation, or extra ch
             .join("\n\n");
         }
 
+        checkAbort();
         // Add cross-repository context
         try {
           const repoUrl = (repository as any).url || "";
@@ -265,11 +286,13 @@ Do not include any Markdown formatting like \`\`\`json, explanation, or extra ch
         } catch (crossRepoErr) {
           console.warn("Failed to retrieve cross-repo context:", crossRepoErr);
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.message === "Request aborted") throw err;
         console.error("RAG codebase retrieval error:", err);
       }
     }
 
+    checkAbort();
     // Construct the fully grounded RAG prompt with prompt injection defense
     const langText = repository.languages
       .map((l: any) => `${l.name} (${l.percentage}%)`)
@@ -315,10 +338,12 @@ Do not include any Markdown formatting like \`\`\`json, explanation, or extra ch
 
     const enhancedPrompt = `${safetySystemPrompt}\n\n${knowledgeContext}${contextPayload}`;
 
+    checkAbort();
     // Invoke Gemini with history and grounded context
     const chatResult = await getGeminiService().chatRaw(
       enhancedPrompt,
       standardizedHistory,
+      signal,
     );
     const response = chatResult.text;
 
@@ -330,6 +355,12 @@ Do not include any Markdown formatting like \`\`\`json, explanation, or extra ch
 
     return NextResponse.json({ response, question });
   } catch (error: any) {
+    // Client disconnected — stop processing silently, no 500 response needed
+    if (error?.message === "Request aborted" || signal.aborted) {
+      console.log("[AI Chat] Request cancelled by client");
+      return new NextResponse(null, { status: 499 });
+    }
+
     console.error("AI chat error:", sanitizeError(error));
 
     if (isHttpError(error)) {

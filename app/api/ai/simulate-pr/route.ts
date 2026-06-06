@@ -9,7 +9,11 @@ import {
 import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
 import { getClientIp } from "@/lib/services/rateLimitService";
 import { sanitizeTextContent } from "@/lib/utils/promptSanitization";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 const SIMULATE_PR_RATE_LIMIT = 10;
 const SIMULATE_PR_WINDOW_MS = 60_000;
@@ -19,20 +23,28 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    const globalRl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.AI_GLOBAL,
+    );
     if (!globalRl.allowed) return rateLimitResponse(globalRl);
 
     const contentTypeError = validateContentType(request);
     if (contentTypeError) return contentTypeError;
 
     const allowed = await checkAiRateLimit(
-      String(user.userId), "userId", "simulate-pr",
-      SIMULATE_PR_RATE_LIMIT, SIMULATE_PR_WINDOW_MS
+      String(user.userId),
+      "userId",
+      "simulate-pr",
+      SIMULATE_PR_RATE_LIMIT,
+      SIMULATE_PR_WINDOW_MS,
     );
     if (!allowed) {
       return NextResponse.json(
-        { error: "Too many requests. Please wait before simulating another PR." },
-        { status: 429 }
+        {
+          error: "Too many requests. Please wait before simulating another PR.",
+        },
+        { status: 429 },
       );
     }
 
@@ -42,7 +54,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json(
         { error: "Invalid or empty request body" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -51,7 +63,7 @@ export async function POST(request: NextRequest) {
     if (!diff || typeof diff !== "string" || !diff.trim()) {
       return NextResponse.json(
         { error: "Diff content is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -60,14 +72,17 @@ export async function POST(request: NextRequest) {
         {
           error: `Diff content exceeds maximum length of ${MAX_DIFF_LENGTH} characters. Please provide a smaller diff.`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (diff.trim().split("\n").length > 2000) {
       return NextResponse.json(
-        { error: "Diff exceeds maximum of 2000 lines. Please provide a smaller diff." },
-        { status: 400 }
+        {
+          error:
+            "Diff exceeds maximum of 2000 lines. Please provide a smaller diff.",
+        },
+        { status: 400 },
       );
     }
 
@@ -77,15 +92,18 @@ export async function POST(request: NextRequest) {
       if (isNaN(repoId)) {
         return NextResponse.json(
           { error: "Invalid repository ID" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
-      const repository = await repositoryService.getRepository(repoId, user.userId);
+      const repository = await repositoryService.getRepository(
+        repoId,
+        user.userId,
+      );
       if (!repository) {
         return NextResponse.json(
           { error: "Repository not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -139,13 +157,13 @@ Ensure the feedback is highly professional, constructive, and grounded strictly 
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to generate simulated PR review" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

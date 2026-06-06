@@ -26,15 +26,17 @@ export default function RepoChatPage() {
     setError(null);
     try {
       const token = localStorage.getItem("gitverse_token");
-      const response = await axios.get(
-        buildApiUrl(`/api/repositories/${id}`),
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const response = await axios.get(buildApiUrl(`/api/repositories/${id}`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const repo = response.data.repository || response.data;
       setRepository(repo);
     } catch (err: any) {
       console.error("Error fetching repository:", err);
-      setError(err.response?.data?.error || "Failed to load repository details. Please try again.");
+      setError(
+        err.response?.data?.error ||
+          "Failed to load repository details. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -71,10 +73,13 @@ export default function RepoChatPage() {
             <div className="flex-1 min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold truncate flex items-center gap-2">
                 <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                {loading ? "Loading..." : `${repository?.name || "Repository"} Chat`}
+                {loading
+                  ? "Loading..."
+                  : `${repository?.name || "Repository"} Chat`}
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                Ask questions about your repository — AI-powered with RAG context
+                Ask questions about your repository — AI-powered with RAG
+                context
               </p>
             </div>
           </div>
@@ -84,7 +89,9 @@ export default function RepoChatPage() {
               <div className="flex items-center justify-center h-full">
                 <div className="flex flex-col items-center gap-3">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  <p className="text-sm text-muted-foreground">Loading repository...</p>
+                  <p className="text-sm text-muted-foreground">
+                    Loading repository...
+                  </p>
                 </div>
               </div>
             ) : error ? (
@@ -93,7 +100,9 @@ export default function RepoChatPage() {
                   <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
                     <MessageSquare className="h-6 w-6 text-red-500" />
                   </div>
-                  <h3 className="text-lg font-semibold">Failed to load repository</h3>
+                  <h3 className="text-lg font-semibold">
+                    Failed to load repository
+                  </h3>
                   <p className="text-sm text-muted-foreground">{error}</p>
                   <button
                     onClick={fetchRepository}

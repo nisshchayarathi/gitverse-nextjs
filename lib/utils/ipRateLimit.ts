@@ -23,7 +23,7 @@ async function checkAiRateLimit(
   field: "userId" | "ip",
   endpoint: string,
   maxRequests: number = 20,
-  windowMs: number = 60_000
+  windowMs: number = 60_000,
 ): Promise<boolean> {
   try {
     void cleanupStaleLogs();

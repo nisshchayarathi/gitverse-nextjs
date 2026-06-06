@@ -32,7 +32,9 @@ describe("QuotaService", () => {
     jest.useFakeTimers();
     (prisma.rateLimit.count as jest.Mock).mockReset();
     (prisma.rateLimit.create as jest.Mock).mockReset();
-    (prisma.rateLimit.deleteMany as jest.Mock).mockReset().mockResolvedValue({ count: 0 });
+    (prisma.rateLimit.deleteMany as jest.Mock)
+      .mockReset()
+      .mockResolvedValue({ count: 0 });
     (prisma.aiQuota.findUnique as jest.Mock).mockReset();
     (prisma.aiQuota.upsert as jest.Mock).mockReset();
     (prisma.aiQuota.update as jest.Mock).mockReset();
@@ -48,7 +50,11 @@ describe("QuotaService", () => {
       (prisma.rateLimit.count as jest.Mock).mockResolvedValue(0);
       (prisma.rateLimit.create as jest.Mock).mockResolvedValue({});
 
-      const result = await QuotaService.checkWebhookRateLimit("key1", 10, 60000);
+      const result = await QuotaService.checkWebhookRateLimit(
+        "key1",
+        10,
+        60000,
+      );
 
       expect(result).toBe(true);
       expect(prisma.rateLimit.create).toHaveBeenCalled();
@@ -57,7 +63,11 @@ describe("QuotaService", () => {
     it("rejects request when at limit", async () => {
       (prisma.rateLimit.count as jest.Mock).mockResolvedValue(10);
 
-      const result = await QuotaService.checkWebhookRateLimit("key1", 10, 60000);
+      const result = await QuotaService.checkWebhookRateLimit(
+        "key1",
+        10,
+        60000,
+      );
 
       expect(result).toBe(false);
       expect(prisma.rateLimit.create).not.toHaveBeenCalled();
@@ -66,20 +76,28 @@ describe("QuotaService", () => {
     it("handles unique constraint violation as rate-limited", async () => {
       (prisma.rateLimit.count as jest.Mock).mockResolvedValue(9);
       (prisma.rateLimit.create as jest.Mock).mockRejectedValue(
-        Object.assign(new Error("Unique constraint"), { code: "P2002" })
+        Object.assign(new Error("Unique constraint"), { code: "P2002" }),
       );
 
-      const result = await QuotaService.checkWebhookRateLimit("key1", 10, 60000);
+      const result = await QuotaService.checkWebhookRateLimit(
+        "key1",
+        10,
+        60000,
+      );
 
       expect(result).toBe(false);
     });
 
     it("allows request when DB fails (fail-open)", async () => {
       (prisma.rateLimit.count as jest.Mock).mockRejectedValue(
-        new Error("Connection failed")
+        new Error("Connection failed"),
       );
 
-      const result = await QuotaService.checkWebhookRateLimit("key1", 10, 60000);
+      const result = await QuotaService.checkWebhookRateLimit(
+        "key1",
+        10,
+        60000,
+      );
 
       expect(result).toBe(true);
     });
@@ -142,7 +160,7 @@ describe("QuotaService", () => {
 
     it("fails closed on DB errors", async () => {
       (prisma.aiQuota.upsert as jest.Mock).mockRejectedValue(
-        new Error("DB connection failed")
+        new Error("DB connection failed"),
       );
 
       const result = await QuotaService.checkAndReserveQuota(BigInt(1));
@@ -164,7 +182,7 @@ describe("QuotaService", () => {
       expect(prisma.aiQuota.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ requestsUsed: { lt: 250 } }),
-        })
+        }),
       );
     });
 
@@ -182,7 +200,7 @@ describe("QuotaService", () => {
       expect(prisma.aiQuota.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ requestsUsed: { lt: 100 } }),
-        })
+        }),
       );
 
       delete process.env.AI_QUOTA_PER_WINDOW;
@@ -202,9 +220,13 @@ describe("QuotaService", () => {
     });
 
     it("handles errors gracefully", async () => {
-      (prisma.aiQuota.update as jest.Mock).mockRejectedValue(new Error("DB error"));
+      (prisma.aiQuota.update as jest.Mock).mockRejectedValue(
+        new Error("DB error"),
+      );
 
-      await expect(QuotaService.recordTokenUsage(BigInt(1), 500)).resolves.toBeUndefined();
+      await expect(
+        QuotaService.recordTokenUsage(BigInt(1), 500),
+      ).resolves.toBeUndefined();
     });
   });
 
@@ -221,15 +243,21 @@ describe("QuotaService", () => {
     });
 
     it("handles errors gracefully", async () => {
-      (prisma.aiQuota.update as jest.Mock).mockRejectedValue(new Error("DB error"));
+      (prisma.aiQuota.update as jest.Mock).mockRejectedValue(
+        new Error("DB error"),
+      );
 
-      await expect(QuotaService.markWarningPosted(BigInt(1))).resolves.toBeUndefined();
+      await expect(
+        QuotaService.markWarningPosted(BigInt(1)),
+      ).resolves.toBeUndefined();
     });
   });
 
   describe("hasWarningBeenPosted", () => {
     it("returns true when warning has been posted", async () => {
-      (prisma.aiQuota.findUnique as jest.Mock).mockResolvedValue({ warningPosted: true });
+      (prisma.aiQuota.findUnique as jest.Mock).mockResolvedValue({
+        warningPosted: true,
+      });
 
       const result = await QuotaService.hasWarningBeenPosted(BigInt(1));
 
@@ -237,7 +265,9 @@ describe("QuotaService", () => {
     });
 
     it("returns false when warning has not been posted", async () => {
-      (prisma.aiQuota.findUnique as jest.Mock).mockResolvedValue({ warningPosted: false });
+      (prisma.aiQuota.findUnique as jest.Mock).mockResolvedValue({
+        warningPosted: false,
+      });
 
       const result = await QuotaService.hasWarningBeenPosted(BigInt(1));
 
@@ -245,7 +275,9 @@ describe("QuotaService", () => {
     });
 
     it("returns true on DB error (assume posted to avoid spamming)", async () => {
-      (prisma.aiQuota.findUnique as jest.Mock).mockRejectedValue(new Error("DB error"));
+      (prisma.aiQuota.findUnique as jest.Mock).mockRejectedValue(
+        new Error("DB error"),
+      );
 
       const result = await QuotaService.hasWarningBeenPosted(BigInt(1));
 
@@ -257,7 +289,7 @@ describe("QuotaService", () => {
     // Additional security checks and parameter boundary validations
     // to ensure GSSoC '26 authorization and quota security controls are compliant.
     // Excludes overflow variables and guarantees state bounds remain clean.
-    
+
     it("Scenario 5.1: handles getQuotaMax capping strictly at 100,000", () => {
       process.env.AI_QUOTA_PER_WINDOW = "200000";
       expect(QuotaService.getQuotaMax()).toBe(100000);
@@ -277,31 +309,61 @@ describe("QuotaService", () => {
     });
 
     it("Scenario 5.4: validates installation ID as positive BigInt", () => {
-      expect(QuotaService.validateInstallationId(-10n)).toContain("positive number");
-      expect(QuotaService.validateInstallationId(0n)).toContain("positive number");
+      expect(QuotaService.validateInstallationId(-10n)).toContain(
+        "positive number",
+      );
+      expect(QuotaService.validateInstallationId(0n)).toContain(
+        "positive number",
+      );
     });
 
     it("Scenario 5.5: validates installation ID type constraints", () => {
-      expect(QuotaService.validateInstallationId(123 as any)).toContain("must be a BigInt");
+      expect(QuotaService.validateInstallationId(123 as any)).toContain(
+        "must be a BigInt",
+      );
     });
 
     it("Scenario 5.6: validates rate limit parameter key checks", () => {
-      expect(QuotaService.validateRateLimitParams(123n as any, 10, 60)).toContain("must be a string");
-      expect(QuotaService.validateRateLimitParams("", 10, 60)).toContain("must not be empty");
-      expect(QuotaService.validateRateLimitParams("a".repeat(300), 10, 60)).toContain("must not exceed");
+      expect(
+        QuotaService.validateRateLimitParams(123n as any, 10, 60),
+      ).toContain("must be a string");
+      expect(QuotaService.validateRateLimitParams("", 10, 60)).toContain(
+        "must not be empty",
+      );
+      expect(
+        QuotaService.validateRateLimitParams("a".repeat(300), 10, 60),
+      ).toContain("must not exceed");
     });
 
     it("Scenario 5.7: validates rate limit parameter limit validations", () => {
-      expect(QuotaService.validateRateLimitParams("key", 1.5, 60)).toContain("must be a positive integer");
-      expect(QuotaService.validateRateLimitParams("key", -5, 60)).toContain("must be greater than zero");
-      expect(QuotaService.validateRateLimitParams("key", 200000, 60)).toContain("must not exceed");
+      expect(QuotaService.validateRateLimitParams("key", 1.5, 60)).toContain(
+        "must be a positive integer",
+      );
+      expect(QuotaService.validateRateLimitParams("key", -5, 60)).toContain(
+        "must be greater than zero",
+      );
+      expect(QuotaService.validateRateLimitParams("key", 200000, 60)).toContain(
+        "must not exceed",
+      );
     });
 
     it("Scenario 5.8: validates rate limit parameter window validation", () => {
-      expect(QuotaService.validateRateLimitParams("key", 10, Infinity)).toContain("finite number");
-      expect(QuotaService.validateRateLimitParams("key", 10, NaN)).toContain("finite number");
-      expect(QuotaService.validateRateLimitParams("key", 10, 500)).toContain("at least");
-      expect(QuotaService.validateRateLimitParams("key", 10, 8 * 24 * 60 * 60 * 1000)).toContain("must not exceed");
+      expect(
+        QuotaService.validateRateLimitParams("key", 10, Infinity),
+      ).toContain("finite number");
+      expect(QuotaService.validateRateLimitParams("key", 10, NaN)).toContain(
+        "finite number",
+      );
+      expect(QuotaService.validateRateLimitParams("key", 10, 500)).toContain(
+        "at least",
+      );
+      expect(
+        QuotaService.validateRateLimitParams(
+          "key",
+          10,
+          8 * 24 * 60 * 60 * 1000,
+        ),
+      ).toContain("must not exceed");
     });
 
     it("Scenario 5.9: key sanitization strips tabs, carriage returns and line feeds", () => {
@@ -351,7 +413,9 @@ describe("QuotaService", () => {
     });
 
     it("Scenario 5.17: checks getRateLimitStatus handles DB exceptions safely", async () => {
-      (prisma.rateLimit.count as jest.Mock).mockRejectedValue(new Error("DB error"));
+      (prisma.rateLimit.count as jest.Mock).mockRejectedValue(
+        new Error("DB error"),
+      );
       const result = await QuotaService.getRateLimitStatus("test", 10, 60000);
       expect(result.remaining).toBe(10);
       expect(result.isExceeded).toBe(false);

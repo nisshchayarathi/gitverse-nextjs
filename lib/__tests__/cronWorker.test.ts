@@ -86,11 +86,9 @@ describe("cronWorker — reclaim orphaned jobs", () => {
     mockReclaimOrphanedJobs.mockResolvedValue(5);
     mockClaimNextJob.mockResolvedValue(null);
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
-    const reclaimed =
-      await analysisJobService.reclaimOrphanedJobs();
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
+    const reclaimed = await analysisJobService.reclaimOrphanedJobs();
     expect(reclaimed).toBe(5);
   });
 
@@ -98,25 +96,20 @@ describe("cronWorker — reclaim orphaned jobs", () => {
     mockReclaimOrphanedJobs.mockResolvedValue(0);
     mockClaimNextJob.mockResolvedValue(null);
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
-    const reclaimed =
-      await analysisJobService.reclaimOrphanedJobs();
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
+    const reclaimed = await analysisJobService.reclaimOrphanedJobs();
     expect(reclaimed).toBe(0);
   });
 
   it("propagates database errors during reclamation", async () => {
-    mockReclaimOrphanedJobs.mockRejectedValue(
-      new Error("connection lost"),
-    );
+    mockReclaimOrphanedJobs.mockRejectedValue(new Error("connection lost"));
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
+    await expect(analysisJobService.reclaimOrphanedJobs()).rejects.toThrow(
+      "connection lost",
     );
-    await expect(
-      analysisJobService.reclaimOrphanedJobs(),
-    ).rejects.toThrow("connection lost");
   });
 });
 
@@ -141,9 +134,8 @@ describe("cronWorker — claim next job", () => {
     mockAnalyzeRepository.mockResolvedValue(undefined);
     mockMarkDone.mockResolvedValue(undefined);
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
     const job = await analysisJobService.claimNextJob({
       workerId: "cron-test",
     });
@@ -154,9 +146,8 @@ describe("cronWorker — claim next job", () => {
   it("returns null when no jobs available", async () => {
     mockClaimNextJob.mockResolvedValue(null);
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
     const job = await analysisJobService.claimNextJob({
       workerId: "cron-test",
     });
@@ -185,14 +176,14 @@ describe("cronWorker — job processing", () => {
     mockAnalyzeRepository.mockResolvedValue(undefined);
     mockMarkDone.mockResolvedValue(undefined);
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
-    const { repositoryService } = await import(
-      "../services/repositoryService"
-    );
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
+    const { repositoryService } = await import("../services/repositoryService");
 
-    await analysisJobService.markDone({ jobId: "job-1", workerId: "cron-test" });
+    await analysisJobService.markDone({
+      jobId: "job-1",
+      workerId: "cron-test",
+    });
     expect(mockMarkDone).toHaveBeenCalledWith({
       jobId: "job-1",
       workerId: "cron-test",
@@ -212,11 +203,13 @@ describe("cronWorker — job processing", () => {
     mockGetJob.mockResolvedValue(mockJob);
     mockMarkDone.mockResolvedValue(undefined);
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
 
-    await analysisJobService.markDone({ jobId: "job-2", workerId: "cron-test" });
+    await analysisJobService.markDone({
+      jobId: "job-2",
+      workerId: "cron-test",
+    });
     expect(mockMarkDone).toHaveBeenCalledWith({
       jobId: "job-2",
       workerId: "cron-test",
@@ -238,9 +231,8 @@ describe("cronWorker — job processing", () => {
     );
     mockMarkFailed.mockResolvedValue(undefined);
 
-    const { analysisJobService } = await import(
-      "../../lib/services/analysisJobService"
-    );
+    const { analysisJobService } =
+      await import("../../lib/services/analysisJobService");
 
     await analysisJobService.markFailed({
       jobId: "job-3",
@@ -270,9 +262,8 @@ describe("cronWorker — job processing", () => {
     });
     mockMarkFailed.mockResolvedValue(undefined);
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
 
     await analysisJobService.markFailed({
       jobId: "job-4",
@@ -293,10 +284,12 @@ describe("cronWorker — job processing", () => {
   it("handles job not found in DB gracefully", async () => {
     mockGetJob.mockResolvedValue(null);
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
-    const job = await analysisJobService.getJob({ jobId: "nonexistent", userId: 0 });
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
+    const job = await analysisJobService.getJob({
+      jobId: "nonexistent",
+      userId: 0,
+    });
     expect(job).toBeNull();
   });
 });
@@ -310,9 +303,8 @@ describe("cronWorker — lock management", () => {
   it("releases lock on a job", async () => {
     mockReleaseLock.mockResolvedValue(undefined);
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
 
     await analysisJobService.releaseLock({
       jobId: "job-1",
@@ -327,9 +319,8 @@ describe("cronWorker — lock management", () => {
   it("handles lock release failure gracefully", async () => {
     mockReleaseLock.mockRejectedValue(new Error("DB error"));
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
 
     await expect(
       analysisJobService.releaseLock({
@@ -340,9 +331,8 @@ describe("cronWorker — lock management", () => {
   });
 
   it("marks drain released job for reprocessing", async () => {
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
 
     const mockMarkDrainReleased = jest.fn();
     (analysisJobService as any).markDrainReleased = mockMarkDrainReleased;
@@ -387,9 +377,8 @@ describe("cronWorker — batch processing limits", () => {
     mockAnalyzeRepository.mockResolvedValue(undefined);
     mockMarkDone.mockResolvedValue(undefined);
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
 
     for (let i = 0; i < 3; i++) {
       const job = await analysisJobService.claimNextJob({
@@ -433,9 +422,8 @@ describe("cronWorker — batch processing limits", () => {
     mockAnalyzeRepository.mockResolvedValue(undefined);
     mockMarkDone.mockResolvedValue(undefined);
 
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
 
     const job1 = await analysisJobService.claimNextJob({
       workerId: "cron-test",
@@ -469,12 +457,9 @@ describe("cronWorker — repository service integration", () => {
     mockAnalyzeRepository.mockResolvedValue(undefined);
     mockMarkDone.mockResolvedValue(undefined);
 
-    const { repositoryService } = await import(
-      "../services/repositoryService"
-    );
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
+    const { repositoryService } = await import("../services/repositoryService");
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
 
     const job = await analysisJobService.getJob({
       jobId: "job-scope",
@@ -515,7 +500,9 @@ describe("cronWorker — process exit behavior", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setupMocks();
-    exitSpy = jest.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    exitSpy = jest
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
   });
 
   afterEach(() => {
@@ -523,9 +510,8 @@ describe("cronWorker — process exit behavior", () => {
   });
 
   it("exits with code 1 on fatal error", async () => {
-    const { analysisJobService } = await import(
-      "../services/analysisJobService"
-    );
+    const { analysisJobService } =
+      await import("../services/analysisJobService");
     mockReclaimOrphanedJobs.mockRejectedValue(
       new Error("catastrophic failure"),
     );

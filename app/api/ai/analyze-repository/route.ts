@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { getGeminiService } from "@/lib/services/geminiService";
 import { repositoryService } from "@/lib/services/repositoryService";
 import prisma from "@/lib/prisma";
@@ -8,18 +8,28 @@ import {
   setGeminiAnalysisCache,
 } from "@/lib/services/geminiAnalysisCacheService";
 import { buildCacheKey } from "@/lib/utils/cacheKey";
-import { buildTreeFromFiles, truncateTree, stringifyTree } from "@/lib/utils/tokenLimits";
+import {
+  buildTreeFromFiles,
+  truncateTree,
+  stringifyTree,
+} from "@/lib/utils/tokenLimits";
 import { validateContentType } from "@/lib/utils/aiRequestValidation";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 const CURRENT_MODEL_VERSION = "gemini-2.5-flash";
-
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    const globalRl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.AI_GLOBAL,
+    );
     if (!globalRl.allowed) return rateLimitResponse(globalRl);
 
     const contentTypeError = validateContentType(request);
@@ -32,19 +42,19 @@ export async function POST(request: NextRequest) {
     if (!body.repositoryId || isNaN(repositoryId) || !type) {
       return NextResponse.json(
         { error: "Valid Repository ID and analysis type are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const repository = await repositoryService.getRepository(
       repositoryId,
-      user.userId
+      user.userId,
     );
 
     if (!repository) {
       return NextResponse.json(
         { error: "Repository not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -52,10 +62,14 @@ export async function POST(request: NextRequest) {
     const fileTree = buildTreeFromFiles(flatFiles);
 
     const SAFE_TOKEN_LIMIT = 8000;
-    const { truncatedTree, isTruncated } = truncateTree(fileTree, SAFE_TOKEN_LIMIT);
+    const { truncatedTree, isTruncated } = truncateTree(
+      fileTree,
+      SAFE_TOKEN_LIMIT,
+    );
     const stringifiedTree = stringifyTree(truncatedTree);
 
-    const analysisScope = typeof scope === "string" && scope.length > 0 ? scope : "full";
+    const analysisScope =
+      typeof scope === "string" && scope.length > 0 ? scope : "full";
 
     const context = {
       targetDirectory: (repository as any).targetDirectory ?? undefined,
@@ -84,9 +98,7 @@ export async function POST(request: NextRequest) {
       })) ?? null;
 
     const commitHash =
-      headCommit?.hash ||
-      (repository.commits?.[0] as any)?.hash ||
-      "unknown";
+      headCommit?.hash || (repository.commits?.[0] as any)?.hash || "unknown";
 
     const cacheKey = buildCacheKey({
       repositoryId,
@@ -100,7 +112,12 @@ export async function POST(request: NextRequest) {
     const cached = await getGeminiAnalysisCache(cacheKey);
 
     if (cached.hit && cached.result != null) {
-      return NextResponse.json({ analysis: cached.result, type, cached: true, isTruncated });
+      return NextResponse.json({
+        analysis: cached.result,
+        type,
+        cached: true,
+        isTruncated,
+      });
     }
 
     const analysis = await getGeminiService().analyzeRepository({
@@ -118,12 +135,12 @@ export async function POST(request: NextRequest) {
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
     return NextResponse.json(
       { error: "Failed to analyze repository" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

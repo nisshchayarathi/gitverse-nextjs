@@ -7,7 +7,10 @@ jest.mock("@/lib/prisma", () => ({
   },
 }));
 
-import { isAnalysisRunnerAuthorized, shouldThrottleJobKick } from "../analysisRunner";
+import {
+  isAnalysisRunnerAuthorized,
+  shouldThrottleJobKick,
+} from "../analysisRunner";
 import prisma from "@/lib/prisma";
 
 const originalEnv = process.env;
@@ -34,25 +37,33 @@ describe("analysisRunner", () => {
   describe("isAnalysisRunnerAuthorized", () => {
     it("returns false when ANALYSIS_RUNNER_SECRET is not set", () => {
       delete process.env.ANALYSIS_RUNNER_SECRET;
-      const request = createMockRequest({ "x-analysis-runner-secret": "any-secret" });
+      const request = createMockRequest({
+        "x-analysis-runner-secret": "any-secret",
+      });
       expect(isAnalysisRunnerAuthorized(request)).toBe(false);
     });
 
     it("returns false when ANALYSIS_RUNNER_SECRET is set to empty string", () => {
       process.env.ANALYSIS_RUNNER_SECRET = "";
-      const request = createMockRequest({ "x-analysis-runner-secret": "any-secret" });
+      const request = createMockRequest({
+        "x-analysis-runner-secret": "any-secret",
+      });
       expect(isAnalysisRunnerAuthorized(request)).toBe(false);
     });
 
     it("returns true when valid secret is provided via header", () => {
       process.env.ANALYSIS_RUNNER_SECRET = "valid-secret-123";
-      const request = createMockRequest({ "x-analysis-runner-secret": "valid-secret-123" });
+      const request = createMockRequest({
+        "x-analysis-runner-secret": "valid-secret-123",
+      });
       expect(isAnalysisRunnerAuthorized(request)).toBe(true);
     });
 
     it("returns false when invalid secret is provided via header", () => {
       process.env.ANALYSIS_RUNNER_SECRET = "valid-secret-123";
-      const request = createMockRequest({ "x-analysis-runner-secret": "wrong-secret" });
+      const request = createMockRequest({
+        "x-analysis-runner-secret": "wrong-secret",
+      });
       expect(isAnalysisRunnerAuthorized(request)).toBe(false);
     });
 
@@ -70,13 +81,17 @@ describe("analysisRunner", () => {
 
     it("rejects secrets with different lengths", () => {
       process.env.ANALYSIS_RUNNER_SECRET = "short";
-      const request = createMockRequest({ "x-analysis-runner-secret": "a-longer-secret-value" });
+      const request = createMockRequest({
+        "x-analysis-runner-secret": "a-longer-secret-value",
+      });
       expect(isAnalysisRunnerAuthorized(request)).toBe(false);
     });
 
     it("uses timing-safe comparison for valid secrets", () => {
       process.env.ANALYSIS_RUNNER_SECRET = "exact-match-secret";
-      const request = createMockRequest({ "x-analysis-runner-secret": "exact-match-secret" });
+      const request = createMockRequest({
+        "x-analysis-runner-secret": "exact-match-secret",
+      });
       expect(isAnalysisRunnerAuthorized(request)).toBe(true);
     });
 
@@ -93,13 +108,17 @@ describe("analysisRunner", () => {
 
     it("does not generate ephemeral secret when env var is not set", () => {
       delete process.env.ANALYSIS_RUNNER_SECRET;
-      const request = createMockRequest({ "x-analysis-runner-secret": "any-secret" });
+      const request = createMockRequest({
+        "x-analysis-runner-secret": "any-secret",
+      });
       expect(isAnalysisRunnerAuthorized(request)).toBe(false);
     });
 
     it("rejects secret with trailing whitespace", () => {
       process.env.ANALYSIS_RUNNER_SECRET = "exact-secret";
-      const request = createMockRequest({ "x-analysis-runner-secret": "exact-secret " });
+      const request = createMockRequest({
+        "x-analysis-runner-secret": "exact-secret ",
+      });
       expect(isAnalysisRunnerAuthorized(request)).toBe(false);
     });
   });
@@ -155,7 +174,7 @@ describe("analysisRunner", () => {
 
     it("returns false (fail open) when database query throws", async () => {
       (prisma.analysisJob.findUnique as jest.Mock).mockRejectedValue(
-        new Error("DB error")
+        new Error("DB error"),
       );
       const result = await shouldThrottleJobKick("job-1");
       expect(result).toBe(false);

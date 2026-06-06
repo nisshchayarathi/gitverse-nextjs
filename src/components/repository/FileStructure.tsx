@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, useRef, Children, isValidElement } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  Children,
+  isValidElement,
+} from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -206,7 +213,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
   } | null>(null);
   const [isExplanationOpen, setIsExplanationOpen] = useState(false);
   const [explainingFilePath, setExplainingFilePath] = useState<string | null>(
-    null
+    null,
   );
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explanationLoading, setExplanationLoading] = useState(false);
@@ -224,9 +231,9 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
       const response = await fetch(
         buildApiUrl(
           `/ai/explain-file?repositoryId=${repository.id}&path=${encodeURIComponent(
-            filePath
-          )}`
-        )
+            filePath,
+          )}`,
+        ),
       );
       if (!response.ok) throw new Error("Failed to get explanation");
       const data = await response.json();
@@ -314,7 +321,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
             },
             body: JSON.stringify({ paths: files.map((file) => file.path) }),
             signal: controller.signal,
-          }
+          },
         );
 
         if (!response.ok) {
@@ -327,7 +334,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
             acc[stat.path] = stat;
             return acc;
           },
-          {}
+          {},
         );
 
         setFileStatsByPath(nextStats);
@@ -360,14 +367,14 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
           const response = await fetch(
             buildApiUrl(
               `/api/repositories/${repository.id}/files/content?path=${encodeURIComponent(
-                selectedFile.path
-              )}`
+                selectedFile.path,
+              )}`,
             ),
             {
               headers: {
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
               },
-            }
+            },
           );
           if (!response.ok) throw new Error("Failed to fetch file content");
           const data = await response.json();
@@ -439,7 +446,9 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
     );
   };
 
-  const selectedFileStats = selectedFile ? getFileStats(selectedFile.path) : null;
+  const selectedFileStats = selectedFile
+    ? getFileStats(selectedFile.path)
+    : null;
   const selectedFileTotalChanges = selectedFileStats
     ? selectedFileStats.additions + selectedFileStats.deletions
     : 0;
@@ -533,7 +542,10 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6" onMouseUp={handleMouseUp}>
+            <div
+              className="flex-1 overflow-y-auto p-6"
+              onMouseUp={handleMouseUp}
+            >
               {activeTab === "analytics" ? (
                 <div className="space-y-8 animate-in fade-in duration-300">
                   {selectedFile.extension && (
@@ -572,7 +584,8 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                       <p className="text-3xl font-bold">
                         {fileStatsLoading
                           ? "..."
-                          : selectedFileStats?.commitCount.toLocaleString() || 0}
+                          : selectedFileStats?.commitCount.toLocaleString() ||
+                            0}
                       </p>
                     </div>
 
@@ -602,7 +615,11 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                               Lines Added
                             </p>
                             <p className="text-2xl font-bold text-green-400">
-                              +{fileStatsLoading ? "..." : selectedFileStats?.additions.toLocaleString() || 0}
+                              +
+                              {fileStatsLoading
+                                ? "..."
+                                : selectedFileStats?.additions.toLocaleString() ||
+                                  0}
                             </p>
                           </div>
                           <p className="text-xs text-muted-foreground">
@@ -615,7 +632,11 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                               Lines Deleted
                             </p>
                             <p className="text-2xl font-bold text-red-400">
-                              -{fileStatsLoading ? "..." : selectedFileStats?.deletions.toLocaleString() || 0}
+                              -
+                              {fileStatsLoading
+                                ? "..."
+                                : selectedFileStats?.deletions.toLocaleString() ||
+                                  0}
                             </p>
                           </div>
                           <p className="text-xs text-muted-foreground">
@@ -658,7 +679,10 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                           </p>
                           <p className="text-2xl font-bold">
                             {!fileStatsLoading && selectedFileStats?.commitCount
-                              ? Math.round(selectedFileTotalChanges / selectedFileStats.commitCount)
+                              ? Math.round(
+                                  selectedFileTotalChanges /
+                                    selectedFileStats.commitCount,
+                                )
                               : 0}
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -671,7 +695,11 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                           </p>
                           <p className="text-2xl font-bold">
                             {!fileStatsLoading && selectedFileTotalChanges > 0
-                              ? (((selectedFileStats?.deletions || 0) / selectedFileTotalChanges) * 100).toFixed(1)
+                              ? (
+                                  ((selectedFileStats?.deletions || 0) /
+                                    selectedFileTotalChanges) *
+                                  100
+                                ).toFixed(1)
                               : "0"}
                             %
                           </p>
@@ -685,10 +713,13 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                           </p>
                           <p className="text-sm font-semibold">
                             {selectedFile.createdAt
-                              ? new Date(selectedFile.createdAt).toLocaleDateString(
-                                  "en-US",
-                                  { year: "numeric", month: "short", day: "numeric" }
-                                )
+                              ? new Date(
+                                  selectedFile.createdAt,
+                                ).toLocaleDateString("en-US", {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                })
                               : "Unknown"}
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -719,8 +750,11 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                         <p className="text-lg font-semibold">
                           {fileStatsLoading
                             ? "..."
-                            : selectedFileStats?.commitCount.toLocaleString() || 0}{" "}
-                          {selectedFileStats?.commitCount === 1 ? "commit" : "commits"}
+                            : selectedFileStats?.commitCount.toLocaleString() ||
+                              0}{" "}
+                          {selectedFileStats?.commitCount === 1
+                            ? "commit"
+                            : "commits"}
                         </p>
                       </div>
                       <div>
@@ -764,7 +798,10 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                             <Sparkles className="h-3 w-3" />
                             Highlight text to explain with AI
                           </span>
-                          <CopyToClipboard text={fileContent}className="text-xs bg-white/5 hover:bg-white/10"/>
+                          <CopyToClipboard
+                            text={fileContent}
+                            className="text-xs bg-white/5 hover:bg-white/10"
+                          />
                         </div>
                       </div>
                       <SyntaxHighlighter
@@ -834,8 +871,11 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     Total Modifications
                   </p>
                   <p className="text-lg font-semibold">
-                    {getFileCommitCount(selectedFile.path)}{" "}
-                    {getFileCommitCount(selectedFile.path) === 1
+                    {fileStatsLoading
+                      ? "..."
+                      : selectedFileStats?.commitCount.toLocaleString() ||
+                        0}{" "}
+                    {selectedFileStats?.commitCount === 1
                       ? "commit"
                       : "commits"}
                   </p>
@@ -845,10 +885,9 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     Impact
                   </p>
                   <p className="text-lg font-semibold">
-                    {(
-                      getFileChangeStats(selectedFile.path).additions +
-                      getFileChangeStats(selectedFile.path).deletions
-                    ).toLocaleString()}{" "}
+                    {fileStatsLoading
+                      ? "..."
+                      : selectedFileTotalChanges.toLocaleString()}{" "}
                     changes
                   </p>
                 </div>

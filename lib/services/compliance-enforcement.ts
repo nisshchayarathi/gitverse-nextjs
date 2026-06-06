@@ -15,10 +15,9 @@ export class ComplianceEnforcementService {
     resource: string;
     action: string;
   }): Promise<void> {
-    
     if (params.targetRegion !== params.attemptedRegion) {
       const reason = `Strict residency policy violation: Attempted to process ${params.action} on ${params.resource} in region ${params.attemptedRegion}, but policy requires ${params.targetRegion}.`;
-      
+
       const auditService = getComplianceAuditService();
       await auditService.logViolation({
         organizationId: params.organizationId,

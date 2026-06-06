@@ -1,4 +1,8 @@
-import { IssueAnalysisResult, IssueData, RepositoryMetadata } from "@/types/firstPRSimulator";
+import {
+  IssueAnalysisResult,
+  IssueData,
+  RepositoryMetadata,
+} from "@/types/firstPRSimulator";
 
 const normalizeText = (text = "") =>
   text
@@ -38,10 +42,17 @@ const extractKeywords = (input: string) => {
     "performance",
   ]);
 
-  return Array.from(new Set(tokens.filter((token) => token.length > 2 && !stopWords.has(token))));
+  return Array.from(
+    new Set(
+      tokens.filter((token) => token.length > 2 && !stopWords.has(token)),
+    ),
+  );
 };
 
-const inferAffectedAreas = (keywords: string[], labels: IssueData["labels"] = []) => {
+const inferAffectedAreas = (
+  keywords: string[],
+  labels: IssueData["labels"] = [],
+) => {
   const areas = new Set<string>();
 
   const labelMap: Record<string, string> = {
@@ -106,7 +117,10 @@ const inferAffectedAreas = (keywords: string[], labels: IssueData["labels"] = []
   return Array.from(areas).slice(0, 4);
 };
 
-const inferLikelyModules = (keywords: string[], metadata?: RepositoryMetadata) => {
+const inferLikelyModules = (
+  keywords: string[],
+  metadata?: RepositoryMetadata,
+) => {
   const modules = new Set<string>();
   const repositoryHints = new Set<string>();
 
@@ -121,7 +135,11 @@ const inferLikelyModules = (keywords: string[], metadata?: RepositoryMetadata) =
     if (keyword.includes("api")) {
       modules.add("API Services");
     }
-    if (keyword.includes("ui") || keyword.includes("dashboard") || keyword.includes("page")) {
+    if (
+      keyword.includes("ui") ||
+      keyword.includes("dashboard") ||
+      keyword.includes("page")
+    ) {
       modules.add("User Interface");
     }
     if (keyword.includes("repo") || keyword.includes("repository")) {
@@ -142,7 +160,11 @@ const inferLikelyModules = (keywords: string[], metadata?: RepositoryMetadata) =
     if (hint.includes("typescript") || hint.includes("javascript")) {
       modules.add("Frontend / Web");
     }
-    if (hint.includes("prisma") || hint.includes("sql") || hint.includes("postgres")) {
+    if (
+      hint.includes("prisma") ||
+      hint.includes("sql") ||
+      hint.includes("postgres")
+    ) {
       modules.add("Database");
     }
   });
@@ -154,18 +176,28 @@ const inferLikelyModules = (keywords: string[], metadata?: RepositoryMetadata) =
   return Array.from(modules).slice(0, 4);
 };
 
-export function analyzeIssue(issue: IssueData, repository?: RepositoryMetadata): IssueAnalysisResult {
+export function analyzeIssue(
+  issue: IssueData,
+  repository?: RepositoryMetadata,
+): IssueAnalysisResult {
   const titleKeywords = extractKeywords(issue.title || "");
   const bodyKeywords = extractKeywords(issue.body || "");
-  const labelKeywords = (issue.labels || []).flatMap((label) => extractKeywords(label.name || ""));
-  const keywords = Array.from(new Set([...titleKeywords, ...bodyKeywords, ...labelKeywords]));
+  const labelKeywords = (issue.labels || []).flatMap((label) =>
+    extractKeywords(label.name || ""),
+  );
+  const keywords = Array.from(
+    new Set([...titleKeywords, ...bodyKeywords, ...labelKeywords]),
+  );
 
   const affectedAreas = inferAffectedAreas(keywords, issue.labels);
   const likelyModules = inferLikelyModules(keywords, repository);
 
   const confidence = Math.min(
     100,
-    30 + keywords.length * 10 + affectedAreas.length * 5 + likelyModules.length * 5,
+    30 +
+      keywords.length * 10 +
+      affectedAreas.length * 5 +
+      likelyModules.length * 5,
   );
 
   const summary = `Predicting a ${affectedAreas[0] || "core"} change based on issue text and labels.`;

@@ -56,12 +56,12 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedRoute && !isAuthenticated) {
     const loginUrl = new URL("/login", request.url);
-    
+
     // 🔥 FIX: Include query parameters so deep links aren't destroyed on redirect
     const callbackPath = request.nextUrl.search
       ? `${pathname}${request.nextUrl.search}`
       : pathname;
-      
+
     loginUrl.searchParams.set("callbackUrl", callbackPath);
     return NextResponse.redirect(loginUrl);
   }

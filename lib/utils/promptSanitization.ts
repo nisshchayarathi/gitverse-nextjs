@@ -24,7 +24,8 @@ const INJECTION_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
     replacement: "[redacted instruction] ",
   },
   {
-    pattern: /act\s+as\s+(a|an|the)\s+(unrestricted|malicious|harmful|dangerous|evil|bad|wrong)\s+/gi,
+    pattern:
+      /act\s+as\s+(a|an|the)\s+(unrestricted|malicious|harmful|dangerous|evil|bad|wrong)\s+/gi,
     replacement: "[redacted instruction] ",
   },
   {
@@ -76,7 +77,8 @@ const INJECTION_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
     replacement: "[redacted instruction] ",
   },
   {
-    pattern: /\bdo\s+not\s+(follow|obey|listen\s+to)\s+(the\s+)?(previous|system|original)\s+/gi,
+    pattern:
+      /\bdo\s+not\s+(follow|obey|listen\s+to)\s+(the\s+)?(previous|system|original)\s+/gi,
     replacement: "[redacted instruction] ",
   },
   {
@@ -152,7 +154,8 @@ const INJECTION_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
     replacement: "[redacted score request]",
   },
   {
-    pattern: /give\s+(this\s+)?(pr\s+)?(a\s+)?(score|rating|grade)\s+of\s+\d+/gi,
+    pattern:
+      /give\s+(this\s+)?(pr\s+)?(a\s+)?(score|rating|grade)\s+of\s+\d+/gi,
     replacement: "[redacted score request]",
   },
   {
@@ -164,7 +167,8 @@ const INJECTION_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
     replacement: "[redacted score request]",
   },
   {
-    pattern: /rate\s+(this|the)\s+(pr|code|change|pull\s+request)\s+(as\s+)?\d+/gi,
+    pattern:
+      /rate\s+(this|the)\s+(pr|code|change|pull\s+request)\s+(as\s+)?\d+/gi,
     replacement: "[redacted score request]",
   },
   {
@@ -180,11 +184,13 @@ const INJECTION_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
     replacement: "[redacted output directive]",
   },
   {
-    pattern: /you\s+(will|shall)\s+(now\s+)?(only\s+)?(output|return|respond\s+with)/gi,
+    pattern:
+      /you\s+(will|shall)\s+(now\s+)?(only\s+)?(output|return|respond\s+with)/gi,
     replacement: "[redacted instruction] ",
   },
   {
-    pattern: /evaluate\s+(this|the)\s+(pr|code|change|pull\s+request)\s+positively/i,
+    pattern:
+      /evaluate\s+(this|the)\s+(pr|code|change|pull\s+request)\s+positively/i,
     replacement: "[redacted evaluation directive]",
   },
   {
@@ -196,15 +202,18 @@ const INJECTION_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
     replacement: "[redacted merge directive]",
   },
   {
-    pattern: /do\s+not\s+(flag|report|raise|create)\s+(any\s+)?(issues?|problems?|warnings?|errors?)/gi,
+    pattern:
+      /do\s+not\s+(flag|report|raise|create)\s+(any\s+)?(issues?|problems?|warnings?|errors?)/gi,
     replacement: "[redacted suppression directive]",
   },
   {
-    pattern: /ignore\s+(all\s+)?(future\s+|subsequent\s+)?(instructions|directives|commands|input)/gi,
+    pattern:
+      /ignore\s+(all\s+)?(future\s+|subsequent\s+)?(instructions|directives|commands|input)/gi,
     replacement: "[redacted instruction]",
   },
   {
-    pattern: /your\s+(response|answer|output|reply)\s+(must|should|will|shall|needs\s+to)\s+/gi,
+    pattern:
+      /your\s+(response|answer|output|reply)\s+(must|should|will|shall|needs\s+to)\s+/gi,
     replacement: "[redacted directive] ",
   },
   {
@@ -212,7 +221,8 @@ const INJECTION_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
     replacement: "[redacted suppression directive]",
   },
   {
-    pattern: /this\s+is\s+(a\s+)?(test|example|dummy|sample|practice)\s+(pr|code|change|review)/gi,
+    pattern:
+      /this\s+is\s+(a\s+)?(test|example|dummy|sample|practice)\s+(pr|code|change|review)/gi,
     replacement: "[redacted classification]",
   },
   {
@@ -248,7 +258,8 @@ export function sanitizeTextContent(content: string): string {
   }
 
   if (sanitized.length > MAX_FILE_CONTENT_CHARS) {
-    sanitized = sanitized.substring(0, MAX_FILE_CONTENT_CHARS) + "\n[content truncated]";
+    sanitized =
+      sanitized.substring(0, MAX_FILE_CONTENT_CHARS) + "\n[content truncated]";
   }
 
   return sanitized;
@@ -258,17 +269,24 @@ export function sanitizeTextContent(content: string): string {
  * Build a delimited context block that signals to the model that the enclosed
  * content is repository data — not instructions to follow.
  */
-export function buildDelimitedContextBlock(contextParts: Array<{ label: string; content: string }>): string {
+export function buildDelimitedContextBlock(
+  contextParts: Array<{ label: string; content: string }>,
+): string {
   const blocks: string[] = [];
 
   for (const { label, content } of contextParts) {
     if (!content || !content.trim()) continue;
-    blocks.push(`<REPOSITORY_DATA source="${label}">\n${sanitizeTextContent(content)}\n</REPOSITORY_DATA>`);
+    blocks.push(
+      `<REPOSITORY_DATA source="${label}">\n${sanitizeTextContent(content)}\n</REPOSITORY_DATA>`,
+    );
   }
 
   const joined = blocks.join("\n\n");
   if (joined.length > MAX_TOTAL_CONTEXT_CHARS) {
-    return joined.substring(0, MAX_TOTAL_CONTEXT_CHARS) + "\n[additional context truncated]";
+    return (
+      joined.substring(0, MAX_TOTAL_CONTEXT_CHARS) +
+      "\n[additional context truncated]"
+    );
   }
   return joined;
 }
@@ -322,7 +340,10 @@ export function assembleChatPrompt(opts: {
   } = opts;
 
   const contextParts: Array<{ label: string; content: string }> = [
-    { label: "metadata", content: `Repository: ${repositoryName}\nDescription: ${repositoryDescription}\nLanguages: ${languages}\nStats: ${stats}` },
+    {
+      label: "metadata",
+      content: `Repository: ${repositoryName}\nDescription: ${repositoryDescription}\nLanguages: ${languages}\nStats: ${stats}`,
+    },
   ];
 
   if (retrievedFilesContent) {

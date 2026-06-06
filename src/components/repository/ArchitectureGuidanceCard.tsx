@@ -1,4 +1,10 @@
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui";
 import { Lightbulb } from "lucide-react";
 import { DifficultyBadge, DifficultyLevel } from "./DifficultyBadge";
 
@@ -23,14 +29,17 @@ export function ArchitectureGuidanceCard({
           <div className="min-w-0">
             <CardTitle className="text-sm">Architecture guidance</CardTitle>
             <CardDescription className="text-xs text-muted-foreground">
-              Common architecture concept for <span className="font-medium">{moduleName}</span>.
+              Common architecture concept for{" "}
+              <span className="font-medium">{moduleName}</span>.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3 p-4 pt-0">
         <div className="flex flex-col gap-3">
-          <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+          <p className="text-sm leading-6 text-muted-foreground">
+            {description}
+          </p>
           <DifficultyBadge level={level} />
         </div>
       </CardContent>

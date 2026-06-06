@@ -58,17 +58,20 @@ Return ONLY valid JSON matching this schema (no markdown, no extra text):
 
     try {
       const response = await gemini.chatRaw(prompt);
-      
+
       const rawText = response.text.trim();
       let jsonText = rawText;
       if (rawText.startsWith("```json")) {
-        jsonText = rawText.replace(/^```json/, "").replace(/```$/, "").trim();
+        jsonText = rawText
+          .replace(/^```json/, "")
+          .replace(/```$/, "")
+          .trim();
       } else if (rawText.startsWith("```")) {
         jsonText = rawText.replace(/^```/, "").replace(/```$/, "").trim();
       }
 
       const parsed = JSON.parse(jsonText);
-      
+
       if (!parsed.isValid) return null;
 
       return {
@@ -78,7 +81,10 @@ Return ONLY valid JSON matching this schema (no markdown, no extra text):
         endLine: parsed.endLine || issue.line,
         suggestionBody: parsed.suggestionBody || "",
         explanation: parsed.explanation || "",
-        confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 50,
+        confidenceScore:
+          typeof parsed.confidenceScore === "number"
+            ? parsed.confidenceScore
+            : 50,
       };
     } catch (error) {
       console.error("[PatchGenerator] Failed to generate patch:", error);

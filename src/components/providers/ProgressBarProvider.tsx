@@ -3,7 +3,11 @@
 import React from "react";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
 
-export default function ProgressBarProvider({ children }: { children: React.ReactNode }) {
+export default function ProgressBarProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <>
       {children}

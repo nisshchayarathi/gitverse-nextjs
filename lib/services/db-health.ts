@@ -12,11 +12,11 @@ export class DatabaseHealthService {
       // is difficult without PgBouncer. We approximate load by checking how many
       // webhooks are actively "processing".
       const processingCount = await prisma.webhookEvent.count({
-        where: { status: "processing" }
+        where: { status: "processing" },
       });
 
       const pendingCount = await prisma.webhookEvent.count({
-        where: { status: "pending" }
+        where: { status: "pending" },
       });
 
       let status: DbHealthMetrics["status"] = "Healthy";
@@ -33,7 +33,10 @@ export class DatabaseHealthService {
         status,
       };
     } catch (error) {
-      console.error("[DatabaseHealthService] Failed to check DB health:", error);
+      console.error(
+        "[DatabaseHealthService] Failed to check DB health:",
+        error,
+      );
       return {
         activeConnections: 0,
         poolUtilization: 0,

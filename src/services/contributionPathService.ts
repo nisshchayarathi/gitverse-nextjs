@@ -1,6 +1,4 @@
-import {
-  buildLearningMap,
-} from "@/utils/repositoryLearningMap";
+import { buildLearningMap } from "@/utils/repositoryLearningMap";
 import {
   buildMilestones,
   findBeginnerIssues,
@@ -17,7 +15,12 @@ const estimateScore = (
   preference: ContributionPreference,
   repository?: RepositoryAnalysisData,
 ) => {
-  const base = preference.experienceLevel === "Beginner" ? 60 : preference.experienceLevel === "Intermediate" ? 75 : 90;
+  const base =
+    preference.experienceLevel === "Beginner"
+      ? 60
+      : preference.experienceLevel === "Intermediate"
+        ? 75
+        : 90;
   const coverageBonus = Math.min(20, (repository?.files?.length || 0) / 15);
   return Math.min(100, Math.round(base + coverageBonus));
 };
@@ -31,8 +34,8 @@ const buildProfile = (
     score >= 90
       ? "Contributor Champion"
       : score >= 75
-      ? "Pathfinder"
-      : "Explorer";
+        ? "Pathfinder"
+        : "Explorer";
 
   return {
     name: preference.name || "Contributor",
@@ -48,13 +51,30 @@ export const buildContributionPathPlan = (
   repository?: RepositoryAnalysisData,
 ): ContributionPathPlan => {
   const profile = buildProfile(preference, repository);
-  const recommendedFiles = recommendFilesForContribution(repository, preference.focusArea);
+  const recommendedFiles = recommendFilesForContribution(
+    repository,
+    preference.focusArea,
+  );
   const learningConcepts = buildLearningMap(repository, preference.focusArea);
-  const roadmap = generateContributionRoadmap(preference.experienceLevel, preference.focusArea, repository);
-  const recommendedIssues = findBeginnerIssues(repository, preference.focusArea);
-  const milestones = buildMilestones(preference.experienceLevel, preference.focusArea);
+  const roadmap = generateContributionRoadmap(
+    preference.experienceLevel,
+    preference.focusArea,
+    repository,
+  );
+  const recommendedIssues = findBeginnerIssues(
+    preference.focusArea,
+    repository,
+  );
+  const milestones = buildMilestones(
+    preference.experienceLevel,
+    preference.focusArea,
+  );
   const progress = Math.min(100, Math.round(profile.score * 0.9));
-  const badges = [profile.badge, `${preference.focusArea} Pathfinder`, `${preference.experienceLevel} Learner`];
+  const badges = [
+    profile.badge,
+    `${preference.focusArea} Pathfinder`,
+    `${preference.experienceLevel} Learner`,
+  ];
   const summary = `A ${preference.experienceLevel} ${preference.focusArea} contributor roadmap designed to help you onboard and make your first contribution quickly.`;
 
   const firstContributionOpportunities = [
@@ -75,7 +95,8 @@ export const buildContributionPathPlan = (
     progress,
     badges,
     summary,
-    aiAssistantHint: "Future AI integration can generate personalized learning plans and contribution prompts based on this roadmap.",
+    aiAssistantHint:
+      "Future AI integration can generate personalized learning plans and contribution prompts based on this roadmap.",
     futureAIReady: true,
   };
 };

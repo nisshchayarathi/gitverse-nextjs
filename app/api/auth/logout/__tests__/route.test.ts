@@ -38,7 +38,8 @@ const { appendClearCookieHeaders } = require("@/lib/utils/authCookie");
 function mockRequest(authHeader?: string): NextRequest {
   return {
     headers: {
-      get: (name: string) => (name === "authorization" ? authHeader || null : null),
+      get: (name: string) =>
+        name === "authorization" ? authHeader || null : null,
     },
   } as unknown as NextRequest;
 }

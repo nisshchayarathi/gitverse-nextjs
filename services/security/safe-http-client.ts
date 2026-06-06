@@ -6,17 +6,24 @@ import { SecurityAudit } from "./security-audit";
 
 export class SafeHttpClient {
   private static allowedProtocols = ["https:", "http:"];
-  private static blockedProtocols = ["file:", "ftp:", "gopher:", "ws:", "wss:", "data:"];
+  private static blockedProtocols = [
+    "file:",
+    "ftp:",
+    "gopher:",
+    "ws:",
+    "wss:",
+    "data:",
+  ];
 
   /**
    * Executes a safe HTTP fetch request by verifying URL scheme, hostname, DNS resolution, and IPs.
    */
   public static async fetch(
     input: string | URL,
-    init?: SafeHttpClientOptions
+    init?: SafeHttpClientOptions,
   ): Promise<Response> {
     const urlStr = typeof input === "string" ? input : input.toString();
-    
+
     let url: URL;
     try {
       url = new URL(urlStr);
@@ -58,7 +65,8 @@ export class SafeHttpClient {
     }
 
     // Determine if localhost/private network is allowed
-    const isDev = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+    const isDev =
+      process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
     const allowLocalhost = init?.allowLocalhost ?? isDev;
 
     // Reject HTTP protocol unless in development/test
@@ -75,7 +83,10 @@ export class SafeHttpClient {
 
     // 2. Allowlist Enforcement
     // Allowlist check can be bypassed in dev for localhost but required for all other domains
-    const isLocalhostHost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+    const isLocalhostHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1";
     if (!(isLocalhostHost && allowLocalhost)) {
       if (!DomainAllowlist.isAllowed(hostname)) {
         SecurityAudit.log({
@@ -91,9 +102,14 @@ export class SafeHttpClient {
 
     // 3. DNS Resolution and IP Classification (Anti-Rebinding protection)
     // Validate DNS and IP *before* request
-    const dnsResult = await DNSValidator.resolveAndValidate(hostname, allowLocalhost);
+    const dnsResult = await DNSValidator.resolveAndValidate(
+      hostname,
+      allowLocalhost,
+    );
     if (!dnsResult.isValid) {
-      const isMetadataAttempt = hostname === "metadata.google.internal" || dnsResult.ips.includes("169.254.169.254");
+      const isMetadataAttempt =
+        hostname === "metadata.google.internal" ||
+        dnsResult.ips.includes("169.254.169.254");
       SecurityAudit.log({
         event: isMetadataAttempt ? "metadata_access_attempt" : "ssrf_attempt",
         url: urlStr,
@@ -113,7 +129,9 @@ export class SafeHttpClient {
     try {
       return await fetch(urlStr, init);
     } catch (fetchError: any) {
-      console.error(`SafeHttpClient request failed: ${fetchError.message || fetchError}`);
+      console.error(
+        `SafeHttpClient request failed: ${fetchError.message || fetchError}`,
+      );
       throw fetchError;
     }
   }

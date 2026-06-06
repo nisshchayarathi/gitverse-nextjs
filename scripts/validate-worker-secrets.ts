@@ -18,7 +18,7 @@ export function validateEnvironment(): ValidationResult {
   if (missingSecrets.length > 0) {
     errors.push(
       `Missing required secrets: ${missingSecrets.join(", ")}. ` +
-        `Set INTERNAL_WORKER_SECRET and ANALYSIS_RUNNER_SECRET in your environment.`
+        `Set INTERNAL_WORKER_SECRET and ANALYSIS_RUNNER_SECRET in your environment.`,
     );
   }
 
@@ -39,21 +39,21 @@ export function validateEnvironment(): ValidationResult {
   if (workerSecret && workerSecret.length < 16) {
     warnings.push(
       "INTERNAL_WORKER_SECRET is shorter than 16 characters. " +
-        "Consider using a longer secret for better security."
+        "Consider using a longer secret for better security.",
     );
   }
 
   if (workerSecret && workerSecret === "secret") {
     warnings.push(
       'INTERNAL_WORKER_SECRET is set to "secret". ' +
-        "This is a common default and should be changed."
+        "This is a common default and should be changed.",
     );
   }
 
   if (workerSecret && workerSecret === "changeme") {
     warnings.push(
       'INTERNAL_WORKER_SECRET is set to "changeme". ' +
-        "This is a placeholder and should be changed."
+        "This is a placeholder and should be changed.",
     );
   }
 

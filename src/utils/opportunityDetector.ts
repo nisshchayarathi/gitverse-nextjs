@@ -6,16 +6,19 @@ import {
 } from "@/types/generatedIssue";
 
 // Detect missing test opportunities
-export const detectMissingTests = (files: RepositoryFile[]): OpportunitySuggestion[] => {
+export const detectMissingTests = (
+  files: RepositoryFile[],
+): OpportunitySuggestion[] => {
   const opportunities: OpportunitySuggestion[] = [];
   const sourceFiles = files.filter((f) =>
-    /\.(tsx?|jsx?|py|go|rs|java)$/.test(f.path || "")
+    /\.(tsx?|jsx?|py|go|rs|java)$/.test(f.path || ""),
   );
   const testFiles = files.filter((f) =>
-    /\.(test|spec)\.(tsx?|jsx?|py|go|rs|java)$/.test(f.path || "")
+    /\.(test|spec)\.(tsx?|jsx?|py|go|rs|java)$/.test(f.path || ""),
   );
 
-  const testCoverage = sourceFiles.length > 0 ? testFiles.length / sourceFiles.length : 0;
+  const testCoverage =
+    sourceFiles.length > 0 ? testFiles.length / sourceFiles.length : 0;
 
   if (testCoverage < 0.3) {
     opportunities.push({
@@ -37,7 +40,9 @@ export const detectMissingTests = (files: RepositoryFile[]): OpportunitySuggesti
 };
 
 // Detect dead code opportunities
-export const detectDeadCode = (files: RepositoryFile[]): OpportunitySuggestion[] => {
+export const detectDeadCode = (
+  files: RepositoryFile[],
+): OpportunitySuggestion[] => {
   const opportunities: OpportunitySuggestion[] = [];
   const unused: string[] = [];
   const orphaned: string[] = [];
@@ -45,7 +50,9 @@ export const detectDeadCode = (files: RepositoryFile[]): OpportunitySuggestion[]
   // Simple heuristic: look for utility files with low import counts
   files.forEach((file) => {
     const isUtility =
-      file.path?.includes("utils") || file.path?.includes("helpers") || file.path?.includes("lib");
+      file.path?.includes("utils") ||
+      file.path?.includes("helpers") ||
+      file.path?.includes("lib");
     if (!isUtility) return;
 
     // Count references from other files
@@ -82,7 +89,9 @@ export const detectDeadCode = (files: RepositoryFile[]): OpportunitySuggestion[]
 };
 
 // Detect refactoring opportunities
-export const detectRefactoringOpportunities = (files: RepositoryFile[]): OpportunitySuggestion[] => {
+export const detectRefactoringOpportunities = (
+  files: RepositoryFile[],
+): OpportunitySuggestion[] => {
   const opportunities: OpportunitySuggestion[] = [];
 
   // Check for very large files
@@ -113,8 +122,10 @@ export const detectRefactoringOpportunities = (files: RepositoryFile[]): Opportu
     opportunities.push({
       type: "refactoring" as OpportunityType,
       title: "Reduce File Dependencies",
-      description: `Found files with many external dependencies (${Math.max(...(highDependencyFiles.map((f) => f.imports?.length || 0)))}) that could benefit from refactoring.`,
-      affectedFiles: highDependencyFiles.map((f) => f.path || "").filter(Boolean),
+      description: `Found files with many external dependencies (${Math.max(...highDependencyFiles.map((f) => f.imports?.length || 0))}) that could benefit from refactoring.`,
+      affectedFiles: highDependencyFiles
+        .map((f) => f.path || "")
+        .filter(Boolean),
       reason:
         "Files with many dependencies are harder to test and understand. Reducing dependencies improves code isolation and reusability.",
       estimatedEffort: "medium",
@@ -126,11 +137,13 @@ export const detectRefactoringOpportunities = (files: RepositoryFile[]): Opportu
 };
 
 // Detect documentation gaps
-export const detectDocumentationGaps = (files: RepositoryFile[]): OpportunitySuggestion[] => {
+export const detectDocumentationGaps = (
+  files: RepositoryFile[],
+): OpportunitySuggestion[] => {
   const opportunities: OpportunitySuggestion[] = [];
 
   const codeFiles = files.filter((f) =>
-    /\.(tsx?|jsx?|py|go|rs|java)$/.test(f.path || "")
+    /\.(tsx?|jsx?|py|go|rs|java)$/.test(f.path || ""),
   );
 
   const docFiles = files.filter(
@@ -138,16 +151,19 @@ export const detectDocumentationGaps = (files: RepositoryFile[]): OpportunitySug
       /\.md$/.test(f.path || "") ||
       f.path?.includes("docs") ||
       f.name?.includes("README") ||
-      f.name?.includes("CONTRIBUTING")
+      f.name?.includes("CONTRIBUTING"),
   );
 
-  const hasMainReadme = files.some((f) => f.name === "README.md" || f.name === "README");
+  const hasMainReadme = files.some(
+    (f) => f.name === "README.md" || f.name === "README",
+  );
   const hasContributing = files.some((f) => f.name?.includes("CONTRIBUTING"));
 
   const gaps: string[] = [];
   if (!hasMainReadme) gaps.push("main README.md");
   if (!hasContributing) gaps.push("CONTRIBUTING.md guide");
-  if (docFiles.length === 0 && codeFiles.length > 10) gaps.push("comprehensive documentation");
+  if (docFiles.length === 0 && codeFiles.length > 10)
+    gaps.push("comprehensive documentation");
 
   if (gaps.length > 0) {
     opportunities.push({
@@ -166,7 +182,9 @@ export const detectDocumentationGaps = (files: RepositoryFile[]): OpportunitySug
 };
 
 // Detect type safety issues
-export const detectTypeSafetyGaps = (files: RepositoryFile[]): OpportunitySuggestion[] => {
+export const detectTypeSafetyGaps = (
+  files: RepositoryFile[],
+): OpportunitySuggestion[] => {
   const opportunities: OpportunitySuggestion[] = [];
 
   const jsFiles = files.filter((f) => /\.jsx?$/.test(f.path || ""));
@@ -192,21 +210,23 @@ export const detectTypeSafetyGaps = (files: RepositoryFile[]): OpportunitySugges
 };
 
 // Detect UI consistency issues
-export const detectUIConsistencyIssues = (files: RepositoryFile[]): OpportunitySuggestion[] => {
+export const detectUIConsistencyIssues = (
+  files: RepositoryFile[],
+): OpportunitySuggestion[] => {
   const opportunities: OpportunitySuggestion[] = [];
 
   const uiFiles = files.filter(
     (f) =>
       f.path?.includes("component") ||
       f.path?.includes("ui/") ||
-      /\.(tsx|jsx)$/.test(f.path || "")
+      /\.(tsx|jsx)$/.test(f.path || ""),
   );
 
   const styleFiles = files.filter(
     (f) =>
       f.path?.includes("style") ||
       f.path?.includes("theme") ||
-      /\.(css|scss|less)$/.test(f.path || "")
+      /\.(css|scss|less)$/.test(f.path || ""),
   );
 
   if (uiFiles.length > 5 && styleFiles.length < 3) {
@@ -214,7 +234,10 @@ export const detectUIConsistencyIssues = (files: RepositoryFile[]): OpportunityS
       type: "ui-consistency" as OpportunityType,
       title: "Establish UI Consistency",
       description: `Found many UI components (${uiFiles.length}) but few centralized style files. Consider creating a design system.`,
-      affectedFiles: uiFiles.slice(0, 3).map((f) => f.path || "").filter(Boolean),
+      affectedFiles: uiFiles
+        .slice(0, 3)
+        .map((f) => f.path || "")
+        .filter(Boolean),
       reason:
         "Consistent UI design improves user experience and reduces maintenance. A centralized design system makes it easier for contributors to maintain consistency.",
       estimatedEffort: "medium",
@@ -226,7 +249,9 @@ export const detectUIConsistencyIssues = (files: RepositoryFile[]): OpportunityS
 };
 
 // Main opportunity detector
-export const detectOpportunities = (files: RepositoryFile[]): OpportunitySuggestion[] => {
+export const detectOpportunities = (
+  files: RepositoryFile[],
+): OpportunitySuggestion[] => {
   if (!files || files.length === 0) return [];
 
   const opportunities: OpportunitySuggestion[] = [

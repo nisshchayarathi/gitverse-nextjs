@@ -34,9 +34,9 @@ export default function RepositoryAnalysisProgress({
   currentStep,
 }: RepositoryAnalysisProgressProps) {
   return (
-    <div 
+    <div
       className="w-full max-w-2xl mx-auto rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-6"
-      role="region" 
+      role="region"
       aria-label="Repository analysis progress"
       aria-live="polite"
     >
@@ -100,7 +100,7 @@ export default function RepositoryAnalysisProgress({
       </div>
 
       <div className="mt-8">
-        <div 
+        <div
           className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden"
           role="progressbar"
           aria-valuenow={Math.round(((currentStep + 1) / steps.length) * 100)}

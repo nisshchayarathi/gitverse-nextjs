@@ -1,46 +1,42 @@
-import React from 'react';
-import {
-  Code,
-  FileText,
-  TestTube,
-  TrendingUp,
-} from 'lucide-react';
+import React from "react";
+import { Code, FileText, TestTube, TrendingUp } from "lucide-react";
 import {
   calculateContributionReadiness,
   getIndicatorColor,
   getIndicatorBgColor,
   getIndicatorEmoji,
   ContributionReadinessScore,
-} from '@/lib/utils/contributionReadinessScore';
+} from "@/lib/utils/contributionReadinessScore";
 
 interface ContributionReadinessCardProps {
   file: any;
   repository: any;
 }
 
-export const ContributionReadinessCard: React.FC<ContributionReadinessCardProps> = ({
-  file,
-  repository,
-}) => {
+export const ContributionReadinessCard: React.FC<
+  ContributionReadinessCardProps
+> = ({ file, repository }) => {
   const readiness = calculateContributionReadiness(file, repository);
 
   const getStatusBadgeClass = () => {
-    const baseClass = 'inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-medium';
+    const baseClass =
+      "inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-medium";
     return `${baseClass} ${getIndicatorBgColor(readiness.indicator)} ${getIndicatorColor(readiness.indicator)}`;
   };
 
   const getAttributeBadgeClass = (value: string) => {
     const colorMap: Record<string, string> = {
-      'Low': 'bg-green-500/20 text-green-400 border-green-500/30',
-      'Medium': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-      'High': 'bg-red-500/20 text-red-400 border-red-500/30',
-      'Complete': 'bg-green-500/20 text-green-400 border-green-500/30',
-      'Partial': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-      'Missing': 'bg-red-500/20 text-red-400 border-red-500/30',
-      'Available': 'bg-green-500/20 text-green-400 border-green-500/30',
+      Low: "bg-green-500/20 text-green-400 border-green-500/30",
+      Medium: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+      High: "bg-red-500/20 text-red-400 border-red-500/30",
+      Complete: "bg-green-500/20 text-green-400 border-green-500/30",
+      Partial: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+      Missing: "bg-red-500/20 text-red-400 border-red-500/30",
+      Available: "bg-green-500/20 text-green-400 border-green-500/30",
     };
-    
-    const color = colorMap[value] || 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+
+    const color =
+      colorMap[value] || "bg-gray-500/20 text-gray-400 border-gray-500/30";
     return `inline-block px-2 py-1 rounded text-xs font-medium border ${color}`;
   };
 
@@ -86,10 +82,10 @@ export const ContributionReadinessCard: React.FC<ContributionReadinessCardProps>
               width: `${readiness.percentage}%`,
               background:
                 readiness.percentage >= 80
-                  ? 'linear-gradient(to right, rgb(34, 197, 94))'
+                  ? "linear-gradient(to right, rgb(34, 197, 94))"
                   : readiness.percentage >= 50
-                  ? 'linear-gradient(to right, rgb(234, 179, 8))'
-                  : 'linear-gradient(to right, rgb(239, 68, 68))',
+                    ? "linear-gradient(to right, rgb(234, 179, 8))"
+                    : "linear-gradient(to right, rgb(239, 68, 68))",
             }}
           />
         </div>
@@ -142,9 +138,7 @@ export const ContributionReadinessCard: React.FC<ContributionReadinessCardProps>
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-lg font-semibold">
-              {readiness.tests}
-            </span>
+            <span className="text-lg font-semibold">{readiness.tests}</span>
             <span className={getAttributeBadgeClass(readiness.tests)}>
               +{readiness.breakdown.tests}
             </span>
@@ -161,9 +155,15 @@ export const ContributionReadinessCard: React.FC<ContributionReadinessCardProps>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-lg font-semibold">
-              {readiness.breakdown.recentActivity > 0 ? 'Yes' : 'No'}
+              {readiness.breakdown.recentActivity > 0 ? "Yes" : "No"}
             </span>
-            <span className={getAttributeBadgeClass(readiness.breakdown.recentActivity > 0 ? 'Available' : 'Missing')}>
+            <span
+              className={getAttributeBadgeClass(
+                readiness.breakdown.recentActivity > 0
+                  ? "Available"
+                  : "Missing",
+              )}
+            >
               +{readiness.breakdown.recentActivity}
             </span>
           </div>
@@ -173,11 +173,15 @@ export const ContributionReadinessCard: React.FC<ContributionReadinessCardProps>
       {/* Score Interpretation */}
       <div className="bg-white/5 rounded-lg p-4 border border-white/10">
         <p className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">What does this mean?</span>
-          {' '}
-          {readiness.indicator === 'Ready' && 'This module is well-structured, documented, and tested. It\'s ready for contribution with clear guidelines.'}
-          {readiness.indicator === 'Moderate' && 'This module has some documentation and tests but could benefit from additional coverage or refactoring before contribution.'}
-          {readiness.indicator === 'Challenging' && 'This module would benefit from better documentation, more tests, and refactoring. Consider addressing these areas before contributing.'}
+          <span className="font-semibold text-foreground">
+            What does this mean?
+          </span>{" "}
+          {readiness.indicator === "Ready" &&
+            "This module is well-structured, documented, and tested. It's ready for contribution with clear guidelines."}
+          {readiness.indicator === "Moderate" &&
+            "This module has some documentation and tests but could benefit from additional coverage or refactoring before contribution."}
+          {readiness.indicator === "Challenging" &&
+            "This module would benefit from better documentation, more tests, and refactoring. Consider addressing these areas before contributing."}
         </p>
       </div>
     </div>

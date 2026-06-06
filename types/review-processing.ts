@@ -1,11 +1,11 @@
-export type PRReviewMode = 'Standard' | 'Chunked' | 'Degraded' | 'Warning';
+export type PRReviewMode = "Standard" | "Chunked" | "Degraded" | "Warning";
 
-export type PartialReviewStatus = 
-  | 'Processing' 
-  | 'Completed' 
-  | 'Partial' 
-  | 'Failed' 
-  | 'TimedOut';
+export type PartialReviewStatus =
+  | "Processing"
+  | "Completed"
+  | "Partial"
+  | "Failed"
+  | "TimedOut";
 
 export interface PRSizeMetrics {
   fileCount: number;
@@ -23,7 +23,7 @@ export interface ReviewThresholds {
 export const DEFAULT_REVIEW_THRESHOLDS: ReviewThresholds = {
   warningFileCount: 100,
   chunkedFileCount: 250,
-  degradedFileCount: 500
+  degradedFileCount: 500,
 };
 
 export interface ChunkedReviewResult {

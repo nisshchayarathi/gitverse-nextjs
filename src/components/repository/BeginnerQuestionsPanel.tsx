@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui";
 import { Info } from "lucide-react";
 
 const QUESTIONS = [
@@ -62,7 +68,9 @@ export function BeginnerQuestionsPanel() {
 
         {activeQuestion ? (
           <div className="rounded-2xl border border-border/60 bg-background/80 p-4 text-sm leading-6 text-muted-foreground">
-            <p className="font-semibold text-foreground mb-2">{activeQuestion}</p>
+            <p className="font-semibold text-foreground mb-2">
+              {activeQuestion}
+            </p>
             <p>{QUESTION_HELPERS[activeQuestion]}</p>
           </div>
         ) : (

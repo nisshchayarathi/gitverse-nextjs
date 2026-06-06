@@ -19,8 +19,7 @@ function base64UrlDecodeToString(input: string): string {
 
 function getSecret(): string {
   const secret = (
-    process.env.GITHUB_APP_STATE_SECRET ||
-    getNextAuthSecret()
+    process.env.GITHUB_APP_STATE_SECRET || getNextAuthSecret()
   ).trim();
   if (!secret) {
     throw new Error(

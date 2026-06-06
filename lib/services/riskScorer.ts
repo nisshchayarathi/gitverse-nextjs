@@ -9,7 +9,11 @@ export interface RiskScoreResult {
 }
 
 export class RiskScorer {
-  public static calculateRisk(changedFiles: string[], impact: DependencyImpact, driftWarnings: string[]): RiskScoreResult {
+  public static calculateRisk(
+    changedFiles: string[],
+    impact: DependencyImpact,
+    driftWarnings: string[],
+  ): RiskScoreResult {
     let score = 0;
     const factors: string[] = [];
 
@@ -25,10 +29,14 @@ export class RiskScorer {
     // Factor 2: Downstream dependency impact
     if (impact.downstreamCount > 30) {
       score += 40;
-      factors.push(`Extensive downstream impact (${impact.downstreamCount} affected files)`);
+      factors.push(
+        `Extensive downstream impact (${impact.downstreamCount} affected files)`,
+      );
     } else if (impact.downstreamCount > 10) {
       score += 20;
-      factors.push(`Moderate downstream impact (${impact.downstreamCount} affected files)`);
+      factors.push(
+        `Moderate downstream impact (${impact.downstreamCount} affected files)`,
+      );
     }
 
     // Factor 3: Critical module modification
@@ -53,7 +61,9 @@ export class RiskScorer {
     // Factor 4: Architectural violations/drift
     if (driftWarnings && driftWarnings.length > 0) {
       score += driftWarnings.length * 20;
-      factors.push(`Architectural drift detected (${driftWarnings.length} warnings)`);
+      factors.push(
+        `Architectural drift detected (${driftWarnings.length} warnings)`,
+      );
     }
 
     // Assign level based on final score

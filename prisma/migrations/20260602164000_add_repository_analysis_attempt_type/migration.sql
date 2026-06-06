@@ -1,2 +1,3 @@
 -- AlterEnum
+CREATE TYPE "AttemptType" AS ENUM (...);
 ALTER TYPE "AttemptType" ADD VALUE 'REPOSITORY_ANALYSIS';

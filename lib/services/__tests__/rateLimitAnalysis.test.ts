@@ -54,7 +54,7 @@ describe("Analysis Runner Rate Limiting", () => {
             key: "runner:my-worker",
             type: "ANALYSIS_RUNNER",
           }),
-        })
+        }),
       );
     });
 
@@ -81,8 +81,8 @@ describe("Analysis Runner Rate Limiting", () => {
         "runner:worker-2": 3,
       };
 
-      prisma.loginAttempt.count.mockImplementation(
-        ({ where: { key } }: any) => Promise.resolve(calls[key] || 0)
+      prisma.loginAttempt.count.mockImplementation(({ where: { key } }: any) =>
+        Promise.resolve(calls[key] || 0),
       );
 
       expect(await isAnalysisRunnerRateLimited("worker-1")).toBe(true);
@@ -123,7 +123,7 @@ describe("Analysis Runner Rate Limiting", () => {
       prisma.loginAttempt.create.mockRejectedValue(new Error("DB error"));
 
       await expect(
-        recordAnalysisRunnerAttempt("worker-1", "job-123", true)
+        recordAnalysisRunnerAttempt("worker-1", "job-123", true),
       ).resolves.toBeUndefined();
     });
   });

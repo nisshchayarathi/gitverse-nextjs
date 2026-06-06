@@ -1,5 +1,8 @@
 import { RepositoryFile } from "@/types/firstPRSimulator";
-import { DifficultyCategory, OpportunitySuggestion } from "@/types/generatedIssue";
+import {
+  DifficultyCategory,
+  OpportunitySuggestion,
+} from "@/types/generatedIssue";
 
 interface DifficultyFactors {
   affectedFileCount: number;
@@ -12,14 +15,15 @@ interface DifficultyFactors {
 
 export const calculateDifficultyFactors = (
   affectedFiles: string[],
-  allFiles: RepositoryFile[]
+  allFiles: RepositoryFile[],
 ): DifficultyFactors => {
   const relevantFiles = allFiles.filter((f) =>
-    affectedFiles.some((af) => f.path === af)
+    affectedFiles.some((af) => f.path === af),
   );
 
   const averageFileSize =
-    relevantFiles.reduce((sum, f) => sum + (f.lines || 0), 0) / Math.max(relevantFiles.length, 1);
+    relevantFiles.reduce((sum, f) => sum + (f.lines || 0), 0) /
+    Math.max(relevantFiles.length, 1);
 
   // Estimate dependency depth by counting imports
   let maxDependencyDepth = 1;
@@ -34,7 +38,9 @@ export const calculateDifficultyFactors = (
     (averageFileSize / 500) * 30 + // File size contributes 30 points max
     (maxDependencyDepth / 5) * 20 + // Dependency depth contributes 20 points max
     (affectedFiles.length / 5) * 20 + // Number of files contributes 20 points max
-    (relevantFiles.some((f) => f.path?.includes("core") || f.path?.includes("api"))
+    (relevantFiles.some(
+      (f) => f.path?.includes("core") || f.path?.includes("api"),
+    )
       ? 20
       : 0); // Core/API files add complexity
 
@@ -43,27 +49,23 @@ export const calculateDifficultyFactors = (
     averageFileSize,
     dependencyDepth: maxDependencyDepth,
     complexityScore: Math.min(complexityScore, 100),
-    isNewArea:
-      !allFiles.some((f) =>
-        affectedFiles.some((af) => f.path === af)
-      ),
+    isNewArea: !allFiles.some((f) => affectedFiles.some((af) => f.path === af)),
     requiresArchitectureChange: affectedFiles.some((af) =>
-      [
-        "schema",
-        "config",
-        "core",
-        "middleware",
-        "types",
-      ].some((keyword) => af.toLowerCase().includes(keyword))
+      ["schema", "config", "core", "middleware", "types"].some((keyword) =>
+        af.toLowerCase().includes(keyword),
+      ),
     ),
   };
 };
 
 export const estimateDifficulty = (
   opportunity: OpportunitySuggestion,
-  allFiles: RepositoryFile[]
+  allFiles: RepositoryFile[],
 ): DifficultyCategory => {
-  const factors = calculateDifficultyFactors(opportunity.affectedFiles, allFiles);
+  const factors = calculateDifficultyFactors(
+    opportunity.affectedFiles,
+    allFiles,
+  );
 
   // Base difficulty from opportunity type
   let difficultyScore = 0;
@@ -118,9 +120,12 @@ export const estimateDifficulty = (
 
 export const estimateEffortHours = (
   opportunity: OpportunitySuggestion,
-  allFiles: RepositoryFile[]
+  allFiles: RepositoryFile[],
 ): number => {
-  const factors = calculateDifficultyFactors(opportunity.affectedFiles, allFiles);
+  const factors = calculateDifficultyFactors(
+    opportunity.affectedFiles,
+    allFiles,
+  );
 
   // Base effort in hours based on opportunity type
   let baseHours = 0;
@@ -157,7 +162,8 @@ export const estimateEffortHours = (
   const sizeMultiplier = factors.averageFileSize > 300 ? 1.5 : 1; // Larger files take longer
   const complexityMultiplier = factors.complexityScore > 60 ? 1.3 : 1; // Complexity adds time
 
-  let estimatedHours = baseHours * fileCountMultiplier * sizeMultiplier * complexityMultiplier;
+  let estimatedHours =
+    baseHours * fileCountMultiplier * sizeMultiplier * complexityMultiplier;
 
   // Round to reasonable estimates
   if (estimatedHours < 1) return 0.5;
@@ -168,9 +174,7 @@ export const estimateEffortHours = (
   return 16;
 };
 
-export const categorizeEffort = (
-  hours: number
-): "low" | "medium" | "high" => {
+export const categorizeEffort = (hours: number): "low" | "medium" | "high" => {
   if (hours <= 2) return "low";
   if (hours <= 8) return "medium";
   return "high";

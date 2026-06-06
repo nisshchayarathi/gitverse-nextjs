@@ -53,7 +53,10 @@ export async function fileToBuffer(file: File): Promise<Buffer> {
 /**
  * Generates a unique filename for avatar storage.
  */
-export function generateAvatarFilename(userId: number, originalName: string): string {
+export function generateAvatarFilename(
+  userId: number,
+  originalName: string,
+): string {
   const parts = originalName.split(".");
   const extension = parts.length > 1 ? parts[parts.length - 1] : "jpg";
   const timestamp = Date.now();

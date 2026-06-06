@@ -5,13 +5,13 @@ import { orgAuditLogService } from "../org-audit-log";
 jest.mock("../org-policy-engine", () => ({
   orgPolicyEngine: {
     getEffectivePolicy: jest.fn(),
-  }
+  },
 }));
 
 jest.mock("../org-audit-log", () => ({
   orgAuditLogService: {
     logEvent: jest.fn(),
-  }
+  },
 }));
 
 describe("PolicyEnforcementService", () => {
@@ -69,8 +69,8 @@ describe("PolicyEnforcementService", () => {
       expect(orgAuditLogService.logEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           action: "POLICY_VIOLATION_BLOCKED",
-          resource: "Pull Request Merge"
-        })
+          resource: "Pull Request Merge",
+        }),
       );
     });
   });

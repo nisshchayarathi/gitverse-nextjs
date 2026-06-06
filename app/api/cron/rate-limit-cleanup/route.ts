@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     console.error("[cron/rate-limit-cleanup] Cleanup failed:", error);
     return NextResponse.json(
       { error: "Cleanup failed", details: error?.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

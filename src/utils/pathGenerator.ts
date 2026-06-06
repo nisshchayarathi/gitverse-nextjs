@@ -25,7 +25,10 @@ const experienceIntensity: Record<ExperienceLevel, number> = {
 const getMatchScore = (path: string, focusArea: FocusArea) => {
   const normalized = path.toLowerCase();
   const keywords = focusAreaLabels[focusArea] || [];
-  return keywords.reduce((score, keyword) => score + (normalized.includes(keyword) ? 10 : 0), 0);
+  return keywords.reduce(
+    (score, keyword) => score + (normalized.includes(keyword) ? 10 : 0),
+    0,
+  );
 };
 
 export function recommendFilesForContribution(
@@ -59,7 +62,11 @@ export function generateContributionRoadmap(
         "Identify the feature area that matches your focus.",
         "Open the top recommended files to understand structure.",
       ],
-      goals: ["Map repository structure", "Locate core modules", "Understand contribution expectations"],
+      goals: [
+        "Map repository structure",
+        "Locate core modules",
+        "Understand contribution expectations",
+      ],
     },
     {
       day: "Day 2",
@@ -69,7 +76,11 @@ export function generateContributionRoadmap(
         "Read the suggested learning concepts and notes.",
         "Check the repository's issue board for beginner-friendly tasks.",
       ],
-      goals: ["Trace feature flow", "Identify a first contribution", "Build confidence"],
+      goals: [
+        "Trace feature flow",
+        "Identify a first contribution",
+        "Build confidence",
+      ],
     },
     {
       day: "Day 3",
@@ -79,7 +90,11 @@ export function generateContributionRoadmap(
         "Draft a small PR that follows repository conventions.",
         "Request feedback on your first contribution plan.",
       ],
-      goals: ["Submit first PR", "Validate contribution path", "Learn review expectations"],
+      goals: [
+        "Submit first PR",
+        "Validate contribution path",
+        "Learn review expectations",
+      ],
     },
   ];
 
@@ -92,20 +107,30 @@ export function generateContributionRoadmap(
         "Propose improvements to tests, documentation, or architecture.",
         "Build a contribution that spans frontend and backend.",
       ],
-      goals: ["Deliver broader impact", "Shape repo structure", "Drive quality improvements"],
+      goals: [
+        "Deliver broader impact",
+        "Shape repo structure",
+        "Drive quality improvements",
+      ],
     });
   }
 
   return rootPlans.map((plan) => ({
     ...plan,
-    tasks: plan.tasks.slice(0, Math.max(2, Math.ceil(plan.tasks.length * intensity))),
-    goals: plan.goals.slice(0, Math.max(2, Math.ceil(plan.goals.length * intensity))),
+    tasks: plan.tasks.slice(
+      0,
+      Math.max(2, Math.ceil(plan.tasks.length * intensity)),
+    ),
+    goals: plan.goals.slice(
+      0,
+      Math.max(2, Math.ceil(plan.goals.length * intensity)),
+    ),
   }));
 }
 
 export function findBeginnerIssues(
-  repository?: RepositoryAnalysisData,
   focusArea: FocusArea,
+  repository?: RepositoryAnalysisData,
 ): RecommendedIssue[] {
   const candidateIssues = repository?.issues || [];
 
@@ -122,13 +147,17 @@ export function findBeginnerIssues(
   }
 
   return candidateIssues
-    .filter((issue) =>
-      String(issue.title || "").toLowerCase().includes(focusArea.toLowerCase()) ||
-      (issue.labels || []).some((label) =>
-        label.name.toLowerCase().includes("good first issue") ||
-        label.name.toLowerCase().includes("beginner") ||
-        label.name.toLowerCase().includes(focusArea.toLowerCase()),
-      ),
+    .filter(
+      (issue) =>
+        String(issue.title || "")
+          .toLowerCase()
+          .includes(focusArea.toLowerCase()) ||
+        (issue.labels || []).some(
+          (label) =>
+            label.name.toLowerCase().includes("good first issue") ||
+            label.name.toLowerCase().includes("beginner") ||
+            label.name.toLowerCase().includes(focusArea.toLowerCase()),
+        ),
     )
     .map((issue) => ({
       id: issue.id?.toString() || "unknown",
@@ -148,22 +177,26 @@ export function buildMilestones(
     {
       title: "Repository onboarding complete",
       progress: 20,
-      description: "You understand the repository layout and contribution process.",
+      description:
+        "You understand the repository layout and contribution process.",
     },
     {
       title: "Concepts reviewed",
       progress: 45,
-      description: "You have studied the key learning concepts for your focus area.",
+      description:
+        "You have studied the key learning concepts for your focus area.",
     },
     {
       title: "First contribution planned",
       progress: 70,
-      description: "You identified a specific issue or improvement to start with.",
+      description:
+        "You identified a specific issue or improvement to start with.",
     },
     {
       title: "First PR submitted",
       progress: 100,
-      description: "You are ready to submit a first pull request with confidence.",
+      description:
+        "You are ready to submit a first pull request with confidence.",
     },
   ];
 
@@ -171,7 +204,8 @@ export function buildMilestones(
     baseMilestones.splice(3, 0, {
       title: "Architecture review completed",
       progress: 85,
-      description: "You reviewed a larger architectural area and identified improvements.",
+      description:
+        "You reviewed a larger architectural area and identified improvements.",
     });
   }
 

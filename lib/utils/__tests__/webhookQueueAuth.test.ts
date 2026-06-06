@@ -6,7 +6,10 @@
  */
 
 import crypto from "crypto";
-import { deriveBearerToken, isInternalWorkerAuthorized } from "@/lib/utils/internalAuth";
+import {
+  deriveBearerToken,
+  isInternalWorkerAuthorized,
+} from "@/lib/utils/internalAuth";
 
 describe("Webhook Queue Authorization", () => {
   const originalEnv = process.env;
@@ -45,7 +48,10 @@ describe("Webhook Queue Authorization", () => {
       const hash = token.replace("Bearer ", "");
 
       // Verify it's a valid SHA-256 hash
-      const expectedHash = crypto.createHash("sha256").update(secret).digest("hex");
+      const expectedHash = crypto
+        .createHash("sha256")
+        .update(secret)
+        .digest("hex");
       expect(hash).toBe(expectedHash);
     });
   });
@@ -129,7 +135,8 @@ describe("Webhook Queue Authorization", () => {
     it("prevents timing attacks", () => {
       process.env.INTERNAL_WORKER_SECRET = "timing-test-secret";
       const validToken = deriveBearerToken("timing-test-secret");
-      const invalidToken = deriveBearerToken("timing-test-secret").slice(0, -2) + "ff";
+      const invalidToken =
+        deriveBearerToken("timing-test-secret").slice(0, -2) + "ff";
 
       // Measure validation times
       const times: number[] = [];

@@ -8,7 +8,9 @@ export class OrgRepositoryDiscovery {
     this.githubService = new GitHubService(token);
   }
 
-  async discoverOrganizationRepositories(orgName: string): Promise<OrgRepository[]> {
+  async discoverOrganizationRepositories(
+    orgName: string,
+  ): Promise<OrgRepository[]> {
     try {
       const query = `org:${orgName} archived:false`;
       let allRepos: OrgRepository[] = [];
@@ -16,9 +18,12 @@ export class OrgRepositoryDiscovery {
       let hasMore = true;
 
       while (hasMore) {
-        const response = await this.githubService.searchRepositories(query, { per_page: 100, page });
-        
-        const mappedRepos = response.items.map(repo => ({
+        const response = await this.githubService.searchRepositories(query, {
+          per_page: 100,
+          page,
+        });
+
+        const mappedRepos = response.items.map((repo) => ({
           id: repo.id,
           name: repo.name,
           fullName: repo.full_name,
@@ -27,7 +32,7 @@ export class OrgRepositoryDiscovery {
           defaultBranch: repo.default_branch,
           description: repo.description || undefined,
           languages: repo.language ? [repo.language] : [],
-          updatedAt: repo.updated_at
+          updatedAt: repo.updated_at,
         }));
 
         allRepos = [...allRepos, ...mappedRepos];
@@ -41,7 +46,10 @@ export class OrgRepositoryDiscovery {
 
       return allRepos;
     } catch (error) {
-      console.error(`Error discovering repositories for org ${orgName}:`, error);
+      console.error(
+        `Error discovering repositories for org ${orgName}:`,
+        error,
+      );
       throw error;
     }
   }

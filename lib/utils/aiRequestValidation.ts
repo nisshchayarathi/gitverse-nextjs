@@ -14,14 +14,12 @@ export const AI_REQUEST_LIMITS = {
   MAX_MANIFEST_CONTENT_CHARS: 5000,
 } as const;
 
-export function validateContentType(
-  request: NextRequest
-): NextResponse | null {
+export function validateContentType(request: NextRequest): NextResponse | null {
   const contentType = request.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
     return NextResponse.json(
       { error: "Content-Type must be application/json" },
-      { status: 415 }
+      { status: 415 },
     );
   }
   return null;
@@ -29,12 +27,12 @@ export function validateContentType(
 
 export function validateRequestBodySize(
   body: string,
-  maxSizeBytes: number
+  maxSizeBytes: number,
 ): NextResponse | null {
   if (body.length > maxSizeBytes) {
     return NextResponse.json(
       { error: `Request body exceeds maximum size of ${maxSizeBytes} bytes` },
-      { status: 413 }
+      { status: 413 },
     );
   }
   return null;
@@ -43,14 +41,14 @@ export function validateRequestBodySize(
 export function validateArrayLength(
   array: any[],
   maxLength: number,
-  fieldName: string
+  fieldName: string,
 ): NextResponse | null {
   if (array.length > maxLength) {
     return NextResponse.json(
       {
         error: `${fieldName} exceeds maximum length of ${maxLength}. You provided ${array.length}.`,
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
   return null;
@@ -59,14 +57,14 @@ export function validateArrayLength(
 export function validateStringLength(
   value: string,
   maxLength: number,
-  fieldName: string
+  fieldName: string,
 ): NextResponse | null {
   if (value.length > maxLength) {
     return NextResponse.json(
       {
         error: `${fieldName} exceeds maximum length of ${maxLength} characters`,
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
   return null;

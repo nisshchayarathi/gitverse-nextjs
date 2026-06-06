@@ -64,8 +64,8 @@ export function ExportButton({
         status === "success"
           ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
           : status === "error"
-          ? "bg-destructive/10 text-destructive border border-destructive/20"
-          : "hover:bg-primary/10 text-muted-foreground hover:text-foreground border border-white/10"
+            ? "bg-destructive/10 text-destructive border border-destructive/20"
+            : "hover:bg-primary/10 text-muted-foreground hover:text-foreground border border-white/10"
       } ${className}`}
       title="Export to Markdown"
       type="button"

@@ -4,15 +4,18 @@ export class RepositorySyncQueue {
   /**
    * Queues a sync job, returning false if a duplicate is already pending.
    */
-  public static async enqueueSyncJob(repositoryId: number, eventType: string): Promise<boolean> {
+  public static async enqueueSyncJob(
+    repositoryId: number,
+    eventType: string,
+  ): Promise<boolean> {
     try {
       // Deduplication: Check if there's already a QUEUED job for this event type and repo
       const existingJob = await prisma.repositorySyncJob.findFirst({
         where: {
           repositoryId,
           eventType,
-          status: "QUEUED"
-        }
+          status: "QUEUED",
+        },
       });
 
       if (existingJob) {
@@ -23,8 +26,8 @@ export class RepositorySyncQueue {
         data: {
           repositoryId,
           eventType,
-          status: "QUEUED"
-        }
+          status: "QUEUED",
+        },
       });
 
       return true;
@@ -37,21 +40,21 @@ export class RepositorySyncQueue {
   public static async markProcessing(jobId: string): Promise<void> {
     await prisma.repositorySyncJob.update({
       where: { id: jobId },
-      data: { status: "PROCESSING", startedAt: new Date() }
+      data: { status: "PROCESSING", startedAt: new Date() },
     });
   }
 
   public static async markCompleted(jobId: string): Promise<void> {
     await prisma.repositorySyncJob.update({
       where: { id: jobId },
-      data: { status: "COMPLETED", completedAt: new Date() }
+      data: { status: "COMPLETED", completedAt: new Date() },
     });
   }
 
   public static async markFailed(jobId: string, error: string): Promise<void> {
     await prisma.repositorySyncJob.update({
       where: { id: jobId },
-      data: { status: "FAILED", completedAt: new Date(), errorMessage: error }
+      data: { status: "FAILED", completedAt: new Date(), errorMessage: error },
     });
   }
 }

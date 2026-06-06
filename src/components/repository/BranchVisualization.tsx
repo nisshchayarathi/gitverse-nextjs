@@ -98,7 +98,7 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
     const date = new Date(timestamp);
     const now = new Date();
     const diffInHours = Math.floor(
-      (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60),
     );
 
     if (diffInHours < 1) return "Just now";
@@ -122,7 +122,7 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
         const diffInDays = Math.floor(
           (new Date().getTime() -
             new Date(branch.lastCommit.timestamp).getTime()) /
-            (1000 * 60 * 60 * 24)
+            (1000 * 60 * 60 * 24),
         );
         return diffInDays > 30;
       case "merged":
@@ -220,7 +220,7 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
                     const days = Math.floor(
                       (new Date().getTime() -
                         new Date(b.lastCommit.timestamp).getTime()) /
-                        (1000 * 60 * 60 * 24)
+                        (1000 * 60 * 60 * 24),
                     );
                     return days > 30;
                   }).length
@@ -334,14 +334,17 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
                     message: rawCommit.message || "",
                     author: rawCommit.authorName || "Unknown",
                     authorName: rawCommit.authorName || "Unknown",
-                    timestamp: toSafeIso(rawCommit.committedAt ?? rawCommit.createdAt),
+                    timestamp: toSafeIso(
+                      rawCommit.committedAt ?? rawCommit.createdAt,
+                    ),
                     branch: rawCommit.branch || "main",
                     parents: rawCommit.parents || [],
                     isMerge: rawCommit.isMerge || false,
                   };
                   const branchColor = getBranchTypeColor(commit.branch);
 
-                  const commitKey = commit.hash || String(rawCommit.id ?? index);
+                  const commitKey =
+                    commit.hash || String(rawCommit.id ?? index);
                   return (
                     <div key={commitKey} className="relative">
                       {/* Connection lines */}

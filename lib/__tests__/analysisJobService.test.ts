@@ -43,7 +43,7 @@ beforeEach(() => {
 });
 
 describe("AnalysisJobService – heartbeat", () => {
-  let service: AnalysisJobService;
+  let service: InstanceType<typeof AnalysisJobService>;
 
   beforeEach(() => {
     service = new AnalysisJobService();
@@ -91,9 +91,7 @@ describe("AnalysisJobService – heartbeat", () => {
 
     const callArgs = asMock(mockPrisma.$executeRaw).mock.calls[0];
     const strings = callArgs[0];
-    const sql = strings
-      .filter((s: unknown) => typeof s === "string")
-      .join(" ");
+    const sql = strings.filter((s: unknown) => typeof s === "string").join(" ");
     // The WHERE clause must include both the status check and the worker
     // identity check, so a worker cannot heartbeat a job it does not own.
     expect(sql).toMatch(/WHERE/i);
@@ -103,14 +101,16 @@ describe("AnalysisJobService – heartbeat", () => {
 });
 
 describe("AnalysisJobService – reclaimOrphanedJobs empty edge cases", () => {
-  let service: AnalysisJobService;
+  let service: InstanceType<typeof AnalysisJobService>;
 
   beforeEach(() => {
     service = new AnalysisJobService();
   });
 
   it("handles null lockExpiresAt gracefully (no-op)", async () => {
-    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({ count: 0 });
+    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({
+      count: 0,
+    });
 
     const result = await service.reclaimOrphanedJobs();
     expect(result).toBe(0);
@@ -121,18 +121,24 @@ describe("AnalysisJobService – reclaimOrphanedJobs empty edge cases", () => {
       new Error("connection lost"),
     );
 
-    await expect(service.reclaimOrphanedJobs()).rejects.toThrow("connection lost");
+    await expect(service.reclaimOrphanedJobs()).rejects.toThrow(
+      "connection lost",
+    );
   });
 
   it("reclaims multiple orphaned jobs at once", async () => {
-    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({ count: 15 });
+    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({
+      count: 15,
+    });
 
     const result = await service.reclaimOrphanedJobs();
     expect(result).toBe(15);
   });
 
   it("does not reclaim jobs with null lockExpiresAt", async () => {
-    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({ count: 0 });
+    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({
+      count: 0,
+    });
 
     await service.reclaimOrphanedJobs();
 
@@ -143,7 +149,7 @@ describe("AnalysisJobService – reclaimOrphanedJobs empty edge cases", () => {
 });
 
 describe("AnalysisJobService – countOrphanedJobs edge cases", () => {
-  let service: AnalysisJobService;
+  let service: InstanceType<typeof AnalysisJobService>;
 
   beforeEach(() => {
     service = new AnalysisJobService();
@@ -164,7 +170,9 @@ describe("AnalysisJobService – countOrphanedJobs edge cases", () => {
       new Error("database unavailable"),
     );
 
-    await expect(service.countOrphanedJobs()).rejects.toThrow("database unavailable");
+    await expect(service.countOrphanedJobs()).rejects.toThrow(
+      "database unavailable",
+    );
   });
 
   it("returns 0 when filter matches no records", async () => {
@@ -176,7 +184,7 @@ describe("AnalysisJobService – countOrphanedJobs edge cases", () => {
 });
 
 describe("AnalysisJobService – getAnalysisStats edge cases", () => {
-  let service: AnalysisJobService;
+  let service: InstanceType<typeof AnalysisJobService>;
 
   beforeEach(() => {
     service = new AnalysisJobService();
@@ -220,7 +228,7 @@ describe("AnalysisJobService – getAnalysisStats edge cases", () => {
 });
 
 describe("AnalysisJobService – releaseLock", () => {
-  let service: AnalysisJobService;
+  let service: InstanceType<typeof AnalysisJobService>;
 
   beforeEach(() => {
     service = new AnalysisJobService();
@@ -252,12 +260,14 @@ describe("AnalysisJobService – releaseLock", () => {
       new Error("connection refused"),
     );
 
-    await expect(service.releaseLock({ jobId: "job-1" })).rejects.toThrow("connection refused");
+    await expect(service.releaseLock({ jobId: "job-1" })).rejects.toThrow(
+      "connection refused",
+    );
   });
 });
 
 describe("AnalysisJobService – markDrainReleased", () => {
-  let service: AnalysisJobService;
+  let service: InstanceType<typeof AnalysisJobService>;
 
   beforeEach(() => {
     service = new AnalysisJobService();
@@ -319,14 +329,16 @@ describe("AnalysisJobService – markDrainReleased", () => {
 });
 
 describe("AnalysisJobService – cleanupStaleJobs edge cases", () => {
-  let service: AnalysisJobService;
+  let service: InstanceType<typeof AnalysisJobService>;
 
   beforeEach(() => {
     service = new AnalysisJobService();
   });
 
   it("does not fail when no matching records exist", async () => {
-    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({ count: 0 });
+    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({
+      count: 0,
+    });
 
     const result = await service.cleanupStaleJobs();
     expect(result).toBe(0);
@@ -341,14 +353,18 @@ describe("AnalysisJobService – cleanupStaleJobs edge cases", () => {
   });
 
   it("zero grace period marks all expired-lock jobs as failed", async () => {
-    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({ count: 5 });
+    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({
+      count: 5,
+    });
 
     const result = await service.cleanupStaleJobs(0);
     expect(result).toBe(5);
   });
 
   it("marks jobs as failed with error message", async () => {
-    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({ count: 1 });
+    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({
+      count: 1,
+    });
 
     await service.cleanupStaleJobs();
 
@@ -365,13 +381,17 @@ describe("AnalysisJobService – exports", () => {
   });
 
   it("exports the AnalysisJobService class", () => {
-    const { AnalysisJobService: Cls } = require("../services/analysisJobService");
+    const {
+      AnalysisJobService: Cls,
+    } = require("../services/analysisJobService");
     expect(Cls).toBe(AnalysisJobService);
   });
 
   it("singleton has all expected methods", () => {
     const { analysisJobService } = require("../services/analysisJobService");
-    expect(typeof analysisJobService.createRepositoryAnalysisJob).toBe("function");
+    expect(typeof analysisJobService.createRepositoryAnalysisJob).toBe(
+      "function",
+    );
     expect(typeof analysisJobService.getJob).toBe("function");
     expect(typeof analysisJobService.updateProgress).toBe("function");
     expect(typeof analysisJobService.markDone).toBe("function");
@@ -387,8 +407,15 @@ describe("AnalysisJobService – exports", () => {
   });
 
   it("singleton methods are bound to the instance", () => {
-    const { analysisJobService: svc } = require("../services/analysisJobService");
-    const { reclaimOrphanedJobs, countOrphanedJobs, getAnalysisStats, cleanupStaleJobs } = svc;
+    const {
+      analysisJobService: svc,
+    } = require("../services/analysisJobService");
+    const {
+      reclaimOrphanedJobs,
+      countOrphanedJobs,
+      getAnalysisStats,
+      cleanupStaleJobs,
+    } = svc;
     expect(typeof reclaimOrphanedJobs).toBe("function");
     expect(typeof countOrphanedJobs).toBe("function");
     expect(typeof getAnalysisStats).toBe("function");
@@ -397,7 +424,7 @@ describe("AnalysisJobService – exports", () => {
 });
 
 describe("AnalysisJobService", () => {
-  let service: AnalysisJobService;
+  let service: InstanceType<typeof AnalysisJobService>;
 
   beforeEach(() => {
     service = new AnalysisJobService();

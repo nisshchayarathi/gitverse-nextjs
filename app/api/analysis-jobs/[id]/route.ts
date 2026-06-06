@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireAuth, isHttpError , sanitizeError } from "@/lib/middleware";
+import { requireAuth, isHttpError, sanitizeError } from "@/lib/middleware";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 
 import { shouldThrottleJobKick } from "@/lib/utils/analysisRunner";
 
-
 async function kickLocalRunner(request: NextRequest, jobId: string) {
   if (process.env.NODE_ENV === "production") return;
 
- if (await shouldThrottleJobKick(jobId)) return;  
+  if (await shouldThrottleJobKick(jobId)) return;
   const origin = new URL(request.url).origin;
   const secret = process.env.ANALYSIS_RUNNER_SECRET;
 
@@ -19,10 +18,9 @@ async function kickLocalRunner(request: NextRequest, jobId: string) {
   }).catch(() => {});
 }
 
-
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const user = await requireAuth(request);
@@ -66,13 +64,13 @@ export async function GET(
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to get analysis job" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

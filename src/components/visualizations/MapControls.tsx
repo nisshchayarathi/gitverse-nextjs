@@ -1,5 +1,12 @@
 import React from "react";
-import { Plus, Minus, Maximize2, Download, Image as ImageIcon, Loader2 } from "lucide-react";
+import {
+  Plus,
+  Minus,
+  Maximize2,
+  Download,
+  Image as ImageIcon,
+  Loader2,
+} from "lucide-react";
 
 interface MapControlsProps {
   onZoomIn: () => void;
@@ -10,10 +17,17 @@ interface MapControlsProps {
   isExporting?: boolean;
 }
 
-export function MapControls({ onZoomIn, onZoomOut, onReset, onExportPng, onExportSvg, isExporting }: MapControlsProps) {
+export function MapControls({
+  onZoomIn,
+  onZoomOut,
+  onReset,
+  onExportPng,
+  onExportSvg,
+  isExporting,
+}: MapControlsProps) {
   return (
     <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-20">
-      <div 
+      <div
         className="flex flex-col rounded-xl border border-white/10 bg-slate-900/80 dark:bg-slate-950/80 backdrop-blur-xl shadow-2xl p-1.5 gap-1.5 transition-all duration-300 hover:border-white/20"
         role="group"
         aria-label="Graph Zoom and Export Controls"
@@ -27,7 +41,7 @@ export function MapControls({ onZoomIn, onZoomOut, onReset, onExportPng, onExpor
         >
           <Plus className="h-4 w-4" />
         </button>
-        
+
         <button
           onClick={onZoomOut}
           disabled={isExporting}
@@ -60,7 +74,11 @@ export function MapControls({ onZoomIn, onZoomOut, onReset, onExportPng, onExpor
               aria-label="Export PNG"
               title="Export as PNG"
             >
-              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+              {isExporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ImageIcon className="h-4 w-4" />
+              )}
             </button>
             <button
               onClick={onExportSvg}
@@ -69,7 +87,11 @@ export function MapControls({ onZoomIn, onZoomOut, onReset, onExportPng, onExpor
               aria-label="Export SVG"
               title="Export as SVG"
             >
-              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {isExporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
             </button>
           </>
         )}

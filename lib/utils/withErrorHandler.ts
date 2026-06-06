@@ -15,7 +15,7 @@ export function withErrorHandler(handler: Function) {
             message: error.message,
             code: error.statusCode,
           },
-          { status: error.statusCode }
+          { status: error.statusCode },
         );
       }
 
@@ -25,7 +25,7 @@ export function withErrorHandler(handler: Function) {
           message: "Something went wrong",
           code: 500,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
   };

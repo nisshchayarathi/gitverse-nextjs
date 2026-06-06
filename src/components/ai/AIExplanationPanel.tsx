@@ -109,14 +109,18 @@ export const AIExplanationPanel: React.FC<AIExplanationPanelProps> = ({
   const formatResult = (content: string) => {
     return content.split("\n").map((line, i) => {
       if (line.startsWith("```")) {
-        return <div key={i} className="text-xs text-primary my-2">───────</div>;
+        return (
+          <div key={i} className="text-xs text-primary my-2">
+            ───────
+          </div>
+        );
       }
       if (line.includes("**")) {
         const parts = line.split("**");
         return (
           <p key={i} className="mb-2">
             {parts.map((part, j) =>
-              j % 2 === 0 ? part : <strong key={j}>{part}</strong>
+              j % 2 === 0 ? part : <strong key={j}>{part}</strong>,
             )}
           </p>
         );
@@ -124,7 +128,10 @@ export const AIExplanationPanel: React.FC<AIExplanationPanelProps> = ({
       if (/^\d+\./.test(line.trim())) {
         return (
           <li key={i} className="ml-4 mb-1 list-decimal">
-            {line.trim().substring(line.indexOf(".") + 1).trim()}
+            {line
+              .trim()
+              .substring(line.indexOf(".") + 1)
+              .trim()}
           </li>
         );
       }
@@ -143,15 +150,24 @@ export const AIExplanationPanel: React.FC<AIExplanationPanelProps> = ({
               j % 2 === 0 ? (
                 part
               ) : (
-                <code key={j} className="bg-primary/10 px-1 py-0.5 rounded text-sm font-mono">
+                <code
+                  key={j}
+                  className="bg-primary/10 px-1 py-0.5 rounded text-sm font-mono"
+                >
                   {part}
                 </code>
-              )
+              ),
             )}
           </p>
         );
       }
-      return line.trim() ? <p key={i} className="mb-2">{line}</p> : <br key={i} />;
+      return line.trim() ? (
+        <p key={i} className="mb-2">
+          {line}
+        </p>
+      ) : (
+        <br key={i} />
+      );
     });
   };
 
@@ -217,19 +233,26 @@ export const AIExplanationPanel: React.FC<AIExplanationPanelProps> = ({
         {isAnalyzing ? (
           <div className="h-full flex flex-col items-center justify-center space-y-4 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm animate-pulse">Analyzing code with Gemini...</p>
+            <p className="text-sm animate-pulse">
+              Analyzing code with Gemini...
+            </p>
           </div>
         ) : result ? (
           <div className="space-y-4 animate-fade-in-up">
             <div className="flex justify-between items-center">
               <h4 className="text-sm font-semibold text-primary uppercase tracking-wider">
-                {actionButtons.find(b => b.type === analysisType)?.label} Result
+                {actionButtons.find((b) => b.type === analysisType)?.label}{" "}
+                Result
               </h4>
               <button
                 onClick={handleCopy}
                 className="flex items-center gap-1 text-xs px-2 py-1 bg-white/5 hover:bg-white/10 rounded transition-colors text-muted-foreground hover:text-foreground"
               >
-                {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                {copied ? (
+                  <Check className="h-3 w-3 text-green-500" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
                 {copied ? "Copied" : "Copy"}
               </button>
             </div>

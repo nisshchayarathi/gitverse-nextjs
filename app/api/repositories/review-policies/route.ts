@@ -18,11 +18,15 @@ export async function GET(request: NextRequest) {
     if (!repositoryId) {
       return NextResponse.json(
         { error: "repositoryId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const permission = await enforceRepositoryPermission(request, Number(repositoryId), 'read');
+    const permission = await enforceRepositoryPermission(
+      request,
+      Number(repositoryId),
+      "read",
+    );
     if (!permission.allowed && permission.errorResponse) {
       return permission.errorResponse;
     }
@@ -35,13 +39,13 @@ export async function GET(request: NextRequest) {
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to query review policies" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -54,14 +58,14 @@ export async function POST(request: NextRequest) {
     if (!repositoryId || !name || !rules) {
       return NextResponse.json(
         { error: "repositoryId, name, and rules are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Array.isArray(rules) || rules.length === 0) {
       return NextResponse.json(
         { error: "rules must be a non-empty array" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -70,18 +74,22 @@ export async function POST(request: NextRequest) {
       if (!rule.rule || !rule.severity) {
         return NextResponse.json(
           { error: "Each rule must have 'rule' and 'severity' fields" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       if (!["critical", "high", "medium", "low"].includes(rule.severity)) {
         return NextResponse.json(
           { error: "severity must be one of: critical, high, medium, low" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
 
-    const permission = await enforceRepositoryPermission(request, Number(repositoryId), 'write');
+    const permission = await enforceRepositoryPermission(
+      request,
+      Number(repositoryId),
+      "write",
+    );
     if (!permission.allowed && permission.errorResponse) {
       return permission.errorResponse;
     }
@@ -100,13 +108,13 @@ export async function POST(request: NextRequest) {
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to create review policy" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -119,7 +127,7 @@ export async function PUT(request: NextRequest) {
     if (!policyId || !repositoryId) {
       return NextResponse.json(
         { error: "policyId and repositoryId are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -128,7 +136,7 @@ export async function PUT(request: NextRequest) {
       if (!Array.isArray(rules) || rules.length === 0) {
         return NextResponse.json(
           { error: "rules must be a non-empty array" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -136,19 +144,23 @@ export async function PUT(request: NextRequest) {
         if (!rule.rule || !rule.severity) {
           return NextResponse.json(
             { error: "Each rule must have 'rule' and 'severity' fields" },
-            { status: 400 }
+            { status: 400 },
           );
         }
         if (!["critical", "high", "medium", "low"].includes(rule.severity)) {
           return NextResponse.json(
             { error: "severity must be one of: critical, high, medium, low" },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
     }
 
-    const permission = await enforceRepositoryPermission(request, Number(repositoryId), 'write');
+    const permission = await enforceRepositoryPermission(
+      request,
+      Number(repositoryId),
+      "write",
+    );
     if (!permission.allowed && permission.errorResponse) {
       return permission.errorResponse;
     }
@@ -163,10 +175,7 @@ export async function PUT(request: NextRequest) {
     });
 
     if (!policy) {
-      return NextResponse.json(
-        { error: "Policy not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Policy not found" }, { status: 404 });
     }
 
     return NextResponse.json({ policy }, { status: 200 });
@@ -176,13 +185,13 @@ export async function PUT(request: NextRequest) {
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to update review policy" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -196,11 +205,15 @@ export async function DELETE(request: NextRequest) {
     if (!policyId || !repositoryId) {
       return NextResponse.json(
         { error: "policyId and repositoryId are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const permission = await enforceRepositoryPermission(request, Number(repositoryId), 'write');
+    const permission = await enforceRepositoryPermission(
+      request,
+      Number(repositoryId),
+      "write",
+    );
     if (!permission.allowed && permission.errorResponse) {
       return permission.errorResponse;
     }
@@ -211,10 +224,7 @@ export async function DELETE(request: NextRequest) {
     });
 
     if (!deleted) {
-      return NextResponse.json(
-        { error: "Policy not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Policy not found" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true }, { status: 200 });
@@ -224,13 +234,13 @@ export async function DELETE(request: NextRequest) {
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to delete review policy" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

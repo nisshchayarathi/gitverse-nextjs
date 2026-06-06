@@ -1,9 +1,17 @@
-
 "use client";
 
 import { Input } from "@/components/ui/Input";
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Sparkles, User, Bot, Copy, Check, Square } from "lucide-react";
+import {
+  Send,
+  Loader2,
+  Sparkles,
+  User,
+  Bot,
+  Copy,
+  Check,
+  Square,
+} from "lucide-react";
 import { Card } from "@/components/ui";
 import { geminiService, ChatMessage } from "@/services/gemini";
 import { useToast } from "@/hooks/use-toast";
@@ -148,7 +156,6 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
     setIsLoading(false);
   };
 
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -205,7 +212,12 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
     let fullResponse = "";
     try {
       // Pass the current messages array as history (excluding the current prompt which is appended by chatRaw)
-      const stream = geminiService.chatStream(currentInput, repositoryContext, messages, controller.signal);
+      const stream = geminiService.chatStream(
+        currentInput,
+        repositoryContext,
+        messages,
+        controller.signal,
+      );
 
       for await (const chunk of stream) {
         fullResponse += chunk;
@@ -239,7 +251,9 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
         toast({
           title: "Error",
           description:
-            error instanceof Error ? error.message : "Failed to get AI response",
+            error instanceof Error
+              ? error.message
+              : "Failed to get AI response",
           variant: "destructive",
         });
       }
@@ -357,7 +371,9 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
                     setInput(question);
                     // Slight delay to allow state update before submission
                     setTimeout(() => {
-                      const form = document.getElementById("ai-chat-form") as HTMLFormElement;
+                      const form = document.getElementById(
+                        "ai-chat-form",
+                      ) as HTMLFormElement;
                       if (form) form.requestSubmit();
                     }, 50);
                   }}

@@ -1,7 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, EmptyState } from "@/components/ui";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  EmptyState,
+} from "@/components/ui";
 import { InsightCard } from "./InsightCard";
 import { RepositorySummaryCard } from "./RepositorySummaryCard";
 import { deriveRepositoryInsights } from "../../lib/repositoryInsights";
@@ -18,7 +25,15 @@ export function RepositoryInsightsDashboard({
 }: RepositoryInsightsDashboardProps) {
   const { insights, summary } = useMemo(() => {
     if (!repositoryData) {
-      return { insights: [], summary: { totalModules: 0, totalConnections: 0, totalHotspots: 0, overallComplexity: "Low" as const } };
+      return {
+        insights: [],
+        summary: {
+          totalModules: 0,
+          totalConnections: 0,
+          totalHotspots: 0,
+          overallComplexity: "Low" as const,
+        },
+      };
     }
     return deriveRepositoryInsights(repositoryData);
   }, [repositoryData]);
@@ -50,9 +65,12 @@ export function RepositoryInsightsDashboard({
       {/* Main title */}
       <Card className="glass border border-border/70">
         <CardHeader>
-          <CardTitle className="text-lg">📊 Repository Insights Dashboard</CardTitle>
+          <CardTitle className="text-lg">
+            📊 Repository Insights Dashboard
+          </CardTitle>
           <CardDescription>
-            Key metrics and insights about your repository structure and activity
+            Key metrics and insights about your repository structure and
+            activity
           </CardDescription>
         </CardHeader>
       </Card>
@@ -76,10 +94,13 @@ export function RepositoryInsightsDashboard({
 
       {/* Learning Tip */}
       <div className="rounded-lg border border-amber-300/40 bg-amber-500/5 p-4 space-y-2">
-        <p className="text-sm font-semibold text-amber-900">💡 Contributing Tip</p>
+        <p className="text-sm font-semibold text-amber-900">
+          💡 Contributing Tip
+        </p>
         <p className="text-xs text-amber-800">
-          Focus on understanding the most active modules first. These are often the
-          most critical parts of the codebase where most development happens.
+          Focus on understanding the most active modules first. These are often
+          the most critical parts of the codebase where most development
+          happens.
         </p>
       </div>
     </div>

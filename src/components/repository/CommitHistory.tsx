@@ -69,43 +69,49 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
   const defaultBranch =
     repository?.branches?.find((b: any) => b.isDefault)?.name || "main";
 
-  const normalizeBranchName = useCallback((value: unknown): string => {
-    const str = typeof value === "string" ? value.trim() : "";
-    if (!str) return defaultBranch;
-    if (str === "--all") return defaultBranch;
-    if (/^\d+$/.test(str)) return defaultBranch;
-    return str;
-  }, [defaultBranch]);
+  const normalizeBranchName = useCallback(
+    (value: unknown): string => {
+      const str = typeof value === "string" ? value.trim() : "";
+      if (!str) return defaultBranch;
+      if (str === "--all") return defaultBranch;
+      if (/^\d+$/.test(str)) return defaultBranch;
+      return str;
+    },
+    [defaultBranch],
+  );
 
   // Use real commits from repository or empty array
-  const commits: Commit[] = useMemo(() => 
-    repository?.commits?.map((commit: any) => ({
-      hash: commit.hash,
-      shortHash: commit.shortHash,
-      author: {
-        name: commit.authorName,
-        email: commit.authorEmail,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${commit.authorName}`,
-      },
-      message: commit.message,
-      description: commit.description,
-      timestamp: commit.committedAt,
-      branch: normalizeBranchName(commit.branch),
-      refs: Array.isArray(commit.refs) ? commit.refs : [],
-      filesChanged: commit.filesChanged || 0,
-      additions: commit.additions || 0,
-      deletions: commit.deletions || 0,
-      fileChanges:
-        commit.fileChanges?.map((fc: any) => ({
-          path: fc.path,
-          additions: fc.additions,
-          deletions: fc.deletions,
-          type: fc.changeType,
-        })) || [],
-      parents: commit.parents || [],
-      isMerge: commit.parents?.length > 1,
-      tags: commit.tags || [],
-    })) || [], [repository?.commits, normalizeBranchName]);
+  const commits: Commit[] = useMemo(
+    () =>
+      repository?.commits?.map((commit: any) => ({
+        hash: commit.hash,
+        shortHash: commit.shortHash,
+        author: {
+          name: commit.authorName,
+          email: commit.authorEmail,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${commit.authorName}`,
+        },
+        message: commit.message,
+        description: commit.description,
+        timestamp: commit.committedAt,
+        branch: normalizeBranchName(commit.branch),
+        refs: Array.isArray(commit.refs) ? commit.refs : [],
+        filesChanged: commit.filesChanged || 0,
+        additions: commit.additions || 0,
+        deletions: commit.deletions || 0,
+        fileChanges:
+          commit.fileChanges?.map((fc: any) => ({
+            path: fc.path,
+            additions: fc.additions,
+            deletions: fc.deletions,
+            type: fc.changeType,
+          })) || [],
+        parents: commit.parents || [],
+        isMerge: commit.parents?.length > 1,
+        tags: commit.tags || [],
+      })) || [],
+    [repository?.commits, normalizeBranchName],
+  );
 
   const refToBadgeText = (ref: string) => {
     const trimmed = ref.trim();
@@ -192,7 +198,7 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
       let laneEndsHere = primaryParent == null;
       if (!laneEndsHere && primaryParent) {
         const otherLane = lanesAfter.findIndex(
-          (h, idx) => idx !== laneIndex && h === primaryParent
+          (h, idx) => idx !== laneIndex && h === primaryParent,
         );
         if (otherLane !== -1) {
           routes.push({
@@ -277,7 +283,7 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
     const date = new Date(timestamp);
     const now = new Date();
     const diffInHours = Math.floor(
-      (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60),
     );
 
     if (diffInHours < 1) return "Just now";
@@ -338,7 +344,7 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
             // Calculate max column for SVG width
             const maxColumn = Math.max(
               column,
-              ...routes.map((r) => Math.max(r.fromColumn, r.toColumn))
+              ...routes.map((r) => Math.max(r.fromColumn, r.toColumn)),
             );
             const svgWidth = (maxColumn + 2) * 16 + 20;
 

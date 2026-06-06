@@ -12,7 +12,11 @@ import {
 import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
 import { getClientIp } from "@/lib/services/rateLimitService";
 import { sanitizeTextContent } from "@/lib/utils/promptSanitization";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 const EXPLAIN_FILE_RATE_LIMIT = 15;
 const EXPLAIN_FILE_WINDOW_MS = 60_000;
@@ -23,20 +27,29 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    const globalRl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.AI_GLOBAL,
+    );
     if (!globalRl.allowed) return rateLimitResponse(globalRl);
 
     const contentTypeError = validateContentType(request);
     if (contentTypeError) return contentTypeError;
 
     const allowed = await checkAiRateLimit(
-      String(user.userId), "userId", "explain-file",
-      EXPLAIN_FILE_RATE_LIMIT, EXPLAIN_FILE_WINDOW_MS
+      String(user.userId),
+      "userId",
+      "explain-file",
+      EXPLAIN_FILE_RATE_LIMIT,
+      EXPLAIN_FILE_WINDOW_MS,
     );
     if (!allowed) {
       return NextResponse.json(
-        { error: "Too many requests. Please wait before explaining another file." },
-        { status: 429 }
+        {
+          error:
+            "Too many requests. Please wait before explaining another file.",
+        },
+        { status: 429 },
       );
     }
 
@@ -46,7 +59,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json(
         { error: "Invalid or empty request body" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -55,21 +68,23 @@ export async function POST(request: NextRequest) {
     if (!filePath || typeof filePath !== "string") {
       return NextResponse.json(
         { error: "File path is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (filePath.length > MAX_FILE_PATH_LENGTH) {
       return NextResponse.json(
-        { error: `File path exceeds maximum length of ${MAX_FILE_PATH_LENGTH} characters` },
-        { status: 400 }
+        {
+          error: `File path exceeds maximum length of ${MAX_FILE_PATH_LENGTH} characters`,
+        },
+        { status: 400 },
       );
     }
 
     if (filePath.includes("..") || filePath.includes("~")) {
       return NextResponse.json(
         { error: "Invalid file path: path traversal is not allowed" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -79,13 +94,13 @@ export async function POST(request: NextRequest) {
       if (isNaN(repoId)) {
         return NextResponse.json(
           { error: "Invalid repository ID" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       const repo = await prisma.repository.findFirst({
         where: { id: repoId, userId: user.userId },
-        select: { url: true }
+        select: { url: true },
       });
       url = repo?.url;
     }
@@ -93,7 +108,7 @@ export async function POST(request: NextRequest) {
     if (!url) {
       return NextResponse.json(
         { error: "Repository URL or ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -101,7 +116,7 @@ export async function POST(request: NextRequest) {
     if (!ownerRepo) {
       return NextResponse.json(
         { error: "Invalid GitHub repository URL" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const { owner, repo } = ownerRepo;
@@ -121,13 +136,15 @@ export async function POST(request: NextRequest) {
 
       const response = await axios.get(
         `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`,
-        { headers }
+        { headers },
       );
 
       if (response.data && response.data.content) {
         const encoding = response.data.encoding;
         if (encoding === "base64") {
-          fileContent = Buffer.from(response.data.content, "base64").toString("utf-8");
+          fileContent = Buffer.from(response.data.content, "base64").toString(
+            "utf-8",
+          );
         } else {
           fileContent = response.data.content;
         }
@@ -135,7 +152,10 @@ export async function POST(request: NextRequest) {
         throw new Error("No content field found in GitHub API response");
       }
     } catch (apiError: any) {
-      console.warn("GitHub API file fetch failed, attempting raw fallback:", apiError.message);
+      console.warn(
+        "GitHub API file fetch failed, attempting raw fallback:",
+        apiError.message,
+      );
 
       let rawResponse;
       const headers: Record<string, string> = {};
@@ -146,18 +166,20 @@ export async function POST(request: NextRequest) {
       try {
         rawResponse = await axios.get(
           `https://raw.githubusercontent.com/${owner}/${repo}/main/${filePath}`,
-          { headers, responseType: "text" }
+          { headers, responseType: "text" },
         );
       } catch (rawMainError) {
         try {
           rawResponse = await axios.get(
             `https://raw.githubusercontent.com/${owner}/${repo}/master/${filePath}`,
-            { headers, responseType: "text" }
+            { headers, responseType: "text" },
           );
         } catch (rawMasterError: any) {
           return NextResponse.json(
-            { error: `Failed to fetch file content from GitHub: ${rawMasterError.message}` },
-            { status: 404 }
+            {
+              error: `Failed to fetch file content from GitHub: ${rawMasterError.message}`,
+            },
+            { status: 404 },
           );
         }
       }
@@ -168,7 +190,7 @@ export async function POST(request: NextRequest) {
     if (!fileContent && fileContent !== "") {
       return NextResponse.json(
         { error: "Fetched file content is empty or undefined" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -177,7 +199,7 @@ export async function POST(request: NextRequest) {
         {
           error: `File is too large for AI explanation (${fileContent.length} characters). Maximum is ${MAX_FILE_CONTENT_LENGTH} characters.`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -186,8 +208,10 @@ export async function POST(request: NextRequest) {
     const maxTokens = 30000;
     if (approxTokens > maxTokens) {
       return NextResponse.json(
-        { error: `File is too large for AI explanation (${approxTokens} tokens). Please choose a file smaller than ${maxTokens} tokens.` },
-        { status: 400 }
+        {
+          error: `File is too large for AI explanation (${approxTokens} tokens). Please choose a file smaller than ${maxTokens} tokens.`,
+        },
+        { status: 400 },
       );
     }
 
@@ -221,7 +245,10 @@ ${safeContent}
 
     return NextResponse.json({
       explanation,
-      file: { path: filePath, language: filePath.split(".").pop() || "unknown" },
+      file: {
+        path: filePath,
+        language: filePath.split(".").pop() || "unknown",
+      },
     });
   } catch (error: any) {
     console.error("File explanation error:", sanitizeError(error));
@@ -229,12 +256,12 @@ ${safeContent}
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
     return NextResponse.json(
       { error: error.message || "Failed to explain file" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

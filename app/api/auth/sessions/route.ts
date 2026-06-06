@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser , sanitizeError } from "@/lib/middleware";
+import { getAuthUser, sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
 import { SAFE_SESSION_SELECT } from "@/lib/utils/sessionResponse";
@@ -23,14 +23,17 @@ export async function DELETE(request: NextRequest) {
       message: "All sessions terminated successfully",
     });
 
-    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    response.headers.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, private",
+    );
 
     return response;
   } catch (error: any) {
     console.error("Delete sessions error:", sanitizeError(error));
     return NextResponse.json(
       { error: "Failed to terminate sessions" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -72,19 +75,22 @@ export async function GET(request: NextRequest) {
       nextCursor = sessions[sessions.length - 1]?.id;
     }
 
-    return NextResponse.json({
-      items: toJsonSafe(sessions),
-      nextCursor,
-    }, {
-      headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+    return NextResponse.json(
+      {
+        items: toJsonSafe(sessions),
+        nextCursor,
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        },
+      },
+    );
   } catch (error: any) {
     console.error("Fetch sessions error:", sanitizeError(error));
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

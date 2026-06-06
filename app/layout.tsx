@@ -11,7 +11,6 @@ import { FocusRingManager } from "@/components/ui/FocusRingManager";
 import ProgressBarProvider from "@/components/providers/ProgressBarProvider";
 import "./globals.css";
 
-
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -32,8 +31,17 @@ export const metadata: Metadata = {
     default: "GitVerse - AI-Powered Repository Analysis & PR Mentoring",
     template: "%s | GitVerse",
   },
-  description: "Accelerate your open-source journey with interactive repository visualization, structural dependency graphs, and automated AI PR mentoring.",
-  keywords: ["GitHub", "Next.js", "AI Code Analysis", "Open Source", "PR Mentor", "Repository Visualization", "GitVerse"],
+  description:
+    "Accelerate your open-source journey with interactive repository visualization, structural dependency graphs, and automated AI PR mentoring.",
+  keywords: [
+    "GitHub",
+    "Next.js",
+    "AI Code Analysis",
+    "Open Source",
+    "PR Mentor",
+    "Repository Visualization",
+    "GitVerse",
+  ],
   authors: [{ name: "GitVerse Team" }],
   creator: "GitVerse",
   openGraph: {
@@ -41,7 +49,8 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: appUrl,
     title: "GitVerse - AI-Powered Repository Analysis",
-    description: "Accelerate your open-source journey with interactive repository visualization, structural dependency graphs, and automated AI PR mentoring.",
+    description:
+      "Accelerate your open-source journey with interactive repository visualization, structural dependency graphs, and automated AI PR mentoring.",
     siteName: "GitVerse",
     images: [
       {
@@ -55,7 +64,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "GitVerse - AI-Powered Repository Analysis",
-    description: "Accelerate your open-source journey with interactive repository visualization, structural dependency graphs, and automated AI PR mentoring.",
+    description:
+      "Accelerate your open-source journey with interactive repository visualization, structural dependency graphs, and automated AI PR mentoring.",
     images: ["/api/og?title=GitVerse%20-%20AI%20Repository%20Analysis"],
     creator: "@gitverse",
   },
@@ -88,14 +98,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <AuthProvider>
               <FocusRingManager />
               <ProgressBarProvider>
-                <main id="main-content">
-                  {children}
-                </main>
+                <main id="main-content">{children}</main>
               </ProgressBarProvider>
 
-                <Toaster />
-                <ScrollToTop />
-              </AuthProvider>
+              <Toaster />
+              <ScrollToTop />
+            </AuthProvider>
           </NextAuthProvider>
         </ThemeProvider>
       </body>

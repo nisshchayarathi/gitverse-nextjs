@@ -8,8 +8,8 @@ jest.mock("../../prisma", () => ({
     webhookEvent: {
       count: jest.fn(),
       findMany: jest.fn(),
-    }
-  }
+    },
+  },
 }));
 
 jest.mock("@/services/security/safe-http-client", () => ({
@@ -56,7 +56,7 @@ describe("WebhookQueueService", () => {
 
     (prisma.webhookEvent.findMany as jest.Mock).mockResolvedValueOnce([
       { id: "job-1" },
-      { id: "job-2" }
+      { id: "job-2" },
     ]);
 
     process.env.INTERNAL_WORKER_SECRET = "test-secret";

@@ -189,7 +189,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 className="hidden sm:flex relative h-9 w-full justify-start rounded-[0.5rem] bg-background/50 text-sm text-muted-foreground sm:pr-12 md:w-56 lg:w-64 border-border/50 hover:bg-accent/50"
                 onClick={() => setCommandPaletteOpen(true)}
               >
-                <span className="hidden lg:inline-flex">Search or jump to...</span>
+                <span className="hidden lg:inline-flex">
+                  Search or jump to...
+                </span>
                 <span className="inline-flex lg:hidden">Search...</span>
                 <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex text-foreground">
                   <span className="text-xs">⌘</span>K / Ctrl K
@@ -203,50 +205,50 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               {/* User Profile Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="gap-2">
-                  <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center">
-                    {user?.avatar ? (
-                      <Image
-                        src={user.avatar}
-                        alt={user.name}
-                        width={32}
-                        height={32}
-                        className="rounded-full h-full w-full object-cover"
-                      />
-                    ) : (
-                      <User className="h-4 w-4 text-primary-foreground" />
-                    )}
-                  </div>
-                  <div className="hidden md:block text-left">
-                    <div className="text-sm font-medium">{user?.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {user?.email}
+                  <Button variant="ghost" className="gap-2">
+                    <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center">
+                      {user?.avatar ? (
+                        <Image
+                          src={user.avatar}
+                          alt={user.name}
+                          width={32}
+                          height={32}
+                          className="rounded-full h-full w-full object-cover"
+                        />
+                      ) : (
+                        <User className="h-4 w-4 text-primary-foreground" />
+                      )}
                     </div>
-                  </div>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 glass">
-                <DropdownMenuLabel>
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">{user?.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {user?.email}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/settings")}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="text-destructive"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Log out
-                </DropdownMenuItem>
+                    <div className="hidden md:block text-left">
+                      <div className="text-sm font-medium">{user?.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {user?.email}
+                      </div>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 glass">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">{user?.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {user?.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push("/settings")}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="text-destructive"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -256,9 +258,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {/* Page Content */}
         <main className="p-6">{children}</main>
       </div>
-      
+
       {/* Global Command Palette */}
-      <CommandPalette open={commandPaletteOpen} setOpen={setCommandPaletteOpen} />
+      <CommandPalette
+        open={commandPaletteOpen}
+        setOpen={setCommandPaletteOpen}
+      />
     </div>
   );
 };

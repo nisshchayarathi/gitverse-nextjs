@@ -10,11 +10,14 @@ export class ConcurrencyLimiter {
   }> = [];
   private activeCount = 0;
 
-  constructor(public readonly name: string, public readonly maxConcurrency: number) {}
+  constructor(
+    public readonly name: string,
+    public readonly maxConcurrency: number,
+  ) {}
 
   public async add<T>(fn: AsyncFunction<T>): Promise<T> {
     concurrencyMetrics.incrementQueued(this.name);
-    
+
     return new Promise<T>((resolve, reject) => {
       this.queue.push({ fn, resolve, reject });
       this.processQueue();
@@ -51,18 +54,18 @@ export class ConcurrencyLimiter {
     return {
       active: this.activeCount,
       queued: this.queue.length,
-      max: this.maxConcurrency
+      max: this.maxConcurrency,
     };
   }
 }
 
 // Global limiters based on env variables or defaults
 export const repoSyncLimiter = new ConcurrencyLimiter(
-  "RepositorySync", 
-  Number(process.env.MAX_REPO_SYNC_CONCURRENCY) || 5
+  "RepositorySync",
+  Number(process.env.MAX_REPO_SYNC_CONCURRENCY) || 5,
 );
 
 export const ragIndexLimiter = new ConcurrencyLimiter(
-  "RagIndexing", 
-  Number(process.env.MAX_RAG_CONCURRENCY) || 3
+  "RagIndexing",
+  Number(process.env.MAX_RAG_CONCURRENCY) || 3,
 );

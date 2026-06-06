@@ -41,7 +41,9 @@ export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{__html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         [cmdk-overlay] {
           position: fixed;
           inset: 0;
@@ -78,7 +80,9 @@ export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
           from { opacity: 0; transform: translate(-50%, -10px); }
           to { opacity: 1; transform: translate(-50%, 0); }
         }
-      `}} />
+      `,
+        }}
+      />
       <Command.Dialog
         open={open}
         onOpenChange={setOpen}
@@ -122,9 +126,11 @@ export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
 
             <Command.Group heading="Quick Actions">
               <Command.Item
-                onSelect={() => runCommand(() => {
-                  setTheme(theme === "dark" ? "light" : "dark");
-                })}
+                onSelect={() =>
+                  runCommand(() => {
+                    setTheme(theme === "dark" ? "light" : "dark");
+                  })
+                }
                 className="flex items-center gap-2 px-2 py-2 text-sm rounded-md aria-selected:bg-accent aria-selected:text-accent-foreground cursor-pointer text-foreground"
               >
                 <Moon className="h-4 w-4" />

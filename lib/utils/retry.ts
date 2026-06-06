@@ -91,9 +91,7 @@ export function isRetryableError(error: unknown): boolean {
 
   for (const message of messages) {
     const lower = message.toLowerCase();
-    if (
-      RETRYABLE_MESSAGE_PATTERNS.some((pattern) => lower.includes(pattern))
-    ) {
+    if (RETRYABLE_MESSAGE_PATTERNS.some((pattern) => lower.includes(pattern))) {
       return true;
     }
   }
@@ -122,11 +120,10 @@ export function computeBackoffMs(
   attempt: number,
   config?: RetryConfig,
 ): number {
-  const {
-    baseDelayMs,
-    maxDelayMs,
-    backoffMultiplier,
-  } = { ...DEFAULT_RETRY_CONFIG, ...config };
+  const { baseDelayMs, maxDelayMs, backoffMultiplier } = {
+    ...DEFAULT_RETRY_CONFIG,
+    ...config,
+  };
 
   return Math.min(
     maxDelayMs,
@@ -138,10 +135,7 @@ export function computeBackoffMs(
  * Returns a `Date` representing "now + backoff delay" for use in
  * `nextRetryAt` columns.
  */
-export function nextRetryDate(
-  attempt: number,
-  config?: RetryConfig,
-): Date {
+export function nextRetryDate(attempt: number, config?: RetryConfig): Date {
   return new Date(Date.now() + computeBackoffMs(attempt, config));
 }
 
@@ -223,7 +217,10 @@ function extractAllErrorMessages(error: unknown): string[] {
       if (typeof e.message === "string") messages.push(e.message);
       if (typeof e.error === "string") messages.push(e.error);
       if (typeof e.cause === "string") messages.push(e.cause);
-      if (e.cause instanceof Error || (e.cause && typeof e.cause === "object")) {
+      if (
+        e.cause instanceof Error ||
+        (e.cause && typeof e.cause === "object")
+      ) {
         collect(e.cause, depth + 1);
       }
       // Also check for nested response objects (Axios-style)

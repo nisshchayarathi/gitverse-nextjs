@@ -27,7 +27,15 @@ export class IssueTriageService {
     repositoryFiles: Array<{ path: string }>;
     githubToken?: string;
   }): Promise<IssueAnalysisResult> {
-    const { owner, repo, issueNumber, title, body, repositoryFiles, githubToken } = params;
+    const {
+      owner,
+      repo,
+      issueNumber,
+      title,
+      body,
+      repositoryFiles,
+      githubToken,
+    } = params;
 
     // 1. Analyze in parallel
     const [classification, complexity, relevantFiles] = await Promise.all([
@@ -37,9 +45,10 @@ export class IssueTriageService {
     ]);
 
     // Construct the suggested investigation path based on findings
-    const suggestedInvestigationPath = relevantFiles.length > 0
-      ? `Start by reviewing ${relevantFiles[0].path}. This file appears to be central to the issue. Follow the logic and references from there.`
-      : `Start by reproducing the issue based on the description to identify the affected area in the codebase.`;
+    const suggestedInvestigationPath =
+      relevantFiles.length > 0
+        ? `Start by reviewing ${relevantFiles[0].path}. This file appears to be central to the issue. Follow the logic and references from there.`
+        : `Start by reproducing the issue based on the description to identify the affected area in the codebase.`;
 
     const result: IssueAnalysisResult = {
       classification,
@@ -54,7 +63,9 @@ export class IssueTriageService {
     try {
       // 2a. Add labels
       const existingLabels = await github.getRepoLabels(owner, repo);
-      const repoLabelNames = new Set(existingLabels.map(l => l.name.toLowerCase()));
+      const repoLabelNames = new Set(
+        existingLabels.map((l) => l.name.toLowerCase()),
+      );
 
       const labelsToAdd = new Set<string>();
 
@@ -71,12 +82,12 @@ export class IssueTriageService {
 
         const fallbacks = categoryMap[classification.category];
         if (fallbacks) {
-           for (const fb of fallbacks) {
-              if (repoLabelNames.has(fb)) {
-                 labelsToAdd.add(fb);
-                 break;
-              }
-           }
+          for (const fb of fallbacks) {
+            if (repoLabelNames.has(fb)) {
+              labelsToAdd.add(fb);
+              break;
+            }
+          }
         }
       }
 
@@ -88,15 +99,22 @@ export class IssueTriageService {
       }
 
       if (labelsToAdd.size > 0) {
-        await github.addIssueLabels(owner, repo, issueNumber, Array.from(labelsToAdd));
+        await github.addIssueLabels(
+          owner,
+          repo,
+          issueNumber,
+          Array.from(labelsToAdd),
+        );
       }
 
       // 2b. Post comment
       const comment = this.formatGuidanceComment(result);
       await github.postIssueComment(owner, repo, issueNumber, comment);
-
     } catch (error) {
-      console.error("[IssueTriageService] Failed to perform GitHub actions:", error);
+      console.error(
+        "[IssueTriageService] Failed to perform GitHub actions:",
+        error,
+      );
       // We still return the result even if GH actions fail
     }
 
@@ -104,31 +122,42 @@ export class IssueTriageService {
   }
 
   private formatGuidanceComment(result: IssueAnalysisResult): string {
-    const { classification, complexity, relevantFiles, suggestedInvestigationPath } = result;
-    
-    // Capitalize category
-    const categoryName = classification.category.charAt(0).toUpperCase() + classification.category.slice(1);
-    
-    const difficultyText = complexity.contributorDifficulty 
-       ? `(${complexity.contributorDifficulty})`
-       : "";
+    const {
+      classification,
+      complexity,
+      relevantFiles,
+      suggestedInvestigationPath,
+    } = result;
 
-    const beginnerText = complexity.beginnerFriendly 
-       ? "🌱 **Beginner Friendly!** Great for first-time contributors."
-       : "";
+    // Capitalize category
+    const categoryName =
+      classification.category.charAt(0).toUpperCase() +
+      classification.category.slice(1);
+
+    const difficultyText = complexity.contributorDifficulty
+      ? `(${complexity.contributorDifficulty})`
+      : "";
+
+    const beginnerText = complexity.beginnerFriendly
+      ? "🌱 **Beginner Friendly!** Great for first-time contributors."
+      : "";
 
     let fileList = "No specific files identified.";
     if (relevantFiles.length > 0) {
-      fileList = relevantFiles.map((f: FileMatch) => `- \`${f.path}\` (${f.reasoning})`).join("\n");
+      fileList = relevantFiles
+        .map((f: FileMatch) => `- \`${f.path}\` (${f.reasoning})`)
+        .join("\n");
     }
 
     // Determine an overall confidence average
-    const overallConfidence = Math.round((classification.confidence + complexity.confidence) / 2);
+    const overallConfidence = Math.round(
+      (classification.confidence + complexity.confidence) / 2,
+    );
 
     return `### GitVerse Smart Issue Analysis
 
 **Detected Type**
-${categoryName} ${classification.tags.length > 0 ? `(${classification.tags.join(', ')})` : ''}
+${categoryName} ${classification.tags.length > 0 ? `(${classification.tags.join(", ")})` : ""}
 
 **Estimated Complexity**
 ${complexity.complexity} ${difficultyText}

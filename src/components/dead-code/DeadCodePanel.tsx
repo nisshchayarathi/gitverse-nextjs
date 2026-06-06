@@ -1,8 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, EmptyState } from "@/components/ui";
-import { DeadCodeFinding, getCleanupRecommendation } from "@/lib/dead-code-analyzer";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  EmptyState,
+} from "@/components/ui";
+import {
+  DeadCodeFinding,
+  getCleanupRecommendation,
+} from "@/lib/dead-code-analyzer";
 import {
   FileX2,
   ShieldAlert,
@@ -57,7 +67,11 @@ const typeLabels: Record<string, string> = {
   page: "Page",
 };
 
-export function DeadCodePanel({ files, findings, className = "" }: DeadCodePanelProps) {
+export function DeadCodePanel({
+  files,
+  findings,
+  className = "",
+}: DeadCodePanelProps) {
   const [confidenceFilter, setConfidenceFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,10 +82,13 @@ export function DeadCodePanel({ files, findings, className = "" }: DeadCodePanel
       high: findings.filter((f) => f.confidence === "HIGH").length,
       medium: findings.filter((f) => f.confidence === "MEDIUM").length,
       low: findings.filter((f) => f.confidence === "LOW").length,
-      byType: findings.reduce((acc, f) => {
-        acc[f.type] = (acc[f.type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
+      byType: findings.reduce(
+        (acc, f) => {
+          acc[f.type] = (acc[f.type] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
     };
   }, [findings]);
 
@@ -123,7 +140,9 @@ export function DeadCodePanel({ files, findings, className = "" }: DeadCodePanel
             Dead Code Analysis
           </CardTitle>
           <CardDescription>
-            {findings.length} potentially unused export{findings.length !== 1 ? "s" : ""} found across {files.length} file{files.length !== 1 ? "s" : ""}
+            {findings.length} potentially unused export
+            {findings.length !== 1 ? "s" : ""} found across {files.length} file
+            {files.length !== 1 ? "s" : ""}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -153,7 +172,9 @@ export function DeadCodePanel({ files, findings, className = "" }: DeadCodePanel
               <AlertTriangle className="h-4 w-4 text-amber-500" />
               <span className="text-xs text-muted-foreground">Medium</span>
             </div>
-            <p className="text-2xl font-bold mt-1 text-amber-500">{stats.medium}</p>
+            <p className="text-2xl font-bold mt-1 text-amber-500">
+              {stats.medium}
+            </p>
           </CardContent>
         </Card>
         <Card className="glass border border-blue-500/20">
@@ -192,7 +213,11 @@ export function DeadCodePanel({ files, findings, className = "" }: DeadCodePanel
               {["HIGH", "MEDIUM", "LOW"].map((level) => (
                 <button
                   key={level}
-                  onClick={() => setConfidenceFilter(confidenceFilter === level ? null : level)}
+                  onClick={() =>
+                    setConfidenceFilter(
+                      confidenceFilter === level ? null : level,
+                    )
+                  }
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                     confidenceFilter === level
                       ? `${confidenceConfig[level as keyof typeof confidenceConfig].bg} ${confidenceConfig[level as keyof typeof confidenceConfig].color} ${confidenceConfig[level as keyof typeof confidenceConfig].border}`
@@ -209,7 +234,9 @@ export function DeadCodePanel({ files, findings, className = "" }: DeadCodePanel
           {filteredFindings.length === 0 ? (
             <div className="py-8 text-center">
               <Filter className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No findings match the current filters</p>
+              <p className="text-sm text-muted-foreground">
+                No findings match the current filters
+              </p>
               <button
                 onClick={() => {
                   setConfidenceFilter(null);
@@ -234,7 +261,9 @@ export function DeadCodePanel({ files, findings, className = "" }: DeadCodePanel
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 min-w-0 flex-1">
-                          <div className={`p-1.5 rounded-md ${config.bg} mt-0.5 flex-shrink-0`}>
+                          <div
+                            className={`p-1.5 rounded-md ${config.bg} mt-0.5 flex-shrink-0`}
+                          >
                             <Icon className={`h-4 w-4 ${config.color}`} />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -242,7 +271,9 @@ export function DeadCodePanel({ files, findings, className = "" }: DeadCodePanel
                               <span className="font-mono text-sm font-semibold truncate max-w-[300px]">
                                 {finding.name}
                               </span>
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider ${config.bg} ${config.color}`}>
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider ${config.bg} ${config.color}`}
+                              >
                                 {finding.confidence}
                               </span>
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-white/5 text-muted-foreground uppercase tracking-wider">
@@ -302,13 +333,15 @@ export function DeadCodePanel({ files, findings, className = "" }: DeadCodePanel
                 .filter((f) => f.confidence === "HIGH")
                 .slice(0, 5)
                 .map((finding, idx) => (
-                  <div key={`rec-${idx}`} className="flex items-start gap-2 text-sm">
+                  <div
+                    key={`rec-${idx}`}
+                    className="flex items-start gap-2 text-sm"
+                  >
                     <Merge className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <span>
                       <code className="text-xs font-mono bg-white/5 px-1 py-0.5 rounded">
                         {finding.filePath.split("/").pop()}:{finding.exportLine}
-                      </code>
-                      {" "}
+                      </code>{" "}
                       <span className="text-muted-foreground">
                         {getCleanupRecommendation(finding)}
                       </span>

@@ -8,7 +8,11 @@ import { SafeHttpClient } from "@/services/security/safe-http-client";
 import { webhookQueue } from "@/lib/services/webhook-queue";
 import { dbHealthService } from "@/lib/services/db-health";
 import { webhookRetryService } from "@/lib/services/webhook-retry";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -60,11 +64,13 @@ export async function POST(request: NextRequest) {
   const event = request.headers.get("x-github-event");
   const secret = process.env.GITHUB_WEBHOOK_SECRET || "";
 
-  const isValid = await GithubWebhookVerifier.verifySignature(request, rawBody) || verifyGitHubWebhookSignature({
-    rawBody,
-    signature256Header: signature,
-    webhookSecret: secret,
-  });
+  const isValid =
+    (await GithubWebhookVerifier.verifySignature(request, rawBody)) ||
+    verifyGitHubWebhookSignature({
+      rawBody,
+      signature256Header: signature,
+      webhookSecret: secret,
+    });
 
   if (!isValid) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
@@ -85,7 +91,7 @@ export async function POST(request: NextRequest) {
   }
 
   const action = payload.action;
-  
+
   if (event === "pull_request") {
     if (!shouldHandlePullRequestAction(action)) {
       return NextResponse.json(
@@ -136,7 +142,9 @@ export async function POST(request: NextRequest) {
 
   // Store webhook event for async processing in-memory to prevent pool exhaustion
   try {
-    const baseUrl = process.env.NEXTAUTH_URL || `http://${request.headers.get("host") || "localhost:3000"}`;
+    const baseUrl =
+      process.env.NEXTAUTH_URL ||
+      `http://${request.headers.get("host") || "localhost:3000"}`;
     webhookQueue.enqueueWebhook(payload, event || "unknown", action, baseUrl);
 
     // Automatically retry any previously failed jobs occasionally
@@ -144,13 +152,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { ok: true, message: "Webhook accepted and queued for processing" },
-      { status: 202 }
+      { status: 202 },
     );
   } catch (error) {
     console.error("Error queueing webhook event:", error);
     return NextResponse.json(
       { error: "Failed to queue webhook event" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

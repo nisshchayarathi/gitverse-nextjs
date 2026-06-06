@@ -34,11 +34,13 @@ export async function POST(request: NextRequest) {
           headers: {
             "Retry-After": "60",
           },
-        }
+        },
       );
     }
 
-    if (await isRateLimited(normalizedEmail, "LOGIN", MAX_ATTEMPTS, WINDOW_MS)) {
+    if (
+      await isRateLimited(normalizedEmail, "LOGIN", MAX_ATTEMPTS, WINDOW_MS)
+    ) {
       return NextResponse.json(
         { error: "Too many failed login attempts. Please try again later." },
         {
@@ -46,7 +48,7 @@ export async function POST(request: NextRequest) {
           headers: {
             "Retry-After": "60",
           },
-        }
+        },
       );
     }
 
@@ -71,10 +73,10 @@ export async function POST(request: NextRequest) {
           status: 423,
           headers: {
             "Retry-After": String(
-              Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000)
+              Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000),
             ),
           },
-        }
+        },
       );
     }
 
@@ -90,7 +92,7 @@ export async function POST(request: NextRequest) {
       if (hasGoogleAccount) {
         return apiError(
           401,
-          "Email already exists. Please sign in with Google."
+          "Email already exists. Please sign in with Google.",
         );
       }
     }

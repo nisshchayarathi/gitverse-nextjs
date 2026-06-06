@@ -67,12 +67,7 @@ export const MODULE_METADATA: Record<string, ModuleMetadata> = {
     complexity: "Low",
     importance: "Supporting Area",
     recommendedFor: ["Beginner", "Intermediate", "Advanced"],
-    examples: [
-      "String formatting",
-      "Date parsing",
-      "Validators",
-      "Converters",
-    ],
+    examples: ["String formatting", "Date parsing", "Validators", "Converters"],
   },
   auth: {
     name: "auth",
@@ -151,9 +146,7 @@ export const MODULE_METADATA: Record<string, ModuleMetadata> = {
   },
 };
 
-export function getComplexityColor(
-  complexity: ComplexityLevel
-): {
+export function getComplexityColor(complexity: ComplexityLevel): {
   bg: string;
   text: string;
   ring: string;

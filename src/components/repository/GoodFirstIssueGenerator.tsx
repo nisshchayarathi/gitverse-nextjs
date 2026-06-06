@@ -26,7 +26,10 @@ import {
   LoadingSpinner,
   Badge,
 } from "@/components/ui";
-import { generateGoodFirstIssues, getIssuesByDifficulty } from "@/services/issueGeneratorService";
+import {
+  generateGoodFirstIssues,
+  getIssuesByDifficulty,
+} from "@/services/issueGeneratorService";
 import { RepositoryAnalysisData } from "@/types/contributionPath";
 import { RepositoryFile } from "@/types/firstPRSimulator";
 import { GeneratedIssue, DifficultyCategory } from "@/types/generatedIssue";
@@ -70,7 +73,13 @@ const opportunityTypeEmoji: Record<string, string> = {
   accessibility: "♿",
 };
 
-const IssueCard = ({ issue, onCopyMarkdown }: { issue: GeneratedIssue; onCopyMarkdown: (body: string) => void }) => {
+const IssueCard = ({
+  issue,
+  onCopyMarkdown,
+}: {
+  issue: GeneratedIssue;
+  onCopyMarkdown: (body: string) => void;
+}) => {
   const [expanded, setExpanded] = useState(false);
   const difficulty = issue.difficulty;
   const config = difficultyConfig[difficulty];
@@ -86,10 +95,13 @@ const IssueCard = ({ issue, onCopyMarkdown }: { issue: GeneratedIssue; onCopyMar
                 {difficulty}
               </Badge>
               <Badge variant="outline" className="text-xs">
-                {opportunityTypeEmoji[issue.opportunity.type]} {issue.opportunity.type}
+                {opportunityTypeEmoji[issue.opportunity.type]}{" "}
+                {issue.opportunity.type}
               </Badge>
             </div>
-            <CardTitle className="text-base leading-tight">{issue.title}</CardTitle>
+            <CardTitle className="text-base leading-tight">
+              {issue.title}
+            </CardTitle>
           </div>
           <button
             onClick={() => setExpanded(!expanded)}
@@ -106,12 +118,16 @@ const IssueCard = ({ issue, onCopyMarkdown }: { issue: GeneratedIssue; onCopyMar
       </CardHeader>
 
       <CardContent className="pb-4">
-        <p className="text-sm text-muted-foreground mb-4">{issue.description}</p>
+        <p className="text-sm text-muted-foreground mb-4">
+          {issue.description}
+        </p>
 
         <div className="grid grid-cols-3 gap-2 mb-4 text-xs">
           <div className="bg-secondary/50 rounded p-2">
             <div className="text-muted-foreground">Effort</div>
-            <div className="font-semibold capitalize">{issue.estimatedEffort}</div>
+            <div className="font-semibold capitalize">
+              {issue.estimatedEffort}
+            </div>
           </div>
           <div className="bg-secondary/50 rounded p-2">
             <div className="text-muted-foreground">Hours</div>
@@ -119,13 +135,17 @@ const IssueCard = ({ issue, onCopyMarkdown }: { issue: GeneratedIssue; onCopyMar
           </div>
           <div className="bg-secondary/50 rounded p-2">
             <div className="text-muted-foreground">Confidence</div>
-            <div className="font-semibold">{Math.round(issue.confidence * 100)}%</div>
+            <div className="font-semibold">
+              {Math.round(issue.confidence * 100)}%
+            </div>
           </div>
         </div>
 
         {issue.affectedFiles.length > 0 && (
           <div className="mb-4">
-            <div className="text-xs font-semibold text-muted-foreground mb-2">Affected Files:</div>
+            <div className="text-xs font-semibold text-muted-foreground mb-2">
+              Affected Files:
+            </div>
             <div className="flex flex-wrap gap-1">
               {issue.affectedFiles.slice(0, 3).map((file, idx) => (
                 <Badge key={idx} variant="secondary" className="text-xs">
@@ -145,7 +165,9 @@ const IssueCard = ({ issue, onCopyMarkdown }: { issue: GeneratedIssue; onCopyMar
         {expanded && (
           <div className="border-t pt-4 space-y-4">
             <div>
-              <h4 className="text-xs font-semibold mb-2">Acceptance Criteria:</h4>
+              <h4 className="text-xs font-semibold mb-2">
+                Acceptance Criteria:
+              </h4>
               <ul className="text-xs space-y-1">
                 {issue.acceptanceCriteria.map((criterion, idx) => (
                   <li key={idx} className="flex gap-2">
@@ -190,12 +212,23 @@ const IssueCard = ({ issue, onCopyMarkdown }: { issue: GeneratedIssue; onCopyMar
                       <h2 className="text-xs font-bold mt-2 mb-1" {...props} />
                     ),
                     h3: ({ node, ...props }) => (
-                      <h3 className="text-xs font-semibold mt-1 mb-1" {...props} />
+                      <h3
+                        className="text-xs font-semibold mt-1 mb-1"
+                        {...props}
+                      />
                     ),
-                    p: ({ node, ...props }) => <p className="text-xs mb-1" {...props} />,
-                    li: ({ node, ...props }) => <li className="text-xs ml-4 list-disc" {...props} />,
-                    ol: ({ node, ...props }) => <ol className="text-xs ml-4 list-decimal" {...props} />,
-                    ul: ({ node, ...props }) => <ul className="text-xs ml-4 list-disc" {...props} />,
+                    p: ({ node, ...props }) => (
+                      <p className="text-xs mb-1" {...props} />
+                    ),
+                    li: ({ node, ...props }) => (
+                      <li className="text-xs ml-4 list-disc" {...props} />
+                    ),
+                    ol: ({ node, ...props }) => (
+                      <ol className="text-xs ml-4 list-decimal" {...props} />
+                    ),
+                    ul: ({ node, ...props }) => (
+                      <ul className="text-xs ml-4 list-disc" {...props} />
+                    ),
                   }}
                 >
                   {issue.body}
@@ -232,7 +265,9 @@ export function GoodFirstIssueGenerator({
   loading = false,
 }: GoodFirstIssueGeneratorProps) {
   const files = (repository?.files || []) as RepositoryFile[];
-  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyCategory | "all">("all");
+  const [selectedDifficulty, setSelectedDifficulty] = useState<
+    DifficultyCategory | "all"
+  >("all");
   const [showTips, setShowTips] = useState(true);
 
   const issues = useMemo(() => {
@@ -250,7 +285,8 @@ export function GoodFirstIssueGenerator({
     return {
       total: allIssues.length,
       beginner: allIssues.filter((i) => i.difficulty === "Beginner").length,
-      intermediate: allIssues.filter((i) => i.difficulty === "Intermediate").length,
+      intermediate: allIssues.filter((i) => i.difficulty === "Intermediate")
+        .length,
       advanced: allIssues.filter((i) => i.difficulty === "Advanced").length,
     };
   }, [repository, files]);
@@ -269,7 +305,8 @@ export function GoodFirstIssueGenerator({
             <CardTitle>Good First Issue Generator</CardTitle>
           </div>
           <CardDescription>
-            Automatically generate contributor-friendly issues from repository analysis
+            Automatically generate contributor-friendly issues from repository
+            analysis
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -290,12 +327,13 @@ export function GoodFirstIssueGenerator({
             <CardTitle>Good First Issue Generator</CardTitle>
           </div>
           <CardDescription>
-            Automatically generate contributor-friendly issues from repository analysis
+            Automatically generate contributor-friendly issues from repository
+            analysis
           </CardDescription>
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={<Lightbulb className="w-12 h-12" />}
+            icon={Lightbulb}
             title="No Repository Data"
             description="Complete a repository analysis to generate good first issues"
           />
@@ -313,12 +351,13 @@ export function GoodFirstIssueGenerator({
             <CardTitle>Good First Issue Generator</CardTitle>
           </div>
           <CardDescription>
-            Automatically generate contributor-friendly issues from repository analysis
+            Automatically generate contributor-friendly issues from repository
+            analysis
           </CardDescription>
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={<Sparkles className="w-12 h-12" />}
+            icon={Sparkles}
             title="No Issues Found"
             description="Repository appears to be in good shape! No immediate opportunities detected."
           />
@@ -337,7 +376,8 @@ export function GoodFirstIssueGenerator({
               <div>
                 <CardTitle>Good First Issue Generator</CardTitle>
                 <CardDescription>
-                  Automatically generate contributor-friendly issues from repository analysis
+                  Automatically generate contributor-friendly issues from
+                  repository analysis
                 </CardDescription>
               </div>
             </div>
@@ -349,9 +389,12 @@ export function GoodFirstIssueGenerator({
             <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex gap-3">
               <Sparkles className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-blue-900 dark:text-blue-100 flex-1">
-                <p className="font-semibold mb-1">Creating good first issues attracts contributors!</p>
+                <p className="font-semibold mb-1">
+                  Creating good first issues attracts contributors!
+                </p>
                 <p className="text-xs">
-                  These auto-generated issues are starting points. Customize them with your project context for best results.
+                  These auto-generated issues are starting points. Customize
+                  them with your project context for best results.
                 </p>
               </div>
               <button
@@ -373,7 +416,9 @@ export function GoodFirstIssueGenerator({
               <span className="text-xs">All ({stats.total})</span>
             </Button>
             <Button
-              variant={selectedDifficulty === "Beginner" ? "default" : "outline"}
+              variant={
+                selectedDifficulty === "Beginner" ? "default" : "outline"
+              }
               size="sm"
               onClick={() => setSelectedDifficulty("Beginner")}
               className="justify-center text-green-600 dark:text-green-400"
@@ -382,16 +427,22 @@ export function GoodFirstIssueGenerator({
               <span className="text-xs">Beginner ({stats.beginner})</span>
             </Button>
             <Button
-              variant={selectedDifficulty === "Intermediate" ? "default" : "outline"}
+              variant={
+                selectedDifficulty === "Intermediate" ? "default" : "outline"
+              }
               size="sm"
               onClick={() => setSelectedDifficulty("Intermediate")}
               className="justify-center text-yellow-600 dark:text-yellow-400"
             >
               <Zap className="w-3 h-3 mr-1" />
-              <span className="text-xs">Intermediate ({stats.intermediate})</span>
+              <span className="text-xs">
+                Intermediate ({stats.intermediate})
+              </span>
             </Button>
             <Button
-              variant={selectedDifficulty === "Advanced" ? "default" : "outline"}
+              variant={
+                selectedDifficulty === "Advanced" ? "default" : "outline"
+              }
               size="sm"
               onClick={() => setSelectedDifficulty("Advanced")}
               className="justify-center text-red-600 dark:text-red-400"
@@ -405,7 +456,7 @@ export function GoodFirstIssueGenerator({
 
       {issues.length === 0 ? (
         <EmptyState
-          icon={<Filter className="w-12 h-12" />}
+          icon={Filter}
           title="No Issues in This Category"
           description={`No ${selectedDifficulty.toLowerCase()} level issues found. Try selecting a different difficulty level.`}
         />

@@ -39,17 +39,35 @@ const generateSuggestedTests = (
 ): string[] => {
   const suggestions = new Set<string>();
 
-  if (issueAnalysis.affectedAreas.some((area) => area.toLowerCase().includes("api"))) {
+  if (
+    issueAnalysis.affectedAreas.some((area) =>
+      area.toLowerCase().includes("api"),
+    )
+  ) {
     suggestions.add("Add API contract tests for endpoint behavior.");
   }
-  if (issueAnalysis.affectedAreas.some((area) => area.toLowerCase().includes("user interface"))) {
+  if (
+    issueAnalysis.affectedAreas.some((area) =>
+      area.toLowerCase().includes("user interface"),
+    )
+  ) {
     suggestions.add("Add component rendering tests for impacted UI paths.");
   }
-  if (issueAnalysis.affectedAreas.some((area) => area.toLowerCase().includes("security"))) {
+  if (
+    issueAnalysis.affectedAreas.some((area) =>
+      area.toLowerCase().includes("security"),
+    )
+  ) {
     suggestions.add("Add authentication or authorization regression tests.");
   }
-  if (issueAnalysis.affectedAreas.some((area) => area.toLowerCase().includes("performance"))) {
-    suggestions.add("Add performance benchmark tests for the affected endpoints.");
+  if (
+    issueAnalysis.affectedAreas.some((area) =>
+      area.toLowerCase().includes("performance"),
+    )
+  ) {
+    suggestions.add(
+      "Add performance benchmark tests for the affected endpoints.",
+    );
   }
   if (difficulty === "Advanced") {
     suggestions.add("Add integration tests that cover the full change flow.");
@@ -68,7 +86,10 @@ const buildConfidence = (
 ) => {
   const fileConfidence = predictedFiles.length > 0 ? 10 : -10;
   const sizeConfidence = changeSize === "Medium" ? 5 : 0;
-  return Math.min(100, Math.max(0, issueAnalysisConfidence + fileConfidence + sizeConfidence));
+  return Math.min(
+    100,
+    Math.max(0, issueAnalysisConfidence + fileConfidence + sizeConfidence),
+  );
 };
 
 export const generateFirstPRSimulator = (
@@ -76,13 +97,29 @@ export const generateFirstPRSimulator = (
   repository?: RepositoryMetadata,
 ): FirstPRSimulatorResult => {
   const issueAnalysis = analyzeIssue(issue, repository);
-  const predictedFiles = predictFiles(issueAnalysis, repository?.files || [], repository);
-  const difficulty = calculateDifficulty(predictedFiles, repository, issueAnalysis);
+  const predictedFiles = predictFiles(
+    issueAnalysis,
+    repository?.files || [],
+    repository,
+  );
+  const difficulty = calculateDifficulty(
+    predictedFiles,
+    repository,
+    issueAnalysis,
+  );
 
-  const { changeSize, estimatedLines } = estimateChangeSize(predictedFiles, repository, issueAnalysis);
+  const { changeSize, estimatedLines } = estimateChangeSize(
+    predictedFiles,
+    repository,
+    issueAnalysis,
+  );
   const suggestedTests = generateSuggestedTests(issueAnalysis, difficulty);
   const startingPoint = buildStartingPoint(predictedFiles, issueAnalysis);
-  const confidence = buildConfidence(issueAnalysis.confidence, predictedFiles, changeSize);
+  const confidence = buildConfidence(
+    issueAnalysis.confidence,
+    predictedFiles,
+    changeSize,
+  );
 
   const roadmapSteps = [
     `Analyze the issue keywords and labels to confirm the predicted impact area.`,
@@ -96,8 +133,13 @@ export const generateFirstPRSimulator = (
       "No strong file matches were found. Use the repository search to locate the most relevant code paths manually.",
     );
   }
-  if (issueAnalysis.affectedAreas.includes("Database") || issueAnalysis.affectedAreas.includes("API Services")) {
-    notes.push("Review related backend and schema dependencies before making the first PR.");
+  if (
+    issueAnalysis.affectedAreas.includes("Database") ||
+    issueAnalysis.affectedAreas.includes("API Services")
+  ) {
+    notes.push(
+      "Review related backend and schema dependencies before making the first PR.",
+    );
   }
 
   return {

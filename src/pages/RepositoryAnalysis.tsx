@@ -45,7 +45,8 @@ type TabType =
   | "commits"
   | "contributors"
   | "mentor"
-  | "insights";
+  | "insights"
+  | "dead-code";
 
 interface Tab {
   id: TabType;
@@ -79,7 +80,13 @@ const tabs: Tab[] = [
   },
 ];
 
-const StatusBadge = ({ status, isAnalyzing }: { status: string; isAnalyzing: boolean }) => {
+const StatusBadge = ({
+  status,
+  isAnalyzing,
+}: {
+  status: string;
+  isAnalyzing: boolean;
+}) => {
   const s = status?.toLowerCase() || "pending";
 
   if (isAnalyzing || s === "analyzing" || s === "processing") {
@@ -126,7 +133,7 @@ export default function RepositoryAnalysis() {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [repository, setRepository] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isAnalyzing, _setIsAnalyzing] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [job, setJob] = useState<any>(null);
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -181,7 +188,7 @@ export default function RepositoryAnalysis() {
         const token = localStorage.getItem("gitverse_token");
         const response = await fetch(
           buildApiUrl(`/api/repositories/${id}/analysis-status?jobId=${jobId}`),
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         if (!response.ok) {
@@ -196,13 +203,13 @@ export default function RepositoryAnalysis() {
           while (!stopped) {
             const { done, value } = await reader.read();
             if (done) break;
-            
+
             buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n\n');
+            const lines = buffer.split("\n\n");
             buffer = lines.pop() || "";
 
             for (const chunk of lines) {
-              if (chunk.startsWith('data: ')) {
+              if (chunk.startsWith("data: ")) {
                 try {
                   const data = JSON.parse(chunk.substring(6));
                   setJob(data);
@@ -214,7 +221,8 @@ export default function RepositoryAnalysis() {
                     setIsAnalyzing(false);
                     toast({
                       title: "Analysis failed",
-                      description: data.error || "The repository analysis failed.",
+                      description:
+                        data.error || "The repository analysis failed.",
                       variant: "destructive",
                     });
                   }
@@ -247,12 +255,9 @@ export default function RepositoryAnalysis() {
     try {
       const token = localStorage.getItem("gitverse_token");
 
-      const response = await axios.get(
-        buildApiUrl(`/api/repositories/${id}`),
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await axios.get(buildApiUrl(`/api/repositories/${id}`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       const repo = response.data.repository || response.data;
       setRepository(repo);
@@ -265,7 +270,10 @@ export default function RepositoryAnalysis() {
       if (response.data.latestJob) {
         setJob(response.data.latestJob);
         if (response.data.latestJob.status === "FAILED") {
-          setError(response.data.latestJob.error || "Analysis failed. Please try again later.");
+          setError(
+            response.data.latestJob.error ||
+              "Analysis failed. Please try again later.",
+          );
         }
       }
       setLoading(false);
@@ -274,13 +282,15 @@ export default function RepositoryAnalysis() {
 
       const status = err.response?.status;
       if (status === 401) {
-        setError("Your session has expired. Please log in again to view your repository analysis.");
+        setError(
+          "Your session has expired. Please log in again to view your repository analysis.",
+        );
         setLoading(false);
         return;
       }
 
       const isColdStart = err.response?.data?.error === "DATABASE_COLD_START";
-      
+
       if (isColdStart) {
         setError("Waking up database... Please wait.");
 
@@ -299,11 +309,15 @@ export default function RepositoryAnalysis() {
         err.response?.data?.error ||
           err.response?.data?.message ||
           err.message ||
-          "Analysis failed. Please try again later."
+          "Analysis failed. Please try again later.",
       );
       toast({
         title: "Error fetching repository",
-        description: err.response?.data?.error || err.response?.data?.message || err.message || "Failed to load repository data.",
+        description:
+          err.response?.data?.error ||
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to load repository data.",
         variant: "destructive",
       });
       setLoading(false);
@@ -346,10 +360,11 @@ export default function RepositoryAnalysis() {
       }
     } catch (err: any) {
       console.error("Error fetching analysis job:", err);
-      
+
       const status = err.response?.status;
       if (status === 401) {
-        const msg = "Your session has expired. The analysis is continuing securely in the background and will be available in your dashboard when you log back in.";
+        const msg =
+          "Your session has expired. The analysis is continuing securely in the background and will be available in your dashboard when you log back in.";
         setError(msg);
         setIsAnalyzing(false);
         pollingStartedAt.current = null;
@@ -361,11 +376,15 @@ export default function RepositoryAnalysis() {
         return;
       }
 
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || "Failed to connect to the analysis service.";
-      
+      const errorMessage =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to connect to the analysis service.";
+
       // 1. Surface inline error state
       setError(errorMessage);
-      
+
       // 2. Stop polling
       setIsAnalyzing(false);
 
@@ -435,7 +454,8 @@ export default function RepositoryAnalysis() {
             <div className="glass p-6 rounded-lg max-w-sm mx-4">
               <h2 className="text-lg font-semibold mb-2">Delete Repository?</h2>
               <p className="text-sm text-muted-foreground mb-6">
-                This action cannot be undone. The repository and all its data will be permanently deleted.
+                This action cannot be undone. The repository and all its data
+                will be permanently deleted.
               </p>
               <div className="flex gap-3 justify-end">
                 <button
@@ -519,7 +539,7 @@ export default function RepositoryAnalysis() {
                       {error}
                     </p>
                   )}
-              </div>
+                </div>
               </div>
               {/* Delete button only if repository exists */}
               {repository && (
@@ -543,28 +563,32 @@ export default function RepositoryAnalysis() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="max-w-md mx-auto space-y-4">
                   <h2 className="text-xl font-semibold">
                     Analyzing Repository
                   </h2>
                   <p className="text-muted-foreground text-sm">
-                    We&apos;re extracting insights, code structure, commits, and contributors.
+                    We&apos;re extracting insights, code structure, commits, and
+                    contributors.
                   </p>
 
                   <div className="space-y-2 mt-8">
                     <div className="flex justify-between text-sm font-medium">
                       <span>Progress</span>
                       <span>
-                        {job?.progressPercent != null && job?.progressPercent >= 0
+                        {job?.progressPercent != null &&
+                        job?.progressPercent >= 0
                           ? `${Math.min(Math.round(job.progressPercent), 100)}%`
                           : "Processing..."}
                       </span>
                     </div>
                     <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary transition-all duration-500 ease-out" 
-                        style={{ width: `${Math.max(job?.progressPercent || 5, 5)}%` }}
+                      <div
+                        className="h-full bg-primary transition-all duration-500 ease-out"
+                        style={{
+                          width: `${Math.max(job?.progressPercent || 5, 5)}%`,
+                        }}
                       ></div>
                     </div>
                   </div>
@@ -586,10 +610,10 @@ export default function RepositoryAnalysis() {
                   <XCircle className="h-12 w-12 text-red-500" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg text-red-500">Failed to Load Repository</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {error}
-                  </p>
+                  <h3 className="font-semibold text-lg text-red-500">
+                    Failed to Load Repository
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">{error}</p>
                 </div>
                 <button
                   onClick={() => fetchRepository()}
@@ -643,8 +667,8 @@ export default function RepositoryAnalysis() {
                     {renderContent()}
                   </div>
                   <div className="lg:col-span-1">
-                    <SyncStatusCard 
-                      repositoryId={repository.id.toString()} 
+                    <SyncStatusCard
+                      repositoryId={repository.id.toString()}
                       lastSynchronizedAt={repository.lastSynchronizedAt}
                       initialJobs={repository.syncJobs || []}
                     />
@@ -673,8 +697,8 @@ export default function RepositoryAnalysis() {
                 Are you sure you want to delete{" "}
                 <strong className="break-words">{repository?.name}</strong>?
                 This action cannot be undone and will permanently remove all
-                repository data, including commits, contributors, and
-                analysis results.
+                repository data, including commits, contributors, and analysis
+                results.
               </p>
             </div>
           </div>

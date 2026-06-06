@@ -13,7 +13,9 @@ describe("authCookie", () => {
 
     it("sets expiry in the past", () => {
       const headers = getClearCookieHeaders();
-      expect(headers["Set-Cookie"]).toContain("Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+      expect(headers["Set-Cookie"]).toContain(
+        "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+      );
     });
 
     it("sets HttpOnly and Secure flags", () => {

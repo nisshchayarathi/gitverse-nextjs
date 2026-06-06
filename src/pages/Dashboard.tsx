@@ -74,16 +74,16 @@ export default function Dashboard() {
         active instanceof HTMLSelectElement ||
         (active instanceof HTMLElement && active.isContentEditable);
 
-      if ((e.key === "/" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")) && !isTyping) {
+      if (
+        (e.key === "/" ||
+          ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")) &&
+        !isTyping
+      ) {
         e.preventDefault();
         searchRef.current?.focus();
       }
 
-      if (
-        e.key === "Escape" &&
-        isTyping &&
-        active === searchRef.current
-      ) {
+      if (e.key === "Escape" && isTyping && active === searchRef.current) {
         setRepoUrl("");
         setRepoScope("");
         searchRef.current?.blur();
@@ -101,12 +101,15 @@ export default function Dashboard() {
   useEffect(() => {
     if (analyzeUrl) {
       setRepoUrl(analyzeUrl);
-      
+
       const triggerAutoAnalyze = async () => {
         setAnalyzing(true);
         try {
           const token = localStorage.getItem("gitverse_token");
-          const cleanUrl = analyzeUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
+          const cleanUrl = analyzeUrl
+            .trim()
+            .replace(/\/$/, "")
+            .replace(/\.git$/, "");
           const urlParts = cleanUrl.split("/");
           const name = urlParts[urlParts.length - 1] || "repository";
           const owner = urlParts[urlParts.length - 2] || "unknown";
@@ -127,7 +130,7 @@ export default function Dashboard() {
             },
             {
               headers: { Authorization: `Bearer ${token}` },
-            }
+            },
           );
 
           await fetchRepositories();
@@ -137,14 +140,17 @@ export default function Dashboard() {
           console.error("Auto analysis failed:", error);
           toast({
             title: "Analysis Failed",
-            description: error.response?.data?.error || error.message || "Failed to analyze repository",
+            description:
+              error.response?.data?.error ||
+              error.message ||
+              "Failed to analyze repository",
             variant: "destructive",
           });
         } finally {
           setAnalyzing(false);
         }
       };
-      
+
       void triggerAutoAnalyze();
     }
   }, [analyzeUrl, router, addRepo]);
@@ -152,9 +158,12 @@ export default function Dashboard() {
   const fetchRepositories = async () => {
     try {
       const token = localStorage.getItem("gitverse_token");
-      const response = await axios.get(buildApiUrl("/api/repositories?limit=1000"), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.get(
+        buildApiUrl("/api/repositories?limit=1000"),
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       // API returns { data: { repositories: [...] } } via apiSuccess wrapper
       const repos = response.data.data?.repositories || [];
       setRepositories(Array.isArray(repos) ? repos : []);
@@ -254,7 +263,8 @@ export default function Dashboard() {
     if (!isValidGithubUrl(repoUrl)) {
       toast({
         title: "Invalid URL",
-        description: "Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo).",
+        description:
+          "Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo).",
         variant: "destructive",
       });
       return;
@@ -265,7 +275,10 @@ export default function Dashboard() {
       const token = localStorage.getItem("gitverse_token");
 
       // Extract owner and name for recent storage
-      const cleanUrl = repoUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
+      const cleanUrl = repoUrl
+        .trim()
+        .replace(/\/$/, "")
+        .replace(/\.git$/, "");
       const cleanParts = cleanUrl.split("/");
       const ownerName = cleanParts[cleanParts.length - 2] || "unknown";
       const repoName = cleanParts[cleanParts.length - 1] || "unknown";
@@ -306,7 +319,6 @@ export default function Dashboard() {
       setRepoUrl("");
       setRepoScope("");
     } catch (error: any) {
-
       console.error("Error creating repository:", error);
       const errMsg =
         error.response?.data?.message ||
@@ -327,17 +339,14 @@ export default function Dashboard() {
         <div className="space-y-6">
           {/* Welcome skeleton */}
           <div className="space-y-2">
-
             <Skeleton style={{ width: "250px", height: "28px" }} />
             <Skeleton style={{ width: "400px", height: "18px" }} />
             <Skeleton className="w-[250px] h-[28px]" />
             <Skeleton className="w-[400px] h-[18px]" />
-
           </div>
 
           {/* Input skeleton */}
           <div className="p-6 border rounded-lg space-y-3">
-
             <Skeleton style={{ width: "100%", height: "40px" }} />
             <Skeleton style={{ width: "180px", height: "40px" }} />
             <Skeleton className="w-full h-10" />
@@ -432,7 +441,6 @@ export default function Dashboard() {
 
         {/* Recent Repositories */}
         <RecentReposList />
-
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -542,54 +550,58 @@ export default function Dashboard() {
                 <div className="space-y-3">
                   {[...repositories]
                     .sort((a: any, b: any) => {
-                      const aTime = new Date(a.lastAnalyzedAt || a.createdAt).getTime();
-                      const bTime = new Date(b.lastAnalyzedAt || b.createdAt).getTime();
+                      const aTime = new Date(
+                        a.lastAnalyzedAt || a.createdAt,
+                      ).getTime();
+                      const bTime = new Date(
+                        b.lastAnalyzedAt || b.createdAt,
+                      ).getTime();
                       return bTime - aTime;
                     })
                     .slice(0, 5)
                     .map((repo: any) => (
-                    <div
-                      key={repo.id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 rounded-lg border border-border/50 hover:border-primary/50 transition-colors cursor-pointer glass-hover"
-                      onClick={() => router.push(`/repo/${repo.id}`)}
-                    >
-                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                        <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
-                          <GitBranch className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                      <div
+                        key={repo.id}
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 rounded-lg border border-border/50 hover:border-primary/50 transition-colors cursor-pointer glass-hover"
+                        onClick={() => router.push(`/repo/${repo.id}`)}
+                      >
+                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                          <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
+                            <GitBranch className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-medium text-sm sm:text-base truncate">
+                              {repo.name}
+                            </h3>
+                            <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                              {repo.url}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <h3 className="font-medium text-sm sm:text-base truncate">
-                            {repo.name}
-                          </h3>
-                          <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                            {repo.url}
-                          </p>
+                        <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <Activity className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">
+                              {(repo as any)._count?.commits || 0} commits
+                            </span>
+                            <span className="sm:hidden">
+                              {(repo as any)._count?.commits || 0}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                            {(repo as any)._count?.contributors || 0}
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                            {formatTimeAgo(
+                              (repo as any).lastAnalyzedAt ||
+                                (repo as any).createdAt,
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Activity className="h-3 w-3 sm:h-4 sm:w-4" />
-                          <span className="hidden sm:inline">
-                            {(repo as any)._count?.commits || 0} commits
-                          </span>
-                          <span className="sm:hidden">
-                            {(repo as any)._count?.commits || 0}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-                          {(repo as any)._count?.contributors || 0}
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                          {formatTimeAgo(
-                            (repo as any).lastAnalyzedAt ||
-                              (repo as any).createdAt,
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </CardContent>
@@ -621,22 +633,25 @@ export default function Dashboard() {
               ) : (
                 <div className="space-y-3">
                   {recentActivity.map((activity: any, index: number) => (
-                  <div key={index} className="flex items-start gap-2 sm:gap-3">
-                    <div className="mt-1 p-1.5 rounded-full bg-accent/10 flex-shrink-0">
-                      <Activity className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-accent" />
+                    <div
+                      key={index}
+                      className="flex items-start gap-2 sm:gap-3"
+                    >
+                      <div className="mt-1 p-1.5 rounded-full bg-accent/10 flex-shrink-0">
+                        <Activity className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-accent" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm break-words">
+                          <span className="font-medium">{activity.action}</span>{" "}
+                          <span className="text-muted-foreground truncate">
+                            {activity.repo}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {activity.time}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm break-words">
-                        <span className="font-medium">{activity.action}</span>{" "}
-                        <span className="text-muted-foreground truncate">
-                          {activity.repo}
-                        </span>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {activity.time}
-                      </p>
-                    </div>
-                  </div>
                   ))}
                 </div>
               )}

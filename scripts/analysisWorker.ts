@@ -21,9 +21,7 @@ function getWorkerId(): string {
   );
 }
 
-export async function startAnalysisWorkerLoop(opts?: {
-  workerId?: string;
-}) {
+export async function startAnalysisWorkerLoop(opts?: { workerId?: string }) {
   const workerId = opts?.workerId || getWorkerId();
   console.log(`BullMQ analysis worker starting: ${workerId}`);
 
@@ -57,7 +55,11 @@ export async function startAnalysisWorkerLoop(opts?: {
           update.progressMessage !== lastProgressMessage;
 
         // Debounce updates to DB if nothing changed
-        if (!percentChanged && !messageChanged && now - lastProgressWriteAt < 1000) {
+        if (
+          !percentChanged &&
+          !messageChanged &&
+          now - lastProgressWriteAt < 1000
+        ) {
           return;
         }
 
@@ -79,9 +81,15 @@ export async function startAnalysisWorkerLoop(opts?: {
       };
 
       try {
-        await writeProgress({ progressPercent: 0, progressMessage: "Processing" });
+        await writeProgress({
+          progressPercent: 0,
+          progressMessage: "Processing",
+        });
 
-        if (dbJob.type !== "repository_analysis" && dbJob.type !== "architecture_generation") {
+        if (
+          dbJob.type !== "repository_analysis" &&
+          dbJob.type !== "architecture_generation"
+        ) {
           throw new Error(`Unsupported job type: ${dbJob.type}`);
         }
 
@@ -89,14 +97,21 @@ export async function startAnalysisWorkerLoop(opts?: {
         const scope = details?.scope;
 
         if (dbJob.type === "repository_analysis") {
-          await repositoryService.analyzeRepository(dbJob.repositoryId, dbJob.userId, {
-            scope,
-            onProgress: async (update) => {
-              await writeProgress(update);
+          await repositoryService.analyzeRepository(
+            dbJob.repositoryId,
+            dbJob.userId,
+            {
+              scope,
+              onProgress: async (update) => {
+                await writeProgress(update);
+              },
             },
-          });
+          );
         } else {
-          await writeProgress({ progressPercent: 100, progressMessage: "Architecture analysis complete" });
+          await writeProgress({
+            progressPercent: 100,
+            progressMessage: "Architecture analysis complete",
+          });
         }
 
         await analysisJobService.markDone({ jobId });
@@ -110,7 +125,7 @@ export async function startAnalysisWorkerLoop(opts?: {
           attempts: job.attemptsMade + 1,
           maxAttempts: dbJob.maxAttempts,
         });
-        
+
         throw err; // Re-throw to let BullMQ handle retry/failure logic
       }
     },
@@ -118,7 +133,7 @@ export async function startAnalysisWorkerLoop(opts?: {
       connection: connection as any,
       concurrency: parseInt(process.env.WORKER_CONCURRENCY || "1", 10),
       name: workerId,
-    }
+    },
   );
 
   worker.on("completed", (job) => {
@@ -146,7 +161,8 @@ export async function startAnalysisWorkerLoop(opts?: {
   process.on("SIGHUP", () => void shutdown("SIGHUP"));
 }
 
-const isMain = typeof require !== "undefined" && (require as any).main === module;
+const isMain =
+  typeof require !== "undefined" && (require as any).main === module;
 if (isMain) {
   startAnalysisWorkerLoop().catch(async (e) => {
     console.error("Worker fatal error:", e);

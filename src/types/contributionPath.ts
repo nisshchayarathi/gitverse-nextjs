@@ -1,5 +1,10 @@
 export type ExperienceLevel = "Beginner" | "Intermediate" | "Advanced";
-export type FocusArea = "Frontend" | "Backend" | "Full Stack" | "AI/ML" | "DevOps";
+export type FocusArea =
+  | "Frontend"
+  | "Backend"
+  | "Full Stack"
+  | "AI/ML"
+  | "DevOps";
 
 export interface ContributionPreference {
   name: string;
@@ -15,9 +20,19 @@ export interface RepositoryAnalysisData {
   size?: number;
   files?: Array<{ path: string; name?: string; language?: string }>;
   languages?: Array<{ name: string; percentage: number }>;
-  commits?: Array<{ hash?: string; message?: string; authorName?: string; committedAt?: string }>;
+  commits?: Array<{
+    hash?: string;
+    message?: string;
+    authorName?: string;
+    committedAt?: string;
+  }>;
   contributors?: Array<{ name?: string; commits?: number }>;
-  issues?: Array<{ id?: string | number; title?: string; labels?: Array<{ name: string }>; state?: string }>;
+  issues?: Array<{
+    id?: string | number;
+    title?: string;
+    labels?: Array<{ name: string }>;
+    state?: string;
+  }>;
 }
 
 export interface ContributionDayPlan {

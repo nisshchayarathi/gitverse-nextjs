@@ -21,11 +21,11 @@ export const CopyToClipboard = ({
       setHasError(false);
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
-  console.error("Failed to copy text: ", err);
-  setIsCopied(false);
-  setHasError(true);
-  setTimeout(() => setHasError(false), 2000);
-}
+      console.error("Failed to copy text: ", err);
+      setIsCopied(false);
+      setHasError(true);
+      setTimeout(() => setHasError(false), 2000);
+    }
   };
 
   return (

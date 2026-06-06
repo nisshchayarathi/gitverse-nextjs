@@ -1,5 +1,6 @@
 import React from "react";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
+import { waitFor } from "@testing-library/react";
 import { AuthProvider, useAuth } from "../AuthContext";
 
 const mockSignOut = jest.fn();
@@ -28,7 +29,10 @@ describe("useAuth", () => {
       localStorage.setItem("gitverse_token", "test-jwt-token");
       useSession.mockReturnValue({ data: null, status: "unauthenticated" });
       mockFetch
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ user: { id: 1, name: "T", email: "t@t.com" } }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ user: { id: 1, name: "T", email: "t@t.com" } }),
+        })
         .mockResolvedValueOnce({ ok: true });
 
       const { result } = renderHook(() => useAuth(), { wrapper });
@@ -74,7 +78,10 @@ describe("useAuth", () => {
       localStorage.setItem("gitverse_token", "test-jwt-token");
       useSession.mockReturnValue({ data: null, status: "unauthenticated" });
       mockFetch
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ user: { id: 1, name: "T", email: "t@t.com" } }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ user: { id: 1, name: "T", email: "t@t.com" } }),
+        })
         .mockRejectedValue(new Error("Network error"));
 
       const { result } = renderHook(() => useAuth(), { wrapper });
@@ -93,7 +100,10 @@ describe("useAuth", () => {
       localStorage.setItem("gitverse_token", "test-jwt-token");
       useSession.mockReturnValue({ data: null, status: "unauthenticated" });
       mockFetch
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ user: { id: 1, name: "T", email: "t@t.com" } }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ user: { id: 1, name: "T", email: "t@t.com" } }),
+        })
         .mockRejectedValueOnce(new Error("Retry 1"))
         .mockRejectedValueOnce(new Error("Retry 2"))
         .mockResolvedValueOnce({ ok: true });
@@ -103,7 +113,7 @@ describe("useAuth", () => {
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
       await act(async () => {
-        await result.current.logout(2);
+        await result.current.logout();
       });
 
       expect(mockFetch).toHaveBeenCalledTimes(4); // 1 auth/me + 3 logout attempts
@@ -139,7 +149,10 @@ describe("useAuth", () => {
       localStorage.setItem("gitverse_token", "expired-token");
       useSession.mockReturnValue({ data: null, status: "unauthenticated" });
       mockFetch
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ user: { id: 1, name: "T", email: "t@t.com" } }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ user: { id: 1, name: "T", email: "t@t.com" } }),
+        })
         .mockResolvedValueOnce({ ok: false, status: 401 });
 
       const { result } = renderHook(() => useAuth(), { wrapper });

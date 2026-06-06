@@ -1,21 +1,32 @@
 import { getGeminiService } from "@/lib/services/geminiService";
 import { sanitizeTextContent } from "@/lib/utils/promptSanitization";
-import { DocumentationPatch, DriftAnalysisResult } from "../../types/documentation-drift";
+import {
+  DocumentationPatch,
+  DriftAnalysisResult,
+} from "../../types/documentation-drift";
 
 export class DocumentationGeneratorService {
   /**
    * Generates a patched version of the file with updated documentation.
    */
-  async generatePatch(filePath: string, content: string, drift: DriftAnalysisResult): Promise<DocumentationPatch> {
+  async generatePatch(
+    filePath: string,
+    content: string,
+    drift: DriftAnalysisResult,
+  ): Promise<DocumentationPatch> {
     const gemini = getGeminiService();
 
     const safePath = sanitizeTextContent(filePath);
     const safeContent = sanitizeTextContent(content);
-    const safeOutdated = sanitizeTextContent(drift.outdatedDescriptions.join(', '));
-    const safeMissing = sanitizeTextContent(drift.missingParameters.join(', '));
-    const safeRemoved = sanitizeTextContent(drift.removedParameters.join(', '));
-    const safeIncorrect = sanitizeTextContent(drift.incorrectReturnValues.join(', '));
-    const safeStale = sanitizeTextContent(drift.staleExamples.join(', '));
+    const safeOutdated = sanitizeTextContent(
+      drift.outdatedDescriptions.join(", "),
+    );
+    const safeMissing = sanitizeTextContent(drift.missingParameters.join(", "));
+    const safeRemoved = sanitizeTextContent(drift.removedParameters.join(", "));
+    const safeIncorrect = sanitizeTextContent(
+      drift.incorrectReturnValues.join(", "),
+    );
+    const safeStale = sanitizeTextContent(drift.staleExamples.join(", "));
 
     const prompt = `
 You are an expert technical writer and code reviewer.
@@ -57,32 +68,42 @@ Return a JSON object matching this schema exactly (no markdown formatting, no co
 
     try {
       const response = await gemini.chatRaw(prompt);
-      
+
       const rawText = response.text.trim();
       let jsonText = rawText;
       if (rawText.startsWith("```json")) {
-        jsonText = rawText.replace(/^```json/, "").replace(/```$/, "").trim();
+        jsonText = rawText
+          .replace(/^```json/, "")
+          .replace(/```$/, "")
+          .trim();
       } else if (rawText.startsWith("```")) {
         jsonText = rawText.replace(/^```/, "").replace(/```$/, "").trim();
       }
 
       const parsed = JSON.parse(jsonText);
-      
+
       return {
         originalContent: content,
         suggestedContent: parsed.suggestedContent || content,
-        suggestedFixConfidence: typeof parsed.suggestedFixConfidence === 'number' ? parsed.suggestedFixConfidence : 0,
+        suggestedFixConfidence:
+          typeof parsed.suggestedFixConfidence === "number"
+            ? parsed.suggestedFixConfidence
+            : 0,
         reasoning: parsed.reasoning || "No reasoning provided.",
-        summaryOfChanges: parsed.summaryOfChanges || "Fixed documentation drift."
+        summaryOfChanges:
+          parsed.summaryOfChanges || "Fixed documentation drift.",
       };
     } catch (error) {
-      console.error("[DocumentationGenerator] Failed to generate patch:", error);
+      console.error(
+        "[DocumentationGenerator] Failed to generate patch:",
+        error,
+      );
       return {
         originalContent: content,
         suggestedContent: content,
         suggestedFixConfidence: 0,
         reasoning: "Failed to generate patch.",
-        summaryOfChanges: ""
+        summaryOfChanges: "",
       };
     }
   }

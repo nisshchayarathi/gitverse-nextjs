@@ -42,8 +42,8 @@ export class ErrorBoundary extends React.Component<
           <AlertTriangle className="h-10 w-10 text-amber-500 mb-4" />
           <h3 className="text-lg font-semibold mb-2">Something went wrong</h3>
           <p className="text-sm text-muted-foreground mb-4 max-w-md">
-            This section encountered an unexpected error. Try refreshing the page, or
-            contact support if the problem persists.
+            This section encountered an unexpected error. Try refreshing the
+            page, or contact support if the problem persists.
           </p>
           <Button
             onClick={() => this.setState({ hasError: false, error: null })}

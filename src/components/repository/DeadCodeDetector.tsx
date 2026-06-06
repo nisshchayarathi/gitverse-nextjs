@@ -22,8 +22,14 @@ interface DeadCodeDetectorProps {
   loading?: boolean;
 }
 
-export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetectorProps) {
-  const files = useMemo(() => (repository?.files || []) as RepositoryFile[], [repository?.files]);
+export function DeadCodeDetector({
+  repository,
+  loading = false,
+}: DeadCodeDetectorProps) {
+  const files = useMemo(
+    () => (repository?.files || []) as RepositoryFile[],
+    [repository?.files],
+  );
 
   const report = useMemo(() => {
     if (!files.length) return null;
@@ -35,7 +41,9 @@ export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetect
       <Card className="glass">
         <CardHeader>
           <CardTitle>Dead Code Detector</CardTitle>
-          <CardDescription>Scanning repository dependencies for unused or orphaned files.</CardDescription>
+          <CardDescription>
+            Scanning repository dependencies for unused or orphaned files.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-12">
@@ -51,7 +59,9 @@ export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetect
       <Card className="glass">
         <CardHeader>
           <CardTitle>Dead Code Detector</CardTitle>
-          <CardDescription>Identify potential unused code in the repository.</CardDescription>
+          <CardDescription>
+            Identify potential unused code in the repository.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <EmptyState
@@ -71,7 +81,9 @@ export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetect
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle>Dead Code Detector</CardTitle>
-              <CardDescription>Potential cleanup candidates based on dependency analysis.</CardDescription>
+              <CardDescription>
+                Potential cleanup candidates based on dependency analysis.
+              </CardDescription>
             </div>
             <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
               No high-confidence candidates
@@ -96,7 +108,8 @@ export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetect
           <div>
             <CardTitle>Dead Code Detector</CardTitle>
             <CardDescription>
-              {report.summary} Review the top findings before cleaning up unused code.
+              {report.summary} Review the top findings before cleaning up unused
+              code.
             </CardDescription>
           </div>
           <div className="rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -116,18 +129,26 @@ export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetect
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold break-all">{finding.path}</span>
+                      <span className="font-semibold break-all">
+                        {finding.path}
+                      </span>
                       <span className="rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
                         {finding.category}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">{finding.reason}</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {finding.reason}
+                    </p>
                   </div>
                   <div className="flex flex-col items-start gap-2 sm:items-end">
                     <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">
                       Confidence: {finding.confidence}%
                     </span>
-                    <Button variant="ghost" size="sm" className="border border-border/50 px-3 py-1 text-xs">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="border border-border/50 px-3 py-1 text-xs"
+                    >
                       View details
                     </Button>
                   </div>
@@ -144,10 +165,14 @@ export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetect
               </div>
               <div className="mt-3 space-y-3 text-sm text-foreground">
                 <p>
-                  Review each candidate and confirm whether the file is still reachable from application routes, component trees, or service consumers.
+                  Review each candidate and confirm whether the file is still
+                  reachable from application routes, component trees, or service
+                  consumers.
                 </p>
                 <p>
-                  Files with low incoming references are likely to be safe cleanup candidates, but route entry points and runtime-loaded modules should be verified manually.
+                  Files with low incoming references are likely to be safe
+                  cleanup candidates, but route entry points and runtime-loaded
+                  modules should be verified manually.
                 </p>
               </div>
             </div>
@@ -158,8 +183,14 @@ export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetect
                 Suggested next step
               </div>
               <div className="mt-3 text-sm text-foreground">
-                <p>Start cleanup with the highest-confidence candidates and preserve any application route or server entry files.</p>
-                <p className="mt-2 text-xs text-muted-foreground">Narrow the candidate set before making deletions to avoid accidental removals.</p>
+                <p>
+                  Start cleanup with the highest-confidence candidates and
+                  preserve any application route or server entry files.
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Narrow the candidate set before making deletions to avoid
+                  accidental removals.
+                </p>
               </div>
             </div>
           </div>
@@ -167,8 +198,13 @@ export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetect
       </CardContent>
       <CardFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">Detective mode</p>
-          <p className="text-sm text-foreground">Use this report to highlight files for manual review and safe cleanup.</p>
+          <p className="text-sm font-medium text-muted-foreground">
+            Detective mode
+          </p>
+          <p className="text-sm text-foreground">
+            Use this report to highlight files for manual review and safe
+            cleanup.
+          </p>
         </div>
         <Button variant="secondary">Export cleanup report</Button>
       </CardFooter>

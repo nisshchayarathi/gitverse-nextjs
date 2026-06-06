@@ -1,0 +1,88 @@
+# ============================================================
+# Dependencies
+# ============================================================
+node_modules/
+.pnp
+.pnp.js
+
+# ============================================================
+# Next.js build output
+# ============================================================
+.next/
+out/
+build/
+
+# ============================================================
+# Environment files — never commit secrets
+# ============================================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# Keep .env.example (template only, no real secrets)
+!.env.example
+
+# ============================================================
+# Testing & coverage
+# ============================================================
+coverage/
+playwright-report/
+test-results/
+test-output.txt
+
+# ============================================================
+# TypeScript
+# ============================================================
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# ============================================================
+# Build / compiled output
+# ============================================================
+dist/
+dist-worker/
+
+# ============================================================
+# Logs
+# ============================================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# ============================================================
+# Deployment platforms
+# ============================================================
+.vercel/
+
+# ============================================================
+# Editors & OS artifacts
+# ============================================================
+.DS_Store
+Thumbs.db
+.vscode/*
+# Keep shared editor settings
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# ============================================================
+# Temporary / scratch files
+# ============================================================
+fix_tests.js
+fix_tests.py
+fix_tests2.py
+batch_create.ts
+DevPath/
+devtrack/
+gitverse-nextjs/
+
+# ============================================================
+# Package manager lock files (keep one, ignore the rest)
+# If your team uses npm, keep package-lock.json and ignore pnpm-lock.yaml.
+# If your team uses pnpm, keep pnpm-lock.yaml and ignore package-lock.json.
+# Uncomment the one you don't use:
+# pnpm-lock.yaml
+# package-lock.json

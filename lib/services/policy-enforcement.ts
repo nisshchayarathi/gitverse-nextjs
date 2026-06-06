@@ -12,7 +12,9 @@ export class PolicyEnforcementService {
     hasCriticalSecrets: boolean;
     secretCount: number;
   }): Promise<{ allowed: boolean; reason?: string }> {
-    const policy = await orgPolicyEngine.getEffectivePolicy(params.repositoryId);
+    const policy = await orgPolicyEngine.getEffectivePolicy(
+      params.repositoryId,
+    );
 
     if (params.hasCriticalSecrets && policy.blockCriticalSecrets) {
       await orgAuditLogService.logEvent({
@@ -20,15 +22,17 @@ export class PolicyEnforcementService {
         action: "POLICY_VIOLATION_BLOCKED",
         resource: "Pull Request Merge",
         details: {
-          reason: "Critical secrets detected and blockCriticalSecrets policy is enforced.",
+          reason:
+            "Critical secrets detected and blockCriticalSecrets policy is enforced.",
           headSha: params.headSha,
           secretCount: params.secretCount,
-        }
+        },
       });
 
       return {
         allowed: false,
-        reason: "Organization policy prohibits merging when critical secrets are detected."
+        reason:
+          "Organization policy prohibits merging when critical secrets are detected.",
       };
     }
 
@@ -43,7 +47,9 @@ export class PolicyEnforcementService {
     headSha: string;
     aiReviewScore: number;
   }): Promise<{ allowed: boolean; reason?: string }> {
-    const policy = await orgPolicyEngine.getEffectivePolicy(params.repositoryId);
+    const policy = await orgPolicyEngine.getEffectivePolicy(
+      params.repositoryId,
+    );
 
     if (policy.enforceSecurityReviews && params.aiReviewScore < 50) {
       await orgAuditLogService.logEvent({
@@ -54,12 +60,13 @@ export class PolicyEnforcementService {
           reason: "Security review failed minimum threshold.",
           headSha: params.headSha,
           aiReviewScore: params.aiReviewScore,
-        }
+        },
       });
 
       return {
         allowed: false,
-        reason: "Organization policy mandates a passing AI security review. Current score is below the threshold."
+        reason:
+          "Organization policy mandates a passing AI security review. Current score is below the threshold.",
       };
     }
 

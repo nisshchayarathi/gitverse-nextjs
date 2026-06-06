@@ -90,7 +90,9 @@ describe("GET /api/internal/worker/healthz – encryption check", () => {
   it("fails health check when INTERNAL_WORKER_SECRET is missing even if encryption is ok", async () => {
     delete process.env.INTERNAL_WORKER_SECRET;
     const { validateRequiredSecrets } = require("@/lib/utils/internalAuth");
-    (validateRequiredSecrets as jest.Mock).mockReturnValueOnce(["INTERNAL_WORKER_SECRET"]);
+    (validateRequiredSecrets as jest.Mock).mockReturnValueOnce([
+      "INTERNAL_WORKER_SECRET",
+    ]);
 
     const res = await GET(mockRequest("Bearer test-secret"));
     const body = await res.json();

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Clipboard, Check } from 'lucide-react';
+import React, { useState } from "react";
+import { Clipboard, Check } from "lucide-react";
 
 interface CopyButtonProps {
   textToCopy: string;
@@ -14,7 +14,7 @@ export const CopyButton: React.FC<CopyButtonProps> = ({ textToCopy }) => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy text: ', err);
+      console.error("Failed to copy text: ", err);
     }
   };
 

@@ -1,6 +1,10 @@
 "use client";
 
-import { ImportanceLevel, ImportanceCategory, getCategoryColor } from "@/config/folderImportance";
+import {
+  ImportanceLevel,
+  ImportanceCategory,
+  getCategoryColor,
+} from "@/config/folderImportance";
 
 interface FolderImportanceBadgeProps {
   level: ImportanceLevel;

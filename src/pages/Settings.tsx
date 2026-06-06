@@ -4,7 +4,16 @@ export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useState, useRef } from "react";
 import Image from "next/image";
-import { User, Lock, Shield, Trash2, AlertCircle, Sun, Moon, Cpu } from "lucide-react";
+import {
+  User,
+  Lock,
+  Shield,
+  Trash2,
+  AlertCircle,
+  Sun,
+  Moon,
+  Cpu,
+} from "lucide-react";
 import { Save } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useTheme } from "@/context/ThemeContext";
@@ -92,15 +101,19 @@ export default function Settings() {
   }, [authLoading, fetchUserInfo]);
 
   useEffect(() => {
-  return () => {
-    if (avatar?.startsWith("blob:")) {
-      URL.revokeObjectURL(avatar);
-    }
-  };
-}, [avatar]);
+    return () => {
+      if (avatar?.startsWith("blob:")) {
+        URL.revokeObjectURL(avatar);
+      }
+    };
+  }, [avatar]);
 
   // AI Settings State
-  const { settings, updateSettings, isLoaded: isAISettingsLoaded } = useAISettings();
+  const {
+    settings,
+    updateSettings,
+    isLoaded: isAISettingsLoaded,
+  } = useAISettings();
   const [aiProvider, setAiProvider] = useState<AIProviderType>("gemini");
   const [aiGeminiKey, setAiGeminiKey] = useState("");
   const [aiOpenaiKey, setAiOpenaiKey] = useState("");
@@ -208,7 +221,7 @@ export default function Settings() {
           // If user is logged in via legacy JWT, send the Bearer token.
           withCredentials: true,
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        }
+        },
       );
 
       if (response.status === 200) {
@@ -225,9 +238,7 @@ export default function Settings() {
       console.error("Error updating profile:", error);
       toast({
         title: "Error",
-        description:
-          error?.response?.data?.error ||
-          "Failed to update profile",
+        description: error?.response?.data?.error || "Failed to update profile",
         variant: "destructive",
       });
     } finally {
@@ -268,7 +279,7 @@ export default function Settings() {
         {
           withCredentials: true,
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        }
+        },
       );
 
       if (response.status === 200) {
@@ -284,8 +295,7 @@ export default function Settings() {
       console.error("Error changing password:", error);
       toast({
         title: "Error",
-        description:
-          error.response?.data?.error || "Failed to change password",
+        description: error.response?.data?.error || "Failed to change password",
         variant: "destructive",
       });
     } finally {
@@ -324,12 +334,12 @@ export default function Settings() {
     // Convert to base64
     const previewUrl = URL.createObjectURL(file);
 
-     setAvatar(previewUrl);
+    setAvatar(previewUrl);
 
-     toast ({
-     title: "Avatar Updated",
-    description: 'Click "Save Changes" to confirm the update',
-});
+    toast({
+      title: "Avatar Updated",
+      description: 'Click "Save Changes" to confirm the update',
+    });
   };
 
   const handleDeleteAccount = () => {
@@ -359,8 +369,7 @@ export default function Settings() {
       console.error("Error deleting account:", error);
       toast({
         title: "Error",
-        description:
-          error.response?.data?.error || "Failed to delete account",
+        description: error.response?.data?.error || "Failed to delete account",
         variant: "destructive",
       });
     } finally {
@@ -452,10 +461,11 @@ export default function Settings() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left ${activeTab === tab.id
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left ${
+                        activeTab === tab.id
                           ? "bg-primary/10 text-primary font-medium"
                           : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                        }`}
+                      }`}
                     >
                       <tab.icon className="h-5 w-5" />
                       <span>{tab.label}</span>
@@ -519,7 +529,7 @@ export default function Settings() {
                     {isGoogleLinked &&
                       !!initialEmailRef.current &&
                       email.trim().toLowerCase() !==
-                      initialEmailRef.current.toLowerCase() && (
+                        initialEmailRef.current.toLowerCase() && (
                         <div className="space-y-2">
                           <label
                             htmlFor="email-change-password"
@@ -624,33 +634,39 @@ export default function Settings() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <button
                         type="button"
-                        onClick={() => setTheme('light')}
-                        aria-pressed={theme === 'light'}
+                        onClick={() => setTheme("light")}
+                        aria-pressed={theme === "light"}
                         aria-label="Use light mode"
                         className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${
-                          theme === 'light'
-                            ? 'border-primary bg-primary/5 text-primary'
-                            : 'border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground'
+                          theme === "light"
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         <Sun className="h-8 w-8 mb-2" />
-                        <span className="font-semibold text-sm">Light Mode</span>
-                        <span className="text-xs text-muted-foreground mt-1">Sleek light workspace</span>
+                        <span className="font-semibold text-sm">
+                          Light Mode
+                        </span>
+                        <span className="text-xs text-muted-foreground mt-1">
+                          Sleek light workspace
+                        </span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => setTheme('dark')}
-                        aria-pressed={theme === 'dark'}
+                        onClick={() => setTheme("dark")}
+                        aria-pressed={theme === "dark"}
                         aria-label="Use dark mode"
                         className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${
-                          theme === 'dark'
-                            ? 'border-primary bg-primary/5 text-primary'
-                            : 'border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground'
+                          theme === "dark"
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         <Moon className="h-8 w-8 mb-2" />
                         <span className="font-semibold text-sm">Dark Mode</span>
-                        <span className="text-xs text-muted-foreground mt-1">Reduce eye strain at night</span>
+                        <span className="text-xs text-muted-foreground mt-1">
+                          Reduce eye strain at night
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -760,19 +776,26 @@ export default function Settings() {
                     AI Summary Settings
                   </CardTitle>
                   <CardDescription>
-                    Configure your AI provider to generate module and file summaries. Keys are stored securely in your browser&apos;s localStorage.
+                    Configure your AI provider to generate module and file
+                    summaries. Keys are stored securely in your browser&apos;s
+                    localStorage.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSaveAISettings} className="space-y-4">
                     <div className="space-y-2">
-                      <label htmlFor="ai-provider" className="text-sm font-medium">
+                      <label
+                        htmlFor="ai-provider"
+                        className="text-sm font-medium"
+                      >
                         AI Provider
                       </label>
                       <select
                         id="ai-provider"
                         value={aiProvider}
-                        onChange={(e) => setAiProvider(e.target.value as AIProviderType)}
+                        onChange={(e) =>
+                          setAiProvider(e.target.value as AIProviderType)
+                        }
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                       >
                         <option value="gemini">Google Gemini</option>
@@ -782,7 +805,10 @@ export default function Settings() {
 
                     {aiProvider === "gemini" && (
                       <div className="space-y-2">
-                        <label htmlFor="gemini-key" className="text-sm font-medium">
+                        <label
+                          htmlFor="gemini-key"
+                          className="text-sm font-medium"
+                        >
                           Gemini API Key
                         </label>
                         <Input
@@ -793,14 +819,18 @@ export default function Settings() {
                           onChange={(e) => setAiGeminiKey(e.target.value)}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Enter your Google Gemini API Key. Get one from Google AI Studio.
+                          Enter your Google Gemini API Key. Get one from Google
+                          AI Studio.
                         </p>
                       </div>
                     )}
 
                     {aiProvider === "openai" && (
                       <div className="space-y-2">
-                        <label htmlFor="openai-key" className="text-sm font-medium">
+                        <label
+                          htmlFor="openai-key"
+                          className="text-sm font-medium"
+                        >
                           OpenAI API Key
                         </label>
                         <Input
@@ -871,7 +901,9 @@ export default function Settings() {
           aria-modal="true"
           aria-labelledby="delete-account-title"
           onKeyDown={(e) => e.key === "Escape" && setShowDeleteModal(false)}
-          onClick={(e) => e.target === e.currentTarget && setShowDeleteModal(false)}
+          onClick={(e) =>
+            e.target === e.currentTarget && setShowDeleteModal(false)
+          }
         >
           <Card className="w-full max-w-sm">
             <CardHeader>
@@ -879,7 +911,8 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-6">
-                This permanently deletes your account and all data. This cannot be undone.
+                This permanently deletes your account and all data. This cannot
+                be undone.
               </p>
 
               <div className="flex gap-3 justify-end">
@@ -905,7 +938,6 @@ export default function Settings() {
           </Card>
         </div>
       )}
-
     </DashboardLayout>
   );
 }

@@ -19,16 +19,12 @@ export function ModuleSelector({
   className = "",
   label,
 }: ModuleSelectorProps) {
-  const modules = getAvailableModules().filter(
-    (mod) => mod !== excludeModule
-  );
+  const modules = getAvailableModules().filter((mod) => mod !== excludeModule);
 
   return (
     <div className={`space-y-1 ${className}`}>
       {label && (
-        <label className="text-sm font-semibold text-foreground">
-          {label}
-        </label>
+        <label className="text-sm font-semibold text-foreground">{label}</label>
       )}
       <select
         value={value || ""}

@@ -184,13 +184,13 @@ describe("internalAuth utilities", () => {
   describe("validateRequiredSecrets", () => {
     it("returns empty array when all secrets are set in development", () => {
       process.env.INTERNAL_WORKER_SECRET = "worker-secret";
-      process.env.NODE_ENV = "development";
+      (process.env as any).NODE_ENV = "development";
 
       expect(validateRequiredSecrets()).toEqual([]);
     });
 
     it("returns missing secrets in production", () => {
-      process.env.NODE_ENV = "production";
+      (process.env as any).NODE_ENV = "production";
       delete process.env.INTERNAL_WORKER_SECRET;
       delete process.env.ANALYSIS_RUNNER_SECRET;
 
@@ -200,7 +200,7 @@ describe("internalAuth utilities", () => {
     });
 
     it("does not require ANALYSIS_RUNNER_SECRET in development", () => {
-      process.env.NODE_ENV = "development";
+      (process.env as any).NODE_ENV = "development";
       process.env.INTERNAL_WORKER_SECRET = "worker-secret";
       delete process.env.ANALYSIS_RUNNER_SECRET;
 
@@ -211,7 +211,7 @@ describe("internalAuth utilities", () => {
 
   describe("validateRequiredAnalysisSecrets", () => {
     it("returns error when ANALYSIS_RUNNER_SECRET is not set in production", () => {
-      process.env.NODE_ENV = "production";
+      (process.env as any).NODE_ENV = "production";
       delete process.env.ANALYSIS_RUNNER_SECRET;
 
       const result = validateRequiredAnalysisSecrets();
@@ -220,7 +220,7 @@ describe("internalAuth utilities", () => {
     });
 
     it("returns warning when ANALYSIS_RUNNER_SECRET is not set in development", () => {
-      process.env.NODE_ENV = "development";
+      (process.env as any).NODE_ENV = "development";
       delete process.env.ANALYSIS_RUNNER_SECRET;
 
       const result = validateRequiredAnalysisSecrets();
@@ -275,7 +275,9 @@ describe("internalAuth utilities", () => {
 
       const result = validateRequiredAnalysisSecrets();
       expect(result.errors.length).toBe(0);
-      expect(result.warnings.filter((w) => w.includes("differ")).length).toBe(0);
+      expect(result.warnings.filter((w) => w.includes("differ")).length).toBe(
+        0,
+      );
     });
   });
 
@@ -297,8 +299,10 @@ describe("internalAuth utilities", () => {
       const warnings = validateSecretIsolation();
       expect(warnings).toEqual(
         expect.arrayContaining([
-          expect.stringContaining("INTERNAL_WORKER_SECRET should differ from GITHUB_WEBHOOK_SECRET"),
-        ])
+          expect.stringContaining(
+            "INTERNAL_WORKER_SECRET should differ from GITHUB_WEBHOOK_SECRET",
+          ),
+        ]),
       );
     });
 
@@ -309,8 +313,10 @@ describe("internalAuth utilities", () => {
       const warnings = validateSecretIsolation();
       expect(warnings).toEqual(
         expect.arrayContaining([
-          expect.stringContaining("INTERNAL_WORKER_SECRET should differ from JWT_SECRET"),
-        ])
+          expect.stringContaining(
+            "INTERNAL_WORKER_SECRET should differ from JWT_SECRET",
+          ),
+        ]),
       );
     });
 
@@ -321,8 +327,10 @@ describe("internalAuth utilities", () => {
       const warnings = validateSecretIsolation();
       expect(warnings).toEqual(
         expect.arrayContaining([
-          expect.stringContaining("ANALYSIS_RUNNER_SECRET should differ from INTERNAL_WORKER_SECRET"),
-        ])
+          expect.stringContaining(
+            "ANALYSIS_RUNNER_SECRET should differ from INTERNAL_WORKER_SECRET",
+          ),
+        ]),
       );
     });
 
@@ -333,8 +341,10 @@ describe("internalAuth utilities", () => {
       const warnings = validateSecretIsolation();
       expect(warnings).toEqual(
         expect.arrayContaining([
-          expect.stringContaining("ANALYSIS_RUNNER_SECRET should differ from CRON_SECRET"),
-        ])
+          expect.stringContaining(
+            "ANALYSIS_RUNNER_SECRET should differ from CRON_SECRET",
+          ),
+        ]),
       );
     });
 
@@ -345,8 +355,10 @@ describe("internalAuth utilities", () => {
       const warnings = validateSecretIsolation();
       expect(warnings).toEqual(
         expect.arrayContaining([
-          expect.stringContaining("ANALYSIS_RUNNER_SECRET should differ from JWT_SECRET"),
-        ])
+          expect.stringContaining(
+            "ANALYSIS_RUNNER_SECRET should differ from JWT_SECRET",
+          ),
+        ]),
       );
     });
   });

@@ -21,29 +21,29 @@ jest.mock("../../../lib/prisma", () => ({
  * ====================================================================================
  * SECURITY TEST SUITE: ROLE-BASED ACCESS CONTROL (RBAC) & IDOR PREVENTION ENGINE
  * ====================================================================================
- * 
+ *
  * This test suite is designed to comprehensively verify the security posture of the
  * GitVerse Next.js authorization and repository access validation subsystem.
- * 
+ *
  * Secure Software Development Lifecycle (SSDLC) Objectives:
  * 1. Zero Trust Architecture: Enforce authentication and strict authorization boundary
  *    checks at the database and object level, ensuring that no access is granted implicitly.
  * 2. Fail-Closed Design: Verify that any validation failure, database anomaly, network error,
  *    or unrecognized user configuration immediately defaults to the most restrictive state (Access Denied).
- * 3. Type Safety at Runtime: Ensure that TypeScript types (specifically RepositoryRole) are 
- *    strictly validated at runtime to prevent privilege escalation via malicious parameter 
+ * 3. Type Safety at Runtime: Ensure that TypeScript types (specifically RepositoryRole) are
+ *    strictly validated at runtime to prevent privilege escalation via malicious parameter
  *    tampering or direct database manipulation (Defense-in-Depth).
  * 4. Indirect Object Reference (IDOR) Prevention: Ensure users cannot enumerate, view,
  *    or modify repositories belonging to other personal accounts or organizations they do not
  *    possess verified active membership in.
- * 
+ *
  * Threat Vector Analysis & Test Matrix:
  * - Personal ownership bypass (direct userId verification)
  * - Cross-tenant organization leaks (cross-tenant assignment lookup)
  * - Organization membership checks (membership status)
  * - Type coercion & string injection attacks (unsafe type casting prevention)
  * - Database exceptions & system failure modes (graceful error propagation)
- * 
+ *
  * ====================================================================================
  * OWASP COMPLIANCE CLASSIFICATION:
  * - OWASP A01:2021-Broken Access Control: Tested via direct IDOR verification scenarios.
@@ -68,7 +68,12 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
     });
 
     it("allows all registered roles to read policy", () => {
-      const roles = ["ORG_ADMIN", "REPO_ADMIN", "CONTRIBUTOR", "VIEWER"] as const;
+      const roles = [
+        "ORG_ADMIN",
+        "REPO_ADMIN",
+        "CONTRIBUTOR",
+        "VIEWER",
+      ] as const;
       for (const role of roles) {
         expect(RBAC.canReadPolicy(role)).toBe(true);
       }
@@ -98,7 +103,10 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           userId: directOwnerId,
         });
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, directOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          directOwnerId,
+        );
         expect(result.allowed).toBe(true);
         expect(result.role).toBe("REPO_ADMIN");
         expect(result.repositoryExists).toBe(true);
@@ -109,9 +117,14 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: targetRepoId,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue(null);
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue(null);
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(false);
         expect(result.role).toBeUndefined();
         expect(result.reason).toContain("Unauthorized access to repository");
@@ -125,14 +138,19 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: targetRepoId,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: orgId,
         });
         (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue({
           role: "ORG_ADMIN",
         });
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(true);
         expect(result.role).toBe("ORG_ADMIN");
         expect(result.repositoryExists).toBe(true);
@@ -143,14 +161,19 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: targetRepoId,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: orgId,
         });
         (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue({
           role: "REPO_ADMIN",
         });
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(true);
         expect(result.role).toBe("REPO_ADMIN");
         expect(result.repositoryExists).toBe(true);
@@ -161,14 +184,19 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: targetRepoId,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: orgId,
         });
         (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue({
           role: "CONTRIBUTOR",
         });
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(true);
         expect(result.role).toBe("CONTRIBUTOR");
         expect(RBAC.canModifyPolicy(result.role!)).toBe(false);
@@ -180,14 +208,19 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: targetRepoId,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: orgId,
         });
         (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue({
           role: "VIEWER",
         });
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(true);
         expect(result.role).toBe("VIEWER");
         expect(RBAC.canModifyPolicy(result.role!)).toBe(false);
@@ -201,16 +234,25 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: targetRepoId,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: orgId,
         });
         // User is not a member of the organization assigned to this repository
-        (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue(null);
+        (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue(
+          null,
+        );
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(false);
         expect(result.role).toBeUndefined();
-        expect(result.reason).toContain("User is not a member of the repository organization");
+        expect(result.reason).toContain(
+          "User is not a member of the repository organization",
+        );
       });
     });
 
@@ -230,7 +272,7 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
       /**
        * The following tests explicitly verify the runtime type validation mechanism
        * implemented to mitigate vulnerability #1590 (Unsafe type casting on database strings).
-       * We test the system against a wide range of injected, malicious, corrupted, or 
+       * We test the system against a wide range of injected, malicious, corrupted, or
        * outdated string inputs to ensure the system rejects all unauthorized values and fails closed.
        */
       const testInvalidRole = async (injectedRoleValue: any) => {
@@ -238,14 +280,19 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: targetRepoId,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: orgId,
         });
         (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue({
           role: injectedRoleValue,
         });
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(false);
         expect(result.role).toBeUndefined();
         expect(result.reason).toContain("Invalid organization role");
@@ -303,13 +350,20 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
        */
       it("fails closed when repository table lookup throws a database connection error", async () => {
         (prisma.repository.findUnique as jest.Mock).mockRejectedValue(
-          new Error("PrismaClientKnownRequestError: Cannot connect to PostgreSQL database server")
+          new Error(
+            "PrismaClientKnownRequestError: Cannot connect to PostgreSQL database server",
+          ),
         );
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(false);
         expect(result.repositoryExists).toBe(true);
-        expect(result.reason).toContain("Authorization error: PrismaClientKnownRequestError");
+        expect(result.reason).toContain(
+          "Authorization error: PrismaClientKnownRequestError",
+        );
       });
 
       it("fails closed when repository policy assignment query throws a database error", async () => {
@@ -317,14 +371,23 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: targetRepoId,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockRejectedValue(
-          new Error("Database deadlock detected on repositoryPolicyAssignment table")
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockRejectedValue(
+          new Error(
+            "Database deadlock detected on repositoryPolicyAssignment table",
+          ),
         );
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(false);
         expect(result.repositoryExists).toBe(true);
-        expect(result.reason).toContain("Authorization error: Database deadlock detected");
+        expect(result.reason).toContain(
+          "Authorization error: Database deadlock detected",
+        );
       });
 
       it("fails closed when organization membership query throws a database error", async () => {
@@ -332,17 +395,26 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: targetRepoId,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: orgId,
         });
         (prisma.organizationMember.findUnique as jest.Mock).mockRejectedValue(
-          new Error("Prisma client request timeout exceeded on organizationMember index lookup")
+          new Error(
+            "Prisma client request timeout exceeded on organizationMember index lookup",
+          ),
         );
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(false);
         expect(result.repositoryExists).toBe(true);
-        expect(result.reason).toContain("Authorization error: Prisma client request timeout");
+        expect(result.reason).toContain(
+          "Authorization error: Prisma client request timeout",
+        );
       });
     });
 
@@ -352,7 +424,12 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
        * We simulate hundreds of virtual access checks to ensure absolute security isolation
        * across a dense matrix of tenant states.
        */
-      const rolesToTest = ["ORG_ADMIN", "REPO_ADMIN", "CONTRIBUTOR", "VIEWER"] as const;
+      const rolesToTest = [
+        "ORG_ADMIN",
+        "REPO_ADMIN",
+        "CONTRIBUTOR",
+        "VIEWER",
+      ] as const;
 
       for (const roleUnderTest of rolesToTest) {
         it(`properly evaluates access and assigns ${roleUnderTest} permissions`, async () => {
@@ -360,12 +437,16 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
             id: 202,
             userId: 1000,
           });
-          (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+          (
+            prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+          ).mockResolvedValue({
             organizationId: "org-202",
           });
-          (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue({
-            role: roleUnderTest,
-          });
+          (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue(
+            {
+              role: roleUnderTest,
+            },
+          );
 
           const result = await RepositoryAccess.checkAccess(202, 999);
           expect(result.allowed).toBe(true);
@@ -389,10 +470,14 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: 502,
           userId: 999,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValueOnce({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValueOnce({
           organizationId: "org-502",
         });
-        (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValueOnce({
+        (
+          prisma.organizationMember.findUnique as jest.Mock
+        ).mockResolvedValueOnce({
           role: "CONTRIBUTOR",
         });
         const resultB = await RepositoryAccess.checkAccess(502, 888);
@@ -408,7 +493,7 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
        */
       it("gracefully rejects floating-point repository IDs and fails gracefully", async () => {
         (prisma.repository.findUnique as jest.Mock).mockResolvedValue(null);
-        
+
         const result = await RepositoryAccess.checkAccess(101.5, nonOwnerId);
         expect(result.allowed).toBe(false);
         expect(result.repositoryExists).toBe(false);
@@ -416,7 +501,7 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
 
       it("handles negative numeric inputs for repository or user IDs safely and fails gracefully", async () => {
         (prisma.repository.findUnique as jest.Mock).mockResolvedValue(null);
-        
+
         const result = await RepositoryAccess.checkAccess(-999, -555);
         expect(result.allowed).toBe(false);
         expect(result.repositoryExists).toBe(false);
@@ -428,7 +513,10 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           userId: Number.MAX_SAFE_INTEGER,
         });
 
-        const result = await RepositoryAccess.checkAccess(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
+        const result = await RepositoryAccess.checkAccess(
+          Number.MAX_SAFE_INTEGER,
+          Number.MAX_SAFE_INTEGER,
+        );
         expect(result.allowed).toBe(true);
         expect(result.role).toBe("REPO_ADMIN");
       });
@@ -440,24 +528,33 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
        * by checking if console methods are invoked with corresponding critical payloads.
        */
       it("asserts console.error is invoked with [CRITICAL] payload when an invalid role is processed", async () => {
-        const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+        const consoleErrorSpy = jest
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
 
         (prisma.repository.findUnique as jest.Mock).mockResolvedValue({
           id: targetRepoId,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: orgId,
         });
         (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue({
           role: "MALICIOUS_HACKER_ROLE",
         });
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(false);
 
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-          expect.stringContaining("[CRITICAL] [SECURITY_ANOMALY] Unknown or unvalidated role")
+          expect.stringContaining(
+            "[CRITICAL] [SECURITY_ANOMALY] Unknown or unvalidated role",
+          ),
         );
 
         consoleErrorSpy.mockRestore();
@@ -476,15 +573,21 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: 777,
           userId: 111,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: "org-b",
         });
         // User 222 is ORG_ADMIN of Org A, but NOT Org B (returns null membership for org-b)
-        (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue(null);
+        (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue(
+          null,
+        );
 
         const result = await RepositoryAccess.checkAccess(777, 222);
         expect(result.allowed).toBe(false);
-        expect(result.reason).toContain("User is not a member of the repository organization");
+        expect(result.reason).toContain(
+          "User is not a member of the repository organization",
+        );
       });
 
       it("grants access to user who is Org Admin of Organization A when accessing Repository of Organization A", async () => {
@@ -493,7 +596,9 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: 777,
           userId: 111,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: "org-a",
         });
         // User 222 is verified member of Org A with ORG_ADMIN role
@@ -517,7 +622,9 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: 888,
           userId: 999,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: "org-888",
         });
         (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue({
@@ -525,12 +632,12 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
         });
 
         const accessPromises = Array.from({ length: 50 }).map(() =>
-          RepositoryAccess.checkAccess(888, 555)
+          RepositoryAccess.checkAccess(888, 555),
         );
 
         const results = await Promise.all(accessPromises);
         expect(results.length).toBe(50);
-        
+
         for (const result of results) {
           expect(result.allowed).toBe(true);
           expect(result.role).toBe("VIEWER");
@@ -549,7 +656,9 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: 101,
           userId: null, // Bad data format in database
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue(null);
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue(null);
 
         const result = await RepositoryAccess.checkAccess(101, nonOwnerId);
         expect(result.allowed).toBe(false);
@@ -561,10 +670,14 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: 101,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: "", // Empty string organizationId anomaly
         });
-        (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue(null);
+        (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue(
+          null,
+        );
 
         const result = await RepositoryAccess.checkAccess(101, nonOwnerId);
         expect(result.allowed).toBe(false);
@@ -577,13 +690,17 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
        * align perfectly with compliance requirements by ensuring correct formatting.
        */
       it("ensures security anomaly log payloads contain precise context", async () => {
-        const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+        const consoleErrorSpy = jest
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
 
         (prisma.repository.findUnique as jest.Mock).mockResolvedValue({
           id: 303,
           userId: 404,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: "org-303",
         });
         (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue({
@@ -593,13 +710,13 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
         await RepositoryAccess.checkAccess(303, 999);
 
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-          expect.stringContaining("[SECURITY_ANOMALY]")
+          expect.stringContaining("[SECURITY_ANOMALY]"),
         );
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-          expect.stringContaining("user 999")
+          expect.stringContaining("user 999"),
         );
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-          expect.stringContaining("repository 303")
+          expect.stringContaining("repository 303"),
         );
 
         consoleErrorSpy.mockRestore();
@@ -611,14 +728,19 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           id: targetRepoId,
           userId: directOwnerId,
         });
-        (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+        (
+          prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+        ).mockResolvedValue({
           organizationId: "a".repeat(5000), // Exceedingly long org ID
         });
         (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue({
           role: "VIEWER",
         });
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, nonOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          nonOwnerId,
+        );
         expect(result.allowed).toBe(true);
         expect(result.role).toBe("VIEWER");
       });
@@ -638,7 +760,10 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
           userId: directOwnerId,
         });
 
-        const result = await RepositoryAccess.checkAccess(targetRepoId, directOwnerId);
+        const result = await RepositoryAccess.checkAccess(
+          targetRepoId,
+          directOwnerId,
+        );
         expect(result).toHaveProperty("allowed", true);
         expect(result).toHaveProperty("repositoryExists", true);
         expect(result).toHaveProperty("role", "REPO_ADMIN");
@@ -648,9 +773,27 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
     describe("Scenario 16: Advanced Tenant Domain Configuration Boundary Assertions", () => {
       it("assures that cross-tenant validation remains isolated across arbitrary role lookups", async () => {
         const tenantMatrix = [
-          { repoId: 1001, userId: 2001, orgId: "t-1", role: "ORG_ADMIN", expectAllowed: true },
-          { repoId: 1002, userId: 2002, orgId: "t-2", role: "CONTRIBUTOR", expectAllowed: true },
-          { repoId: 1003, userId: 2003, orgId: "t-3", role: "INVALID_TENANT", expectAllowed: false },
+          {
+            repoId: 1001,
+            userId: 2001,
+            orgId: "t-1",
+            role: "ORG_ADMIN",
+            expectAllowed: true,
+          },
+          {
+            repoId: 1002,
+            userId: 2002,
+            orgId: "t-2",
+            role: "CONTRIBUTOR",
+            expectAllowed: true,
+          },
+          {
+            repoId: 1003,
+            userId: 2003,
+            orgId: "t-3",
+            role: "INVALID_TENANT",
+            expectAllowed: false,
+          },
         ];
 
         for (const tenant of tenantMatrix) {
@@ -658,14 +801,21 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
             id: tenant.repoId,
             userId: 99999,
           });
-          (prisma.repositoryPolicyAssignment.findUnique as jest.Mock).mockResolvedValue({
+          (
+            prisma.repositoryPolicyAssignment.findUnique as jest.Mock
+          ).mockResolvedValue({
             organizationId: tenant.orgId,
           });
-          (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue({
-            role: tenant.role,
-          });
+          (prisma.organizationMember.findUnique as jest.Mock).mockResolvedValue(
+            {
+              role: tenant.role,
+            },
+          );
 
-          const result = await RepositoryAccess.checkAccess(tenant.repoId, tenant.userId);
+          const result = await RepositoryAccess.checkAccess(
+            tenant.repoId,
+            tenant.userId,
+          );
           expect(result.allowed).toBe(tenant.expectAllowed);
           if (tenant.expectAllowed) {
             expect(result.role).toBe(tenant.role);

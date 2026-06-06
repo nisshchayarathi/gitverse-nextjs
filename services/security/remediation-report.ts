@@ -5,9 +5,12 @@ export class RemediationReport {
   /**
    * Generates a beautifully formatted security markdown report.
    */
-  public static generate(workflow: RemediationWorkflow, prCreated = false): string {
+  public static generate(
+    workflow: RemediationWorkflow,
+    prCreated = false,
+  ): string {
     const maskedSecret = TokenRevocation.maskSecret(workflow.finding.rawSecret);
-    
+
     return [
       `## Secret Remediation Report`,
       ``,

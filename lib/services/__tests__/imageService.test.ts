@@ -112,14 +112,14 @@ describe("imageService", () => {
   describe("validateHttpAvatarUrl", () => {
     it("accepts valid HTTPS URLs", () => {
       const result = validateHttpAvatarUrl(
-        "https://example.com/avatars/user123.jpg"
+        "https://example.com/avatars/user123.jpg",
       );
       expect(result.valid).toBe(true);
     });
 
     it("accepts valid HTTP URLs", () => {
       const result = validateHttpAvatarUrl(
-        "http://example.com/avatars/user123.jpg"
+        "http://example.com/avatars/user123.jpg",
       );
       expect(result.valid).toBe(true);
     });

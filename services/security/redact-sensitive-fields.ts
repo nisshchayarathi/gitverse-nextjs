@@ -9,7 +9,7 @@ export class RedactSensitiveFields {
     "secret",
     "password",
     "key",
-    "privatekey"
+    "privatekey",
   ];
 
   /**
@@ -21,7 +21,7 @@ export class RedactSensitiveFields {
     }
 
     if (Array.isArray(obj)) {
-      return obj.map(item => this.redact(item)) as any;
+      return obj.map((item) => this.redact(item)) as any;
     }
 
     if (typeof obj === "object") {
@@ -33,9 +33,9 @@ export class RedactSensitiveFields {
       const redactedObj: any = {};
       for (const [key, value] of Object.entries(obj)) {
         const lowerKey = key.toLowerCase();
-        
+
         // Strip or redact sensitive keys
-        if (this.sensitiveKeys.some(sk => lowerKey.includes(sk))) {
+        if (this.sensitiveKeys.some((sk) => lowerKey.includes(sk))) {
           // Completely drop the key from being returned
           continue;
         }

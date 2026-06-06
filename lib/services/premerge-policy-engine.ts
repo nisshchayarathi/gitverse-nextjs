@@ -1,4 +1,7 @@
-import { FinalPolicyOutput, PolicyEvaluationResult } from "@/types/github-checks";
+import {
+  FinalPolicyOutput,
+  PolicyEvaluationResult,
+} from "@/types/github-checks";
 
 export class PremergePolicyEngine {
   private evaluations: PolicyEvaluationResult[] = [];

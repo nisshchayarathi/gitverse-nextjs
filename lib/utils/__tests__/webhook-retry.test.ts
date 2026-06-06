@@ -176,11 +176,11 @@ describe("Webhook Worker Retry Logic", () => {
 
   describe("backoff timing", () => {
     it("uses exponential backoff", () => {
-      expect(computeBackoffMs(0)).toBe(10000);   // 10s
-      expect(computeBackoffMs(1)).toBe(20000);   // 20s
-      expect(computeBackoffMs(2)).toBe(40000);   // 40s
-      expect(computeBackoffMs(3)).toBe(80000);   // 80s
-      expect(computeBackoffMs(4)).toBe(160000);  // 160s
+      expect(computeBackoffMs(0)).toBe(10000); // 10s
+      expect(computeBackoffMs(1)).toBe(20000); // 20s
+      expect(computeBackoffMs(2)).toBe(40000); // 40s
+      expect(computeBackoffMs(3)).toBe(80000); // 80s
+      expect(computeBackoffMs(4)).toBe(160000); // 160s
     });
 
     it("caps at 5 minutes", () => {
@@ -237,7 +237,9 @@ describe("Webhook Worker Retry Logic", () => {
       });
 
       expect(result.nextRetryAt).toBeInstanceOf(Date);
-      expect(result.nextRetryAt!.getTime()).toBeGreaterThanOrEqual(before + 10000);
+      expect(result.nextRetryAt!.getTime()).toBeGreaterThanOrEqual(
+        before + 10000,
+      );
     });
 
     it("sets nextRetryAt to null for non-retryable errors", () => {

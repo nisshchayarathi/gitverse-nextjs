@@ -11,15 +11,15 @@ export class WebhookRecoveryService {
     try {
       const result = await prisma.webhookEvent.updateMany({
         where: {
-          status: 'processing',
+          status: "processing",
           updatedAt: {
-            lt: thresholdDate
-          }
+            lt: thresholdDate,
+          },
         },
         data: {
-          status: 'timed_out',
-          error: 'Event exceeded processing limits and was forcibly timed out.'
-        }
+          status: "timed_out",
+          error: "Event exceeded processing limits and was forcibly timed out.",
+        },
       });
       return result.count;
     } catch (err) {

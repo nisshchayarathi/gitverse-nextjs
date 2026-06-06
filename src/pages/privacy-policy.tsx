@@ -29,7 +29,6 @@ export default function PrivacyPolicy() {
         <section className="container mx-auto px-4 pb-24 relative z-10">
           <div className="max-w-4xl mx-auto">
             <div className="space-y-6">
-
               <section className="glass rounded-2xl p-8 border border-border/40 transition-all duration-300 hover:border-primary/50 hover:scale-[1.01] hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10">
                 <h2 className="text-2xl font-semibold mb-4">
                   Information Collection
@@ -43,9 +42,7 @@ export default function PrivacyPolicy() {
               </section>
 
               <section className="glass rounded-2xl p-8 border border-border/40 transition-all duration-300 hover:border-primary/50 hover:scale-[1.01] hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10">
-                <h2 className="text-2xl font-semibold mb-4">
-                  How We Use Data
-                </h2>
+                <h2 className="text-2xl font-semibold mb-4">How We Use Data</h2>
 
                 <p className="text-muted-foreground leading-7">
                   The collected information is used to generate repository
@@ -60,9 +57,9 @@ export default function PrivacyPolicy() {
                 </h2>
 
                 <p className="text-muted-foreground leading-7">
-                  We prioritize secure authentication, protected API access,
-                  and safe handling of repository permissions to ensure user
-                  data remains protected.
+                  We prioritize secure authentication, protected API access, and
+                  safe handling of repository permissions to ensure user data
+                  remains protected.
                 </p>
               </section>
 
@@ -79,16 +76,13 @@ export default function PrivacyPolicy() {
               </section>
 
               <section className="glass rounded-2xl p-8 border border-border/40 transition-all duration-300 hover:border-primary/50 hover:scale-[1.01] hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10">
-                <h2 className="text-2xl font-semibold mb-4">
-                  Policy Updates
-                </h2>
+                <h2 className="text-2xl font-semibold mb-4">Policy Updates</h2>
 
                 <p className="text-muted-foreground leading-7">
                   This privacy policy may be updated periodically to reflect
                   improvements, legal requirements, or platform changes.
                 </p>
               </section>
-
             </div>
           </div>
         </section>

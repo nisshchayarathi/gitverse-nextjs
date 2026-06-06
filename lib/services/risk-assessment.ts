@@ -8,14 +8,22 @@ export class RiskAssessmentService {
    */
   async assessRisk(
     changedFilesContent: { path: string; content: string }[],
-    affectedFiles: string[]
-  ): Promise<Pick<ImpactReport, "riskLevel" | "reasoning" | "suggestedFollowUpChecks" | "confidenceScore">> {
+    affectedFiles: string[],
+  ): Promise<
+    Pick<
+      ImpactReport,
+      "riskLevel" | "reasoning" | "suggestedFollowUpChecks" | "confidenceScore"
+    >
+  > {
     const gemini = getGeminiService();
 
     const fileListStr = changedFilesContent
-      .map(f => `File: ${sanitizeTextContent(f.path)}\n\`\`\`\n${sanitizeTextContent(f.content.substring(0, 5000))}\n\`\`\``)
+      .map(
+        (f) =>
+          `File: ${sanitizeTextContent(f.path)}\n\`\`\`\n${sanitizeTextContent(f.content.substring(0, 5000))}\n\`\`\``,
+      )
       .join("\n\n");
-    
+
     const affectedFilesStr = sanitizeTextContent(affectedFiles.join("\n- "));
 
     const prompt = `
@@ -44,33 +52,44 @@ Return a JSON object exactly matching this schema (no markdown formatting, no co
 
     try {
       const response = await gemini.chatRaw(prompt);
-      
+
       const rawText = response.text.trim();
       let jsonText = rawText;
       if (rawText.startsWith("```json")) {
-        jsonText = rawText.replace(/^```json/, "").replace(/```$/, "").trim();
+        jsonText = rawText
+          .replace(/^```json/, "")
+          .replace(/```$/, "")
+          .trim();
       } else if (rawText.startsWith("```")) {
         jsonText = rawText.replace(/^```/, "").replace(/```$/, "").trim();
       }
 
       const parsed = JSON.parse(jsonText);
-      
+
       const validRiskLevels = ["Low", "Medium", "High"];
-      const riskLevel = validRiskLevels.includes(parsed.riskLevel) ? parsed.riskLevel : "Medium";
+      const riskLevel = validRiskLevels.includes(parsed.riskLevel)
+        ? parsed.riskLevel
+        : "Medium";
 
       return {
         riskLevel: riskLevel as RiskLevel,
         reasoning: parsed.reasoning || "Failed to determine reasoning.",
-        suggestedFollowUpChecks: Array.isArray(parsed.suggestedFollowUpChecks) ? parsed.suggestedFollowUpChecks : [],
-        confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 50
+        suggestedFollowUpChecks: Array.isArray(parsed.suggestedFollowUpChecks)
+          ? parsed.suggestedFollowUpChecks
+          : [],
+        confidenceScore:
+          typeof parsed.confidenceScore === "number"
+            ? parsed.confidenceScore
+            : 50,
       };
     } catch (error) {
       console.error("[RiskAssessment] Failed to parse analysis result:", error);
       return {
         riskLevel: "Medium",
-        reasoning: "AI analysis failed or was unable to parse the result. Manual review recommended.",
+        reasoning:
+          "AI analysis failed or was unable to parse the result. Manual review recommended.",
         suggestedFollowUpChecks: ["Verify downstream consumers manually."],
-        confidenceScore: 0
+        confidenceScore: 0,
       };
     }
   }

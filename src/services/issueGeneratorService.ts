@@ -11,7 +11,7 @@ import { generateIssueDrafts } from "@/utils/issueDraftGenerator";
  */
 export const generateGoodFirstIssues = (
   repository: RepositoryMetadata,
-  config: GeneratorConfig = {}
+  config: GeneratorConfig = {},
 ): GeneratedIssue[] => {
   const files = repository.files || [];
 
@@ -28,18 +28,16 @@ export const generateGoodFirstIssues = (
 
   // Filter opportunities based on confidence and config
   const minConfidence = config.minConfidenceScore ?? 0.5;
-  const filteredOpportunities = opportunities.filter(
-    (opp) => {
-      // Calculate basic confidence based on opportunity type
-      const baseConfidence = 0.8;
-      // TODO comments might need validation
-      if (opp.type === "missing-tests") return true;
-      if (opp.type === "dead-code") return true;
-      if (opp.type === "refactoring") return true;
-      if (opp.type === "documentation") return true;
-      return baseConfidence >= minConfidence;
-    }
-  );
+  const filteredOpportunities = opportunities.filter((opp) => {
+    // Calculate basic confidence based on opportunity type
+    const baseConfidence = 0.8;
+    // TODO comments might need validation
+    if (opp.type === "missing-tests") return true;
+    if (opp.type === "dead-code") return true;
+    if (opp.type === "refactoring") return true;
+    if (opp.type === "documentation") return true;
+    return baseConfidence >= minConfidence;
+  });
 
   // Apply category limits
   const maxPerCategory = config.maxIssuesPerCategory ?? 2;
@@ -52,14 +50,10 @@ export const generateGoodFirstIssues = (
   });
 
   // Generate issue drafts from opportunities
-  const issues = generateIssueDrafts(
-    limitedOpportunities,
-    files,
-    {
-      name: repository.name,
-      url: repository.id?.toString(),
-    }
-  );
+  const issues = generateIssueDrafts(limitedOpportunities, files, {
+    name: repository.name,
+    url: repository.id?.toString(),
+  });
 
   return issues;
 };
@@ -72,7 +66,7 @@ export const generateGoodFirstIssues = (
  */
 export const generateSingleIssue = (
   repository: RepositoryMetadata,
-  opportunityIndex: number
+  opportunityIndex: number,
 ): GeneratedIssue | null => {
   const issues = generateGoodFirstIssues(repository);
   return issues[opportunityIndex] || null;
@@ -107,8 +101,10 @@ export const getGeneratorStats = (repository: RepositoryMetadata) => {
   const statsByDifficulty: Record<string, number> = {};
 
   issues.forEach((issue) => {
-    statsByType[issue.opportunity.type] = (statsByType[issue.opportunity.type] || 0) + 1;
-    statsByDifficulty[issue.difficulty] = (statsByDifficulty[issue.difficulty] || 0) + 1;
+    statsByType[issue.opportunity.type] =
+      (statsByType[issue.opportunity.type] || 0) + 1;
+    statsByDifficulty[issue.difficulty] =
+      (statsByDifficulty[issue.difficulty] || 0) + 1;
   });
 
   return {
@@ -117,7 +113,8 @@ export const getGeneratorStats = (repository: RepositoryMetadata) => {
     issuesByType: statsByType,
     issuesByDifficulty: statsByDifficulty,
     averageEffort:
-      issues.reduce((sum, i) => sum + i.estimatedHours, 0) / Math.max(issues.length, 1),
+      issues.reduce((sum, i) => sum + i.estimatedHours, 0) /
+      Math.max(issues.length, 1),
     hasIssues: issues.length > 0,
   };
 };
@@ -127,6 +124,8 @@ export const getGeneratorStats = (repository: RepositoryMetadata) => {
  * @param repository The repository metadata
  * @returns Boolean indicating if analysis is possible
  */
-export const canAnalyzeRepository = (repository: RepositoryMetadata): boolean => {
+export const canAnalyzeRepository = (
+  repository: RepositoryMetadata,
+): boolean => {
   return (repository.files?.length ?? 0) > 0;
 };

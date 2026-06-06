@@ -1,23 +1,29 @@
-// @vitest-environment jsdom
+// @jest-environment jsdom
 import { render, screen } from "@testing-library/react";
 
 jest.mock("next/link", () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
-  ),
+  default: ({
+    children,
+    href,
+  }: {
+    children: React.ReactNode;
+    href: string;
+  }) => <a href={href}>{children}</a>,
 }));
 
-vi.mock("lucide-react", () => ({
+jest.mock("lucide-react", () => ({
   GitBranch: () => <svg data-testid="git-branch" />,
   Menu: () => <svg data-testid="menu" />,
   X: () => <svg data-testid="x" />,
 }));
 
-vi.mock("@/components/ui", () => ({
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+jest.mock("@/components/ui", () => ({
+  Button: ({ children, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
 }));
 
-vi.mock("@/components/ThemeToggle", () => ({
+jest.mock("@/components/ThemeToggle", () => ({
   ThemeToggle: () => <button data-testid="theme-toggle">Toggle</button>,
 }));
 

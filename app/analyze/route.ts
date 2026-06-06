@@ -7,7 +7,11 @@ import { analysisJobService } from "@/lib/services/analysisJobService";
 import { sanitizeError } from "@/lib/middleware";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
 import { normalizeTargetDirectory } from "@/lib/utils/repositoryUtils";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 function normalizeKnownRepoHttpUrl(input: string): string | null {
   let parsed: URL;
@@ -51,8 +55,11 @@ function kickProductionWorker() {
 
   void triggerAnalysisWorkerWorkflow().catch((error) => {
     logger.error(
-      { err: sanitizeError(error), operation: "dispatch-analysis-worker-workflow" },
-      "Failed to dispatch analysis worker workflow"
+      {
+        err: sanitizeError(error),
+        operation: "dispatch-analysis-worker-workflow",
+      },
+      "Failed to dispatch analysis worker workflow",
     );
   });
 }
@@ -60,7 +67,10 @@ function kickProductionWorker() {
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
-    const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.ANALYZE_REPOSITORY);
+    const rl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.ANALYZE_REPOSITORY,
+    );
     if (!rl.allowed) return rateLimitResponse(rl);
     const body = await request.json();
 
@@ -77,7 +87,7 @@ export async function POST(request: NextRequest) {
       if (!Number.isFinite(repositoryId)) {
         return NextResponse.json(
           { error: "Invalid repositoryId" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -89,14 +99,14 @@ export async function POST(request: NextRequest) {
       if (!repo) {
         return NextResponse.json(
           { error: "Repository not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
     } else {
       if (!url || !name) {
         return NextResponse.json(
           { error: "Provide either repositoryId or (name + url)" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -111,11 +121,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const normalizedTargetDirectory = normalizeTargetDirectory(targetDirectory);
+      const normalizedTargetDirectory =
+        normalizeTargetDirectory(targetDirectory);
       if (targetDirectory && !normalizedTargetDirectory) {
         return NextResponse.json(
-          { error: "Invalid targetDirectory. Example: packages/ui or apps/web" },
-          { status: 400 }
+          {
+            error: "Invalid targetDirectory. Example: packages/ui or apps/web",
+          },
+          { status: 400 },
         );
       }
 
@@ -140,16 +153,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { jobId: job.id, status: job.status, repositoryId },
-      { status: 202 }
+      { status: 202 },
     );
   } catch (error: any) {
     logger.error(
       { err: sanitizeError(error), operation: "POST /analyze" },
-      "POST /analyze error"
+      "POST /analyze error",
     );
     return NextResponse.json(
       { error: "Failed to create job" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

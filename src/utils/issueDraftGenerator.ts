@@ -1,4 +1,8 @@
-import { GeneratedIssue, OpportunitySuggestion, DifficultyCategory } from "@/types/generatedIssue";
+import {
+  GeneratedIssue,
+  OpportunitySuggestion,
+  DifficultyCategory,
+} from "@/types/generatedIssue";
 import { RepositoryFile } from "@/types/firstPRSimulator";
 import {
   estimateDifficulty,
@@ -42,7 +46,7 @@ const OPPORTUNITY_TEMPLATES = {
     ],
     labels: ["good-first-issue", "documentation", "help-wanted"],
   },
-  "refactoring": {
+  refactoring: {
     titleTemplate: "Refactor {area} for better maintainability",
     descriptionTemplate: `This issue involves refactoring {area} to improve code quality and maintainability. Smaller, focused functions are easier to test and understand.`,
     acceptanceCriteriaTemplate: [
@@ -78,7 +82,7 @@ const OPPORTUNITY_TEMPLATES = {
     ],
     labels: ["good-first-issue", "typescript", "technical-debt"],
   },
-  "performance": {
+  performance: {
     titleTemplate: "Optimize performance in {area}",
     descriptionTemplate: `This issue involves identifying and fixing performance bottlenecks in {area}. Performance improvements enhance user experience.`,
     acceptanceCriteriaTemplate: [
@@ -90,7 +94,7 @@ const OPPORTUNITY_TEMPLATES = {
     ],
     labels: ["good-first-issue", "performance"],
   },
-  "accessibility": {
+  accessibility: {
     titleTemplate: "Improve accessibility in {area}",
     descriptionTemplate: `This issue involves making {area} more accessible to users with disabilities. Accessibility is a key aspect of good UX.`,
     acceptanceCriteriaTemplate: [
@@ -105,7 +109,10 @@ const OPPORTUNITY_TEMPLATES = {
 };
 
 const generateTitle = (opportunity: OpportunitySuggestion): string => {
-  const template = OPPORTUNITY_TEMPLATES[opportunity.type as keyof typeof OPPORTUNITY_TEMPLATES];
+  const template =
+    OPPORTUNITY_TEMPLATES[
+      opportunity.type as keyof typeof OPPORTUNITY_TEMPLATES
+    ];
   if (!template) return opportunity.title;
 
   const area = opportunity.affectedFiles[0]?.split("/").pop() || "the codebase";
@@ -114,14 +121,18 @@ const generateTitle = (opportunity: OpportunitySuggestion): string => {
 
 const generateDescription = (
   opportunity: OpportunitySuggestion,
-  repository?: { name?: string; url?: string }
+  repository?: { name?: string; url?: string },
 ): string => {
-  const template = OPPORTUNITY_TEMPLATES[opportunity.type as keyof typeof OPPORTUNITY_TEMPLATES];
+  const template =
+    OPPORTUNITY_TEMPLATES[
+      opportunity.type as keyof typeof OPPORTUNITY_TEMPLATES
+    ];
   if (!template) return opportunity.description;
 
-  const area = opportunity.affectedFiles.length > 0
-    ? opportunity.affectedFiles.slice(0, 3).join(", ")
-    : "the codebase";
+  const area =
+    opportunity.affectedFiles.length > 0
+      ? opportunity.affectedFiles.slice(0, 3).join(", ")
+      : "the codebase";
 
   const description = template.descriptionTemplate.replace("{area}", area);
 
@@ -140,18 +151,28 @@ const generateDescription = (
   return fullDescription;
 };
 
-const generateAcceptanceCriteria = (opportunity: OpportunitySuggestion): string[] => {
-  const template = OPPORTUNITY_TEMPLATES[opportunity.type as keyof typeof OPPORTUNITY_TEMPLATES];
-  return template?.acceptanceCriteriaTemplate || [
-    "Implement the required changes",
-    "Verify solution works as expected",
-    "All tests pass",
-    "Code follows project conventions",
-  ];
+const generateAcceptanceCriteria = (
+  opportunity: OpportunitySuggestion,
+): string[] => {
+  const template =
+    OPPORTUNITY_TEMPLATES[
+      opportunity.type as keyof typeof OPPORTUNITY_TEMPLATES
+    ];
+  return (
+    template?.acceptanceCriteriaTemplate || [
+      "Implement the required changes",
+      "Verify solution works as expected",
+      "All tests pass",
+      "Code follows project conventions",
+    ]
+  );
 };
 
 const generateLabels = (opportunity: OpportunitySuggestion): string[] => {
-  const template = OPPORTUNITY_TEMPLATES[opportunity.type as keyof typeof OPPORTUNITY_TEMPLATES];
+  const template =
+    OPPORTUNITY_TEMPLATES[
+      opportunity.type as keyof typeof OPPORTUNITY_TEMPLATES
+    ];
   const baseLabels = template?.labels || ["good-first-issue", "help-wanted"];
 
   // Add difficulty label
@@ -170,7 +191,10 @@ const generateLabels = (opportunity: OpportunitySuggestion): string[] => {
   return [...new Set(baseLabels)]; // Remove duplicates
 };
 
-const generateResources = (opportunity: OpportunitySuggestion, files: RepositoryFile[]): string[] => {
+const generateResources = (
+  opportunity: OpportunitySuggestion,
+  files: RepositoryFile[],
+): string[] => {
   const resources: string[] = [];
 
   // Find relevant documentation or guide files
@@ -180,7 +204,7 @@ const generateResources = (opportunity: OpportunitySuggestion, files: Repository
         /\.md$/.test(f.path || "") ||
         f.path?.includes("docs") ||
         f.name?.includes("GUIDE") ||
-        f.name?.includes("README")
+        f.name?.includes("README"),
     )
     .slice(0, 3);
 
@@ -205,8 +229,12 @@ const generateResources = (opportunity: OpportunitySuggestion, files: Repository
       break;
     case "accessibility":
       resources.push("**Resources:**");
-      resources.push("- [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)");
-      resources.push("- [ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/)");
+      resources.push(
+        "- [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)",
+      );
+      resources.push(
+        "- [ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/)",
+      );
       break;
   }
 
@@ -216,7 +244,7 @@ const generateResources = (opportunity: OpportunitySuggestion, files: Repository
 export const generateIssueDraft = (
   opportunity: OpportunitySuggestion,
   files: RepositoryFile[],
-  repository?: { name?: string; url?: string }
+  repository?: { name?: string; url?: string },
 ): GeneratedIssue => {
   const difficulty = opportunity.difficulty;
   const effortHours = estimateEffortHours(opportunity, files);
@@ -261,7 +289,7 @@ ${resources.length > 0 ? `## Resources\n${resources.join("\n")}` : ""}
 export const generateIssueDrafts = (
   opportunities: OpportunitySuggestion[],
   files: RepositoryFile[],
-  repository?: { name?: string; url?: string }
+  repository?: { name?: string; url?: string },
 ): GeneratedIssue[] => {
   return opportunities
     .map((opp) => generateIssueDraft(opp, files, repository))

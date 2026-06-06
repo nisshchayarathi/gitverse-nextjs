@@ -1,12 +1,14 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from "react";
 
 export function useGraphDrilldown() {
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['root']));
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
+    new Set(["root"]),
+  );
   const [focusNode, setFocusNode] = useState<string | null>(null);
   const [history, setHistory] = useState<string[]>([]);
 
   const toggleExpand = useCallback((nodeId: string) => {
-    setExpandedNodes(prev => {
+    setExpandedNodes((prev) => {
       const next = new Set(prev);
       if (next.has(nodeId)) {
         // Collapse: remove this node and ideally all its children
@@ -21,29 +23,29 @@ export function useGraphDrilldown() {
   }, []);
 
   const expandAll = useCallback((nodes: string[]) => {
-    setExpandedNodes(prev => {
+    setExpandedNodes((prev) => {
       const next = new Set(prev);
-      nodes.forEach(n => next.add(n));
+      nodes.forEach((n) => next.add(n));
       return next;
     });
   }, []);
 
   const collapseAll = useCallback(() => {
-    setExpandedNodes(new Set(['root']));
+    setExpandedNodes(new Set(["root"]));
   }, []);
 
   const setFocus = useCallback((nodeId: string | null) => {
     setFocusNode(nodeId);
     if (nodeId) {
-      setHistory(prev => {
+      setHistory((prev) => {
         // Avoid consecutive duplicates
         if (prev[prev.length - 1] === nodeId) return prev;
         return [...prev, nodeId];
       });
-      
+
       // Auto-expand the focused node if it's a folder
-      if (nodeId.startsWith('folder-')) {
-        setExpandedNodes(prev => {
+      if (nodeId.startsWith("folder-")) {
+        setExpandedNodes((prev) => {
           const next = new Set(prev);
           next.add(nodeId);
           return next;
@@ -53,7 +55,7 @@ export function useGraphDrilldown() {
   }, []);
 
   const goBack = useCallback(() => {
-    setHistory(prev => {
+    setHistory((prev) => {
       if (prev.length <= 1) {
         setFocusNode(null);
         return [];
@@ -78,6 +80,6 @@ export function useGraphDrilldown() {
     setFocus,
     clearFocus,
     goBack,
-    canGoBack: history.length > 0
+    canGoBack: history.length > 0,
   };
 }

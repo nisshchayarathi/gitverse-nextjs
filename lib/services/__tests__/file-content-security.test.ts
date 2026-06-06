@@ -30,7 +30,7 @@ import { NextRequest } from "next/server";
 
 function createRequest(path: string): NextRequest {
   const url = new URL(
-    `https://example.com/api/repositories/1/files/content?path=${encodeURIComponent(path)}`
+    `https://example.com/api/repositories/1/files/content?path=${encodeURIComponent(path)}`,
   );
   return new NextRequest(url.toString());
 }
@@ -44,7 +44,7 @@ function mockAuth() {
 
 function mockRepository(
   url = "https://github.com/test-org/test-repo",
-  defaultBranch = "main"
+  defaultBranch = "main",
 ) {
   (repositoryService.getRepository as jest.Mock).mockResolvedValue({
     id: 1,
@@ -57,7 +57,7 @@ function mockRepository(
 function mockGitHubFetch(
   status = 200,
   body = "file content",
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
 ) {
   mockFetch.mockResolvedValue({
     ok: status >= 200 && status < 300,
@@ -163,7 +163,9 @@ describe("File Content Path Traversal Prevention", () => {
 
   describe("input validation", () => {
     it("rejects missing path", async () => {
-      const url = new URL("https://example.com/api/repositories/1/files/content");
+      const url = new URL(
+        "https://example.com/api/repositories/1/files/content",
+      );
       const req = new NextRequest(url.toString());
       const res = await GET(req, { params: { id: "1" } });
       const body = await res.json();
@@ -174,7 +176,7 @@ describe("File Content Path Traversal Prevention", () => {
 
     it("rejects invalid repository ID", async () => {
       const url = new URL(
-        "https://example.com/api/repositories/abc/files/content?path=src/index.ts"
+        "https://example.com/api/repositories/abc/files/content?path=src/index.ts",
       );
       const req = new NextRequest(url.toString());
       const res = await GET(req, { params: { id: "abc" } });
@@ -365,7 +367,7 @@ describe("File Content Path Traversal Prevention", () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("feature%2Fbranch"),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -376,7 +378,7 @@ describe("File Content Path Traversal Prevention", () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("/main/"),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
   });
@@ -421,7 +423,7 @@ describe("File Content Path Traversal Prevention", () => {
 
     it("returns 500 on internal errors without leaking details", async () => {
       (repositoryService.getRepository as jest.Mock).mockRejectedValue(
-        new Error("DB password: secret123")
+        new Error("DB password: secret123"),
       );
 
       const req = createRequest("src/index.ts");
@@ -451,7 +453,7 @@ describe("File Content Path Traversal Prevention", () => {
   describe("authentication", () => {
     it("requires authentication", async () => {
       (requireAuth as jest.Mock).mockRejectedValue(
-        Object.assign(new Error("Unauthorized"), { status: 401 })
+        Object.assign(new Error("Unauthorized"), { status: 401 }),
       );
 
       const req = createRequest("src/index.ts");
@@ -485,7 +487,7 @@ describe("File Content Path Traversal Prevention", () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("raw.githubusercontent.com/my-org/my-repo/"),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -496,7 +498,7 @@ describe("File Content Path Traversal Prevention", () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("raw.githubusercontent.com/my-org/my-repo/"),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -507,7 +509,7 @@ describe("File Content Path Traversal Prevention", () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("raw.githubusercontent.com/my-org/my-repo/"),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 

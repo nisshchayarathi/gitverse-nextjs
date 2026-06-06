@@ -24,7 +24,7 @@ describe("PatchValidatorService", () => {
     it("should return low_confidence when score is below threshold", () => {
       const result = service.validatePatch(
         makePatch({ confidenceScore: 50 }),
-        "const a = 0;"
+        "const a = 0;",
       );
       expect(result.status).toBe("low_confidence");
     });
@@ -32,7 +32,7 @@ describe("PatchValidatorService", () => {
     it("should return invalid_syntax for patched content with syntax errors", () => {
       const result = service.validatePatch(
         makePatch({ suggestionBody: "const x =" }),
-        "const a = 0;"
+        "const a = 0;",
       );
       expect(result.status).toBe("invalid_syntax");
     });
@@ -40,7 +40,7 @@ describe("PatchValidatorService", () => {
     it("should skip TS syntax check for non-TS/JS files", () => {
       const result = service.validatePatch(
         makePatch({ file: "readme.md", suggestionBody: "# Broken ```" }),
-        "# Title"
+        "# Title",
       );
       expect(result.status).toBe("valid");
     });
@@ -53,7 +53,7 @@ describe("PatchValidatorService", () => {
           endLine: 4,
           suggestionBody: "replacement",
         }),
-        original
+        original,
       );
       expect(result.status).toBe("valid");
     });
@@ -61,15 +61,18 @@ describe("PatchValidatorService", () => {
     it("should handle empty suggestionBody gracefully", () => {
       const result = service.validatePatch(
         makePatch({ suggestionBody: "" }),
-        "const a = 0;"
+        "const a = 0;",
       );
       expect(result.status).not.toBe("invalid_syntax");
     });
 
     it("should handle .tsx files", () => {
       const result = service.validatePatch(
-        makePatch({ file: "component.tsx", suggestionBody: "const x: number = 1;" }),
-        "const a = 0;"
+        makePatch({
+          file: "component.tsx",
+          suggestionBody: "const x: number = 1;",
+        }),
+        "const a = 0;",
       );
       expect(result.status).toBe("valid");
     });
@@ -77,7 +80,7 @@ describe("PatchValidatorService", () => {
     it("should handle .js files", () => {
       const result = service.validatePatch(
         makePatch({ file: "script.js", suggestionBody: "const x = 1;" }),
-        ""
+        "",
       );
       expect(result.status).toBe("valid");
     });
