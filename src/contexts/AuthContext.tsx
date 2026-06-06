@@ -23,7 +23,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (retries?: number) => Promise<void>;
   updateUser: (data: Partial<User>) => void;
 }
 

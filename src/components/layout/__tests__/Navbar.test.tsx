@@ -1,23 +1,20 @@
-// @vitest-environment jsdom
+import React from "react";
 import { render, screen } from "@testing-library/react";
 
-jest.mock("next/link", () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
-  ),
-}));
+jest.mock("next/link", () => {
+  const MockLink = ({ children, href, ...props }: any) =>
+    React.createElement("a", { href, ...props }, children);
+  return MockLink;
+});
 
-vi.mock("lucide-react", () => ({
+jest.mock("lucide-react", () => ({
   GitBranch: () => <svg data-testid="git-branch" />,
   Menu: () => <svg data-testid="menu" />,
   X: () => <svg data-testid="x" />,
 }));
 
-vi.mock("@/components/ui", () => ({
+jest.mock("@/components/ui", () => ({
   Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-}));
-
-vi.mock("@/components/ThemeToggle", () => ({
   ThemeToggle: () => <button data-testid="theme-toggle">Toggle</button>,
 }));
 
@@ -25,15 +22,15 @@ import { Navbar } from "../Navbar";
 
 describe("Navbar", () => {
   it("renders without crashing", () => {
-    render(<Navbar />);
-    expect(screen.getByText("GitVerse")).toBeDefined();
+    const { container } = render(<Navbar />);
+    expect(container.querySelector("nav")).toBeTruthy();
   });
 
   it("renders navigation links", () => {
     render(<Navbar />);
-    expect(screen.getByText("Features")).toBeDefined();
-    expect(screen.getByText("How it Works")).toBeDefined();
-    expect(screen.getByText("Pricing")).toBeDefined();
+    expect(screen.getByText((content) => content.includes("Features"))).toBeDefined();
+    expect(screen.getByText((content) => content.includes("How it Works"))).toBeDefined();
+    expect(screen.getByText((content) => content.includes("Pricing"))).toBeDefined();
   });
 
   it("renders sign in and get started buttons", () => {

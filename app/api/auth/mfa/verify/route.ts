@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Apply strict rate limiting on MFA verification to prevent brute-force
     const rlResult = await checkRateLimit({
-      endpoint: "ai:analyze-repository", // reuse the strictest quota as sentinel
+      endpoint: "mfa:verify",
       userId: user.userId,
       ip,
       tier: "free",

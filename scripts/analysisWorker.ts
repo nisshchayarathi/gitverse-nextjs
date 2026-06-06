@@ -6,6 +6,8 @@ import prisma, { disconnectPrisma } from "../lib/prisma";
 import { analysisJobService } from "../lib/services/analysisJobService";
 import { repositoryService } from "../lib/services/repositoryService";
 import { ANALYSIS_QUEUE_NAME } from "../lib/queue/analysisQueue";
+import { WEBHOOK_QUEUE_NAME } from "../lib/queue/webhookQueue";
+import { processWebhookJob } from "../lib/workers/webhookProcessor";
 
 // Catch any rejections that slip through the promise-gap fixes above.
 process.on("unhandledRejection", async (reason) => {
@@ -129,12 +131,41 @@ export async function startAnalysisWorkerLoop(opts?: {
     console.log(`Job ${job?.id} has failed with ${err.message}`);
   });
 
+  const webhookWorker = new Worker(
+    WEBHOOK_QUEUE_NAME,
+    async (job: Job) => {
+      const { eventId } = job.data;
+      console.log(`Processing webhook job ${job.id} for event ${eventId} (attempt ${job.attemptsMade + 1})`);
+      
+      try {
+        await processWebhookJob(eventId);
+      } catch (err: any) {
+        console.error(`Webhook job ${job.id} failed:`, err);
+        throw err;
+      }
+    },
+    {
+      connection: connection as any,
+      concurrency: parseInt(process.env.WEBHOOK_WORKER_CONCURRENCY || process.env.WORKER_CONCURRENCY || "2", 10),
+      name: `webhook-${workerId}`,
+    }
+  );
+
+  webhookWorker.on("completed", (job) => {
+    console.log(`Webhook Job ${job.id} has completed!`);
+  });
+
+  webhookWorker.on("failed", (job, err) => {
+    console.log(`Webhook Job ${job?.id} has failed with ${err.message}`);
+  });
+
   let stopping = false;
   const shutdown = async (signal: string) => {
     if (stopping) return;
     stopping = true;
-    console.log(`Received ${signal}, shutting down BullMQ worker...`);
+    console.log(`Received ${signal}, shutting down BullMQ workers...`);
     await worker.close();
+    await webhookWorker.close();
     await connection.quit();
     await disconnectPrisma();
     process.exit(0);

@@ -21,13 +21,36 @@ import {
   getMfaStatus,
 } from "@/lib/mfa";
 import { logAuditEvent } from "@/lib/auditLogger";
-import { getClientIp } from "@/lib/rateLimiter";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIp,
+} from "@/lib/rateLimiter";
 import prisma from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
     const ip = getClientIp(request);
+
+    // Rate limit MFA setup to prevent abuse
+    const rlResult = await checkRateLimit({
+      endpoint: "mfa:setup",
+      userId: user.userId,
+      ip,
+      tier: "free",
+    });
+
+    if (!rlResult.allowed) {
+      await logAuditEvent({
+        userId: user.userId,
+        action: "RATE_LIMIT_EXCEEDED",
+        resource: "User:MFA",
+        details: { endpoint: "/api/auth/mfa/setup", ip },
+        ipAddress: ip,
+      });
+      return rateLimitResponse(rlResult);
+    }
 
     // Fetch user email for QR code label
     const dbUser = await prisma.user.findUnique({
@@ -101,6 +124,25 @@ export async function DELETE(request: NextRequest) {
   try {
     const user = await requireAuth(request);
     const ip = getClientIp(request);
+
+    // Rate limit MFA disable attempts
+    const rlResult = await checkRateLimit({
+      endpoint: "mfa:setup",
+      userId: user.userId,
+      ip,
+      tier: "free",
+    });
+
+    if (!rlResult.allowed) {
+      await logAuditEvent({
+        userId: user.userId,
+        action: "RATE_LIMIT_EXCEEDED",
+        resource: "User:MFA",
+        details: { endpoint: "/api/auth/mfa/setup", method: "DELETE", ip },
+        ipAddress: ip,
+      });
+      return rateLimitResponse(rlResult);
+    }
 
     const body = await request.json().catch(() => ({}));
     const { token } = body as { token?: string };

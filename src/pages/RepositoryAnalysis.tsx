@@ -32,6 +32,7 @@ import {
   Loader2,
   XCircle,
   FileX2,
+  MessageSquare,
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
@@ -44,7 +45,8 @@ type TabType =
   | "commits"
   | "contributors"
   | "mentor"
-  | "insights";
+  | "insights"
+  | "dead-code";
 
 interface Tab {
   id: TabType;
@@ -125,7 +127,7 @@ export default function RepositoryAnalysis() {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [repository, setRepository] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isAnalyzing, _setIsAnalyzing] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [job, setJob] = useState<any>(null);
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -133,11 +135,20 @@ export default function RepositoryAnalysis() {
   const [error, setError] = useState<string | null>(null);
   const pollingStartedAt = useRef<number | null>(null);
   const pollingJobRef = useRef<string | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetchRepository();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // Guard against dual-polling when the dependency array changes mid-cycle.
@@ -273,8 +284,15 @@ export default function RepositoryAnalysis() {
       
       if (isColdStart) {
         setError("Waking up database... Please wait.");
-        // Auto-retry in 3 seconds. Do not set loading to false so spinner stays.
-        setTimeout(fetchRepository, 3000);
+
+        if (retryTimeoutRef.current) {
+          clearTimeout(retryTimeoutRef.current);
+        }
+
+        retryTimeoutRef.current = setTimeout(() => {
+          fetchRepository();
+        }, 3000);
+
         return;
       }
 

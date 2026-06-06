@@ -2,8 +2,9 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
+  // Note: The 'driverAdapters' preview feature has been deprecated
+  // and removed from this schema as it is now generally available.
 }
 
 datasource db {

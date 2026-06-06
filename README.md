@@ -10,6 +10,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Deploy on Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel)](https://vercel.com)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://github.com/nisshchayarathi/gitverse-nextjs/pulls)
+[![CI: Test Platform](https://github.com/nisshchayarathi/gitverse-nextjs/actions/workflows/test.yml/badge.svg)](https://github.com/nisshchayarathi/gitverse-nextjs/actions/workflows/test.yml)
+[![CI: Playwright](https://github.com/nisshchayarathi/gitverse-nextjs/actions/workflows/playwright.yml/badge.svg)](https://github.com/nisshchayarathi/gitverse-nextjs/actions/workflows/playwright.yml)
+[![CI: Prisma Schema](https://github.com/nisshchayarathi/gitverse-nextjs/actions/workflows/prisma-check.yml/badge.svg)](https://github.com/nisshchayarathi/gitverse-nextjs/actions/workflows/prisma-check.yml)
+[![CI: CodeQL](https://github.com/nisshchayarathi/gitverse-nextjs/actions/workflows/codeql.yml/badge.svg)](https://github.com/nisshchayarathi/gitverse-nextjs/actions/workflows/codeql.yml)
+[![CI: Worker Consistency](https://github.com/nisshchayarathi/gitverse-nextjs/actions/workflows/worker-consistency.yml/badge.svg)](https://github.com/nisshchayarathi/gitverse-nextjs/actions/workflows/worker-consistency.yml)
 
 > **Paste a repo. Understand it in minutes.**
 
@@ -102,6 +107,59 @@ That’s the MVP: turn repo complexity into a contributor roadmap.
 - D3/Recharts for visualizations
 - Auth: NextAuth (Google) + credentials
 
+## 🏗️ Project Architecture
+
+GitVerse follows a layered architecture with clear separation between the frontend, API layer, service layer, and background processing.
+
+### Frontend Layer (src/)
+
+The React frontend uses the Next.js App Router with client and server components:
+
+- **`src/components/`** — Reusable React components organized by domain: `ai/`, `auth/`, `layout/`, `repository/`, `ui/`, `visualizations/`. UI components use Radix UI primitives and Tailwind CSS for styling
+- **`src/contexts/`** — React context providers for auth state, theme, and application settings
+- **`src/hooks/`** — Custom React hooks for data fetching, form handling, and UI state
+- **`src/utils/`** — Client-side utility functions for formatting, validation, and data transformation
+
+### API Layer (app/api/)
+
+The API follows Next.js Route Handlers, organized by domain module:
+
+- **`app/api/auth/`** — Authentication endpoints: login, signup, logout, sessions, MFA setup and verification
+- **`app/api/repositories/`** — Repository CRUD, analysis triggers, stats, file browsing, architecture generation
+- **`app/api/ai/`** — AI-powered features: chat, code analysis, PR simulation, repository comparison
+- **`app/api/users/`** — User profile management, password changes, avatar uploads
+- **`app/api/integrations/`** — Third-party integrations: GitHub OAuth, webhook receiver
+- **`app/api/internal/`** — Internal service endpoints: worker health checks, analysis execution, webhook processing
+- **`app/api/cron/`** — Scheduled job endpoints: webhook recovery, analysis job cleanup, database backup
+
+### Service Layer (lib/)
+
+The service layer contains all business logic, separated from the API routes:
+
+- **`lib/services/`** — Domain services: `gitService`, `geminiService`, `repositoryService`, `imageService`, `rateLimitService`, `webhookService`, and specialized analysis services
+- **`lib/middleware/`** — Express-style middleware for auth, rate limiting, and request validation
+- **`lib/utils/`** — Shared utilities: token encryption, auth cookies, cache keys, retry logic, webhook verification
+- **`lib/prisma.ts`** — Singleton Prisma client instance with connection pooling for serverless
+
+### Background Worker (scripts/ + dist-worker/)
+
+The background analysis worker runs as a separate process to handle long-running repository analysis without blocking the API:
+
+- **`scripts/analysisWorker.ts`** — Main worker entry point, processes queued analysis jobs from the database
+- **`scripts/workerServer.ts`** — HTTP server mode for receiving analysis requests via API
+- **`scripts/cronWorker.ts`** — Scheduled job handler that picks up and processes analysis batches
+- **`scripts/verify-worker-consistency.ts`** — CI helper that validates worker build integrity
+
+### Data Layer (prisma/)
+
+- **`prisma/schema.prisma`** — Database schema with models for users, repositories, sessions, accounts, analysis jobs, MFA config, and more
+- **`prisma/migrations/`** — Database migration history, one directory per migration
+
+### Infrastructure (.github/)
+
+- **`.github/workflows/`** — GitHub Actions CI/CD workflows for testing, security scanning, and GSSoC automation
+- **`.github/dependabot.yml`** — Automatic dependency update configuration
+
 ## 🏗️ Project Structure
 
 ```
@@ -143,6 +201,29 @@ gitverse-nextjs/
 └── package.json             # Dependencies
 ```
 
+### Background Processing Architecture
+
+Repository analysis is computationally expensive and time-consuming. GitVerse uses a background worker pattern to decouple analysis requests from execution:
+
+1. **Request** — A user triggers analysis via the API (`/api/repositories/[id]/analyze`). This creates an `analysis_job` record in the database with status `QUEUED`
+2. **Scheduling** — The cron workflow (`run-analysis-cron.yml`) runs every 5 minutes or the worker can be triggered via API (`/api/internal/run-analysis`)
+3. **Execution** — The worker picks up queued jobs, sets status to `PROCESSING`, acquires a lock with a 5-minute TTL, and runs the analysis pipeline:
+   - Clone the repository (or fetch latest if already cloned)
+   - Build the dependency graph
+   - Run AI analysis via Gemini
+   - Generate architecture summary
+   - Store results in the database
+4. **Completion** — On success, status moves to `COMPLETED`. On failure, status moves to `FAILED` with error details. If the worker crashes, the lock expires and the job is requeued by the next cron run
+
+### Error Handling Strategy
+
+The application uses a layered error handling approach:
+
+- **API routes** — Wrap handler logic in try/catch blocks. Return structured JSON error responses with appropriate HTTP status codes (400 for validation, 401 for auth, 403 for authorization, 404 for not found, 500 for server errors)
+- **Service layer** — Throw typed errors with context. Services catch and wrap low-level errors (database, network, API) into domain-specific errors before propagating
+- **Background worker** — Logs errors with context (job ID, repository ID, error stack). Failed jobs store the error message in the database for debugging. Stale locks from crashed workers are cleaned up on the next cron run
+- **Middleware** — Auth middleware returns 401 for unauthenticated requests. Rate limit middleware returns 429 when limits are exceeded. Both include descriptive error messages in the response body
+
 ## 🎨 Design System
 
 ### Color Palette
@@ -158,17 +239,78 @@ gitverse-nextjs/
 - **Body:** Source Sans 3
 - **Code:** JetBrains Mono
 
+## Development Workflow
+
+The standard development cycle for contributing to GitVerse follows these stages:
+
+1. **Fork and clone** — Fork the upstream repository, clone your fork locally, and add the upstream remote
+2. **Create a branch** — Use a descriptive branch name following the branching convention (see CONTRIBUTING.md)
+3. **Install dependencies** — Run `npm install` to install all required packages
+4. **Set up the database** — Configure your local PostgreSQL or Neon database, set `DATABASE_URL` in `.env.local`, run `npm run prisma:generate` and `npm run prisma:migrate`
+5. **Start the dev server** — Run `npm run dev` to start the Next.js development server with hot reload
+6. **Make changes** — Edit code, add features, fix bugs. Follow the code style guidelines
+7. **Run checks locally** — Execute `npm run lint`, `npm run typecheck`, and `npm test` to verify your changes
+8. **Commit** — Write a conventional commit message describing the change
+9. **Push and open a PR** — Push your branch to your fork and open a pull request against the upstream `main` branch
+10. **Address review feedback** — Respond to reviewer comments, push additional commits as needed
+
+### Branch Naming Convention
+
+Use these prefixes to name your branches:
+
+| Prefix | When to use | Example |
+| :----- | :---------- | :------ |
+| `feature/` | Adding a new capability or enhancement | `feature/ai-chat-history` |
+| `bugfix/` | Fixing a bug or regression | `bugfix/login-error-toast` |
+| `fix/` | Short for bugfix | `fix/broken-yaml-test-workflow` |
+| `refactor/` | Restructuring code without changing behavior | `refactor/api-response-types` |
+| `docs/` | Adding or updating documentation | `docs/contributing-guide` |
+| `chore/` | Maintenance, dependency updates, config changes | `chore/upgrade-prisma` |
+
+The branch name should be short but descriptive. Use hyphens to separate words. Avoid generic names like `patch-1` or `fix-bug`.
+
+### Commit Message Format
+
+Use conventional commits for all commit messages:
+
+```
+<type>(<scope>): <description>
+
+[optional body explaining why the change was made]
+```
+
+Types include: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`.
+
+Examples:
+- `feat(ai): add repository analysis progress tracking`
+- `fix(auth): handle expired session tokens gracefully`
+- `docs(readme): update environment variable table`
+- `chore(deps): upgrade prisma to v7`
+
+The body should explain why the change was made, not what changed. The diff already shows what changed. Keep the body focused and concise.
+
 ## 🧩 Available Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm start` - Start production server
-- `npm run lint` - Run Next.js linter
-- `npm run format` - Format code with Prettier
-- `npm run prisma:generate` - Generate Prisma client
-- `npm run prisma:migrate` - Run database migrations
-- `npm run prisma:studio` - Open Prisma Studio
-- `npm run db:seed` - Seed the database with mock data
+| Script | Command | Purpose |
+| :----- | :------ | :------ |
+| `npm run dev` | `next dev` | Start the Next.js development server with hot module replacement. Uses `--dns-result-order=ipv4first` for NeonDB compatibility |
+| `npm run build` | `prisma generate && npm run build:worker && next build` | Full production build: generates Prisma client, compiles the background worker, then builds the Next.js application |
+| `npm start` | `next start` | Start the production Next.js server. Requires a prior build |
+| `npm run lint` | `next lint` | Run ESLint via Next.js. Reports code quality, accessibility, and React best practice violations |
+| `npm run typecheck` | `prisma generate && tsc --noEmit` | TypeScript type checking without emitting compiled files. Deletes the tsbuildinfo cache to ensure fresh checking |
+| `npm run format` | `prettier --write` | Format all TypeScript, TSX, and CSS files with Prettier. Run before committing |
+| `npm run analyze` | `ANALYZE=true next build` | Build with bundle analyzer enabled. Opens a visual report of bundle sizes in the browser |
+| `npm test` | `jest` | Run the Jest unit test suite. Use with `--watch` for continuous testing during development |
+| `npm run test:e2e` | `playwright test` | Run Playwright end-to-end browser tests. Requires Playwright browsers to be installed first |
+| `npm run build:worker` | `tsc -p tsconfig.worker.json` | Compile the background analysis worker from TypeScript sources in `scripts/` and `lib/` into `dist-worker/` |
+| `npm run worker` | `node dist-worker/scripts/analysisWorker.js` | Run the analysis worker directly in the foreground. Processes queued analysis jobs |
+| `npm run worker:server` | `node dist-worker/scripts/workerServer.js` | Run the worker as an HTTP server, listening for analysis requests |
+| `npm run worker:dev` | `tsx watch scripts/analysisWorker.ts` | Run the worker in development mode with file watching and automatic restart |
+| `npm run prisma:generate` | `prisma generate` | Generate the Prisma type-safe client from the schema. Run after every schema change |
+| `npm run prisma:migrate` | `prisma migrate dev` | Apply pending migrations to the local database. Creates migration files for new schema changes |
+| `npm run prisma:studio` | `prisma studio` | Open Prisma Studio web UI for browsing and editing database records |
+| `npm run db:seed` | `tsx prisma/seed.ts` | Seed the database with realistic mock data. Clears existing data before inserting new records |
+| `npm run test:validation` | `tsx scripts/test-validation.ts` | Run validation scripts for data integrity checks |
 
 ## 🔧 API Routes
 
@@ -393,6 +535,70 @@ Optional:
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+### CI/CD Pipeline
+
+GitVerse uses GitHub Actions for continuous integration. Every pull request runs the full test suite automatically:
+
+- **Lint** — ESLint checks for code quality
+- **Type Check** — TypeScript compiler validation
+- **Build** — Worker and application build verification
+- **Unit Tests** — Jest test suite
+- **Prisma Schema** — Schema formatting and validation
+- **Playwright E2E** — Browser-based end-to-end tests
+- **CodeQL** — Security vulnerability scanning
+- **Worker Consistency** — Worker build integrity check
+
+All checks must pass before a PR can be merged. See [CONTRIBUTING.md](CONTRIBUTING.md#ci-cd-pipeline) for detailed workflow documentation.
+
+### Running CI Checks Locally
+
+Run these commands before pushing to catch CI failures early:
+
+```bash
+# Lint and type check
+npm run lint
+npm run typecheck
+
+# Unit tests
+npm test
+
+# Prisma schema validation
+npx prisma validate
+npx prisma format
+```
+
+### CI Environment Variables
+
+The following environment variables are used by CI workflows. For unit tests, dummy values are configured inline. For E2E tests, configure these in your local `.env.local`:
+
+| Variable | Description | Required For |
+| :------- | :---------- | :----------- |
+| `DATABASE_URL` | PostgreSQL connection string (Neon pooler URL for serverless) | Unit tests (dummy), E2E tests, Prisma migration |
+| `JWT_SECRET` | JWT signing secret. Generate with `openssl rand -base64 32` | All auth endpoints |
+| `NEXTAUTH_SECRET` | NextAuth session encryption key | NextAuth authentication |
+| `NEXTAUTH_URL` | Application base URL (`http://localhost:3000` for local dev) | NextAuth OAuth callbacks |
+| `GEMINI_API_KEY` | Google Gemini API key from [Google AI Studio](https://aistudio.google.com) | AI analysis features |
+| `INTERNAL_WORKER_SECRET` | Worker API shared secret for internal communication | Analysis worker |
+| `TOKEN_ENCRYPTION_KEY` | 32-byte hex key (64 hex chars) for encrypting OAuth tokens | GitHub integration token storage |
+| `ANALYSIS_RUNNER_SECRET` | Analysis worker API authentication secret | Cron analysis pipeline |
+| `CRON_SECRET` | Bearer token for authenticating cron webhook requests | Cron job endpoints |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID from Google Cloud Console | Google sign-in |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret from Google Cloud Console | Google sign-in |
+| `GITHUB_APP_ID` | GitHub App ID for PR review integration | GitHub App features |
+| `GITHUB_APP_PRIVATE_KEY` | GitHub App private key (PEM format with `\n` line breaks) | GitHub App features |
+| `GITHUB_WEBHOOK_SECRET` | Secret for verifying GitHub webhook payloads | Webhook receiver |
+
+### CI Troubleshooting
+
+- **Lint fails locally but passes in CI**: Ensure your ESLint configuration is up to date with `npm run lint -- --no-cache`. Check that you have the same ESLint plugins and configs installed as CI
+- **Tests pass locally but fail in CI**: Check for environment-specific test behavior. CI uses mock database credentials — tests must not depend on a real database connection. Look for tests that read from `process.env` without mocks
+- **Build succeeds locally but fails in CI**: Verify your lockfile is committed (`package-lock.json`) and in sync with `package.json`. Run `npm install` to regenerate the lockfile if needed
+- **Playwright tests hang**: Ensure all async operations in tests have proper timeouts and cleanup. Check for unhandled promise rejections or missing `await` on page interactions
+- **Prisma validation fails**: Run `npx prisma validate` and `npx prisma format` before committing schema changes. Check that the `DATABASE_URL` in `.env` points to a valid PostgreSQL instance
+- **Worker consistency check fails**: Run `npm run build:worker` locally and commit any changes to `dist-worker/`. If the check still fails, verify the worker imports do not use server-only modules
+- **Type check fails in CI but not locally**: Run `rm -f tsconfig.tsbuildinfo && npm run typecheck` to clear cached type information. The CI workflow deletes the tsbuildinfo file before running to ensure fresh checking
+- **GitHub Actions workflow does not trigger**: Check that your branch is pushing to the `origin` remote, not `upstream`. Some workflows only run on specific branches or paths
 
 ## 💖 Contributors & Thanks
 

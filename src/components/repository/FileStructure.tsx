@@ -244,47 +244,48 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
     }
   };
 
-  // Build file tree from repository files
-  const buildFileTree = (files: FileData[]): FileNode => {
-    const root: FileNode = {
-      name: repository?.name || "root",
-      type: "folder",
-      path: "/",
-      children: [],
-    };
-
-    files?.forEach((file: FileData) => {
-      const parts = file.path.split("/").filter(Boolean);
-      let current = root;
-
-      parts.forEach((part: string, index: number) => {
-        const isLast = index === parts.length - 1;
-        const path = "/" + parts.slice(0, index + 1).join("/");
-
-        if (!current.children) current.children = [];
-
-        let existing = current.children.find((c) => c.name === part);
-        if (!existing) {
-          existing = {
-            name: part,
-            type: isLast ? "file" : "folder",
-            path,
-            size: isLast ? file.size : undefined,
-            fileData: isLast ? file : undefined,
-            children: isLast ? undefined : [],
-          };
-          current.children.push(existing);
-        }
-
-        if (!isLast) current = existing;
-      });
-    });
-
-    return root;
-  };
-
   const files = useMemo(() => repository?.files || [], [repository?.files]);
-  const fileTree = useMemo(() => buildFileTree(files), [files, repository?.name]);
+  const fileTree = useMemo(() => {
+    // Build file tree from repository files
+    const buildFileTree = (files: FileData[]): FileNode => {
+      const root: FileNode = {
+        name: repository?.name || "root",
+        type: "folder",
+        path: "/",
+        children: [],
+      };
+
+      files?.forEach((file: FileData) => {
+        const parts = file.path.split("/").filter(Boolean);
+        let current = root;
+
+        parts.forEach((part: string, index: number) => {
+          const isLast = index === parts.length - 1;
+          const path = "/" + parts.slice(0, index + 1).join("/");
+
+          if (!current.children) current.children = [];
+
+          let existing = current.children.find((c) => c.name === part);
+          if (!existing) {
+            existing = {
+              name: part,
+              type: isLast ? "file" : "folder",
+              path,
+              size: isLast ? file.size : undefined,
+              fileData: isLast ? file : undefined,
+              children: isLast ? undefined : [],
+            };
+            current.children.push(existing);
+          }
+
+          if (!isLast) current = existing;
+        });
+      });
+
+      return root;
+    };
+    return buildFileTree(files);
+  }, [files, repository?.name]);
 
   useEffect(() => {
     if (!repository?.id || files.length === 0) {

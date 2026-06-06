@@ -14,7 +14,6 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware
 
 const CURRENT_MODEL_VERSION = "gemini-2.5-flash";
 
-const CURRENT_MODEL_VERSION = "gemini-2.5-flash";
 
 export async function POST(request: NextRequest) {
   try {

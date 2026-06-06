@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/middleware";
+import { requireAdmin } from "@/lib/middleware";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 export async function GET(request: NextRequest) {
   try {
-    // Basic admin check (could be expanded)
-    const user = await requireAuth(request);
+    const user = await requireAdmin(request);
     const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.ADMIN_DLQ);
     if (!rl.allowed) return rateLimitResponse(rl);
 
@@ -20,11 +19,31 @@ export async function GET(request: NextRequest) {
         orderBy: { updatedAt: "desc" },
         take,
         skip,
+        select: {
+          id: true,
+          event: true,
+          action: true,
+          status: true,
+          error: true,
+          retryCount: true,
+          nextRetryAt: true,
+          createdAt: true,
+          updatedAt: true,
+        }
       }),
       prisma.webhookEvent.count({
         where: { status: "dlq" }
       })
     ]);
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "ACCESS_DLQ",
+        resource: "admin/dlq",
+        details: { take, skip, returnedCount: events.length },
+      }
+    });
 
     return NextResponse.json({ events, total }, { status: 200 });
   } catch (error: any) {

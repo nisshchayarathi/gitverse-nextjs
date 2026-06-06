@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import CircuitBreaker from "opossum";
+import { LRUCache } from "lru-cache";
 
 export interface RateLimitConfig {
   namespace: string;
@@ -12,6 +14,7 @@ export interface RateLimitResult {
   remaining: number;
   resetAt: number;
   limit: number;
+  fallbackFailed?: boolean;
 }
 
 export const RATE_LIMITS = {
@@ -58,16 +61,16 @@ function buildRateLimitKey(namespace: string, identifier: string): string {
   return `${namespace}:${sanitized}`;
 }
 
-export async function checkRateLimit(
-  identifier: string,
-  config: RateLimitConfig,
-): Promise<RateLimitResult> {
-  try {
-    void maybeCleanupExpired();
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + config.windowMs);
-    const key = buildRateLimitKey(config.namespace, identifier);
+// 1. LRU Cache Fallback
+const fallbackCache = new LRUCache<string, { count: number; resetAt: number }>({
+  max: 10000,
+  ttl: 1000 * 60 * 60,
+});
 
+// 2. Circuit Breaker for DB operations
+const dbLimiterCircuit = new CircuitBreaker(
+  async ({ key, config, now, expiresAt }: { key: string, config: RateLimitConfig, now: Date, expiresAt: Date }) => {
+    void maybeCleanupExpired();
     const count = await prisma.rateLimit.count({
       where: {
         key,
@@ -99,8 +102,28 @@ export async function checkRateLimit(
       resetAt: expiresAt.getTime(),
       limit: config.maxRequests,
     };
+  },
+  {
+    timeout: 3000,       // 3s timeout
+    errorThresholdPercentage: 50,
+    resetTimeout: 10000, // 10s wait before retry
+  }
+);
+
+export async function checkRateLimit(
+  identifier: string,
+  config: RateLimitConfig,
+): Promise<RateLimitResult> {
+  const key = buildRateLimitKey(config.namespace, identifier);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + config.windowMs);
+
+  try {
+    // 3. Fire circuit breaker
+    return await dbLimiterCircuit.fire({ key, config, now, expiresAt }) as RateLimitResult;
   } catch (error: any) {
     if (error?.code === "P2002") {
+      // Normal race condition handling, not a circuit failure
       return {
         allowed: false,
         remaining: 0,
@@ -108,13 +131,40 @@ export async function checkRateLimit(
         limit: config.maxRequests,
       };
     }
-    console.error("Rate limit check failed, allowing request:", error);
-    return {
-      allowed: true,
-      remaining: 1,
-      resetAt: Date.now() + config.windowMs,
-      limit: config.maxRequests,
-    };
+
+    console.error("[RateLimit DB] Circuit Breaker opened or DB failed, falling back to LRU:", error.message);
+
+    try {
+      // 4. Fallback to LRU Cache
+      const timeNow = Date.now();
+      let record = fallbackCache.get(key);
+
+      if (!record || record.resetAt <= timeNow) {
+        record = { count: 0, resetAt: timeNow + config.windowMs };
+      }
+
+      record.count += 1;
+      fallbackCache.set(key, record, { ttl: record.resetAt - timeNow });
+
+      const allowed = record.count <= config.maxRequests;
+      const remaining = Math.max(0, config.maxRequests - record.count);
+
+      return {
+        allowed,
+        remaining,
+        limit: config.maxRequests,
+        resetAt: record.resetAt,
+      };
+    } catch (fallbackErr) {
+      console.error("[RateLimit DB] LRU Fallback also failed:", fallbackErr);
+      return {
+        allowed: false, // Default to fail closed
+        remaining: 0,
+        resetAt: Date.now() + config.windowMs,
+        limit: config.maxRequests,
+        fallbackFailed: true, // Signal to webhook to DLQ
+      };
+    }
   }
 }
 

@@ -32,9 +32,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
-import { useRecentRepos } from "@/hooks/useRecentRepos";
-import { isValidGithubUrl } from "@/lib/utils/validators";
-import { RecentReposList } from "@/components/RecentReposList";
+
 interface Repository {
   id: string;
   name: string;
@@ -368,11 +366,6 @@ export default function Dashboard() {
                 <div key={i} className="p-4 border rounded-lg space-y-2">
                   <Skeleton style={{ width: "30%", height: "18px" }} />
                   <Skeleton style={{ width: "70%", height: "14px" }} />
-              <Skeleton className="w-[40%] h-5" />
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="p-4 border rounded-lg space-y-2">
-                  <Skeleton className="w-[30%] h-[18px]" />
-                  <Skeleton className="w-[70%] h-3.5" />
                 </div>
               ))}
             </div>
@@ -381,9 +374,6 @@ export default function Dashboard() {
               <Skeleton style={{ width: "50%", height: "20px" }} />
               {Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} style={{ width: "100%", height: "40px" }} />
-              <Skeleton className="w-[50%] h-5" />
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="w-full h-10" />
               ))}
             </div>
           </div>

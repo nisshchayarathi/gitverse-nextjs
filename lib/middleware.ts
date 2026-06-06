@@ -183,6 +183,29 @@ export async function requireAuth(
   return user;
 }
 
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim()) : [];
+
+/**
+ * Checks if the given user is an administrator.
+ */
+export function isAdmin(user: JWTPayload): boolean {
+  return ADMIN_EMAILS.includes(user.email);
+}
+
+/**
+ * Ensures the incoming request is authenticated AND the user is an admin.
+ * Throws an HttpError if authentication or authorization fails.
+ */
+export async function requireAdmin(request: NextRequest): Promise<JWTPayload> {
+  const user = await requireAuth(request);
+
+  if (!isAdmin(user)) {
+    throw new HttpError(403, "Forbidden: Admin access required");
+  }
+
+  return user;
+}
+
 /**
  * Ensures the authenticated user owns the requested resource.
  */
