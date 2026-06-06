@@ -20,8 +20,10 @@ import {
   EmptyState,
   Modal,
 } from "@/components/ui";
-import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
+import Image from "next/image";
+import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { useAISettings, AIProviderType } from "@/hooks/useAISettings";
