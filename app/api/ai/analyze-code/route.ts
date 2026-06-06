@@ -7,10 +7,14 @@ import {
   validateContentType,
   AI_REQUEST_LIMITS,
 } from "@/lib/utils/aiRequestValidation";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+
+    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    if (!globalRl.allowed) return rateLimitResponse(globalRl);
 
     const allowed = await checkAiRateLimit(
       String(user.userId), "userId", "analyze-code", 20, 60_000

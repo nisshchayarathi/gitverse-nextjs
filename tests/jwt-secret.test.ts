@@ -26,7 +26,7 @@ describe('Environment Secret Resolution', () => {
   it('should fallback to development secret if NODE_ENV !== production', () => {
     delete process.env.JWT_SECRET;
     delete process.env.NEXTAUTH_SECRET;
-    process.env.NODE_ENV = 'development';
+    (process.env as any).NODE_ENV = 'development';
     
     expect(getJwtSecret()).toBe('development-jwt-secret');
     expect(getNextAuthSecret()).toBe('development-nextauth-secret');
@@ -35,7 +35,7 @@ describe('Environment Secret Resolution', () => {
   it('should throw an error in production if secret is missing', () => {
     delete process.env.JWT_SECRET;
     delete process.env.NEXTAUTH_SECRET;
-    process.env.NODE_ENV = 'production';
+    (process.env as any).NODE_ENV = 'production';
     
     expect(() => getJwtSecret()).toThrow('Internal Server Error: Missing required security configuration.');
     expect(() => getNextAuthSecret()).toThrow('Internal Server Error: Missing required security configuration.');

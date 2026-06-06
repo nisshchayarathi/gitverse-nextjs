@@ -4,12 +4,36 @@ import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
+import {
+  invalidateCacheForCommit,
+  invalidateExpiredCacheEntries,
+} from "./geminiAnalysisCacheService";
+import { ttlCache, TTL, repoStatsCacheKey } from "../utils/ttlCache";
 import { invalidateGeminiAnalysisCacheForRepository } from "./geminiAnalysisCacheService";
 import { FileChangeType } from "@prisma/client";
 import { repoSyncLimiter } from "../utils/concurrencyLimiter";
 import { withDbRetry } from "../utils/dbRetry";
-import { getGeminiService } from "./geminiService";
+import { gitverseConfigParser, ParsedRepositoryKnowledge } from "../parsers/gitverseConfigParser";
+import { repositoryKnowledgeService } from "./repositoryKnowledgeService";
 import { getGithubAccessToken } from "./githubAuthService";
+import { detectMonorepoPackages } from "../utils/monorepoUtils";
+import { getGeminiService } from "./geminiService";
+
+/** Shape returned by getRepositoryStats / _fetchRepositoryStats. */
+interface RepoStats {
+  totalCommits: number;
+  totalContributors: number;
+  totalFiles: number;
+  totalBranches: number;
+  recentActivity: {
+    shortHash: string;
+    message: string;
+    authorName: string;
+    committedAt: Date;
+  }[];
+  status: string;
+  lastAnalyzedAt: Date | null;
+}
 
 function yieldIfHighMemory(threshold?: number): Promise<void> {
   if (threshold === undefined) {
@@ -117,12 +141,19 @@ export class RepositoryService {
         throw new Error(`Repository exceeds maximum allowed size of 500MB (${(remoteSize / 1024 / 1024).toFixed(2)}MB).`);
       }
 
-      // For README we don't need all branches; keep it lightweight.
-      gitService = await GitService.cloneRepository(repository.url, tempDir, {
-        depth: 1,
-        noSingleBranch: false,
-        accessToken: token,
-      });
+      const readmeController = new AbortController();
+      const readmeTimeout = setTimeout(() => readmeController.abort(), 5 * 60 * 1000);
+
+      try {
+        gitService = await GitService.cloneRepository(repository.url, tempDir, {
+          depth: 1,
+          noSingleBranch: false,
+          accessToken: token,
+          signal: readmeController.signal,
+        });
+      } finally {
+        clearTimeout(readmeTimeout);
+      }
 
       const scopedPath = repository.targetDirectory
         ? path.join(tempDir, repository.targetDirectory)
@@ -173,15 +204,15 @@ export class RepositoryService {
     }
 
     const existingRepositoryName = await prisma.repository.findFirst({
-  where: {
-    name: input.name,
-    userId: input.userId,
-  },
-});
+      where: {
+        name: input.name,
+        userId: input.userId,
+      },
+    });
 
-if (existingRepositoryName) {
-  throw new Error("Repository with this name already exists");
-}
+    if (existingRepositoryName) {
+      throw new Error("Repository with this name already exists");
+    }
 
     const repository = await prisma.repository.create({
       data: {
@@ -292,23 +323,30 @@ if (existingRepositoryName) {
 
       checkAborted();
 
-      await report({ progressPercent: 9, progressMessage: "Checking AI context configuration" });
-      
+      // Check for monorepo workspaces if this is the root project
+      let subPackages: string[] = [];
+      if (!repository.targetDirectory) {
+        await report({ progressPercent: 9, progressMessage: "Detecting Monorepo sub-packages..." });
+        subPackages = await detectMonorepoPackages(tempDir);
+      }
+
+      await report({ progressPercent: 10, progressMessage: "Checking AI context configuration" });
+
       let knowledgeJson: ParsedRepositoryKnowledge | undefined = undefined;
       let knowledgeMd: ParsedRepositoryKnowledge | undefined = undefined;
-      
+
       try {
         const jsonPath = path.join(tempDir, ".gitverse.json");
         const jsonContent = await fs.readFile(jsonPath, "utf8");
         knowledgeJson = gitverseConfigParser.parseJson(jsonContent);
       } catch (e) { /* Ignore missing or invalid */ }
-      
+
       try {
         const mdPath = path.join(tempDir, ".gitverse.md");
         const mdContent = await fs.readFile(mdPath, "utf8");
         knowledgeMd = gitverseConfigParser.parseMarkdown(mdContent);
       } catch (e) { /* Ignore missing or invalid */ }
-      
+
       const parsedKnowledge = gitverseConfigParser.mergeKnowledge(knowledgeJson, knowledgeMd);
 
       checkAborted();
@@ -319,7 +357,7 @@ if (existingRepositoryName) {
       });
       const [size, branches] = await Promise.all([
         gitService.getRepositorySize(),
-        gitService.getBranches(),
+        gitService.getBranches(signal),
       ]);
 
       checkAborted();
@@ -330,7 +368,7 @@ if (existingRepositoryName) {
         progressPercent: 25,
         progressMessage: "Fetching commit history...",
       });
-      const commits = await gitService.getCommits("--all", 1000);
+      const commits = await gitService.getCommits("--all", 1000, signal);
 
       checkAborted();
 
@@ -338,7 +376,7 @@ if (existingRepositoryName) {
         progressPercent: 65,
         progressMessage: "Scanning files",
       });
-      const files = await gitService.getFileTree(opts?.scope || repository.targetDirectory || undefined);
+      const files = await gitService.getFileTree(opts?.scope || repository.targetDirectory || undefined, signal);
       checkAborted();
 
       await report({
@@ -351,8 +389,8 @@ if (existingRepositoryName) {
       });
 
       const [contributors, languages] = await Promise.all([
-        gitService.getContributors(),
-        gitService.detectLanguages(repository.targetDirectory ?? undefined),
+        gitService.getContributors(signal),
+        gitService.detectLanguages(repository.targetDirectory ?? undefined, signal),
       ]);
 
       checkAborted();
@@ -570,7 +608,7 @@ if (existingRepositoryName) {
           },
         });
       });
-      
+
       // Save repository knowledge if found
       try {
         await repositoryKnowledgeService.upsertKnowledge(repositoryId, parsedKnowledge);
@@ -580,6 +618,8 @@ if (existingRepositoryName) {
 
       // Cache invalidation (outside transaction — best-effort, non-critical)
       try {
+        await invalidateExpiredCacheEntries(repositoryId);
+
         const headCommit = await prisma.commit.findFirst({
           where: { repositoryId, branch: defaultBranch },
           orderBy: { committedAt: "desc" },
@@ -587,11 +627,46 @@ if (existingRepositoryName) {
         });
 
         if (headCommit?.hash) {
-          await invalidateGeminiAnalysisCacheForRepository(repositoryId, headCommit.hash);
+          await invalidateCacheForCommit(repositoryId, headCommit.hash);
         }
       } catch (error) {
         console.warn("Gemini cache invalidation failed:", error);
       }
+
+      // Automatically queue AnalysisJobs for any detected Monorepo sub-packages
+      if (subPackages.length > 0) {
+        await report({ progressPercent: 98, progressMessage: "Queueing sub-package analysis..." });
+        for (const pkgPath of subPackages) {
+          try {
+            const subRepo = await this.createRepository({
+              name: `${repository.name}/${pkgPath}`,
+              url: repository.url,
+              userId: repository.userId,
+              targetDirectory: pkgPath,
+              isPrivate: repository.isPrivate,
+            });
+
+            await prisma.repository.update({
+              where: { id: subRepo.id },
+              data: { parentId: repository.id }
+            });
+
+            await prisma.analysisJob.create({
+              data: {
+                repositoryId: subRepo.id,
+                userId: repository.userId,
+                status: "QUEUED",
+                type: "repository_analysis",
+              },
+            });
+          } catch (e) {
+            console.warn(`Failed to queue analysis for sub-package ${pkgPath}:`, e);
+          }
+        }
+      }
+
+      // Invalidate cached stats — analysis has changed commits, files, contributors, etc.
+      ttlCache.deleteByPrefix(`repo-stats:${repositoryId}:`);
 
       await report({ progressPercent: 100, progressMessage: "Completed" });
 
@@ -601,6 +676,9 @@ if (existingRepositoryName) {
         where: { id: repositoryId },
         data: { status: "failed" },
       });
+      // Invalidate cached stats — status has changed to "failed".
+      ttlCache.deleteByPrefix(`repo-stats:${repositoryId}:`);
+      await report({ progressMessage: "Failed" });
       await report({ progressMessage: "Analysis failed. Please try again." });
       throw error;
     } finally {
@@ -638,7 +716,7 @@ if (existingRepositoryName) {
 
     const report = async (update: RepositoryAnalysisProgress) => {
       if (opts?.onProgress) {
-        try { await opts.onProgress(update); } catch {}
+        try { await opts.onProgress(update); } catch { }
       }
     };
 
@@ -668,9 +746,9 @@ if (existingRepositoryName) {
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      await report({ 
-        progressPercent: 10 + Math.floor((completedChunks / totalChunks) * 60), 
-        progressMessage: `Analyzing chunk ${i + 1} of ${totalChunks}...` 
+      await report({
+        progressPercent: 10 + Math.floor((completedChunks / totalChunks) * 60),
+        progressMessage: `Analyzing chunk ${i + 1} of ${totalChunks}...`
       });
 
       let aiResponse = await geminiService.analyzeRepository({
@@ -711,9 +789,19 @@ if (existingRepositoryName) {
       type: "architecture-document",
       context: {
         fileTree: `Combined Intermediate Summaries:\n\n${combinedSummaries}`,
-        commits: repository.commits,
-        languages: repository.languages,
-        contributors: repository.contributors
+        commits: repository.commits.map((c) => ({
+          message: c.message,
+          author: c.authorName,
+          date: c.committedAt.toISOString(),
+        })),
+        languages: repository.languages.map((l) => ({
+          name: l.name,
+          percentage: l.percentage,
+        })),
+        contributors: repository.contributors.map((c) => ({
+          name: c.name,
+          commits: c.commits,
+        })),
       }
     });
 
@@ -767,6 +855,8 @@ if (existingRepositoryName) {
           take: 500,
         },
         knowledge: true,
+        subPackages: true,
+        parent: true,
       },
     });
 
@@ -785,17 +875,16 @@ if (existingRepositoryName) {
             contributors: true,
             files: true,
             branches: true,
+            subPackages: true,
           },
         },
         languages: {
           orderBy: { percentage: "desc" },
           take: 3,
         },
+        parent: true,
       },
-      orderBy: [
-        { createdAt: "desc" },
-        { id: "desc" } // Deterministic tie-breaker
-      ],
+      orderBy: { id: "desc" },
     });
 
     let nextCursor: number | undefined = undefined;
@@ -823,6 +912,31 @@ if (existingRepositoryName) {
       throw new Error("Repository not found");
     }
 
+    await prisma.$transaction([
+      // Explicitly delete file changes linked to commits of this repository
+      prisma.fileChange.deleteMany({
+        where: { commit: { repositoryId: id } },
+      }),
+      // Explicitly delete commits to prevent orphaned relational data
+      prisma.commit.deleteMany({
+        where: { repositoryId: id },
+      }),
+      // Explicitly delete analysis jobs
+      prisma.analysisJob.deleteMany({
+        where: { repositoryId: id },
+      }),
+      // Repository deletion handles the rest via Cascade
+      prisma.repository.delete({
+        where: { id },
+      }),
+    ]);
+    await prisma.repository.delete({
+      where: { id },
+    });
+
+    // Invalidate cached stats — repository no longer exists.
+    ttlCache.deleteByPrefix(`repo-stats:${id}:`);
+
     return { success: true };
   }
   //Explicitly set the status of a repository
@@ -838,8 +952,30 @@ if (existingRepositoryName) {
 
   /**
    * Get repository statistics
+   *
+   * Results are cached in-process for TTL.REPO_STATS (5 minutes) to avoid
+   * repeated DB round-trips for the same repo. The cache is invalidated
+   * automatically when analysis completes, fails, or the repo is deleted.
    */
   async getRepositoryStats(id: number, userId: number) {
+    const cacheKey = repoStatsCacheKey(id, userId);
+
+    // Return cached result if still fresh.
+    const cached = ttlCache.get<RepoStats>(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const stats = await this._fetchRepositoryStats(id, userId);
+
+    // Populate cache.
+    ttlCache.set(cacheKey, stats, TTL.REPO_STATS);
+
+    return stats;
+  }
+
+  /** Raw DB fetch for repository stats — called by getRepositoryStats. */
+  private async _fetchRepositoryStats(id: number, userId: number): Promise<RepoStats> {
     const repository = await prisma.repository.findFirst({
       where: { id, userId },
     });

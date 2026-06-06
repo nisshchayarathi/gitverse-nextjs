@@ -24,7 +24,7 @@ export interface DecodedToken extends JWTPayload {
  */
 export async function verifyTokenWithUserValidation(token: string): Promise<JWTPayload | null> {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
+    const decoded = jwt.verify(token, getJwtSecret()) as DecodedToken;
     
     // Require tokenVersion in payload for security
     if (decoded.tokenVersion == null) {
@@ -126,7 +126,7 @@ export function generateToken(payload: JWTPayload): string {
  */
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    return jwt.verify(token, getJwtSecret()) as JWTPayload;
   } catch (error) {
     return null;
   }
@@ -432,7 +432,6 @@ export async function invalidateAllUserTokens(
       reason,
       timestamp: new Date(),
     };
-    return jwt.verify(token, getJwtSecret()) as JWTPayload
   } catch (error) {
     console.error(`[JWT] Failed to invalidate tokens for user ${userId}:`, error);
     return null;
@@ -517,7 +516,7 @@ export async function validateTokenForPasswordChange(
   userId: number
 ): Promise<boolean> {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
+    const decoded = jwt.verify(token, getJwtSecret()) as DecodedToken;
     
     // Verify user owns this token
     if (decoded.userId !== userId) {
@@ -591,7 +590,7 @@ export interface JWTConfig {
  */
 export function getJWTConfig(): JWTConfig {
   return {
-    secret: JWT_SECRET,
+    secret: getJwtSecret(),
     tokenExpiry: '7d',
     requireTokenVersion: true,
     validatePasswordChange: true,

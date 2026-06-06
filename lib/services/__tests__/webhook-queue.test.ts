@@ -12,6 +12,15 @@ jest.mock("../../prisma", () => ({
   }
 }));
 
+jest.mock("@/services/security/safe-http-client", () => ({
+  SafeHttpClient: {
+    fetch: jest.fn((url, init) => {
+      (global as any).fetch(url, init);
+      return Promise.resolve({} as any);
+    }),
+  },
+}));
+
 // Mock global fetch
 jest.mock("@/services/security/safe-http-client", () => ({
   SafeHttpClient: {

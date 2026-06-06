@@ -14,6 +14,12 @@
   "include": [
     "scripts/analysisWorker.ts",
     "scripts/workerServer.ts",
+    "scripts/cronWorker.ts",
     "lib/**/*.ts"
+  ],
+  "exclude": [
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }

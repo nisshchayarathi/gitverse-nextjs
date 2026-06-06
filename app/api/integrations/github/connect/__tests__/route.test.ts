@@ -139,7 +139,7 @@ describe("POST /api/integrations/github/connect", () => {
   describe("successful connection", () => {
     it("encrypts the token before storing", async () => {
       const mockGitHubUser = { id: 12345, login: "testuser" };
-      (GitHubService as jest.Mock).mockImplementation(() => ({
+      (GitHubService as any).mockImplementation(() => ({
         getAuthenticatedUser: jest.fn().mockResolvedValue(mockGitHubUser),
       }));
 
@@ -149,7 +149,7 @@ describe("POST /api/integrations/github/connect", () => {
     });
 
     it("stores encrypted token with tokenEncrypted flag", async () => {
-      (GitHubService as jest.Mock).mockImplementation(() => ({
+      (GitHubService as any).mockImplementation(() => ({
         getAuthenticatedUser: jest.fn().mockResolvedValue({ id: 12345, login: "testuser" }),
       }));
 

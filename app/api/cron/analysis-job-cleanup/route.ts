@@ -10,15 +10,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [reclaimed, failed] = await Promise.all([
-      analysisJobService.reclaimOrphanedJobs(),
-      analysisJobService.cleanupStaleJobs(),
-    ]);
-
+    // Cleanup is now handled internally by BullMQ (dead worker detection, retries).
     return NextResponse.json({
       ok: true,
-      reclaimed,
-      failed,
+      message: "Background job lifecycle is now managed by BullMQ",
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {

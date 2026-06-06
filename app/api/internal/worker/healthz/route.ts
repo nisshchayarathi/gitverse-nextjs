@@ -5,10 +5,15 @@ import {
   validateSecretIsolation,
 } from "@/lib/utils/internalAuth";
 import { checkEncryptionHealth } from "@/lib/utils/tokenEncryption";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
+  const workerId = request.headers.get("x-worker-id") || "healthz";
+  const rl = await checkRateLimit(workerId, RATE_LIMITS.WORKER_HEALTHZ);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   if (!isInternalWorkerAuthorized(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

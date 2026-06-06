@@ -2,6 +2,7 @@ import prisma from "../prisma";
 import type { AnalysisJob } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { isRetryableError, computeBackoffMs } from "../utils/retry";
+import { analysisQueue } from "../queue/analysisQueue";
 
 export type JobProgressUpdate = {
   progressPercent?: number;
@@ -12,32 +13,7 @@ export type JobProgressUpdate = {
 const DEFAULT_LOCK_MS = 5 * 60 * 1000;
 
 export class AnalysisJobService {
-  async reclaimOrphanedJobs(): Promise<number> {
-    const result = await prisma.analysisJob.updateMany({
-      where: {
-        status: "PROCESSING",
-        lockExpiresAt: { lt: new Date() },
-      },
-      data: {
-        status: "QUEUED",
-        lockedAt: null,
-        lockedBy: null,
-        lockExpiresAt: null,
-        nextRunAt: new Date(),
-        progressMessage: "Reclaimed after lock expiration",
-      },
-    });
-    return result.count;
-  }
 
-  async countOrphanedJobs(params?: { userId?: number }): Promise<number> {
-    const where: any = {
-      status: "PROCESSING",
-      lockExpiresAt: { lt: new Date() },
-    };
-    if (params?.userId) where.userId = params.userId;
-    return prisma.analysisJob.count({ where });
-  }
 
   async getAnalysisStats(params: { userId: number }): Promise<{
     total: number;
@@ -80,8 +56,6 @@ export class AnalysisJobService {
     scope?: string;
   }): Promise<AnalysisJob> {
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(${params.repositoryId})`;
-
       const existing = await tx.analysisJob.findFirst({
         where: {
           repositoryId: params.repositoryId,
@@ -91,7 +65,7 @@ export class AnalysisJobService {
       if (existing) return existing;
 
       try {
-        return await tx.analysisJob.create({
+        const job = await tx.analysisJob.create({
           data: {
             repositoryId: params.repositoryId,
             userId: params.userId,
@@ -103,6 +77,8 @@ export class AnalysisJobService {
             maxAttempts: params.maxAttempts ?? 3,
           },
         });
+        await analysisQueue.add("repository_analysis", { jobId: job.id, userId: params.userId });
+        return job;
       } catch (error: any) {
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -111,6 +87,56 @@ export class AnalysisJobService {
           const activeJob = await tx.analysisJob.findFirst({
             where: {
               repositoryId: params.repositoryId,
+              status: { in: ["QUEUED", "PROCESSING"] },
+            },
+          });
+          if (activeJob) return activeJob;
+        }
+        throw error;
+      }
+    });
+  }
+
+  async createArchitectureGenerationJob(params: {
+    repositoryId: number;
+    userId: number;
+    maxAttempts?: number;
+  }): Promise<AnalysisJob> {
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(${params.repositoryId})`;
+
+      const existing = await tx.analysisJob.findFirst({
+        where: {
+          repositoryId: params.repositoryId,
+          type: "architecture_generation",
+          status: { in: ["QUEUED", "PROCESSING"] },
+        },
+      });
+      if (existing) return existing;
+
+      try {
+        const job = await tx.analysisJob.create({
+          data: {
+            repositoryId: params.repositoryId,
+            userId: params.userId,
+            type: "architecture_generation",
+            status: "QUEUED",
+            progressPercent: 0,
+            progressMessage: "Queued",
+            maxAttempts: params.maxAttempts ?? 3,
+          },
+        });
+        await analysisQueue.add("architecture_generation", { jobId: job.id, userId: params.userId });
+        return job;
+      } catch (error: any) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          const activeJob = await tx.analysisJob.findFirst({
+            where: {
+              repositoryId: params.repositoryId,
+              type: "architecture_generation",
               status: { in: ["QUEUED", "PROCESSING"] },
             },
           });
@@ -335,11 +361,79 @@ export class AnalysisJobService {
     });
   }
 
+  async releaseLock(params: {
+    jobId: string;
+    workerId?: string;
+  }): Promise<void> {
+    const where: any = { id: params.jobId };
+    if (params.workerId) {
+      where.lockedBy = params.workerId;
+    }
+    await prisma.analysisJob.update({
+      where,
+      data: {
+        lockExpiresAt: new Date(),
+      },
+    });
+  }
+
+  async reclaimOrphanedJobs(): Promise<number> {
+    const result = await prisma.analysisJob.updateMany({
+      where: {
+        status: "PROCESSING",
+        lockExpiresAt: { lt: new Date() },
+      },
+      data: {
+        status: "QUEUED",
+        lockedBy: null,
+        lockedAt: null,
+      },
+    });
+    return result.count;
+  }
+
+  async countOrphanedJobs(params?: { userId?: number }): Promise<number> {
+    const where: any = {
+      status: "PROCESSING",
+      lockExpiresAt: { lt: new Date() },
+    };
+    if (params?.userId != null) {
+      where.userId = params.userId;
+    }
+    return prisma.analysisJob.count({ where });
+  }
+
+  async markDrainReleased(params: {
+    jobId: string;
+    workerId?: string;
+    error: string;
+  }): Promise<void> {
+    const where: any = { id: params.jobId };
+    if (params.workerId) {
+      where.lockedBy = params.workerId;
+    }
+    await prisma.analysisJob.update({
+      where,
+      data: {
+        status: "QUEUED",
+        lockExpiresAt: new Date(),
+        lockedAt: null,
+        lockedBy: null,
+        nextRunAt: new Date(),
+        progressMessage: "Worker shutting down — job released for reprocessing",
+        error: params.error,
+      },
+    });
+  }
+
   async cleanupStaleJobs(gracePeriodMs: number = 10 * 60 * 1000): Promise<number> {
     const stale = await prisma.analysisJob.updateMany({
       where: {
         status: "PROCESSING",
-        lockExpiresAt: { lt: new Date() },
+        OR: [
+          { lockExpiresAt: { lt: new Date() } },
+          { lockExpiresAt: null }
+        ],
         updatedAt: { lt: new Date(Date.now() - gracePeriodMs) },
       },
       data: {

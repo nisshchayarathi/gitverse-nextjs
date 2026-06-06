@@ -5,14 +5,19 @@ import { startAnalysisWorkerLoop } from "./analysisWorker";
 import { disconnectPrisma, getPoolHealth, getPoolMetrics } from "../lib/prisma";
 
 const port = Number(process.env.PORT || "8080");
+const GRACE_PERIOD_MS = 35_000;
+
 let healthServer: http.Server | null = null;
 let stopping = false;
+let workerDone: (() => void) | null = null;
+let workerFinished: Promise<void> | null = null;
 
 function startHealthServer(): http.Server {
   const server = http.createServer((req, res) => {
     if (stopping) {
       res.statusCode = 503;
       res.setHeader("content-type", "text/plain; charset=utf-8");
+      res.setHeader("retry-after", "60");
       res.end("shutting down");
       return;
     }
@@ -53,6 +58,19 @@ function startHealthServer(): http.Server {
       return;
     }
 
+    if (req.url === "/drain") {
+      const drainMsg = stopping
+        ? "already draining"
+        : "drain initiated";
+      res.statusCode = 200;
+      res.setHeader("content-type", "text/plain; charset=utf-8");
+      res.end(drainMsg);
+      if (!stopping) {
+        drain("DRAIN_ENDPOINT");
+      }
+      return;
+    }
+
     res.statusCode = 404;
     res.setHeader("content-type", "text/plain; charset=utf-8");
     res.end("not found");
@@ -65,10 +83,29 @@ function startHealthServer(): http.Server {
   return server;
 }
 
-const shutdown = async (signal: string) => {
+const drain = async (source: string) => {
   if (stopping) return;
   stopping = true;
-  console.log(`received ${signal}, shutting down worker server...`);
+  console.log(`drain initiated via ${source}`);
+
+  if (workerDone) {
+    workerDone();
+  }
+
+  const forcedExit = setTimeout(() => {
+    if (healthServer) {
+      healthServer.close(() => {});
+    }
+    console.error(`drain timeout after ${GRACE_PERIOD_MS}ms, forcing exit`);
+    disconnectPrisma().catch(() => {});
+    process.exit(1);
+  }, GRACE_PERIOD_MS);
+
+  if (workerFinished) {
+    await workerFinished;
+  }
+
+  clearTimeout(forcedExit);
 
   if (healthServer) {
     await new Promise<void>((resolve) => healthServer!.close(() => resolve()));
@@ -76,6 +113,10 @@ const shutdown = async (signal: string) => {
 
   await disconnectPrisma();
   process.exit(0);
+};
+
+const shutdown = async (signal: string) => {
+  await drain(signal);
 };
 
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
@@ -86,8 +127,15 @@ process.on("SIGHUP", () => void shutdown("SIGHUP"));
 async function main() {
   healthServer = startHealthServer();
 
-  // Run worker loop indefinitely.
+  workerFinished = new Promise<void>((resolve) => {
+    workerDone = resolve;
+  });
+
   await startAnalysisWorkerLoop();
+
+  if (!stopping) {
+    workerDone?.();
+  }
 }
 
 main().catch(async (e) => {

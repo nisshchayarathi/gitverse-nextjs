@@ -284,6 +284,37 @@ if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
   );
 }
 
+const tokenVersionCache = new Map<string, { version: number; fetchedAt: number }>();
+const CACHE_TTL_MS = 60_000;
+
+async function getFreshTokenVersion(
+  sub: string | undefined,
+  fallback: number | undefined,
+): Promise<number | undefined> {
+  if (!sub) return fallback;
+  const userId = Number(sub);
+  if (!Number.isFinite(userId)) return fallback;
+
+  const cached = tokenVersionCache.get(sub);
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+    return cached.version;
+  }
+
+  try {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { tokenVersion: true },
+    });
+    if (dbUser) {
+      tokenVersionCache.set(sub, { version: dbUser.tokenVersion, fetchedAt: Date.now() });
+      return dbUser.tokenVersion;
+    }
+  } catch {
+    // DB unavailable — use the existing token version from the JWT cookie
+  }
+  return fallback;
+}
+
 export const authOptions: NextAuthOptions = {
   debug: process.env.NEXTAUTH_DEBUG === "true",
   logger: {
@@ -428,7 +459,6 @@ export const authOptions: NextAuthOptions = {
               jwtTokenVersion != null &&
               fresh.tokenVersion !== jwtTokenVersion
             ) {
-              // Return minimal session to signal invalidation
               return {
                 ...session,
                 user: { id: (session.user as any).id },
@@ -465,29 +495,13 @@ export const authOptions: NextAuthOptions = {
         ((user as any)?.image as string | undefined);
 
       // Attach tokenVersion for session invalidation on password change/logout.
-      // On initial sign-in (user object present), fetch from DB.
-      // On subsequent requests, keep the existing tokenVersion from the cookie.
-      let tokenVersion: number | undefined =
-        typeof (token as any).tokenVersion === "number"
-          ? (token as any).tokenVersion
-          : undefined;
-
-      if (user) {
-        const userId = Number((user as any).id);
-        if (Number.isFinite(userId)) {
-          try {
-            const dbUser = await prisma.user.findUnique({
-              where: { id: userId },
-              select: { tokenVersion: true },
-            });
-            if (dbUser) {
-              tokenVersion = dbUser.tokenVersion;
-            }
-          } catch {
-            // If DB is unavailable, keep existing tokenVersion
-          }
-        }
-      }
+      // Always fetch from DB on every JWT callback invocation so that logout
+      // or password change is reflected within one token refresh cycle (~5 min).
+      // Cache the DB lookup for 60 seconds to avoid excessive queries.
+      const tokenVersion = await getFreshTokenVersion(
+        user ? String((user as any).id) : token.sub,
+        (token as any).tokenVersion as number | undefined,
+      );
 
       const safeToken: Record<string, unknown> = {
         sub,

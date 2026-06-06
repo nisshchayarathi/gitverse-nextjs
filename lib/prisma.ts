@@ -141,7 +141,7 @@ function createPrismaClient() {
   }));
 }
 
-type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
+export type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
 
 // Follow Next.js best practices for Prisma Client instantiation while retaining lazy loading
 // for build-time static analysis where DATABASE_URL might not be present.

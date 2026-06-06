@@ -8,6 +8,7 @@ import { SafeHttpClient } from "@/services/security/safe-http-client";
 import { webhookQueue } from "@/lib/services/webhook-queue";
 import { dbHealthService } from "@/lib/services/db-health";
 import { webhookRetryService } from "@/lib/services/webhook-retry";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -49,8 +50,9 @@ function shouldHandleIssueAction(action: string | undefined): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  // Note: Rate limiting is deferred to background processing or handled by in-memory limits
-  // to avoid exhausting the Prisma database connection pool synchronously.
+  const ip = getClientIp(request);
+  const rl = await checkRateLimit(ip, RATE_LIMITS.GITHUB_WEBHOOK);
+  if (!rl.allowed) return rateLimitResponse(rl, "Webhook rate limit exceeded");
 
   const rawBody = await request.text();
 

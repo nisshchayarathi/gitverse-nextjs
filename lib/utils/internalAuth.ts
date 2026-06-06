@@ -7,7 +7,7 @@ export function deriveBearerToken(secret: string): string {
 
 export function validateAuthorizationHeader(
   authHeader: string | null,
-  secret: string
+  secret: string | undefined
 ): boolean {
   if (!secret) return false;
 

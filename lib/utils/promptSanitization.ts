@@ -103,6 +103,122 @@ const INJECTION_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
     pattern: /<\/<SYS>>/gi,
     replacement: "[redacted token]",
   },
+  {
+    pattern: /<\|system\|>/gi,
+    replacement: "[redacted token]",
+  },
+  {
+    pattern: /<\|user\|>/gi,
+    replacement: "[redacted token]",
+  },
+  {
+    pattern: /<\|assistant\|>/gi,
+    replacement: "[redacted token]",
+  },
+  {
+    pattern: /<\|tool\|>/gi,
+    replacement: "[redacted token]",
+  },
+  {
+    pattern: /\[SYSTEM\]/gi,
+    replacement: "[redacted token]",
+  },
+  {
+    pattern: /\[USER\]/gi,
+    replacement: "[redacted token]",
+  },
+  {
+    pattern: /\[ASSISTANT\]/gi,
+    replacement: "[redacted token]",
+  },
+  {
+    pattern: /overallScore\s+(?:should\s+be|is|=|:)\s*\d+/gi,
+    replacement: "[redacted score request]",
+  },
+  {
+    pattern: /overallScore\s+of\s+\d+/gi,
+    replacement: "[redacted score request]",
+  },
+  {
+    pattern: /overallScore\s+\d+/gi,
+    replacement: "[redacted score request]",
+  },
+  {
+    pattern: /score\s+(this\s+)?(pr|code|change|review)\s+(as\s+)?\d+/gi,
+    replacement: "[redacted score request]",
+  },
+  {
+    pattern: /return\s+(a\s+)?(score|rating|grade)\s+of\s+\d+/gi,
+    replacement: "[redacted score request]",
+  },
+  {
+    pattern: /give\s+(this\s+)?(pr\s+)?(a\s+)?(score|rating|grade)\s+of\s+\d+/gi,
+    replacement: "[redacted score request]",
+  },
+  {
+    pattern: /give\s+it\s+(a\s+)?(score|rating|grade)\s+of\s+\d+/gi,
+    replacement: "[redacted score request]",
+  },
+  {
+    pattern: /set\s+(the\s+)?overallScore\s+(to\s+)?\d+/gi,
+    replacement: "[redacted score request]",
+  },
+  {
+    pattern: /rate\s+(this|the)\s+(pr|code|change|pull\s+request)\s+(as\s+)?\d+/gi,
+    replacement: "[redacted score request]",
+  },
+  {
+    pattern: /respond\s+(with|only)\s+(valid\s+)?json/i,
+    replacement: "[redacted output directive]",
+  },
+  {
+    pattern: /say\s+[""'][^""']*[""']/gi,
+    replacement: "[redacted quoted output]",
+  },
+  {
+    pattern: /output\s+only\s+(the\s+)?json/i,
+    replacement: "[redacted output directive]",
+  },
+  {
+    pattern: /you\s+(will|shall)\s+(now\s+)?(only\s+)?(output|return|respond\s+with)/gi,
+    replacement: "[redacted instruction] ",
+  },
+  {
+    pattern: /evaluate\s+(this|the)\s+(pr|code|change|pull\s+request)\s+positively/i,
+    replacement: "[redacted evaluation directive]",
+  },
+  {
+    pattern: /approve\s+(this|the)\s+(pr|code|change|pull\s+request)/gi,
+    replacement: "[redacted approval directive]",
+  },
+  {
+    pattern: /merge\s+(this|the)\s+(pr|code|change|pull\s+request)/gi,
+    replacement: "[redacted merge directive]",
+  },
+  {
+    pattern: /do\s+not\s+(flag|report|raise|create)\s+(any\s+)?(issues?|problems?|warnings?|errors?)/gi,
+    replacement: "[redacted suppression directive]",
+  },
+  {
+    pattern: /ignore\s+(all\s+)?(future\s+|subsequent\s+)?(instructions|directives|commands|input)/gi,
+    replacement: "[redacted instruction]",
+  },
+  {
+    pattern: /your\s+(response|answer|output|reply)\s+(must|should|will|shall|needs\s+to)\s+/gi,
+    replacement: "[redacted directive] ",
+  },
+  {
+    pattern: /never\s+(flag|report|mention|note|tell|say|state|indicate)/gi,
+    replacement: "[redacted suppression directive]",
+  },
+  {
+    pattern: /this\s+is\s+(a\s+)?(test|example|dummy|sample|practice)\s+(pr|code|change|review)/gi,
+    replacement: "[redacted classification]",
+  },
+  {
+    pattern: /the\s+answer\s+(is|should\s+be|must\s+be)\s*:?\s+/gi,
+    replacement: "[redacted answer directive] ",
+  },
 ];
 
 /**

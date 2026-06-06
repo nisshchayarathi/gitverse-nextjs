@@ -19,6 +19,7 @@ import { GitService } from "@/lib/services/gitService";
 import { logger } from "@/lib/logger";
 import { apiError, apiSuccess } from "@/lib/utils/apiResponse";
 import { isValidGitScope } from "@/lib/utils/validators";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 function kickLocalRunner(request: NextRequest) {
   if (process.env.NODE_ENV === "production") return;
   const origin = new URL(request.url).origin;
@@ -71,6 +72,9 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
+    const burstRl = await checkRateLimit(String(user.userId), RATE_LIMITS.REPOSITORY_CREATE_BURST);
+    if (!burstRl.allowed) return rateLimitResponse(burstRl);
+
     const attemptsCount = await countAttempts(
       String(user.userId),
       "REPOSITORY_ANALYSIS",
@@ -106,6 +110,7 @@ export async function POST(request: NextRequest) {
 
     // Backend check to catch non-existent or private repositories
     let exists = false;
+    let isPrivate = false;
     
     // First try without token (public check)
     exists = await GitService.checkGithubRepositoryExists(normalizedUrl);
@@ -115,6 +120,9 @@ export async function POST(request: NextRequest) {
       const token = await getGithubAccessToken(user.userId);
       if (token) {
         exists = await GitService.checkGithubRepositoryExists(normalizedUrl, token);
+        if (exists) {
+          isPrivate = true;
+        }
       }
     }
 

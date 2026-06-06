@@ -32,7 +32,7 @@ export function CommandPalette({ open, setOpen }: CommandPaletteProps) {
     };
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
-  }, [setOpen]);
+  }, [open, setOpen]);
 
   const runCommand = (command: () => void) => {
     setOpen(false);

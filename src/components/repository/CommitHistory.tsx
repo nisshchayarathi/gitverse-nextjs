@@ -1,6 +1,6 @@
 import { FileText, Plus, Minus, GitMerge, Tag } from "lucide-react";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 
 interface FileChange {
   path: string;
@@ -49,36 +49,36 @@ interface CommitHistoryProps {
   repository?: any;
 }
 
+// Branch colors for visualization
+const branchColors = [
+  "#3b82f6", // blue
+  "#ef4444", // red
+  "#10b981", // green
+  "#f59e0b", // amber
+  "#8b5cf6", // purple
+  "#ec4899", // pink
+  "#06b6d4", // cyan
+];
+
 export const CommitHistory = ({ repository }: CommitHistoryProps) => {
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
 
   const DOT_Y = 8;
   const CURVE_END_Y = 50;
 
-  // Branch colors for visualization
-  const branchColors = [
-    "#3b82f6", // blue
-    "#ef4444", // red
-    "#10b981", // green
-    "#f59e0b", // amber
-    "#8b5cf6", // purple
-    "#ec4899", // pink
-    "#06b6d4", // cyan
-  ];
-
   const defaultBranch =
     repository?.branches?.find((b: any) => b.isDefault)?.name || "main";
 
-  const normalizeBranchName = (value: unknown): string => {
+  const normalizeBranchName = useCallback((value: unknown): string => {
     const str = typeof value === "string" ? value.trim() : "";
     if (!str) return defaultBranch;
     if (str === "--all") return defaultBranch;
     if (/^\d+$/.test(str)) return defaultBranch;
     return str;
-  };
+  }, [defaultBranch]);
 
   // Use real commits from repository or empty array
-  const commits: Commit[] =
+  const commits: Commit[] = useMemo(() => 
     repository?.commits?.map((commit: any) => ({
       hash: commit.hash,
       shortHash: commit.shortHash,
@@ -105,7 +105,7 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
       parents: commit.parents || [],
       isMerge: commit.parents?.length > 1,
       tags: commit.tags || [],
-    })) || [];
+    })) || [], [repository?.commits, normalizeBranchName]);
 
   const refToBadgeText = (ref: string) => {
     const trimmed = ref.trim();
@@ -271,7 +271,7 @@ export const CommitHistory = ({ repository }: CommitHistoryProps) => {
     }
 
     return nodes;
-  }, [commits, branchColors]);
+  }, [commits]);
 
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);

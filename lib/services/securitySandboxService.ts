@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma";
 import crypto from "crypto";
 import { validateSafeUrl } from "@/lib/utils/ssrfValidator";
 import { GitHubService } from "./githubService";
+import { getDecryptedGitHubToken } from "@/lib/utils/githubToken";
 
 const execFileAsync = promisify(execFile);
 
@@ -300,18 +301,20 @@ export async function runSecuritySandbox(params: {
       const repo = await prisma.repository.findUnique({
         where: { id: params.repositoryId },
         include: { 
-          user: { include: { githubAccount: true } }, 
-          pullRequests: { where: { id: params.pullRequestId } } 
+          user: { include: { githubAccount: true } }
         }
       });
+      const pr = await prisma.pullRequest.findUnique({
+        where: { id: params.pullRequestId }
+      });
 
-      if (repo && repo.user.githubAccount && repo.pullRequests.length > 0) {
+      if (repo && repo.user.githubAccount && pr) {
         try {
           const githubService = new GitHubService(repo.user.githubAccount.accessToken);
           const parts = repo.url.split("/");
           const owner = parts[parts.length - 2];
           const name = parts[parts.length - 1];
-          const pullNumber = repo.pullRequests[0].prNumber;
+          const pullNumber = pr.prNumber;
           
           await githubService.updatePullRequest(owner, name, pullNumber, {
             state: "closed",

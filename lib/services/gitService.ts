@@ -1,10 +1,7 @@
 import {
-  exec,
   spawn,
-  type ExecOptions,
   type SpawnOptions,
 } from "child_process";
-import { promisify } from "util";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { createReadStream } from "fs";
@@ -14,6 +11,7 @@ import { normalizeKnownRepoHttpUrl } from "@/lib/utils/repositoryUtils";
 const DEFAULT_GIT_TIMEOUT_MS = 2 * 60 * 1000;
 const GIT_CLONE_TIMEOUT_MS = 10 * 60 * 1000;
 const GIT_LOG_TIMEOUT_MS = 5 * 60 * 1000;
+const FORCE_KILL_DELAY_MS = 5_000;
 const MAX_COMMITS_DEFAULT = 1000;
 const MAX_CONTRIBUTOR_COMMITS = 3000;
 const MAX_FILE_BYTES_TO_READ_FOR_LINECOUNT = 256 * 1024; // 256KB
@@ -39,6 +37,18 @@ function countLinesReadStream(filePath: string): Promise<number> {
   });
 }
 
+function killProcess(
+  child: import("child_process").ChildProcess,
+): void {
+  child.kill("SIGTERM");
+  setTimeout(() => {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+    }
+  }, FORCE_KILL_DELAY_MS);
+}
+
 function spawnOutput(
   command: string,
   args: string[],
@@ -50,10 +60,8 @@ function spawnOutput(
       env: {
         ...process.env,
         ...options.env,
-        // Prevent git from hanging on credential / interactive prompts.
         GIT_TERMINAL_PROMPT: "0",
         GCM_INTERACTIVE: "Never",
-        // Avoid fetching large LFS objects during clone/checkout.
         GIT_LFS_SKIP_SMUDGE: "1",
       },
     });
@@ -66,7 +74,7 @@ function spawnOutput(
 
     const timeout = options.timeout ?? DEFAULT_GIT_TIMEOUT_MS;
     const timer = setTimeout(() => {
-      child.kill();
+      killProcess(child);
       reject(new Error(`Command timed out: ${command} ${args.join(" ")}`));
     }, timeout);
 
@@ -86,7 +94,8 @@ function spawnOutput(
 
     if (options.signal) {
       options.signal.addEventListener("abort", () => {
-        child.kill();
+        clearTimeout(timer);
+        killProcess(child);
         reject(new Error("Command aborted"));
       });
     }
@@ -215,11 +224,12 @@ export class GitService {
 
   private spawnGit(
     args: string[],
-    options: { timeout?: number } = {},
+    options: { timeout?: number; signal?: AbortSignal } = {},
   ): Promise<{ stdout: string; stderr: string }> {
+    const combined = options.signal || this.signal;
     return spawnOutput("git", args, {
       cwd: this.repoPath,
-      signal: this.signal,
+      signal: combined,
       timeout: options.timeout,
     });
   }
@@ -321,6 +331,13 @@ export class GitService {
         stderr += chunk.toString();
       });
 
+      if (opts?.signal) {
+        opts.signal.addEventListener("abort", () => {
+          killProcess(child);
+          reject(new Error("Repository clone aborted"));
+        });
+      }
+
       child.on("close", (code) => {
         if (code === 0) {
           resolve(new GitService(destination, opts?.signal));
@@ -399,18 +416,18 @@ export class GitService {
   /**
    * Get all branches in the repository
    */
-  async getBranches(): Promise<BranchData[]> {
+  async getBranches(signal?: AbortSignal): Promise<BranchData[]> {
     try {
       const { stdout: defaultBranch } = await this.spawnGit(
         ["symbolic-ref", "refs/remotes/origin/HEAD"],
-        { timeout: DEFAULT_GIT_TIMEOUT_MS },
+        { timeout: DEFAULT_GIT_TIMEOUT_MS, signal },
       );
       const defaultBranchName = defaultBranch.trim().replace(/^refs\/remotes\/origin\//, "");
 
       // Get both local and remote branches
       const { stdout } = await this.spawnGit(
         ["for-each-ref", "--format=%(refname:short)|%(committerdate:iso)|%(objectname)", "refs/heads/", "refs/remotes/origin/"],
-        { timeout: DEFAULT_GIT_TIMEOUT_MS },
+        { timeout: DEFAULT_GIT_TIMEOUT_MS, signal },
       );
 
       const lines = stdout.trim().split("\n").filter(Boolean);
@@ -442,7 +459,7 @@ export class GitService {
           batch.map((entry) =>
             this.spawnGit(
               ["rev-list", "--count", entry.fullName],
-              { timeout: DEFAULT_GIT_TIMEOUT_MS },
+              { timeout: DEFAULT_GIT_TIMEOUT_MS, signal },
             ).then(({ stdout }) => parseInt(stdout.trim())),
           ),
         );
@@ -482,6 +499,7 @@ export class GitService {
   async getCommits(
     branch: string = "HEAD",
     limit: number = MAX_COMMITS_DEFAULT,
+    signal?: AbortSignal,
   ): Promise<CommitData[]> {
     const effectiveLimit = Math.max(1, Math.min(limit, MAX_COMMITS_DEFAULT));
     const format = "%H|%h|%an|%ae|%aI|%s|%b|%P|%D";
@@ -498,6 +516,8 @@ export class GitService {
       branch,
     ];
 
+    const combined = signal || this.signal;
+
     const spawnOpts: SpawnOptions = {
       stdio: ["ignore", "pipe", "pipe"],
       env: {
@@ -507,11 +527,22 @@ export class GitService {
         GIT_LFS_SKIP_SMUDGE: "1",
       },
       timeout: GIT_LOG_TIMEOUT_MS,
-      signal: this.signal,
+      signal: combined,
     };
 
     return new Promise((resolve, reject) => {
       const child = spawn("git", args, spawnOpts);
+
+      if (combined) {
+        combined.addEventListener("abort", () => {
+          killProcess(child);
+          reject(
+            new Error(
+              `Repository analysis timed out after ${GIT_LOG_TIMEOUT_MS / 60000} minutes`,
+            ),
+          );
+        });
+      }
 
       child.on("error", (err) => {
         reject(new Error(`Failed to get commits: ${err.message}`));
@@ -679,12 +710,11 @@ export class GitService {
   /**
    * Get all contributors with their statistics
    */
-  async getContributors(): Promise<ContributorData[]> {
+  async getContributors(signal?: AbortSignal): Promise<ContributorData[]> {
     try {
-      // Contributor scans can be expensive; cap by commit count.
       const { stdout } = await this.spawnGit(
         ["log", "--format=%an|%ae|%aI", "--numstat", "-n", String(MAX_CONTRIBUTOR_COMMITS)],
-        { timeout: GIT_LOG_TIMEOUT_MS },
+        { timeout: GIT_LOG_TIMEOUT_MS, signal },
       );
 
       const contributorMap = new Map<string, ContributorData>();
@@ -698,7 +728,29 @@ export class GitService {
         if (line.includes("|") && !line.includes("\t")) {
           // Author line
           const [name, email, date] = line.split("|");
-          currentAuthor = { name, email, date: new Date(date) };
+          const commitDate = new Date(date);
+          currentAuthor = { name, email, date: commitDate };
+
+          const key = email;
+          const existing = contributorMap.get(key);
+
+          if (existing) {
+            existing.commits++;
+            existing.lastCommit =
+              commitDate > existing.lastCommit ? commitDate : existing.lastCommit;
+            existing.firstCommit =
+              commitDate < existing.firstCommit ? commitDate : existing.firstCommit;
+          } else {
+            contributorMap.set(key, {
+              name,
+              email,
+              commits: 1,
+              additions: 0,
+              deletions: 0,
+              firstCommit: commitDate,
+              lastCommit: commitDate,
+            });
+          }
         } else if (currentAuthor && line.includes("\t")) {
           // Stats line
           const [addStr, delStr] = line.split("\t");
@@ -709,27 +761,8 @@ export class GitService {
           const existing = contributorMap.get(key);
 
           if (existing) {
-            existing.commits++;
             existing.additions += additions;
             existing.deletions += deletions;
-            existing.lastCommit =
-              currentAuthor.date > existing.lastCommit
-                ? currentAuthor.date
-                : existing.lastCommit;
-            existing.firstCommit =
-              currentAuthor.date < existing.firstCommit
-                ? currentAuthor.date
-                : existing.firstCommit;
-          } else {
-            contributorMap.set(key, {
-              name: currentAuthor.name,
-              email: currentAuthor.email,
-              commits: 1,
-              additions,
-              deletions,
-              firstCommit: currentAuthor.date,
-              lastCommit: currentAuthor.date,
-            });
           }
         }
       }
@@ -853,7 +886,7 @@ export class GitService {
     return languageMap[ext] || null;
   }
 
-  async getFileTree(scope?: string): Promise<
+  async getFileTree(scope?: string, signal?: AbortSignal): Promise<
     {
       path: string;
       name: string;
@@ -866,7 +899,7 @@ export class GitService {
     try {
       const args = ["ls-files"];
       if (scope) args.push(scope);
-      const { stdout } = await this.spawnGit(args, { timeout: DEFAULT_GIT_TIMEOUT_MS });
+      const { stdout } = await this.spawnGit(args, { timeout: DEFAULT_GIT_TIMEOUT_MS, signal });
 
       const files: {
         path: string;
@@ -938,9 +971,9 @@ export class GitService {
   /**
    * Detect programming languages in the repository
    */
-  async detectLanguages(scope?: string): Promise<LanguageData[]> {
+  async detectLanguages(scope?: string, signal?: AbortSignal): Promise<LanguageData[]> {
     try {
-      const files = await this.getFileTree(scope);
+      const files = await this.getFileTree(scope, signal);
 
       const languageStats = new Map<string, { bytes: number; lines: number }>();
       let totalBytes = 0;

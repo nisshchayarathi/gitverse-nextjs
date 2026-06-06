@@ -649,6 +649,12 @@ export class GitHubService {
   /**
    * Post a comment on an issue
    */
+  
+  async createIssue(owner: string, repo: string, title: string, body: string): Promise<any> {
+    const response = await this.client.post(`/repos/${owner}/${repo}/issues`, { title, body });
+    return response.data;
+  }
+
   async postIssueComment(
     owner: string,
     repo: string,

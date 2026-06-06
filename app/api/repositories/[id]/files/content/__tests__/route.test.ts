@@ -1,10 +1,3 @@
-const { TextEncoder, TextDecoder } = require("util");
-global.TextEncoder = TextEncoder;
-global.TextDecoder = TextDecoder;
-
-const { ReadableStream } = require("node:stream/web");
-global.ReadableStream = ReadableStream;
-
 const undici = require("undici");
 (global as any).Request = undici.Request;
 (global as any).Response = undici.Response;
@@ -329,6 +322,8 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
     it("Scenario 5.1: limits file size gracefully using the HTTP Content-Length header", async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
+        status: 200,
+        statusText: "OK",
         headers: {
           get: jest.fn().mockImplementation((name) => {
             if (name.toLowerCase() === "content-length") {
@@ -344,8 +339,8 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
-      expect(response.status).toBe(400);
-      expect(data.error).toContain("File size exceeds 1MB limit");
+      expect(response.status).toBe(413);
+      expect(data.error).toContain("too large");
     });
 
     it("Scenario 5.2: checks actual text buffer sizing to prevent bypasses when Content-Length is missing", async () => {
@@ -361,8 +356,8 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
-      expect(response.status).toBe(400);
-      expect(data.error).toContain("File size exceeds 1MB limit");
+      expect(response.status).toBe(413);
+      expect(data.error).toContain("too large");
     });
 
     it("Scenario 5.3: permits files that are exactly at the 1MB boundary limit", async () => {

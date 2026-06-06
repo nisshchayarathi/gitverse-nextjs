@@ -2,8 +2,9 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
+  // Note: The 'driverAdapters' preview feature has been deprecated
+  // and removed from this schema as it is now generally available.
 }
 
 datasource db {
@@ -58,6 +59,8 @@ model User {
   organizationMemberships OrganizationMember[]
   mapAnnotations          MapAnnotation[]
   annotationActivities    AnnotationActivity[]
+  mfaConfig               MfaConfig?
+  auditLogs               AuditLog[]
 
   @@map("users")
 }
@@ -93,6 +96,11 @@ model GitHubRepo {
   @@unique([userId, repoFullName])
   @@index([installationId])
   @@index([enabled])
+  @@index([updatedAt])
+  // pr-reviews / repositories / connected-repos: WHERE userId ORDER BY enabled DESC, repoFullName ASC
+  @@index([userId, enabled(sort: Desc), repoFullName(sort: Asc)])
+  // sync / delete: WHERE userId AND installationId IS NOT NULL
+  @@index([userId, installationId])
   @@map("github_repos")
 }
 
@@ -172,6 +180,8 @@ model Account {
   @@unique([provider, providerAccountId])
   // Index on userId for fast lookup of all accounts belonging to a user
   @@index([userId])
+  // auth checks: WHERE userId + provider (count calls on every login/signup)
+  @@index([userId, provider])
   // Index on provider to speed up OAuth provider-based queries (e.g. filtering by provider: "google")
   @@index([provider])
   @@map("accounts")
@@ -199,63 +209,73 @@ model VerificationToken {
 }
 
 model Repository {
-  id                  Int                         @id @default(autoincrement())
-  name                String
-  url                 String
-  description         String?
-  targetDirectory     String?                     @map("target_directory")
-  readmePath          String?                     @map("readme_path")
-  readmeText          String?                     @map("readme_text") @db.Text
-  readmeFetchedAt     DateTime?                   @map("readme_fetched_at")
-  defaultBranch       String                      @default("main") @map("default_branch")
-  isPrivate           Boolean                     @default(false) @map("is_private")
-  inheritedRegion     DataResidencyRegion?        @map("inherited_region")
-  overrideAllowed     Boolean                     @default(false) @map("override_allowed")
-  stars               Int                         @default(0)
-  forks               Int                         @default(0)
-  size                Int                         @default(0) // Size in bytes
-  lastAnalyzedAt      DateTime?                   @map("last_analyzed_at")
+  id                           Int                           @id @default(autoincrement())
+  name                         String
+  url                          String
+  description                  String?
+  targetDirectory              String?                       @map("target_directory")
+  readmePath                   String?                       @map("readme_path")
+  readmeText                   String?                       @map("readme_text") @db.Text
+  readmeFetchedAt              DateTime?                     @map("readme_fetched_at")
+  defaultBranch                String                        @default("main") @map("default_branch")
+  isPrivate                    Boolean                       @default(false) @map("is_private")
+  inheritedRegion              DataResidencyRegion?          @map("inherited_region")
+  overrideAllowed              Boolean                       @default(false) @map("override_allowed")
+  stars                        Int                           @default(0)
+  forks                        Int                           @default(0)
+  size                         Int                           @default(0) // Size in bytes
+  lastAnalyzedAt               DateTime?                     @map("last_analyzed_at")
   status              String                      @default("pending") // pending, analyzing, completed, failed
-  userId              Int                         @map("user_id")
-  user                User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt           DateTime                    @default(now()) @map("created_at")
-  updatedAt           DateTime                    @updatedAt @map("updated_at")
-  branches            Branch[]
-  commits             Commit[]
-  files               File[]
-  contributors        Contributor[]
-  languages           Language[]
-  analysisJobs        AnalysisJob[]
-  geminiAnalysisCache GeminiAnalysisCache[]
-  securitySandboxes   SecuritySandbox[]
-  reviewPolicies      ReviewPolicy[]
-  policyAssignment    RepositoryPolicyAssignment?
-  mapAnnotations      MapAnnotation[]
-  knowledge           RepositoryKnowledge?
-  syncJobs            RepositorySyncJob[]
-  architectureChunks  RepositoryArchitectureChunk[]
-  lastSynchronizedAt  DateTime?                   @map("last_synchronized_at")
+  userId                       Int                           @map("user_id")
+  user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId                     Int?                          @map("parent_id")
+  parent                       Repository?                   @relation("RepositorySubPackages", fields: [parentId], references: [id])
+  subPackages                  Repository[]                  @relation("RepositorySubPackages")
+  createdAt                    DateTime                      @default(now()) @map("created_at")
+  updatedAt                    DateTime                      @updatedAt @map("updated_at")
+  branches                     Branch[]
+  commits                      Commit[]
+  files                        File[]
+  contributors                 Contributor[]
+  languages                    Language[]
+  analysisJobs                 AnalysisJob[]
+  geminiAnalysisCache          GeminiAnalysisCache[]
+  securitySandboxes            SecuritySandbox[]
+  reviewPolicies               ReviewPolicy[]
+  policyAssignment             RepositoryPolicyAssignment?
+  mapAnnotations               MapAnnotation[]
+  knowledge                    RepositoryKnowledge?
+  syncJobs                     RepositorySyncJob[]
+  lastSynchronizedAt           DateTime?                     @map("last_synchronized_at")
+  repositoryArchitectureChunks RepositoryArchitectureChunk[]
 
   @@index([url])
+  // Index for fast listing of all repos belonging to a user
   @@index([userId])
+  // listRepositories: WHERE userId ORDER BY createdAt DESC
+  @@index([userId, createdAt(sort: Desc)])
+  // createRepository duplicate check: WHERE url + userId
+  @@index([userId, url])
+  // Composite index for duplicate-check query in createRepository (url + userId + targetDirectory)
   @@index([userId, url, targetDirectory])
+  // Composite index for name-uniqueness check in createRepository (name + userId)
+  @@index([userId, name])
   @@map("repositories")
 }
 
 model RepositoryArchitectureChunk {
-  id           Int        @id @default(autoincrement())
-  repositoryId Int        @map("repository_id")
-  chunkPath    String     @map("chunk_path")
-  summary      String     @db.Text
-  createdAt    DateTime   @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  repositoryId Int      @map("repository_id")
+  chunkPath    String   @map("chunk_path")
+  summary      String   @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
   @@unique([repositoryId, chunkPath])
   @@index([repositoryId])
   @@map("repository_architecture_chunks")
 }
-
 
 model RepositorySyncJob {
   id           String    @id @default(uuid()) @db.Uuid
@@ -308,6 +328,12 @@ model AnalysisJob {
   @@index([status, nextRunAt])
   // Worker lock cleanup: find and release expired locks
   @@index([lockExpiresAt])
+  @@index([repositoryId])
+  @@index([userId])
+  @@index([status, lockExpiresAt, nextRunAt])
+  // GET /api/repositories/[id]: WHERE repositoryId + userId ORDER BY createdAt DESC
+  @@index([repositoryId, userId, createdAt(sort: Desc)])
+  @@map("analysis_jobs")
   // List all jobs for a repository sorted by newest first
   @@index([repositoryId, createdAt(sort: Desc)])
   // List all jobs for a user sorted by newest first
@@ -329,6 +355,8 @@ model Branch {
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
   @@unique([repositoryId, name])
+  // getRepository: ORDER BY isDefault DESC scoped to a repo
+  @@index([repositoryId, isDefault(sort: Desc)])
   @@map("branches")
 }
 
@@ -386,6 +414,8 @@ enum AttemptType {
   SIGNUP
   CHANGE_PASSWORD
   DELETE_ACCOUNT
+  REPOSITORY_ANALYSIS
+  ANALYSIS_RUNNER
 }
 
 enum FileChangeType {
@@ -406,7 +436,7 @@ model FileChange {
   file       File?          @relation(fields: [fileId], references: [id], onDelete: SetNull)
   createdAt  DateTime       @default(now()) @map("created_at")
 
-  @@index([fileId])
+  @@index([fileId], map: "file_changes_file_id_idx")
   @@index([commitId])
   @@map("file_changes")
 }
@@ -428,6 +458,8 @@ model Contributor {
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
   @@unique([repositoryId, email])
+  // getRepository: ORDER BY commits DESC scoped to a repo
+  @@index([repositoryId, commits(sort: Desc)])
   @@map("contributors")
 }
 
@@ -443,6 +475,8 @@ model Language {
   createdAt    DateTime   @default(now()) @map("created_at")
 
   @@unique([repositoryId, name])
+  // getRepository + listRepositories: ORDER BY percentage DESC scoped to a repo
+  @@index([repositoryId, percentage(sort: Desc)])
   // Index for fast language lookup per repository
   @@index([repositoryId])
   @@map("languages")
@@ -454,7 +488,8 @@ model GeminiAnalysisCache {
   commitHash     String    @map("commit_hash")
   analysisType   String    @map("analysis_type")
   promptHash     String    @map("prompt_hash")
-  model          String?
+  modelVersion   String    @default("unknown") @map("model_version")
+  analysisScope  String    @default("full") @map("analysis_scope")
   cachedResult   String    @map("cached_result") @db.Text
   createdAt      DateTime  @default(now()) @map("created_at")
   lastAccessedAt DateTime? @map("last_accessed_at")
@@ -462,9 +497,10 @@ model GeminiAnalysisCache {
 
   repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
-  @@unique([repositoryId, commitHash, analysisType, promptHash])
+  @@unique([repositoryId, commitHash, analysisType, promptHash, modelVersion, analysisScope])
   @@index([expiresAt])
   @@index([repositoryId])
+  @@index([modelVersion])
   @@map("gemini_analysis_cache")
 }
 
@@ -581,7 +617,8 @@ model RateLimit {
   expiresAt DateTime @map("expires_at")
 
   @@index([key])
-  @@index([expiresAt])
+  @@index([key, expiresAt])
+  @@index([expiresAt], name: "rate_limits_expires_at_idx")
   @@map("rate_limits")
 }
 
@@ -662,6 +699,9 @@ model AuditLog {
   details        Json
   createdAt      DateTime @default(now()) @map("created_at")
 
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([repositoryId, createdAt(sort: Desc)])
   @@map("audit_logs")
@@ -716,4 +756,26 @@ model RepositoryKnowledge {
   repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
   @@map("repository_knowledge")
+}
+
+/// MFA configuration for TOTP-based Multi-Factor Authentication.
+/// Stores the encrypted TOTP secret and hashed backup codes per user.
+model MfaConfig {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique @map("user_id")
+  /// Base32-encoded TOTP secret (should be encrypted at rest via application-layer encryption)
+  totpSecret    String   @map("totp_secret") @db.Text
+  /// Whether TOTP MFA is active for this user
+  isEnabled     Boolean  @default(false) @map("is_enabled")
+  /// One-time backup codes (stored as bcrypt hashes, comma-separated)
+  backupCodes   String?  @map("backup_codes") @db.Text
+  /// Timestamp of the last successful MFA verification
+  lastVerifiedAt DateTime? @map("last_verified_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_configs")
 }

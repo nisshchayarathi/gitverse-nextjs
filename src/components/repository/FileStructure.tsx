@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, Children, isValidElement } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -21,8 +21,10 @@ import {
   CardContent,
   Modal,
   Skeleton,
+  CopyToClipboard,
 } from "@/components/ui";
 import { ContributionReadinessCard } from "@/components/repository/ContributionReadinessCard";
+import { ChangeImpactPredictor } from "@/components/repository/ChangeImpactPredictor";
 import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -156,9 +158,9 @@ const FileTreeNode: React.FC<FileTreeProps> = ({
       </div>
       {node.type === "folder" && isExpanded && node.children && (
         <div>
-          {node.children.map((child, index) => (
+          {node.children.map((child) => (
             <FileTreeNode
-              key={index}
+              key={child.path}
               node={child}
               level={level + 1}
               onFileSelect={onFileSelect}
@@ -242,47 +244,48 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
     }
   };
 
-  // Build file tree from repository files
-  const buildFileTree = (files: FileData[]): FileNode => {
-    const root: FileNode = {
-      name: repository?.name || "root",
-      type: "folder",
-      path: "/",
-      children: [],
-    };
-
-    files?.forEach((file: FileData) => {
-      const parts = file.path.split("/").filter(Boolean);
-      let current = root;
-
-      parts.forEach((part: string, index: number) => {
-        const isLast = index === parts.length - 1;
-        const path = "/" + parts.slice(0, index + 1).join("/");
-
-        if (!current.children) current.children = [];
-
-        let existing = current.children.find((c) => c.name === part);
-        if (!existing) {
-          existing = {
-            name: part,
-            type: isLast ? "file" : "folder",
-            path,
-            size: isLast ? file.size : undefined,
-            fileData: isLast ? file : undefined,
-            children: isLast ? undefined : [],
-          };
-          current.children.push(existing);
-        }
-
-        if (!isLast) current = existing;
-      });
-    });
-
-    return root;
-  };
-
   const files = useMemo(() => repository?.files || [], [repository?.files]);
-  const fileTree = useMemo(() => buildFileTree(files), [files, repository?.name]);
+  const fileTree = useMemo(() => {
+    // Build file tree from repository files
+    const buildFileTree = (files: FileData[]): FileNode => {
+      const root: FileNode = {
+        name: repository?.name || "root",
+        type: "folder",
+        path: "/",
+        children: [],
+      };
+
+      files?.forEach((file: FileData) => {
+        const parts = file.path.split("/").filter(Boolean);
+        let current = root;
+
+        parts.forEach((part: string, index: number) => {
+          const isLast = index === parts.length - 1;
+          const path = "/" + parts.slice(0, index + 1).join("/");
+
+          if (!current.children) current.children = [];
+
+          let existing = current.children.find((c) => c.name === part);
+          if (!existing) {
+            existing = {
+              name: part,
+              type: isLast ? "file" : "folder",
+              path,
+              size: isLast ? file.size : undefined,
+              fileData: isLast ? file : undefined,
+              children: isLast ? undefined : [],
+            };
+            current.children.push(existing);
+          }
+
+          if (!isLast) current = existing;
+        });
+      });
+
+      return root;
+    };
+    return buildFileTree(files);
+  }, [files, repository?.name]);
 
   useEffect(() => {
     if (!repository?.id || files.length === 0) {
@@ -756,10 +759,13 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     <div className="text-sm">
                       <div className="bg-black/40 px-4 py-2 border-b border-border/50 flex justify-between items-center text-xs text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
                         <span>{selectedFile.path}</span>
-                        <span className="flex items-center gap-2 text-yellow-500">
-                          <Sparkles className="h-3 w-3" />
-                          Highlight text to explain with AI
-                        </span>
+                        <div className="flex items-center gap-4">
+                          <span className="flex items-center gap-2 text-yellow-500">
+                            <Sparkles className="h-3 w-3" />
+                            Highlight text to explain with AI
+                          </span>
+                          <CopyToClipboard text={fileContent}className="text-xs bg-white/5 hover:bg-white/10"/>
+                        </div>
                       </div>
                       <SyntaxHighlighter
                         language={
@@ -808,6 +814,54 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
               </button>
             )}
 
+            {/* Change Impact Predictor */}
+            <div className="mb-8">
+              <ChangeImpactPredictor
+                repository={repository}
+                selectedFile={selectedFile}
+              />
+            </div>
+
+            {/* Change Summary */}
+            <div className="bg-gradient-to-r from-primary/10 to-transparent rounded-lg p-6 border border-white/10">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Summary
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">
+                    Total Modifications
+                  </p>
+                  <p className="text-lg font-semibold">
+                    {getFileCommitCount(selectedFile.path)}{" "}
+                    {getFileCommitCount(selectedFile.path) === 1
+                      ? "commit"
+                      : "commits"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">
+                    Impact
+                  </p>
+                  <p className="text-lg font-semibold">
+                    {(
+                      getFileChangeStats(selectedFile.path).additions +
+                      getFileChangeStats(selectedFile.path).deletions
+                    ).toLocaleString()}{" "}
+                    changes
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">
+                    Current Size
+                  </p>
+                  <p className="text-lg font-semibold">
+                    {selectedFile.lines?.toLocaleString() || 0} lines
+                  </p>
+                </div>
+              </div>
+            </div>
             <AIExplanationPanel
               isOpen={isAIPanelOpen}
               onClose={() => setIsAIPanelOpen(false)}

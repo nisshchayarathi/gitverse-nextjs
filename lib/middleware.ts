@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyToken, verifyTokenWithUserValidation } from "./auth";
-import { verifyToken } from "./auth";
+import { verifyTokenWithUserValidation } from "./auth";
 import { getNextAuthSecret } from "./config/env";
 import type { JWTPayload } from "./auth";
 import prisma from "@/lib/prisma";
@@ -115,6 +114,13 @@ export async function getAuthUser(
           jwtTokenVersion != null &&
           jwtTokenVersion !== dbUser.tokenVersion
         ) {
+          try {
+            request.cookies.delete("next-auth.session-token");
+            request.cookies.delete("next-auth.csrf-token");
+            request.cookies.delete("next-auth.callback-url");
+          } catch {
+            // Best-effort cookie clearing
+          }
           return null;
         }
 
@@ -171,6 +177,18 @@ export async function requireAuth(request: NextRequest): Promise<JWTPayload> {
 }
 
 /**
+ * Checks if the given user is an administrator.
+ */
+export function isAdmin(user: JWTPayload): boolean {
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  return adminEmails.includes(user.email.toLowerCase());
+}
+
+/**
  * Ensures the incoming request is made by an admin user.
  * Admin emails are controlled via the ADMIN_EMAILS environment variable
  * (comma-separated list). Throws HttpError 403 if the user is not an admin.
@@ -178,15 +196,7 @@ export async function requireAuth(request: NextRequest): Promise<JWTPayload> {
 export async function requireAdmin(request: NextRequest): Promise<JWTPayload> {
   const user = await requireAuth(request);
 
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-
-  if (
-    adminEmails.length === 0 ||
-    !adminEmails.includes(user.email.toLowerCase())
-  ) {
+  if (!isAdmin(user)) {
     throw new HttpError(403, "Forbidden");
   }
 

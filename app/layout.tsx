@@ -8,7 +8,9 @@ import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import { FocusRingManager } from "@/components/ui/FocusRingManager";
+import ProgressBarProvider from "@/components/providers/ProgressBarProvider";
 import "./globals.css";
+
 
 const inter = Inter({
   subsets: ["latin"],
@@ -85,13 +87,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <NextAuthProvider>
             <AuthProvider>
               <FocusRingManager />
-              <main id="main-content">
-                {children}
-              </main>
+              <ProgressBarProvider>
+                <main id="main-content">
+                  {children}
+                </main>
+              </ProgressBarProvider>
 
-              <Toaster />
-              <ScrollToTop />
-            </AuthProvider>
+                <Toaster />
+                <ScrollToTop />
+              </AuthProvider>
           </NextAuthProvider>
         </ThemeProvider>
       </body>

@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { sanitizeTextContent } from "@/lib/utils/promptSanitization";
 
 export type ReviewPolicyRule = {
   rule: string;
@@ -125,7 +126,7 @@ export function buildPolicyPromptSection(policies: ReviewPolicyData[]): string {
     if (!policy.rules || !Array.isArray(policy.rules)) continue;
     for (const rule of policy.rules) {
       if (!rule.rule) continue;
-      ruleLines.push(`- [${rule.severity.toUpperCase()}] ${rule.rule}`);
+      ruleLines.push(`- [${rule.severity.toUpperCase()}] ${sanitizeTextContent(rule.rule)}`);
     }
   }
 

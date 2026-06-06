@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useMemo, Children, isValidElement } from "react";
 import {
   AlertTriangle,
   GitBranch,
@@ -21,20 +21,37 @@ import {
   Check,
   RefreshCw,
   Loader2,
+  Package,
 } from "lucide-react";
+import Link from "next/link";
 import {
+  Button,
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
+  EmptyState,
+  Input,
   Skeleton,
   CopyToClipboard,
 } from "@/components/ui";
 import { BeginnerModeToggle } from "@/components/repository/BeginnerModeToggle";
 import { BeginnerGuidanceCard } from "@/components/repository/BeginnerGuidanceCard";
 import { BeginnerQuestionsPanel } from "@/components/repository/BeginnerQuestionsPanel";
+import { FirstPRSimulator } from "@/components/repository/FirstPRSimulator";
+import { ContributionPathGenerator } from "@/components/repository/ContributionPathGenerator";
+import { DeadCodeDetector } from "@/components/repository/DeadCodeDetector";
+import { ArchitecturalDriftDetector } from "@/components/repository/ArchitecturalDriftDetector";
 import { QuickStartChecklist } from "@/components/repository/QuickStartChecklist";
+import { FolderImportanceGuide } from "@/components/repository/FolderImportanceGuide";
+import { SavedModulesPanel } from "@/components/repository/SavedModulesPanel";
+import { ModuleComparisonTool } from "@/components/repository/ModuleComparisonTool";
+import { GoodFirstIssueGenerator } from "@/components/repository/GoodFirstIssueGenerator";
+import { RepositoryInsightsDashboard } from "@/components/repository/RepositoryInsightsDashboard";
+import { useModuleBookmarks } from "@/hooks/useModuleBookmarks";
+import { IssueData } from "@/types/firstPRSimulator";
+import { RepositoryAnalysisData } from "@/types/contributionPath";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -93,7 +110,7 @@ export const RepositoryOverview = ({
         { repositoryId: Number(repository.id) },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       const readme = response.data.markdown;
       setGeneratedReadme(readme);
       setEditorText(readme);
@@ -137,12 +154,12 @@ export const RepositoryOverview = ({
         { readmeText: editorText, readmePath: readmePath || "README.md" },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       toast({
         title: "README Saved",
         description: "Successfully updated repository README in the database.",
       });
-      
+
       // Update local view of repositoryData
       if (repositoryData) {
         repositoryData.readmeText = editorText;
@@ -183,6 +200,9 @@ export const RepositoryOverview = ({
   const readmeText: string | null = repositoryData?.readmeText ?? null;
   const readmePath: string | null = repositoryData?.readmePath ?? null;
 
+  // Initialize module bookmarks hook
+  const { bookmarkedModules, removeBookmark } = useModuleBookmarks();
+
   // Calculate total lines of code from languages only
   const totalLines =
     repositoryData?.languages?.reduce(
@@ -215,15 +235,69 @@ export const RepositoryOverview = ({
   };
 
   const [isBeginnerMode, setIsBeginnerMode] = useState(false);
+  const [issueTitle, setIssueTitle] = useState("");
+  const [issueBody, setIssueBody] = useState("");
+  const [selectedIssue, setSelectedIssue] = useState<IssueData | null>(null);
 
-  const MODULE_GUIDANCE: Record<
+  const sampleIssue = useMemo(() => {
+    if (!repositoryData?.issues?.length) return null;
+    const issue = repositoryData.issues[0];
+    return {
+      id: issue.id?.toString?.() || "sample-issue",
+      title: issue.title || "",
+      body: issue.body || issue.description || "",
+      labels: issue.labels || [],
+    } as IssueData;
+  }, [repositoryData?.issues]);
+
+  const issueToSimulate = selectedIssue || sampleIssue;
+
+  const repositoryMetadata = useMemo<RepositoryAnalysisData>(() => ({
+    id: repositoryData?.id,
+    name: repositoryData?.name,
+    description: repositoryData?.description,
+    url: repositoryData?.url,
+    size: repositoryData?.size,
+    files: repositoryData?.files,
+    languages: repositoryData?.languages,
+    commits: repositoryData?.commits,
+    contributors: repositoryData?.contributors,
+    issues: repositoryData?.issues,
+  }), [repositoryData]);
+
+  const hasIssueInput = Boolean(issueTitle.trim() || issueBody.trim());
+
+  const buildManualIssue = (): IssueData | null => {
+    if (!issueTitle.trim() && !issueBody.trim()) return null;
+    return {
+      id: "manual-issue",
+      title: issueTitle.trim() || "First PR issue",
+      body: issueBody.trim() || "",
+      labels: [],
+    };
+  };
+
+  const handleRunSimulation = () => {
+    const issue = buildManualIssue();
+    if (issue) {
+      setSelectedIssue(issue);
+    }
+  };
+
+  const handleResetSimulation = () => {
+    setIssueTitle("");
+    setIssueBody("");
+    setSelectedIssue(null);
+  };
+
+  const MODULE_GUIDANCE = useMemo<Record<
     string,
     {
       description: string;
       recommendation: string;
       difficulty: "beginner" | "intermediate" | "advanced";
     }
-  > = {
+  >>(() => ({
     components: {
       description:
         "Contains reusable UI building blocks used throughout the application.",
@@ -255,7 +329,7 @@ export const RepositoryOverview = ({
       recommendation: "Requires understanding of security flows.",
       difficulty: "advanced",
     },
-  };
+  }), []);
 
   const ARCHITECTURE_GUIDANCE: Record<string, string> = {
     services:
@@ -282,7 +356,7 @@ export const RepositoryOverview = ({
     return Array.from(segments).filter((segment) =>
       Object.prototype.hasOwnProperty.call(MODULE_GUIDANCE, segment),
     );
-  }, [repositoryData?.files]);
+  }, [repositoryData?.files, MODULE_GUIDANCE]);
 
   const hotspotGuidance = useMemo(() => {
     const filePaths = (repositoryData?.files || []).map((file: any) =>
@@ -478,6 +552,16 @@ export const RepositoryOverview = ({
               <span className="px-2 py-1 rounded-full text-xs bg-accent/10 text-accent flex-shrink-0">
                 {repository.language}
               </span>
+              {repositoryData?.parent && (
+                <Link
+                  href={`/repo/${repositoryData.parent.id}`}
+                  className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary flex items-center gap-1 hover:bg-primary/20 transition-colors flex-shrink-0"
+                  title="View Parent Repository"
+                >
+                  <Package className="h-3 w-3" />
+                  Part of {repositoryData.parent.name}
+                </Link>
+              )}
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground mb-3 break-words">
               {repository.description}
@@ -556,6 +640,71 @@ export const RepositoryOverview = ({
       </div>
 
       <div className="space-y-4 transition-all duration-300">
+        <Card className="glass border border-border/60 p-4">
+          <CardHeader>
+            <CardTitle>First PR Simulator</CardTitle>
+            <CardDescription>
+              Generate a recommended first PR plan from a repository issue or a custom issue description.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 lg:grid-cols-[1fr_1.5fr]">
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-muted-foreground">Issue title</label>
+                <Input
+                  value={issueTitle}
+                  onChange={(event) => setIssueTitle(event.target.value)}
+                  placeholder="e.g. Fix broken repository filtering"
+                />
+              </div>
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-muted-foreground">Issue description</label>
+                <textarea
+                  value={issueBody}
+                  onChange={(event) => setIssueBody(event.target.value)}
+                  className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  placeholder="Describe the issue and expected behavior..."
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={handleRunSimulation}
+                  disabled={!hasIssueInput}
+                >
+                  Simulate issue
+                </Button>
+                {sampleIssue && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setSelectedIssue(sampleIssue)}
+                  >
+                    Use first available issue
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  onClick={handleResetSimulation}
+                >
+                  Reset
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground max-w-xl">
+                The simulator uses issue text and repository structure to recommend a starter file set, difficulty, and test focus.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <FirstPRSimulator issue={issueToSimulate} repository={repositoryMetadata} />
+
+        <ContributionPathGenerator repository={repositoryMetadata} />
+
+        <DeadCodeDetector repository={repositoryMetadata} />
+
+        <ArchitecturalDriftDetector repository={repositoryMetadata} />
+
         <BeginnerModeToggle
           enabled={isBeginnerMode}
           onToggle={() => setIsBeginnerMode(!isBeginnerMode)}
@@ -619,7 +768,56 @@ export const RepositoryOverview = ({
         )}
 
         <QuickStartChecklist />
+
+        <SavedModulesPanel
+          bookmarkedModules={bookmarkedModules}
+          onRemoveBookmark={removeBookmark}
+        />
+
+        <RepositoryInsightsDashboard repositoryData={repositoryData} />
+
+        <GoodFirstIssueGenerator repository={repositoryMetadata} />
+
+        <ModuleComparisonTool />
+
+        <FolderImportanceGuide />
       </div>
+
+      {/* Monorepo Sub-packages */}
+      {repositoryData?.subPackages && repositoryData.subPackages.length > 0 && (
+        <Card className="glass border border-primary/20 bg-primary/5">
+          <CardHeader className="p-4 sm:p-6 pb-2">
+            <CardTitle className="font-heading text-lg sm:text-xl flex items-center gap-2 text-primary">
+              <Package className="h-5 w-5" />
+              Monorepo Workspaces
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              This repository contains multiple packages. Select one to view its isolated analysis.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {repositoryData.subPackages.map((subPkg: any) => (
+                <Link
+                  key={subPkg.id}
+                  href={`/repo/${subPkg.id}`}
+                  className="p-3 rounded-xl border border-border/50 bg-background/50 hover:bg-background/80 hover:border-primary/50 transition-all group flex flex-col gap-1"
+                >
+                  <div className="font-medium flex items-center justify-between">
+                    <span className="truncate">{subPkg.targetDirectory}</span>
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+                  </div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {subPkg.status}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Repository Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -961,22 +1159,20 @@ export const RepositoryOverview = ({
               <div className="flex bg-secondary-100 dark:bg-secondary-900 p-1 rounded-lg self-start">
                 <button
                   onClick={() => setEditorMode("preview")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    editorMode === "preview"
-                      ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${editorMode === "preview"
+                    ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   <Eye className="h-3.5 w-3.5" />
                   Preview
                 </button>
                 <button
                   onClick={() => setEditorMode("edit")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    editorMode === "edit"
-                      ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${editorMode === "edit"
+                    ? "bg-white dark:bg-secondary-800 text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   <Edit2 className="h-3.5 w-3.5" />
                   Edit Markdown

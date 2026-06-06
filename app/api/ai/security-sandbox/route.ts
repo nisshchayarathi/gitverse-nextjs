@@ -3,10 +3,20 @@ import { requireAuth, sanitizeError, isHttpError } from "@/lib/middleware";
 import { runSecuritySandbox, getSandboxStatus, listSandboxesForRepository } from "@/lib/services/securitySandboxService";
 import { isValidGitSha } from "@/lib/utils/validators";
 import prisma from "@/lib/prisma";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+
+const SANDBOX_RATE_LIMIT = 3;
+const SANDBOX_WINDOW_MS = 60_000;
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+
+    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    if (!globalRl.allowed) return rateLimitResponse(globalRl);
+
+    const allowed = await checkRateLimit(String(user.userId), { namespace: "security-sandbox", maxRequests: SANDBOX_RATE_LIMIT, windowMs: SANDBOX_WINDOW_MS });
+    if (!allowed.allowed) return rateLimitResponse(allowed);
     const body = await request.json();
     const { repositoryId, pullRequestId, headSha } = body;
 

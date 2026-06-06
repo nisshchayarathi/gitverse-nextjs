@@ -1,6 +1,9 @@
+
+"use client";
+
 import { Input } from "@/components/ui/Input";
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Sparkles, User, Bot, Copy, Check } from "lucide-react";
+import { Send, Loader2, Sparkles, User, Bot, Copy, Check, Square } from "lucide-react";
 import { Card } from "@/components/ui";
 import { geminiService, ChatMessage } from "@/services/gemini";
 import { useToast } from "@/hooks/use-toast";
@@ -133,8 +136,18 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
   const [streamingMessage, setStreamingMessage] = useState("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+  };
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -159,7 +172,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
         },
       ]);
     }
-  }, []);
+  }, [messages.length, repositoryContext]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,14 +194,18 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input;
     setInput("");
     setIsLoading(true);
     setStreamingMessage("");
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    let fullResponse = "";
     try {
-      let fullResponse = "";
       // Pass the current messages array as history (excluding the current prompt which is appended by chatRaw)
-      const stream = geminiService.chatStream(input, repositoryContext, messages);
+      const stream = geminiService.chatStream(currentInput, repositoryContext, messages, controller.signal);
 
       for await (const chunk of stream) {
         fullResponse += chunk;
@@ -203,16 +220,34 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
 
       setMessages((prev) => [...prev, assistantMessage]);
       setStreamingMessage("");
-    } catch (error) {
-      console.error("Chat error:", error);
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to get AI response",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      if (error.name === "AbortError") {
+        console.log("Chat generation aborted by user.");
+        if (fullResponse) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: fullResponse + " _[Generation stopped by user]_",
+              timestamp: new Date(),
+            },
+          ]);
+        }
+        setStreamingMessage("");
+      } else {
+        console.error("Chat error:", error);
+        toast({
+          title: "Error",
+          description:
+            error instanceof Error ? error.message : "Failed to get AI response",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -302,6 +337,39 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
           </div>
         ))}
 
+        {/* Suggested Questions (only show when chat has just the greeting) */}
+        {messages.length === 1 && !isLoading && (
+          <div className="mt-8 mb-4">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3 px-2 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Suggested questions
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {[
+                "Can you explain the main architecture of this repository?",
+                "Where is the authentication logic located?",
+                "How do I set up this project locally?",
+                "What are the main dependencies used in this project?",
+              ].map((question, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setInput(question);
+                    // Slight delay to allow state update before submission
+                    setTimeout(() => {
+                      const form = document.getElementById("ai-chat-form") as HTMLFormElement;
+                      if (form) form.requestSubmit();
+                    }, 50);
+                  }}
+                  className="text-left p-3 text-sm glass rounded-lg hover:bg-primary/10 transition-colors border border-white/5 hover:border-primary/30"
+                >
+                  <p className="line-clamp-2 text-foreground/80">{question}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Streaming message */}
         {isLoading && streamingMessage && (
           <div className="flex gap-3 justify-start">
@@ -357,7 +425,7 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
             </button>
           )}
         </div>
-        <form onSubmit={handleSubmit} className="flex gap-2">
+        <form id="ai-chat-form" onSubmit={handleSubmit} className="flex gap-2">
           <Input
             type="text"
             value={input}
@@ -366,6 +434,16 @@ export function AIChatInterface({ repositoryContext }: AIChatInterfaceProps) {
             className="flex-1 glass px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
             disabled={isLoading}
           />
+          {isLoading && (
+            <button
+              type="button"
+              onClick={handleStop}
+              className="bg-destructive/10 border border-destructive/20 text-destructive hover:bg-destructive/20 px-4 py-3 rounded-lg transition-all duration-300 flex items-center gap-2"
+            >
+              <Square className="h-4 w-4 fill-destructive" />
+              <span className="hidden sm:inline">Stop</span>
+            </button>
+          )}
           <button
             type="submit"
             disabled={!input.trim() || isLoading}

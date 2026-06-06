@@ -16,6 +16,7 @@ import { useGraphFilters } from "@/hooks/useGraphFilters";
 import { FilterPanel } from "../map/FilterPanel";
 import { DrilldownControls } from "../map/DrilldownControls";
 import { MiniMap } from "../map/MiniMap";
+import { TimeTravelTimeline } from "../repository/TimeTravelTimeline";
 
 interface RepositoryFile {
   path: string;
@@ -46,6 +47,20 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const nodesRef = useRef<any[]>([]);
   const linksRef = useRef<any[]>([]);
   const [, setTick] = useState(0);
+  
+  const [selectedCommitHash, setSelectedCommitHash] = useState<string | null>(null);
+
+  const selectedCommit = useMemo(() => {
+    if (!selectedCommitHash || !repository?.commits) return null;
+    return repository.commits.find((c: any) => c.hash === selectedCommitHash || c.shortHash === selectedCommitHash) || null;
+  }, [selectedCommitHash, repository?.commits]);
+
+  const changedFiles = useMemo(() => {
+    if (!selectedCommit) return null;
+    return new Map(
+      (selectedCommit.fileChanges || []).map((fc: any) => [fc.path, fc.changeType || fc.type])
+    );
+  }, [selectedCommit]);
 
   const { 
     filters, toggleDirectory, toggleFileType, toggleDomain, resetFilters 
@@ -392,7 +407,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     return () => {
       simulation.stop();
     };
-  }, [graphData]); // Use graphData as dependency
+  }, [graphData, setFocus, toggleExpand]);
 
   // Effect to handle focus mode fading
   useEffect(() => {
@@ -423,6 +438,56 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         (d.source.id === focusNode || d.target.id === focusNode) ? 1 : 0.1
       );
   }, [focusNode]);
+
+  // Effect to handle time-travel highlighting
+  useEffect(() => {
+    if (!svgSelectionRef.current) return;
+    const { node, link } = svgSelectionRef.current;
+
+    // If there is a focusNode, it overrides time-travel highlighting to prevent conflicting transitions
+    if (focusNode) return;
+
+    if (!changedFiles) {
+      // Restore normal opacity/colors
+      node.transition().duration(300)
+        .style("opacity", 1)
+        .selectAll("circle")
+        .attr("stroke", "rgba(255,255,255,0.3)")
+        .attr("stroke-width", 2);
+      
+      link.transition().duration(300).attr("stroke-opacity", 0.6);
+      return;
+    }
+
+    // Highlight modified files
+    node.transition().duration(300)
+      .style("opacity", (d: any) => {
+        if (d.type === 'file') {
+          return changedFiles.has(d.path) ? 1 : 0.2;
+        }
+        if (d.type === 'folder') {
+          for (const [path] of changedFiles.entries()) {
+            if (path.startsWith(d.path + '/')) return 1;
+          }
+          return 0.2;
+        }
+        return 0.2;
+      })
+      .selectAll("circle")
+      .attr("stroke", (d: any) => {
+         if (d.type === 'file' && changedFiles.has(d.path)) {
+           const type = changedFiles.get(d.path);
+           if (type === 'ADDED' || type === 'added') return '#22c55e'; // green
+           if (type === 'DELETED' || type === 'deleted') return '#ef4444'; // red
+           return '#eab308'; // yellow for modified
+         }
+         return "rgba(255,255,255,0.3)";
+      })
+      .attr("stroke-width", (d: any) => (d.type === 'file' && changedFiles.has(d.path) ? 3 : 2));
+      
+    // Dim links
+    link.transition().duration(300).attr("stroke-opacity", 0.1);
+  }, [changedFiles, focusNode]);
 
   const handleZoomIn = () => {
     if (svgRef.current) {
@@ -618,6 +683,14 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
           💡 Drag nodes to reposition • Scroll to zoom • Hover for details • Right-click to annotate
         </p>
+
+        {repository?.commits && repository.commits.length > 0 && (
+          <TimeTravelTimeline 
+            commits={repository.commits} 
+            selectedCommitHash={selectedCommitHash}
+            onCommitSelect={setSelectedCommitHash} 
+          />
+        )}
 
         <div
           ref={tooltipRef}

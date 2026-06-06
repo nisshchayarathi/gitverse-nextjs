@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import axios from "axios";
-import { buildApiUrl } from "@/services/apiConfig";
+import { buildApiUrl } from "../services/apiConfig";
 
 export interface Repository {
   id: string;
@@ -39,89 +39,92 @@ export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositories
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isFetchingRef = useRef(false);
+  const isFetchingRef = useRef<boolean>(false);
+  const initRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const fetchRepos = useCallback(
-    async (isLoadMore = false) => {
-      // Prevent concurrent identical requests
-      if (isFetchingRef.current) return;
-      if (isLoadMore && !hasMore) return;
+  const fetchRepos = useCallback(async (isLoadMore = false) => {
+    // Concurrency lock: Prevent duplicate requests
+    if (isFetchingRef.current) return;
 
-      // Abort any previous pending request just in case
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+    // Prevent loadMore if no more items
+    if (isLoadMore && !hasMore) return;
+
+    // Abort any in-flight request before starting a new one
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    isFetchingRef.current = true;
+
+    if (isLoadMore) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
+
+    setError(null);
+
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      const url = new URL(buildApiUrl("/api/repositories"));
+      url.searchParams.set("limit", limit.toString());
+
+      if (isLoadMore && cursorRef.current !== undefined) {
+        url.searchParams.set("cursor", cursorRef.current.toString());
       }
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
 
-      isFetchingRef.current = true;
+      const response = await axios.get(url.toString(), {
+        headers: {
+          Authorization: "Bearer ",
+        },
+        signal: controller.signal,
+      });
 
-      if (isLoadMore) setIsLoadingMore(true);
-      else setIsLoading(true);
+      // apiSuccess wraps response in { error, data: { repositories, nextCursor, hasMore } }
+      const { repositories, nextCursor: newCursor, hasMore: newHasMore } = response.data.data || {};
 
-      setError(null);
+      const newRepos = Array.isArray(repositories) ? repositories : [];
 
-      try {
-        const token = localStorage.getItem("gitverse_token");
+      setRepos((prev) => {
+        if (!isLoadMore) return newRepos;
 
-        const url = new URL(buildApiUrl("/api/repositories"));
-        url.searchParams.set("limit", limit.toString());
+        const existingIds = new Set(prev.map((r) => r.id));
+        const filtered = newRepos.filter((r: Repository) => !existingIds.has(r.id));
 
-        if (isLoadMore && cursorRef.current !== undefined) {
-          url.searchParams.set("cursor", cursorRef.current.toString());
-        }
+        return [...prev, ...filtered];
+      });
 
-        const response = await axios.get(url.toString(), {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          signal: controller.signal,
-        });
-        // apiSuccess wraps response in { error, data: { repositories, nextCursor, hasMore } }
-        const { repositories, nextCursor: newCursor, hasMore: newHasMore } = response.data.data || {};
-
-        const newRepos = Array.isArray(repositories) ? repositories : [];
-
-        setRepos((prev) => {
-          if (!isLoadMore) return newRepos;
-
-          const existingIds = new Set(prev.map((r) => r.id));
-          const filtered = newRepos.filter((r: Repository) => !existingIds.has(r.id));
-
-          return [...prev, ...filtered];
-        });
-
-        setCursor(newCursor);
-        cursorRef.current = nextCursor;
-        setHasMore(newHasMore);
-      } catch (err: any) {
-        if (err.name !== "CanceledError" && err.name !== "AbortError" && !axios.isCancel(err)) {
-          setError(err.response?.data?.error || err.message || "Failed to fetch repositories.");
-        }
-      } finally {
-        if (abortControllerRef.current === controller) {
-          setIsLoading(false);
-          setIsLoadingMore(false);
-          isFetchingRef.current = false;
-        }
+      cursorRef.current = newCursor;
+      setHasMore(newHasMore);
+    } catch (err: any) {
+      if (err.name !== "CanceledError" && err.name !== "AbortError" && !axios.isCancel(err)) {
+        setError(err.response?.data?.error || err.message || "Failed to fetch repositories.");
       }
-    },
-    [hasMore, limit]
-  );
+    } finally {
+      if (abortControllerRef.current === controller) {
+        setIsLoading(false);
+        setIsLoadingMore(false);
+        isFetchingRef.current = false;
+      }
+    }
+  }, [hasMore, limit]);
 
-  // Clean up on unmount
+  // CLEAN useEffect (no duplicate fetch logic)
   useEffect(() => {
+    if (!initRef.current) {
+      initRef.current = true;
+      fetchRepos();
+    }
+
+    // Cleanup: abort in-flight request when component unmounts
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, []);
-
-  // ✅ CLEAN useEffect (no duplicate fetch logic)
-  useEffect(() => {
-    fetchRepos(false);
   }, [fetchRepos]);
 
   const loadMore = useCallback(async () => {
@@ -134,13 +137,5 @@ export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositories
     await fetchRepos(false);
   }, [fetchRepos]);
 
-  return {
-    repos,
-    isLoading,
-    isLoadingMore,
-    hasMore,
-    error,
-    loadMore,
-    refresh,
-  };
+  return { repos, isLoading, isLoadingMore, hasMore, error, loadMore, refresh };
 }

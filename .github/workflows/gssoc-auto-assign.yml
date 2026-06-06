@@ -1,7 +1,7 @@
 name: GSSoC — Auto Assign Issue
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Uni-Event | roshankumar0036singh/Uni-Event
+# GitVerse | nisshchayarathi/gitverse-nextjs
 # ─────────────────────────────────────────────────────────────────────────────
 # Runs when someone comments on an issue.
 # • Filters out bot comments immediately
@@ -49,7 +49,7 @@ jobs:
             const commenter   = comment.user.login;
             const commentBody = comment.body.trim();
 
-            const REPO_OWNER  = 'roshankumar0036singh';
+            const REPO_OWNER  = 'nisshchayarathi';
             const TOTAL_LIMIT = 1;   // Only 1 issue at a time
             const DAILY_LIMIT = 4;   // Max 4 new assignments per day
             const DEADLINE_DAYS = 7; // Days to complete an issue
@@ -210,7 +210,7 @@ jobs:
                     ``,
                     `Browse open issues here: [Open Issues](https://github.com/${owner}/${repo}/issues?q=is%3Aissue+is%3Aopen+no%3Aassignee)`,
                     ``,
-                    `_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo}) · [@${REPO_OWNER}](https://github.com/${REPO_OWNER})_`,
+                    `_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo}) · [@${REPO_OWNER}](https://github.com/${REPO_OWNER})_`,
                   ].join('\n'),
                 });
                 return;
@@ -220,7 +220,7 @@ jobs:
               if (currentAssignees.includes(commenter)) {
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: issueNum,
-                  body: `Hey @${commenter}! ✅ You are **already assigned** to this issue. Go ahead and work on it! 💪\n\n_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo})_`,
+                  body: `Hey @${commenter}! ✅ You are **already assigned** to this issue. Go ahead and work on it! 💪\n\n_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo})_`,
                 });
                 return;
               }
@@ -235,7 +235,7 @@ jobs:
                     ``,
                     `Browse available issues: [Available Issues](https://github.com/${owner}/${repo}/issues?q=is%3Aissue+is%3Aopen+label%3Agssoc%3Aavailable)`,
                     ``,
-                    `_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo})_`,
+                    `_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo})_`,
                   ].join('\n'),
                 });
                 return;
@@ -259,7 +259,7 @@ jobs:
                     ``,
                     `Once you've resolved your current issue, come back and comment \`/assign\` here! 🙏`,
                     ``,
-                    `_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo}) · [@${REPO_OWNER}](https://github.com/${REPO_OWNER})_`,
+                    `_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo}) · [@${REPO_OWNER}](https://github.com/${REPO_OWNER})_`,
                   ].join('\n'),
                 });
                 console.log(`🚫 @${commenter} already has ${assignedCount} active issue(s) — denied.`);
@@ -281,7 +281,7 @@ jobs:
                     `- 💪 Focus on completing the issue you already have`,
                     `- 📋 [View your active issues](https://github.com/${owner}/${repo}/issues?q=is%3Aissue+is%3Aopen+assignee%3A${commenter})`,
                     ``,
-                    `_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo}) · [@${REPO_OWNER}](https://github.com/${REPO_OWNER})_`,
+                    `_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo}) · [@${REPO_OWNER}](https://github.com/${REPO_OWNER})_`,
                   ].join('\n'),
                 });
                 console.log(`🚫 @${commenter} hit daily limit (${assignedTodayCount}/${DAILY_LIMIT}).`);
@@ -314,9 +314,9 @@ jobs:
                 body: [
                   `## ✅ Issue Assigned — @${commenter}`,
                   ``,
-                  `Welcome to **Uni-Event**! You've been assigned to this issue. Here's what to do next:`,
+                  `Welcome to **GitVerse**! You've been assigned to this issue. Here's what to do next:`,
                   ``,
-                  `1. 🍴 **Fork** the repo: [roshankumar0036singh/Uni-Event](https://github.com/${owner}/${repo}/fork)`,
+                  `1. 🍴 **Fork** the repo: [nisshchayarathi/gitverse-nextjs](https://github.com/${owner}/${repo}/fork)`,
                   `2. 🌿 **Create a branch**: \`git checkout -b fix/issue-${issueNum}\``,
                   `3. 📖 **Read the docs**: [CONTRIBUTING.md](https://github.com/${owner}/${repo}/blob/main/CONTRIBUTING.md) | [Setup Guide](https://github.com/${owner}/${repo}/blob/main/docs/SETUP.md)`,
                   `4. 💻 **Work on the fix** and commit your changes`,
@@ -335,7 +335,7 @@ jobs:
                   ``,
                   `Good luck! 🚀 Feel free to ask questions in the comments.`,
                   ``,
-                  `_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo}) · [@${REPO_OWNER}](https://github.com/${REPO_OWNER})_`,
+                  `_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo}) · [@${REPO_OWNER}](https://github.com/${REPO_OWNER})_`,
                 ].join('\n'),
               });
               console.log(`✅ Assigned #${issueNum} to @${commenter} (active: ${assignedCount + 1}/${TOTAL_LIMIT}, today: ${assignedTodayCount + 1}/${DAILY_LIMIT})`);
@@ -352,7 +352,7 @@ jobs:
               if (!canAssign) {
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: issueNum,
-                  body: `@${commenter} ❌ Only maintainers can assign issues to others.\nTo assign yourself, comment \`/assign\`.\n\n_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo})_`,
+                  body: `@${commenter} ❌ Only maintainers can assign issues to others.\nTo assign yourself, comment \`/assign\`.\n\n_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo})_`,
                 });
                 return;
               }
@@ -361,7 +361,7 @@ jobs:
               if (assignedCount >= TOTAL_LIMIT) {
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: issueNum,
-                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} already has **${assignedCount}/${TOTAL_LIMIT}** active issue. They must resolve it first.\n\n_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo})_`,
+                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} already has **${assignedCount}/${TOTAL_LIMIT}** active issue. They must resolve it first.\n\n_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo})_`,
                 });
                 return;
               }
@@ -370,7 +370,7 @@ jobs:
               if (assignedTodayCount >= DAILY_LIMIT) {
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: issueNum,
-                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} has hit the daily limit (**${assignedTodayCount}/${DAILY_LIMIT}**). Resets at midnight UTC.\n\n_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo})_`,
+                  body: `@${commenter} ⚠️ Cannot assign — @${targetUser} has hit the daily limit (**${assignedTodayCount}/${DAILY_LIMIT}**). Resets at midnight UTC.\n\n_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo})_`,
                 });
                 return;
               }
@@ -399,7 +399,7 @@ jobs:
                   ``,
                   `> ⚠️ @${targetUser} cannot pick up another issue until this one is resolved.`,
                   ``,
-                  `_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo})_`,
+                  `_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo})_`,
                 ].join('\n'),
               });
               console.log(`✅ Maintainer @${commenter} assigned #${issueNum} to @${targetUser}`);
@@ -417,7 +417,7 @@ jobs:
                 if (!canUnassign) {
                   await github.rest.issues.createComment({
                     owner, repo, issue_number: issueNum,
-                    body: `@${commenter} ❌ Only maintainers can unassign other contributors.\n\n_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo})_`,
+                    body: `@${commenter} ❌ Only maintainers can unassign other contributors.\n\n_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo})_`,
                   });
                   return;
                 }
@@ -427,7 +427,7 @@ jobs:
               if (!currentAssignees.includes(targetUser)) {
                 await github.rest.issues.createComment({
                   owner, repo, issue_number: issueNum,
-                  body: `@${commenter} ℹ️ @${targetUser} is not currently assigned to this issue.\n\n_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo})_`,
+                  body: `@${commenter} ℹ️ @${targetUser} is not currently assigned to this issue.\n\n_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo})_`,
                 });
                 return;
               }
@@ -459,7 +459,7 @@ jobs:
                   ``,
                   `Anyone interested? Comment \`/assign\` below 👇`,
                   ``,
-                  `_GSSoC'26 · [Uni-Event](https://github.com/${owner}/${repo}) · [@${REPO_OWNER}](https://github.com/${REPO_OWNER})_`,
+                  `_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo}) · [@${REPO_OWNER}](https://github.com/${REPO_OWNER})_`,
                 ].join('\n'),
               });
               console.log(`🔓 Unassigned @${targetUser} from issue #${issueNum}`);

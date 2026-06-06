@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { isHttpError, requireAdmin, sanitizeError } from "@/lib/middleware";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
-    await requireAdmin(request);
+    const user = await requireAdmin(request);
+    const rl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.ADMIN_DLQ_REPLAY,
+    );
+    if (!rl.allowed) return rateLimitResponse(rl);
 
     const eventId = params.id;
     if (!eventId) {
@@ -42,10 +52,16 @@ export async function POST(
       },
     });
 
-    return NextResponse.json(
-      { success: true, event: updated },
-      { status: 200 },
-    );
+    await prisma.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "REPLAY_DLQ_EVENT",
+        resource: `admin/dlq/${eventId}/replay`,
+        details: { eventId, originalStatus: event.status },
+      },
+    });
+
+    return NextResponse.json({ success: true, event: updated }, { status: 200 });
   } catch (error: unknown) {
     if (isHttpError(error)) {
       return NextResponse.json(

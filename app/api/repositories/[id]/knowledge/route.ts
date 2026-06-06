@@ -25,10 +25,23 @@ export async function GET(
     // Parse JSON strings back to objects for API response
     let formattedKnowledge = null;
     if (knowledge) {
+      const parseField = (val: any) => {
+        if (!val) return null;
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string') {
+          try {
+            return JSON.parse(val);
+          } catch {
+            return null;
+          }
+        }
+        return val;
+      };
+
       formattedKnowledge = {
         ...knowledge,
-        onboardingNotes: knowledge.onboardingNotes ? JSON.parse(knowledge.onboardingNotes as string) : null,
-        architecturePrinciples: knowledge.architecturePrinciples ? JSON.parse(knowledge.architecturePrinciples as string) : null,
+        onboardingNotes: parseField(knowledge.onboardingNotes),
+        architecturePrinciples: parseField(knowledge.architecturePrinciples),
       };
     }
 

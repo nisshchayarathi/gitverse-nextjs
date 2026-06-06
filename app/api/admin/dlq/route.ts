@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { isHttpError, requireAdmin, sanitizeError } from "@/lib/middleware";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    const user = await requireAdmin(request);
+    const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.ADMIN_DLQ);
+    if (!rl.allowed) return rateLimitResponse(rl);
 
     const { searchParams } = new URL(request.url);
     const take = Number(searchParams.get("take")) || 50;
@@ -16,11 +23,31 @@ export async function GET(request: NextRequest) {
         orderBy: { updatedAt: "desc" },
         take,
         skip,
+        select: {
+          id: true,
+          event: true,
+          action: true,
+          status: true,
+          error: true,
+          retryCount: true,
+          nextRetryAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       }),
       prisma.webhookEvent.count({
         where: { status: "dlq" },
       }),
     ]);
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "ACCESS_DLQ",
+        resource: "admin/dlq",
+        details: { take, skip, returnedCount: events.length },
+      },
+    });
 
     return NextResponse.json({ events, total }, { status: 200 });
   } catch (error: unknown) {

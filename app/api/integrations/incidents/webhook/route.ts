@@ -8,9 +8,15 @@ import {
   parseIncidentTarget,
   verifyIncidentWebhookSignature,
 } from "@/lib/utils/incidentWebhook";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import { getClientIp } from "@/lib/services/rateLimitService";
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req as any);
+    const rl = await checkRateLimit(ip, RATE_LIMITS.INCIDENT_WEBHOOK);
+    if (!rl.allowed) return rateLimitResponse(rl, "Webhook rate limit exceeded");
+
     const rawBody = await req.text();
     const isAuthorized = verifyIncidentWebhookSignature({
       rawBody,

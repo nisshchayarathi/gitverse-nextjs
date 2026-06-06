@@ -2,14 +2,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Toast as ToastType } from "@/hooks/useToast";
+import { ToasterToast as ToastType } from "@/hooks/use-toast";
 
-interface ToastProps {
+export interface ToastProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: "default" | "destructive";
+  message?: string;
+  type?: "success" | "error" | "info" | "warning";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+export type ToastActionElement = React.ReactElement;
+
+interface ToastItemProps {
   toast: ToastType;
   onRemove: (id: string) => void;
 }
 
-function ToastItem({ toast, onRemove }: ToastProps) {
+function ToastItem({ toast, onRemove }: ToastItemProps) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -23,7 +32,7 @@ function ToastItem({ toast, onRemove }: ToastProps) {
     };
   }, []);
 
-  const isSuccess = toast.type === "success";
+  const isSuccess = toast.variant !== "destructive" && toast.type !== "error";
 
   return (
     <div
@@ -76,7 +85,12 @@ function ToastItem({ toast, onRemove }: ToastProps) {
       </span>
 
       {/* Message */}
-      <span className="text-sm font-medium leading-snug flex-1">{toast.message}</span>
+      <div className="text-sm font-medium leading-snug flex-1 flex flex-col gap-1">
+        {toast.title && <span className="font-semibold">{toast.title}</span>}
+        {(toast.description || toast.message) && (
+          <span className="opacity-90">{toast.description || toast.message}</span>
+        )}
+      </div>
 
       {/* Close button */}
       <button

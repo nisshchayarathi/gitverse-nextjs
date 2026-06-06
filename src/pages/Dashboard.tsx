@@ -3,6 +3,9 @@
 export const dynamic = "force-dynamic";
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useRecentRepos } from "@/hooks/useRecentRepos";
+import { isValidGithubUrl } from "@/lib/utils/validators";
+import { RecentReposList } from "@/components/RecentReposList";
 import {
   GitBranch,
   TrendingUp,
@@ -29,9 +32,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
-import { useRecentRepos } from "@/hooks/useRecentRepos";
-import { isValidGithubUrl } from "@/lib/utils/validators";
-import { RecentReposList } from "@/components/RecentReposList";
+
 interface Repository {
   id: string;
   name: string;
@@ -326,12 +327,19 @@ export default function Dashboard() {
         <div className="space-y-6">
           {/* Welcome skeleton */}
           <div className="space-y-2">
+
+            <Skeleton style={{ width: "250px", height: "28px" }} />
+            <Skeleton style={{ width: "400px", height: "18px" }} />
             <Skeleton className="w-[250px] h-[28px]" />
             <Skeleton className="w-[400px] h-[18px]" />
+
           </div>
 
           {/* Input skeleton */}
           <div className="p-6 border rounded-lg space-y-3">
+
+            <Skeleton style={{ width: "100%", height: "40px" }} />
+            <Skeleton style={{ width: "180px", height: "40px" }} />
             <Skeleton className="w-full h-10" />
             <Skeleton className="w-[180px] h-10" />
           </div>
@@ -340,6 +348,9 @@ export default function Dashboard() {
           <div className="grid grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="p-4 border rounded-lg space-y-3">
+                <Skeleton style={{ width: "60%", height: "16px" }} />
+                <Skeleton style={{ width: "40%", height: "28px" }} />
+                <Skeleton style={{ width: "80%", height: "12px" }} />
                 <Skeleton className="w-[60%] h-4" />
                 <Skeleton className="w-[40%] h-7" />
                 <Skeleton className="w-[80%] h-3" />
@@ -350,19 +361,19 @@ export default function Dashboard() {
           {/* Cards skeleton */}
           <div className="grid grid-cols-3 gap-6">
             <div className="col-span-2 space-y-3">
-              <Skeleton className="w-[40%] h-5" />
+              <Skeleton style={{ width: "40%", height: "20px" }} />
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="p-4 border rounded-lg space-y-2">
-                  <Skeleton className="w-[30%] h-[18px]" />
-                  <Skeleton className="w-[70%] h-3.5" />
+                  <Skeleton style={{ width: "30%", height: "18px" }} />
+                  <Skeleton style={{ width: "70%", height: "14px" }} />
                 </div>
               ))}
             </div>
 
             <div className="space-y-3">
-              <Skeleton className="w-[50%] h-5" />
+              <Skeleton style={{ width: "50%", height: "20px" }} />
               {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="w-full h-10" />
+                <Skeleton key={i} style={{ width: "100%", height: "40px" }} />
               ))}
             </div>
           </div>

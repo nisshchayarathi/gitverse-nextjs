@@ -429,6 +429,107 @@ This project is licensed under the MIT License.
 - NeonDB for serverless PostgreSQL
 - All contributors and users of GitVerse
 
+## ❓ FAQ – Common Questions & Edge Cases
+> This section covers product behavior, limitations, and design decisions not included in troubleshooting.
+### 1. Can GitVerse analyze very large repositories?
+Yes, but performance depends on repo size.
+
+- Small repos → fast (seconds)
+- Medium repos → moderate (few seconds to a minute)
+- Large monorepos → slower due to:
+  - dependency graph building
+  - AI summarization
+  - full file traversal
+
+### 2. Does GitVerse store repository data?
+GitVerse may temporarily store:
+- repository structure
+- analysis results
+- AI-generated summaries
+
+This helps improve performance and reduce repeated computation. You can extend it to add long-term caching if needed.
+
+### 3. What happens if GitHub API rate limits are hit?
+If GitHub rate limits are reached:
+- repository fetch may fail
+- partial analysis may be returned
+
+Recommended improvements:
+- use GitHub App authentication for higher limits
+- add retry with exponential backoff
+- cache repository metadata
+
+### 4. Does GitVerse support GitLab or Bitbucket?
+Not currently.
+
+GitVerse is built for GitHub only, but it can be extended by abstracting `gitService.ts` into provider-based adapters.
+
+### 5. Is GitVerse real-time collaborative?
+No.
+
+Currently:
+- single-user analysis only
+- no shared sessions or live collaboration
+
+Future idea:
+- shared repo exploration rooms
+- collaborative AI chat per repository
+
+### 6. How accurate is AI-based architecture mapping?
+AI results are:
+- helpful for understanding structure
+- not guaranteed to reflect runtime behavior perfectly
+
+Accuracy depends on:
+- code quality
+- naming conventions
+- project structure clarity
+
+### 7. Can I customize graphs and visualizations?
+Yes.
+
+Modify:
+src/components/visualizations/
+
+You can customize:
+- dependency graphs
+- module maps
+- risk heatmaps
+- node layouts
+
+### 8. Is GitVerse suitable for production-level analysis?
+Yes, but mainly for:
+- onboarding developers
+- exploring unfamiliar codebases
+- hackathon or OSS contribution workflows
+
+It is not a replacement for full static analysis tools.
+
+### 9. Can I customize AI prompts?
+Yes.
+
+Edit:
+lib/services/geminiService.ts
+
+You can change:
+- architecture explanation style
+- onboarding prompts
+- risk detection logic
+- suggestion formats
+
+### 10. What makes GitVerse different from GitHub UI?
+GitHub shows files.
+
+GitVerse shows understanding:
+- architecture map
+- dependency flow
+- hotspots & risks
+- AI onboarding assistant
+
+It turns a repo into a **learning system, not just a file browser**.
+
+
+
 ---
 
 Made with ❤️ by the GitVerse Team
