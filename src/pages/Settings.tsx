@@ -34,6 +34,7 @@ export default function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const didInitProfileForm = useRef(false);
@@ -333,18 +334,13 @@ export default function Settings() {
 });
   };
 
-  const handleDeleteAccount = async () => {
-    if (isDeletingAccount) return;
-    if (deleteConfirmText !== "DELETE") return;
-
-    setShowDeleteModal(false);
-    setDeleteConfirmText("");
   const handleDeleteAccount = () => {
     setShowDeleteModal(true);
   };
 
   const confirmDeleteAccount = async () => {
     if (isDeletingAccount) return;
+    if (deleteConfirmText !== "DELETE") return;
 
     setIsDeletingAccount(true);
     try {
@@ -367,11 +363,13 @@ export default function Settings() {
       toast({
         title: "Error",
         description:
-          error.response?.data?.error || "Failed to delete account",
+          error.response?.data?.message || "Failed to delete account.",
         variant: "destructive",
       });
     } finally {
       setIsDeletingAccount(false);
+      setShowDeleteModal(false);
+      setDeleteConfirmText("");
     }
   };
 
@@ -914,47 +912,6 @@ export default function Settings() {
           </div>
         </div>
       </div>
-      {showDeleteModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-account-title"
-          onKeyDown={(e) => e.key === "Escape" && setShowDeleteModal(false)}
-          onClick={(e) => e.target === e.currentTarget && setShowDeleteModal(false)}
-        >
-          <Card className="w-full max-w-sm">
-            <CardHeader>
-              <CardTitle id="delete-account-title">Delete Account</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-6">
-                This permanently deletes your account and all data. This cannot be undone.
-              </p>
-
-              <div className="flex gap-3 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDeleteModal(false)}
-                >
-                  Cancel
-                </Button>
-
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    confirmDeleteAccount();
-                  }}
-                  disabled={isDeletingAccount}
-                >
-                  {isDeletingAccount ? "Deleting..." : "Delete Account"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
     </DashboardLayout>
   );

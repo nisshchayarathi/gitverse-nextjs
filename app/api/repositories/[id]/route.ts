@@ -33,7 +33,17 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(repository, { headers: securityHeaders });
+    const latestJob = await prisma.analysisJob.findFirst({
+      where: { repositoryId: id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const responseData = {
+      ...repository,
+      latestJob,
+    };
+
+    return NextResponse.json(responseData, { headers: securityHeaders });
   } catch (error: any) {
     console.error("Error fetching repository:", sanitizeError(error));
 

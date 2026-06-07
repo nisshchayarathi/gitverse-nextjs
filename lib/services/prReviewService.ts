@@ -285,7 +285,6 @@ export async function reviewPullRequest(params: {
       policySection += "\nIMPORTANT: Policy violations should be flagged with the exact severity specified. Use the \"suggestion\" field to explain how to fix the violation according to the organizational standard.\n";
     }
   }
-
   const processChunk = async (chunkFiles: typeof prFiles, chunkIndex: number, totalChunks: number): Promise<PRReviewResponse | null> => {
     const { diff, stats } = buildDiffForPrompt(chunkFiles);
 

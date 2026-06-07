@@ -11,6 +11,7 @@ import {
 import { ttlCache, TTL, repoStatsCacheKey } from "../utils/ttlCache";
 import { invalidateGeminiAnalysisCacheForRepository } from "./geminiAnalysisCacheService";
 import { FileChangeType } from "@prisma/client";
+import { DependencyGraphService } from "./dependency-graph";
 import { repoSyncLimiter } from "../utils/concurrencyLimiter";
 import { withDbRetry } from "../utils/dbRetry";
 import { gitverseConfigParser, ParsedRepositoryKnowledge } from "../parsers/gitverseConfigParser";
@@ -397,6 +398,158 @@ export class RepositoryService {
 
       checkAborted();
 
+      await report({
+        progressPercent: 90,
+        progressMessage: "Generating architecture snapshots...",
+      });
+
+      const snapshotsToCreate: any[] = [];
+      try {
+        const tags = await gitService.getTags();
+        const milestones: { commitHash: string; tagName?: string; commitMessage: string; committedAt: Date }[] = [];
+
+        // Select commits for milestones
+        if (tags.length > 0) {
+          // If we have tags, sort them chronologically and sample up to 7 tags
+          const tagMap = new Map(tags.map(t => [t.commitHash, t.name]));
+          const tagCommits = commits.filter(c => tagMap.has(c.hash));
+          
+          if (tagCommits.length > 0) {
+            tagCommits.sort((a, b) => a.committedAt.getTime() - b.committedAt.getTime());
+            const step = Math.max(1, (tagCommits.length - 1) / 6);
+            for (let i = 0; i < tagCommits.length; i = Math.round(i + step)) {
+              const c = tagCommits[i];
+              if (!milestones.some(m => m.commitHash === c.hash)) {
+                milestones.push({
+                  commitHash: c.hash,
+                  tagName: tagMap.get(c.hash),
+                  commitMessage: c.message,
+                  committedAt: c.committedAt,
+                });
+              }
+              if (milestones.length >= 7) break;
+            }
+          }
+        }
+
+        // If no milestones found via tags, use chronologically sampled commits
+        if (milestones.length === 0 && commits.length > 0) {
+          const sortedCommits = [...commits].sort((a, b) => a.committedAt.getTime() - b.committedAt.getTime());
+          const step = Math.max(1, (sortedCommits.length - 1) / 6);
+          for (let i = 0; i < sortedCommits.length; i = Math.round(i + step)) {
+            const c = sortedCommits[i];
+            if (!milestones.some(m => m.commitHash === c.hash)) {
+              milestones.push({
+                commitHash: c.hash,
+                commitMessage: c.message,
+                committedAt: c.committedAt,
+              });
+            }
+            if (milestones.length >= 7) break;
+          }
+        }
+
+        // Ensure latest HEAD commit is always included as a milestone
+        const headCommit = commits[0];
+        if (headCommit && !milestones.some(m => m.commitHash === headCommit.hash)) {
+          milestones.push({
+            commitHash: headCommit.hash,
+            commitMessage: headCommit.message,
+            committedAt: headCommit.committedAt,
+          });
+        }
+
+        // Sort milestones chronologically
+        milestones.sort((a, b) => a.committedAt.getTime() - b.committedAt.getTime());
+
+        // Generate snapshots
+        const graphService = new DependencyGraphService();
+        for (const milestone of milestones) {
+          try {
+            await gitService.checkout(milestone.commitHash);
+            const graph = await graphService.buildGraph(tempDir);
+            
+            // Serialize Map to Object
+            const graphObj: Record<string, string[]> = {};
+            for (const [file, dependents] of graph.entries()) {
+              graphObj[file] = dependents;
+            }
+
+            // Gather metadata
+            let totalFiles = 0;
+            let totalLines = 0;
+            let totalSize = 0;
+            const langCounts: Record<string, { files: number; lines: number; bytes: number }> = {};
+
+            for (const relPath of Object.keys(graphObj)) {
+              try {
+                const fullPath = path.join(tempDir, relPath);
+                const stat = await fs.stat(fullPath);
+                totalFiles++;
+                totalSize += stat.size;
+
+                const ext = path.extname(relPath);
+                const lang = GitService.detectLanguageFromExtension(ext) || "Other";
+                
+                let lineCount = 0;
+                try {
+                  if (stat.size <= 256 * 1024) {
+                    const content = await fs.readFile(fullPath, "utf-8");
+                    lineCount = content.split("\n").length;
+                  } else {
+                    lineCount = Math.ceil(stat.size / 80);
+                  }
+                } catch {
+                  lineCount = Math.ceil(stat.size / 80);
+                }
+                totalLines += lineCount;
+
+                if (!langCounts[lang]) {
+                  langCounts[lang] = { files: 0, lines: 0, bytes: 0 };
+                }
+                langCounts[lang].files++;
+                langCounts[lang].lines += lineCount;
+                langCounts[lang].bytes += stat.size;
+              } catch {}
+            }
+
+            const languagesMeta = Object.entries(langCounts).map(([name, stats]) => ({
+              name,
+              files: stats.files,
+              lines: stats.lines,
+              bytes: stats.bytes,
+              percentage: totalSize > 0 ? (stats.bytes / totalSize) * 100 : 0,
+            })).sort((a, b) => b.bytes - a.bytes);
+
+            snapshotsToCreate.push({
+              commitHash: milestone.commitHash,
+              tagName: milestone.tagName || null,
+              commitMessage: milestone.commitMessage,
+              committedAt: milestone.committedAt,
+              dependencyGraph: graphObj,
+              metadata: {
+                totalFiles,
+                totalLines,
+                totalSize,
+                languages: languagesMeta,
+              },
+            });
+          } catch (snapshotError) {
+            console.error(`Failed to generate snapshot for ${milestone.commitHash}:`, snapshotError);
+          }
+        }
+      } catch (milestoneError) {
+        console.error("Failed to select milestones for snapshots:", milestoneError);
+      } finally {
+        try {
+          await gitService.checkout(defaultBranch);
+        } catch (checkoutDefaultError) {
+          console.error("Failed to restore default branch checkout:", checkoutDefaultError);
+        }
+      }
+
+      checkAborted();
+
       // Write phase: all database writes in a single atomic transaction.
       // This ensures that a failure mid-way rolls back all changes, preventing
       // the repository from being stuck in "analyzing" with partial data visible.
@@ -404,11 +557,27 @@ export class RepositoryService {
         // Delete stale analysis data for a clean slate, then re-insert fresh data.
         // This avoids the skipDuplicates problem where old rows from a previous
         // partial run survive alongside new data.
-        await prisma.commit.deleteMany({ where: { repositoryId } });
-        await prisma.branch.deleteMany({ where: { repositoryId } });
-        await prisma.file.deleteMany({ where: { repositoryId } });
-        await prisma.contributor.deleteMany({ where: { repositoryId } });
-        await prisma.language.deleteMany({ where: { repositoryId } });
+        await tx.commit.deleteMany({ where: { repositoryId } });
+        await tx.branch.deleteMany({ where: { repositoryId } });
+        await tx.file.deleteMany({ where: { repositoryId } });
+        await tx.contributor.deleteMany({ where: { repositoryId } });
+        await tx.language.deleteMany({ where: { repositoryId } });
+        await tx.architectureSnapshot.deleteMany({ where: { repositoryId } });
+
+        // Insert snapshots
+        if (snapshotsToCreate.length > 0) {
+          await tx.architectureSnapshot.createMany({
+            data: snapshotsToCreate.map((snap) => ({
+              repositoryId,
+              commitHash: snap.commitHash,
+              tagName: snap.tagName,
+              commitMessage: snap.commitMessage,
+              committedAt: snap.committedAt,
+              dependencyGraph: snap.dependencyGraph,
+              metadata: snap.metadata,
+            })),
+          });
+        }
 
         // Update README
         await prisma.repository.update({

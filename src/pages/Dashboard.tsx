@@ -131,7 +131,11 @@ export default function Dashboard() {
           );
 
           await fetchRepositories();
-          router.push(`/repo/${response.data.repository.id}`);
+          const newRepo = response.data.data?.repository || response.data.repository;
+          if (!newRepo?.id) {
+            throw new Error("Repository object not found in create response");
+          }
+          router.push(`/repo/${newRepo.id}`);
           setRepoUrl("");
         } catch (error: any) {
           console.error("Auto analysis failed:", error);
@@ -297,7 +301,11 @@ export default function Dashboard() {
 
       await fetchRepositories();
 
-      router.push(`/repo/${response.data.repository.id}`);
+      const newRepo = response.data.data?.repository || response.data.repository;
+      if (!newRepo?.id) {
+        throw new Error("Repository object not found in create response");
+      }
+      router.push(`/repo/${newRepo.id}`);
 
       if (isExisting) {
         console.log("Navigating to existing repository");

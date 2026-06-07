@@ -14,7 +14,6 @@ import {
 import Image from "next/image";
 import { Card } from "@/components/ui";
 import { useState, useRef, useEffect } from "react";
-import Image from "next/image";
 
 interface Contributor {
   id: string;
@@ -112,7 +111,7 @@ export function Contributors({ repository }: ContributorsProps) {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortOption)}
-          className="glass px-4 py-2 rounded-lprisma migrate resetg hover:bg-white/10 transition-all duration-300 cursor-pointer"
+          className="glass px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-300 cursor-pointer"
         >
           <option value="commits">Most commits</option>
           <option value="additions">Most additions</option>

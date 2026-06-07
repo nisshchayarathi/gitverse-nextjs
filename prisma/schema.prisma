@@ -227,7 +227,7 @@ model Repository {
   forks                        Int                           @default(0)
   size                         Int                           @default(0) // Size in bytes
   lastAnalyzedAt               DateTime?                     @map("last_analyzed_at")
-  status              String                      @default("pending") // pending, analyzing, completed, failed
+  status                       String                        @default("pending") // pending, analyzing, completed, failed
   userId                       Int                           @map("user_id")
   user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
   parentId                     Int?                          @map("parent_id")
@@ -245,6 +245,7 @@ model Repository {
   securitySandboxes            SecuritySandbox[]
   reviewPolicies               ReviewPolicy[]
   policyAssignment             RepositoryPolicyAssignment?
+  architectureSnapshots        ArchitectureSnapshot[]
   mapAnnotations               MapAnnotation[]
   knowledge                    RepositoryKnowledge?
   syncJobs                     RepositorySyncJob[]
@@ -768,6 +769,24 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model ArchitectureSnapshot {
+  id            Int        @id @default(autoincrement())
+  repositoryId  Int        @map("repository_id")
+  commitHash    String     @map("commit_hash")
+  tagName       String?    @map("tag_name")
+  commitMessage String     @map("commit_message")
+  committedAt   DateTime   @map("committed_at")
+  dependencyGraph Json     @map("dependency_graph")
+  metadata      Json?      @map("metadata")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, commitHash])
+  @@index([repositoryId])
+  @@map("architecture_snapshots")
+}
+
 model MapAnnotation {
   id             String   @id @default(uuid()) @db.Uuid
   repositoryId   Int      @map("repository_id")
@@ -858,3 +877,4 @@ model MfaConfig {
   @@index([userId])
   @@map("mfa_configs")
 }
+
