@@ -6,6 +6,8 @@ import {
   validateImageFile,
   validateDataUrl,
   validateHttpAvatarUrl,
+  fetchAndValidateAvatarUrl,
+  validateImageContent,
 } from "@/lib/services/imageService";
 import { storeAvatar, parseDataUrl } from "@/lib/services/storageService";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
@@ -65,7 +67,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     const { dataUrl, url } = body;
 
     if (dataUrl) {
-      const validation = validateDataUrl(dataUrl);
+      const validation = await validateDataUrl(dataUrl);
       if (!validation.valid) {
         return NextResponse.json(
           { error: true, message: validation.error, code: 400 },
@@ -81,7 +83,15 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         );
       }
 
-      const stored = await storeAvatar(parsed.buffer, user.userId, parsed.mimeType);
+      const contentCheck = await validateImageContent(parsed.buffer);
+      if (!contentCheck.valid) {
+        return NextResponse.json(
+          { error: true, message: contentCheck.error, code: 400 },
+          { status: 400 }
+        );
+      }
+
+      const stored = await storeAvatar(parsed.buffer, user.userId, contentCheck.mimeType || parsed.mimeType);
       avatarUrl = stored.url;
 
       logger.info({ userId: user.userId }, "Avatar uploaded via data URL");
@@ -93,9 +103,22 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           { status: 400 }
         );
       }
-      avatarUrl = url;
 
-      logger.info({ userId: user.userId }, "Avatar uploaded via HTTP URL");
+      const fetched = await fetchAndValidateAvatarUrl(url);
+      if (!fetched.valid || !fetched.fetched) {
+        return NextResponse.json(
+          { error: true, message: fetched.error || "Failed to fetch avatar", code: 400 },
+          { status: 400 }
+        );
+      }
+
+      const stored = await storeAvatar(fetched.fetched.buffer, user.userId, fetched.fetched.mimeType);
+      avatarUrl = stored.url;
+
+      logger.info(
+        { userId: user.userId, originalUrl: url, mimeType: fetched.fetched.mimeType, size: fetched.fetched.buffer.length },
+        "Avatar uploaded via HTTP URL with server-side fetch",
+      );
     } else {
       return NextResponse.json(
         {

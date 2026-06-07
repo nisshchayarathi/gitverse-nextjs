@@ -5,102 +5,186 @@ import { webhookQueueInstance } from "../../queue/webhookQueue";
 jest.mock("../../prisma", () => ({
   __esModule: true,
   default: {
-    $transaction: jest.fn((promises) => Promise.all(promises)),
     webhookEvent: {
       count: jest.fn(),
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
   },
 }));
 
 jest.mock("../../queue/webhookQueue", () => ({
+  __esModule: true,
   webhookQueueInstance: {
-    add: jest.fn(),
+    addBulk: jest.fn(),
   },
-  WEBHOOK_QUEUE_NAME: "webhook-events",
 }));
 
 describe("WebhookQueueService", () => {
-  let queue: WebhookQueueService;
+  const queue = new WebhookQueueService();
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.useFakeTimers();
-    queue = new WebhookQueueService();
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
+  describe("enqueueWebhook", () => {
+    it("should create a webhook event and enqueue it via BullMQ", async () => {
+      (prisma.webhookEvent.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.webhookEvent.create as jest.Mock).mockResolvedValue({ id: "evt-001" });
+
+      await queue.enqueueWebhook({ foo: "bar" }, "push", undefined, "http://localhost");
+
+      expect(prisma.webhookEvent.findFirst).not.toHaveBeenCalled();
+      expect(prisma.webhookEvent.create).toHaveBeenCalledWith({
+        data: {
+          event: "push",
+          action: undefined,
+          payload: { foo: "bar" },
+          status: "pending",
+          deliveryId: undefined,
+        },
+        select: { id: true },
+      });
+      expect(webhookQueueInstance.addBulk).toHaveBeenCalledWith([
+        { name: "process-webhook", data: { eventId: "evt-001" } },
+      ]);
+    });
+
+    it("should create a webhook event with action and deliveryId when provided", async () => {
+      (prisma.webhookEvent.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.webhookEvent.create as jest.Mock).mockResolvedValue({ id: "evt-002" });
+
+      await queue.enqueueWebhook(
+        { pull_request: { number: 42 } },
+        "pull_request",
+        "opened",
+        "http://example.com",
+        "delivery-abc-123"
+      );
+
+      expect(prisma.webhookEvent.findFirst).toHaveBeenCalledWith({
+        where: { deliveryId: "delivery-abc-123" },
+      });
+      expect(prisma.webhookEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            event: "pull_request",
+            action: "opened",
+            deliveryId: "delivery-abc-123",
+          }),
+        })
+      );
+      expect(webhookQueueInstance.addBulk).toHaveBeenCalledWith([
+        { name: "process-webhook", data: { eventId: "evt-002" } },
+      ]);
+    });
+
+    it("should deduplicate by deliveryId when it already exists", async () => {
+      (prisma.webhookEvent.findFirst as jest.Mock).mockResolvedValue({ id: "evt-001" });
+
+      await queue.enqueueWebhook({ foo: "bar" }, "push", undefined, "http://localhost", "delivery-123");
+
+      expect(prisma.webhookEvent.findFirst).toHaveBeenCalledWith({
+        where: { deliveryId: "delivery-123" },
+      });
+      expect(prisma.webhookEvent.create).not.toHaveBeenCalled();
+      expect(webhookQueueInstance.addBulk).not.toHaveBeenCalled();
+    });
+
+    it("should create event even without deliveryId (no dedup check)", async () => {
+      (prisma.webhookEvent.create as jest.Mock).mockResolvedValue({ id: "evt-003" });
+
+      await queue.enqueueWebhook({ x: 1 }, "issues", "opened", "http://localhost");
+
+      expect(prisma.webhookEvent.findFirst).not.toHaveBeenCalled();
+      expect(prisma.webhookEvent.create).toHaveBeenCalled();
+      expect(webhookQueueInstance.addBulk).toHaveBeenCalled();
+    });
+
+    it("should default event name to 'unknown' when event is undefined", async () => {
+      (prisma.webhookEvent.create as jest.Mock).mockResolvedValue({ id: "evt-004" });
+
+      await queue.enqueueWebhook({}, undefined as any, undefined, "http://localhost");
+
+      expect(prisma.webhookEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            event: "unknown",
+          }),
+        })
+      );
+    });
+
+    it("should propagate DB create errors", async () => {
+      (prisma.webhookEvent.create as jest.Mock).mockRejectedValue(new Error("DB connection failed"));
+
+      await expect(
+        queue.enqueueWebhook({}, "push", undefined, "http://localhost")
+      ).rejects.toThrow("DB connection failed");
+
+      expect(webhookQueueInstance.addBulk).not.toHaveBeenCalled();
+    });
+
+    it("should propagate addBulk errors after a successful DB create", async () => {
+      (prisma.webhookEvent.create as jest.Mock).mockResolvedValue({ id: "evt-005" });
+      (webhookQueueInstance.addBulk as jest.Mock).mockRejectedValue(new Error("Redis unreachable"));
+
+      await expect(
+        queue.enqueueWebhook({}, "push", undefined, "http://localhost")
+      ).rejects.toThrow("Redis unreachable");
+
+      expect(prisma.webhookEvent.create).toHaveBeenCalled();
+    });
+
+    it("should handle concurrent dedup checks without interfering", async () => {
+      (prisma.webhookEvent.findFirst as jest.Mock)
+        .mockResolvedValue(null);
+      (prisma.webhookEvent.create as jest.Mock)
+        .mockResolvedValue({ id: "evt-006" });
+      (webhookQueueInstance.addBulk as jest.Mock).mockResolvedValue(undefined);
+
+      await Promise.all([
+        queue.enqueueWebhook({ a: 1 }, "push", undefined, "http://localhost", "delivery-concurrent"),
+        queue.enqueueWebhook({ b: 2 }, "pull_request", "synchronize", "http://localhost", "delivery-concurrent"),
+      ]);
+
+      expect(prisma.webhookEvent.create).toHaveBeenCalledTimes(2);
+    });
   });
 
-  it("should batch and enqueue webhooks to BullMQ queue on flush", async () => {
-    const mockCreatedEvents = [
-      { id: "evt-1" },
-      { id: "evt-2" },
-    ];
+  describe("triggerWorkers", () => {
+    it("should return active worker and pending job counts", async () => {
+      (prisma.webhookEvent.count as jest.Mock)
+        .mockResolvedValueOnce(5)
+        .mockResolvedValueOnce(10);
 
-    (prisma.webhookEvent.create as jest.Mock)
-      .mockResolvedValueOnce(mockCreatedEvents[0])
-      .mockResolvedValueOnce(mockCreatedEvents[1]);
+      const status = await queue.triggerWorkers("http://localhost");
 
-    (webhookQueueInstance.add as jest.Mock).mockResolvedValue(undefined as any);
-
-    queue.enqueueWebhook({ data: "foo" }, "push", undefined, "http://localhost");
-    queue.enqueueWebhook({ data: "bar" }, "pull_request", "opened", "http://localhost");
-
-    // Fast-forward timers
-    jest.runAllTimers();
-
-    // Flush all pending microtasks
-    for (let i = 0; i < 10; i++) {
-      await Promise.resolve();
-    }
-
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.webhookEvent.create).toHaveBeenCalledTimes(2);
-    expect(prisma.webhookEvent.create).toHaveBeenNthCalledWith(1, {
-      data: {
-        event: "push",
-        action: undefined,
-        payload: { data: "foo" },
-        status: "pending",
-      },
-      select: { id: true },
-    });
-    expect(prisma.webhookEvent.create).toHaveBeenNthCalledWith(2, {
-      data: {
-        event: "pull_request",
-        action: "opened",
-        payload: { data: "bar" },
-        status: "pending",
-      },
-      select: { id: true },
+      expect(status.isThrottled).toBe(false);
+      expect(status.activeWorkers).toBe(5);
+      expect(status.pendingJobs).toBe(10);
     });
 
-    expect(webhookQueueInstance.add).toHaveBeenCalledTimes(2);
-    expect(webhookQueueInstance.add).toHaveBeenNthCalledWith(1, "process-webhook", { eventId: "evt-1" });
-    expect(webhookQueueInstance.add).toHaveBeenNthCalledWith(2, "process-webhook", { eventId: "evt-2" });
-  });
+    it("should return zero counts when no events exist", async () => {
+      (prisma.webhookEvent.count as jest.Mock)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0);
 
-  it("should return correct status from triggerWorkers", async () => {
-    (prisma.webhookEvent.count as jest.Mock)
-      .mockResolvedValueOnce(3)  // processing/activeWorkers
-      .mockResolvedValueOnce(7);  // pending/pendingJobs
+      const status = await queue.triggerWorkers("http://localhost");
 
-    const status = await queue.triggerWorkers("http://localhost");
-
-    expect(status).toEqual({
-      activeWorkers: 3,
-      pendingJobs: 7,
-      isThrottled: false,
+      expect(status.activeWorkers).toBe(0);
+      expect(status.pendingJobs).toBe(0);
     });
 
-    expect(prisma.webhookEvent.count).toHaveBeenCalledTimes(2);
-    expect(prisma.webhookEvent.count).toHaveBeenNthCalledWith(1, {
-      where: { status: "processing" },
-    });
-    expect(prisma.webhookEvent.count).toHaveBeenNthCalledWith(2, {
-      where: { status: "pending" },
+    it("should not use findMany for anything", async () => {
+      (prisma.webhookEvent.count as jest.Mock)
+        .mockResolvedValueOnce(3)
+        .mockResolvedValueOnce(10);
+
+      await queue.triggerWorkers("http://localhost");
+
+      expect(prisma.webhookEvent.findMany).not.toHaveBeenCalled();
     });
   });
 });

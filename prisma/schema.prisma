@@ -316,6 +316,8 @@ model AnalysisJob {
   lockedAt      DateTime? @map("locked_at")
   lockedBy      String?   @map("locked_by")
   lockExpiresAt DateTime? @map("lock_expires_at")
+  /// Random UUID regenerated on every claim, used to guard heartbeat / markDone / markFailed against stale-worker writes
+  lockToken     String?   @map("lock_token")
 
   startedAt  DateTime? @map("started_at")
   finishedAt DateTime? @map("finished_at")
@@ -537,18 +539,73 @@ model AiRequestLog {
   @@map("ai_request_logs")
 }
 
+/// Incoming webhook events from GitHub and incident providers.
+/// Each row represents a single webhook delivery that has been accepted
+/// by the route handler and enqueued (or failed to enqueue) to BullMQ.
+///
+/// ## State machine
+///
+///   pending ──► processing ──► completed
+///                  │
+///                  ├──► failed        (retries exhausted)
+///                  ├──► rate_limited  (temporary deferral)
+///                  └──► dlq           (systemic failure, manual review)
+///
+/// ## Idempotency
+///
+/// GitHub's X-GitHub-Delivery header is stored in `deliveryId` and
+/// indexed.  Two layers of deduplication protect against duplicates:
+///
+/// 1. Redis idempotency lock in the route handler (atomic claim).
+/// 2. Database `findFirst` check in WebhookQueueService before create.
+///
+/// ## Index strategy
+///
+/// - `@@index([deliveryId])` — dedup lookups and manual queries by header.
+/// - `@@index([status, createdAt])` — worker queries for pending events.
+/// - `@@index([status, nextRetryAt])` — retry scheduler queries.
+///
+/// ## Retention
+///
+/// Completed events accumulate indefinitely; there is no TTL or archival
+/// mechanism.  For production deployments, consider a periodic cleanup
+/// job or a partitioned table with a retention window.
 model WebhookEvent {
+  /// Auto-generated UUID primary key.
   id          String    @id @default(uuid()) @db.Uuid
+
+  /// GitHub event type (e.g. "push", "pull_request", "issues").
   event       String
+
+  /// Event sub-action (e.g. "opened", "synchronize", null for push).
   action      String?
+
+  /// The full webhook payload, stored as a JSON document.
   payload     Json
-  status      String    @default("pending") // pending, processing, completed, failed, rate_limited
+
+  /// Processing status: pending, processing, completed, failed,
+  /// rate_limited, or dlq (dead-letter queue).
+  status      String    @default("pending")
+
+  /// Error message from the last failed processing attempt.
   error       String?   @db.Text
-  deliveryId  String?   @map("delivery_id") // X-GitHub-Delivery header for idempotency
+
+  /// X-GitHub-Delivery header value, used for delivery deduplication.
+  deliveryId  String?   @map("delivery_id")
+
+  /// Number of processing attempts made so far.
   retryCount  Int       @default(0) @map("retry_count")
+
+  /// Maximum processing attempts before moving to "failed" status.
   maxRetries  Int       @default(3) @map("max_retries")
+
+  /// Scheduled time for the next retry (null when not awaiting retry).
   nextRetryAt DateTime? @map("next_retry_at")
+
+  /// Timestamp of when this row was created.
   createdAt   DateTime  @default(now()) @map("created_at")
+
+  /// Timestamp of the last update to this row.
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@index([deliveryId])
