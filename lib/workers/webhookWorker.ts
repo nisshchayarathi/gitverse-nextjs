@@ -39,10 +39,14 @@ async function processWebhookEvent(eventId: string): Promise<void> {
     return;
   }
 
-  await prisma.webhookEvent.update({
-    where: { id: eventId },
+  const { count } = await prisma.webhookEvent.updateMany({
+    where: { id: eventId, status: "pending" },
     data: { status: "processing" },
   });
+
+  if (count === 0) {
+    return;
+  }
 
   const deliveryId = webhookEvent.deliveryId;
   const idempotencyKey = deliveryId ? generateWebhookKey(deliveryId, webhookEvent.event, webhookEvent.action || undefined) : null;

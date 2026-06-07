@@ -40,15 +40,17 @@ export async function processWebhookJob(eventId: string) {
   }
 
   if (webhookEvent.status !== "pending") {
-    // Already processed, ignore
     return { ok: true, ignored: true, reason: "already_processed" };
   }
 
-  // Mark as processing
-  await prisma.webhookEvent.update({
-    where: { id: eventId },
+  const { count } = await prisma.webhookEvent.updateMany({
+    where: { id: eventId, status: "pending" },
     data: { status: "processing" },
   });
+
+  if (count === 0) {
+    return { ok: true, ignored: true, reason: "already_processed" };
+  }
 
   const deliveryId = webhookEvent.deliveryId;
   const idempotencyKey = deliveryId ? generateWebhookKey(deliveryId, webhookEvent.event, webhookEvent.action || undefined) : null;

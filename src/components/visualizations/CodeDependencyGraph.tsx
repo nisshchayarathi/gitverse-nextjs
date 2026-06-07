@@ -54,10 +54,9 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const nodesRef = useRef<any[]>([]);
   const linksRef = useRef<any[]>([]);
   const [, setTick] = useState(0);
-
-  const [selectedCommitHash, setSelectedCommitHash] = useState<string | null>(
-    null,
-  );
+  
+  const [selectedCommitHash, setSelectedCommitHash] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState("");
 
   const selectedCommit = useMemo(() => {
     if (!selectedCommitHash || !repository?.commits) return null;
@@ -284,6 +283,30 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .data(nodes)
       .join("g")
       .style("cursor", "pointer")
+      .attr("tabindex", "0")
+      .attr("role", "button")
+      .attr("aria-label", (d: any) => `${d.type === 'folder' ? 'Directory' : 'File'}: ${d.name}, Path: ${d.path}`)
+      .on("focus", function (_event: any, d: any) {
+        const connections = linksRef.current.filter((l: any) => l.source.id === d.id || l.target.id === d.id).length;
+        setAnnouncement(`Focused on ${d.type} ${d.name}. ${connections} dependencies.`);
+        d3.select(this).select("circle")
+          .attr("stroke", "#fbbf24")
+          .attr("stroke-width", 3);
+      })
+      .on("blur", function (_event: any, d: any) {
+        d3.select(this).select("circle")
+          .attr("stroke", "rgba(255,255,255,0.3)")
+          .attr("stroke-width", 2);
+      })
+      .on("keydown", function (event: any, d: any) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          if (d.type === 'folder') {
+            toggleExpand(d.id);
+          }
+          setFocus(d.id);
+        }
+      })
       .call(
         d3
           .drag<any, any>()
@@ -518,15 +541,9 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         if (d.type === "file") {
           return changedFiles.has(d.path) ? 1 : 0.2;
         }
-<<<<<<< HEAD
-        if (d.type === "folder") {
-          for (const [path] of changedFiles.entries()) {
-            if ((path as string).startsWith(d.path + "/")) return 1;
-=======
         if (d.type === 'folder') {
           for (const [path] of changedFiles.entries() as Iterable<[string, string]>) {
             if (path.startsWith(d.path + '/')) return 1;
->>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
           }
           return 0.2;
         }
@@ -848,6 +865,11 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             }
           }}
         />
+        
+        {/* Screen reader announcement region */}
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </div>
       </Card>
     </div>
   );

@@ -42,6 +42,8 @@ jest.mock("@/lib/services/imageService", () => ({
   validateImageFile: jest.fn(),
   validateDataUrl: jest.fn(),
   validateHttpAvatarUrl: jest.fn(),
+  fetchAndValidateAvatarUrl: jest.fn(),
+  validateImageContent: jest.fn(),
 }));
 
 jest.mock("@/lib/services/storageService", () => ({
@@ -55,6 +57,8 @@ import {
   validateImageFile,
   validateDataUrl,
   validateHttpAvatarUrl,
+  fetchAndValidateAvatarUrl,
+  validateImageContent,
 } from "@/lib/services/imageService";
 import { storeAvatar, parseDataUrl } from "@/lib/services/storageService";
 import { NextRequest } from "next/server";
@@ -76,12 +80,8 @@ describe("POST /api/upload/avatar", () => {
     jest.clearAllMocks();
     (requireAuth as jest.Mock).mockResolvedValue(mockUser);
     (storeAvatar as jest.Mock).mockResolvedValue(mockStored);
-    mockCheckRateLimit.mockResolvedValue({
-      allowed: true,
-      remaining: 4,
-      limit: 5,
-      resetAt: Date.now() + 3600000,
-    });
+    (validateImageContent as jest.Mock).mockResolvedValue({ valid: true, mimeType: "image/png" });
+    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 4, limit: 5, resetAt: Date.now() + 3600000 });
     mockRateLimitResponse.mockReturnValue(
       new Response(
         JSON.stringify({
@@ -394,8 +394,16 @@ describe("POST /api/upload/avatar", () => {
       expect(data.message).toContain("Invalid URL");
     });
 
-    it("returns 200 and passes URL through for valid HTTP URL", async () => {
-      (validateHttpAvatarUrl as jest.Mock).mockReturnValue({ valid: true });
+    it("returns 200 and stores fetched URL content locally", async () => {
+      (validateHttpAvatarUrl as jest.Mock).mockResolvedValue({ valid: true });
+      (fetchAndValidateAvatarUrl as jest.Mock).mockResolvedValue({
+        valid: true,
+        fetched: {
+          buffer: Buffer.from("fetched-image-data"),
+          mimeType: "image/jpeg",
+          originalUrl: "https://example.com/avatars/user123.jpg",
+        },
+      });
 
       const url = "https://example.com/avatars/user123.jpg";
       const request = new NextRequest("http://localhost/api/upload/avatar", {
@@ -409,8 +417,12 @@ describe("POST /api/upload/avatar", () => {
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
-      expect(data.avatarUrl).toBe(url);
-      expect(storeAvatar).not.toHaveBeenCalled();
+      expect(data.avatarUrl).toBe(mockStored.url);
+      expect(storeAvatar).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        mockUser.userId,
+        "image/jpeg",
+      );
     });
 
     it("returns 400 when neither dataUrl nor url is provided", async () => {
@@ -428,8 +440,16 @@ describe("POST /api/upload/avatar", () => {
       expect(data.message).toContain("Either 'dataUrl' or 'url'");
     });
 
-    it("does not call storeAvatar when only url is provided", async () => {
-      (validateHttpAvatarUrl as jest.Mock).mockReturnValue({ valid: true });
+    it("calls storeAvatar after fetching URL content", async () => {
+      (validateHttpAvatarUrl as jest.Mock).mockResolvedValue({ valid: true });
+      (fetchAndValidateAvatarUrl as jest.Mock).mockResolvedValue({
+        valid: true,
+        fetched: {
+          buffer: Buffer.from("data"),
+          mimeType: "image/jpeg",
+          originalUrl: "https://example.com/avatar.jpg",
+        },
+      });
 
       await POST(
         new NextRequest("http://localhost/api/upload/avatar", {
@@ -439,7 +459,8 @@ describe("POST /api/upload/avatar", () => {
         }),
       );
 
-      expect(storeAvatar).not.toHaveBeenCalled();
+      expect(fetchAndValidateAvatarUrl).toHaveBeenCalled();
+      expect(storeAvatar).toHaveBeenCalled();
     });
   });
 
@@ -676,7 +697,15 @@ describe("POST /api/upload/avatar", () => {
     });
 
     it("logs on HTTP URL upload", async () => {
-      (validateHttpAvatarUrl as jest.Mock).mockReturnValue({ valid: true });
+      (validateHttpAvatarUrl as jest.Mock).mockResolvedValue({ valid: true });
+      (fetchAndValidateAvatarUrl as jest.Mock).mockResolvedValue({
+        valid: true,
+        fetched: {
+          buffer: Buffer.from("data"),
+          mimeType: "image/jpeg",
+          originalUrl: "https://example.com/avatar.jpg",
+        },
+      });
 
       await POST(
         new NextRequest("http://localhost/api/upload/avatar", {
@@ -688,8 +717,8 @@ describe("POST /api/upload/avatar", () => {
 
       const { logger } = require("@/lib/logger");
       expect(logger.info).toHaveBeenCalledWith(
-        { userId: 123 },
-        "Avatar uploaded via HTTP URL",
+        expect.objectContaining({ userId: 123 }),
+        "Avatar uploaded via HTTP URL with server-side fetch",
       );
     });
   });
@@ -850,9 +879,17 @@ describe("POST /api/upload/avatar", () => {
       expect(storeAvatar).not.toHaveBeenCalled();
     });
 
-    it("stores the exact URL returned by validation", async () => {
+    it("stores the fetched content and returns local URL", async () => {
       const testUrl = "https://cdn.example.com/avatars/img.jpg";
       (validateHttpAvatarUrl as jest.Mock).mockResolvedValue({ valid: true });
+      (fetchAndValidateAvatarUrl as jest.Mock).mockResolvedValue({
+        valid: true,
+        fetched: {
+          buffer: Buffer.from("img"),
+          mimeType: "image/jpeg",
+          originalUrl: testUrl,
+        },
+      });
 
       const response = await POST(new NextRequest("http://localhost/api/upload/avatar", {
         method: "POST",
@@ -861,7 +898,8 @@ describe("POST /api/upload/avatar", () => {
       }));
 
       const data = await response.json();
-      expect(data.avatarUrl).toBe(testUrl);
+      expect(data.avatarUrl).toBe(mockStored.url);
+      expect(data.avatarUrl).not.toBe(testUrl);
     });
   });
 });

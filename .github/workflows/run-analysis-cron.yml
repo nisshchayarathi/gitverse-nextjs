@@ -5,6 +5,10 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
+concurrency:
+  group: analysis-worker-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   run-worker:
     runs-on: ubuntu-latest
@@ -52,33 +56,6 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Release stale locks before worker run
-        run: |
-          echo "Releasing stale locks..."
-          node -e "
-            const { PrismaClient } = require('@prisma/client');
-            const client = new PrismaClient();
-            client.analysisJob.updateMany({
-              where: {
-                status: 'PROCESSING',
-                lockExpiresAt: { lt: new Date() }
-              },
-              data: {
-                status: 'QUEUED',
-                lockedBy: null,
-                lockedAt: null,
-              }
-            }).then((r) => {
-              console.log('Released ' + r.count + ' stale lock(s)');
-              process.exit(0);
-            }).catch((err) => {
-              console.error('Lock cleanup failed:', err.message);
-              process.exit(1);
-            });
-          "
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
       - name: Run worker once
         id: worker-run
         env:
@@ -86,15 +63,7 @@ jobs:
           ANALYSIS_RUNNER_SECRET: ${{ secrets.ANALYSIS_RUNNER_SECRET }}
         run: |
           echo "Running analysis worker (one-shot, timeout 240s)"
-          cleanup() {
-            echo "Cleaning up worker..."
-            kill $child_pid 2>/dev/null
-            wait $child_pid 2>/dev/null
-          }
-          trap cleanup SIGTERM SIGINT EXIT
-          timeout 240 node dist-worker/scripts/cronWorker.js &
-          child_pid=$!
-          wait $child_pid
+          timeout --kill-after=30 240 node dist-worker/scripts/cronWorker.js
           exit_code=$?
           echo "Worker exited with code $exit_code"
           exit $exit_code
