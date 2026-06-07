@@ -572,41 +572,41 @@ model AiRequestLog {
 /// job or a partitioned table with a retention window.
 model WebhookEvent {
   /// Auto-generated UUID primary key.
-  id          String    @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
   /// GitHub event type (e.g. "push", "pull_request", "issues").
-  event       String
+  event String
 
   /// Event sub-action (e.g. "opened", "synchronize", null for push).
-  action      String?
+  action String?
 
   /// The full webhook payload, stored as a JSON document.
-  payload     Json
+  payload Json
 
   /// Processing status: pending, processing, completed, failed,
   /// rate_limited, or dlq (dead-letter queue).
-  status      String    @default("pending")
+  status String @default("pending")
 
   /// Error message from the last failed processing attempt.
-  error       String?   @db.Text
+  error String? @db.Text
 
   /// X-GitHub-Delivery header value, used for delivery deduplication.
-  deliveryId  String?   @map("delivery_id")
+  deliveryId String? @map("delivery_id")
 
   /// Number of processing attempts made so far.
-  retryCount  Int       @default(0) @map("retry_count")
+  retryCount Int @default(0) @map("retry_count")
 
   /// Maximum processing attempts before moving to "failed" status.
-  maxRetries  Int       @default(3) @map("max_retries")
+  maxRetries Int @default(3) @map("max_retries")
 
   /// Scheduled time for the next retry (null when not awaiting retry).
   nextRetryAt DateTime? @map("next_retry_at")
 
   /// Timestamp of when this row was created.
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   /// Timestamp of the last update to this row.
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([deliveryId])
   @@index([status, createdAt])

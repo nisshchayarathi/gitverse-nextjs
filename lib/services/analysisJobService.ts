@@ -293,7 +293,7 @@ export class AnalysisJobService {
    * complete a job. This prevents a race where two workers both think
    * they own the same job.
    */
-  async markDone(params: { jobId: string; workerId?: string }): Promise<void> {
+  async markDone(params: { jobId: string; workerId?: string; lockToken?: string }): Promise<void> {
     const where: any = { id: params.jobId };
     if (params.workerId) {
       where.lockedBy = params.workerId;

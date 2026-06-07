@@ -547,3 +547,5 @@ describe("cronWorker — process exit behavior", () => {
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 });
+
+export {};

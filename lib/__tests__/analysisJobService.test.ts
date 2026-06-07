@@ -11,7 +11,7 @@ jest.mock("../prisma", () => ({
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
-      updateMany: jest.fn(),
+      updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
     },
   }),
 }));
