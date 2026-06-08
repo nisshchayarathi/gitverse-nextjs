@@ -22,13 +22,19 @@ describe("GitService", () => {
       await fs.mkdir(nestedDir);
       await fs.writeFile(path.join(nestedDir, "index.ts"), "console.log('ok');");
 
-      const readmeStat = await fs.stat(path.join(tempDir, "README.md"));
-      const indexStat = await fs.stat(path.join(nestedDir, "index.ts"));
+      const readmeStat = await fs.lstat(path.join(tempDir, "README.md"));
+      const indexStat = await fs.lstat(path.join(nestedDir, "index.ts"));
       const expectedSize = readmeStat.size + indexStat.size;
 
       const service = new GitService(tempDir);
 
       await expect(service.getRepositorySize()).resolves.toBe(expectedSize);
+    });
+
+    it("returns zero for an empty repository directory", async () => {
+      const service = new GitService(tempDir);
+
+      await expect(service.getRepositorySize()).resolves.toBe(0);
     });
   });
 });
