@@ -129,6 +129,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           <div
             className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
             onClick={() => setMobileMenuOpen(false)}
+            role="button"
+  tabIndex={0}
+  aria-label="Close mobile menu"
+  onKeyDown={(e) => {
+    if (e.key === "Enter") setMobileMenuOpen(false);
+  }}
           />
           <aside className="fixed top-0 left-0 z-50 h-screen w-64 md:hidden">
             <div className="h-full glass border-r border-border/50 flex flex-col">
@@ -188,6 +194,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 variant="outline"
                 className="hidden sm:flex relative h-9 w-full justify-start rounded-[0.5rem] bg-background/50 text-sm text-muted-foreground sm:pr-12 md:w-56 lg:w-64 border-border/50 hover:bg-accent/50"
                 onClick={() => setCommandPaletteOpen(true)}
+                  aria-label="Open search"
+                
               >
                 <span className="hidden lg:inline-flex">Search or jump to...</span>
                 <span className="inline-flex lg:hidden">Search...</span>
@@ -203,7 +211,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               {/* User Profile Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="gap-2">
+                <Button
+                  variant="ghost"
+                  className="gap-2"
+                  aria-label="Open user dropdown"
+                >
                   <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center">
                     {user?.avatar ? (
                       <Image
