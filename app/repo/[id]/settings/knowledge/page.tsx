@@ -15,6 +15,7 @@ export default function RepositoryKnowledgeSettings() {
   const params = useParams();
   const repositoryId = params?.id as string;
   const [knowledge, setKnowledge] = useState<Knowledge | null>(null);
+  const [configWarning, setConfigWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +32,7 @@ export default function RepositoryKnowledgeSettings() {
       }
       const data = await response.json();
       setKnowledge(data.knowledge);
+      setConfigWarning(data.configWarning || null);
     } catch (err: any) {
       setError(err.message || "An error occurred");
     } finally {
@@ -53,6 +55,7 @@ export default function RepositoryKnowledgeSettings() {
       }
       const data = await response.json();
       setKnowledge(data.knowledge);
+      setConfigWarning(data.configWarning || null);
     } catch (err: any) {
       setError(err.message || "An error occurred while refreshing");
     } finally {
@@ -97,8 +100,17 @@ export default function RepositoryKnowledgeSettings() {
         </div>
       )}
 
-      {!knowledge ||
-      Object.keys(knowledge).filter((k) => k !== "updatedAt").length === 0 ? (
+      {configWarning && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-200 p-4 rounded mb-6 border border-amber-200 dark:border-amber-900/30 flex items-start gap-3">
+          <span className="text-amber-500 dark:text-amber-400 mt-0.5 text-lg">⚠️</span>
+          <div>
+            <h3 className="font-semibold text-sm">Configuration Warning</h3>
+            <p className="text-xs mt-1 opacity-90">{configWarning}</p>
+          </div>
+        </div>
+      )}
+
+      {!knowledge || Object.keys(knowledge).filter(k => k !== 'updatedAt').length === 0 ? (
         <div className="bg-white dark:bg-gray-800 p-8 text-center rounded-lg shadow border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
             No custom knowledge configured

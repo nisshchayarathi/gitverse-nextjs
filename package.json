@@ -67,6 +67,7 @@
     "framer-motion": "^12.40.0",
     "google-auth-library": "^10.3.0",
     "html-to-image": "^1.11.13",
+    "html2canvas": "^1.4.1",
     "ioredis": "^5.11.0",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",

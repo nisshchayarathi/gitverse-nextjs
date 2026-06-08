@@ -227,7 +227,7 @@ model Repository {
   forks                        Int                           @default(0)
   size                         Int                           @default(0) // Size in bytes
   lastAnalyzedAt               DateTime?                     @map("last_analyzed_at")
-  status              String                      @default("pending") // pending, analyzing, completed, failed
+  status                       String                        @default("pending") // pending, analyzing, completed, failed
   userId                       Int                           @map("user_id")
   user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
   parentId                     Int?                          @map("parent_id")
@@ -249,6 +249,7 @@ model Repository {
   knowledge                    RepositoryKnowledge?
   syncJobs                     RepositorySyncJob[]
   lastSynchronizedAt           DateTime?                     @map("last_synchronized_at")
+  configWarning                String?                       @map("config_warning") @db.Text
   repositoryArchitectureChunks RepositoryArchitectureChunk[]
 
   @@index([url])
@@ -337,13 +338,13 @@ model AnalysisJob {
   @@index([status, lockExpiresAt, nextRunAt])
   // GET /api/repositories/[id]: WHERE repositoryId + userId ORDER BY createdAt DESC
   @@index([repositoryId, userId, createdAt(sort: Desc)])
-  @@map("analysis_jobs")
   // List all jobs for a repository sorted by newest first
   @@index([repositoryId, createdAt(sort: Desc)])
   // List all jobs for a user sorted by newest first
   @@index([userId, createdAt(sort: Desc)])
   // Filter active jobs per repository
   @@index([repositoryId, status])
+  @@map("analysis_jobs")
 }
 
 model Branch {
@@ -573,41 +574,41 @@ model AiRequestLog {
 /// job or a partitioned table with a retention window.
 model WebhookEvent {
   /// Auto-generated UUID primary key.
-  id          String    @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
   /// GitHub event type (e.g. "push", "pull_request", "issues").
-  event       String
+  event String
 
   /// Event sub-action (e.g. "opened", "synchronize", null for push).
-  action      String?
+  action String?
 
   /// The full webhook payload, stored as a JSON document.
-  payload     Json
+  payload Json
 
   /// Processing status: pending, processing, completed, failed,
   /// rate_limited, or dlq (dead-letter queue).
-  status      String    @default("pending")
+  status String @default("pending")
 
   /// Error message from the last failed processing attempt.
-  error       String?   @db.Text
+  error String? @db.Text
 
   /// X-GitHub-Delivery header value, used for delivery deduplication.
-  deliveryId  String?   @map("delivery_id")
+  deliveryId String? @map("delivery_id")
 
   /// Number of processing attempts made so far.
-  retryCount  Int       @default(0) @map("retry_count")
+  retryCount Int @default(0) @map("retry_count")
 
   /// Maximum processing attempts before moving to "failed" status.
-  maxRetries  Int       @default(3) @map("max_retries")
+  maxRetries Int @default(3) @map("max_retries")
 
   /// Scheduled time for the next retry (null when not awaiting retry).
   nextRetryAt DateTime? @map("next_retry_at")
 
   /// Timestamp of when this row was created.
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   /// Timestamp of the last update to this row.
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([deliveryId])
   @@index([status, createdAt])
@@ -677,8 +678,8 @@ model RateLimit {
   points    Int      @default(0)
   expiresAt DateTime @map("expires_at")
 
-  @@index([key])
   @@unique([key, expiresAt])
+  @@index([key])
   @@index([expiresAt], name: "rate_limits_expires_at_idx")
   @@map("rate_limits")
 }
@@ -760,7 +761,7 @@ model AuditLog {
   details        Json
   createdAt      DateTime @default(now()) @map("created_at")
 
-  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([organizationId, createdAt(sort: Desc)])
@@ -822,14 +823,14 @@ model RepositoryKnowledge {
 /// MFA configuration for TOTP-based Multi-Factor Authentication.
 /// Stores the encrypted TOTP secret and hashed backup codes per user.
 model ApiKey {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @map("user_id")
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
   name       String
-  hashedKey  String   @unique @map("hashed_key")
-  scopes     Json     @default("[]")
-  expiresAt  DateTime @map("expires_at")
+  hashedKey  String    @unique @map("hashed_key")
+  scopes     Json      @default("[]")
+  expiresAt  DateTime  @map("expires_at")
   lastUsedAt DateTime? @map("last_used_at")
-  createdAt  DateTime @default(now()) @map("created_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -839,21 +840,21 @@ model ApiKey {
 }
 
 model MfaConfig {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @unique @map("user_id")
+  id             Int       @id @default(autoincrement())
+  userId         Int       @unique @map("user_id")
   /// Base32-encoded TOTP secret (encrypted at rest via application-layer encryption)
-  totpSecret    String   @map("totp_secret") @db.Text
-  tokenEncrypted Boolean @default(false) @map("token_encrypted")
+  totpSecret     String    @map("totp_secret") @db.Text
+  tokenEncrypted Boolean   @default(false) @map("token_encrypted")
   /// Whether TOTP MFA is active for this user
-  isEnabled     Boolean  @default(false) @map("is_enabled")
+  isEnabled      Boolean   @default(false) @map("is_enabled")
   /// One-time backup codes (stored as bcrypt hashes, comma-separated)
-  backupCodes   String?  @map("backup_codes") @db.Text
+  backupCodes    String?   @map("backup_codes") @db.Text
   /// Timestamp of the last successful MFA verification
   lastVerifiedAt DateTime? @map("last_verified_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("mfa_configs")

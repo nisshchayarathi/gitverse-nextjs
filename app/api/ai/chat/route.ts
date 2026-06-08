@@ -24,6 +24,9 @@ import {
 // Allowed roles in the conversation history
 const ALLOWED_MESSAGE_ROLES = new Set(["user", "model", "assistant"]);
 
+const AI_CHAT_RATE_LIMIT = process.env.AI_CHAT_RATE_LIMIT ? parseInt(process.env.AI_CHAT_RATE_LIMIT, 10) : 30;
+const AI_CHAT_WINDOW_MS = process.env.AI_CHAT_WINDOW_MS ? parseInt(process.env.AI_CHAT_WINDOW_MS, 10) : 60_000;
+
 function parseKnowledgeArray(value: any): string[] {
   if (Array.isArray(value)) {
     return value;
@@ -79,8 +82,8 @@ export async function POST(request: NextRequest) {
       String(user.userId),
       "userId",
       "chat",
-      30,
-      60_000,
+      AI_CHAT_RATE_LIMIT,
+      AI_CHAT_WINDOW_MS,
     );
     if (!allowed) {
       return NextResponse.json(

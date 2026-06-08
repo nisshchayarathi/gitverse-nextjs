@@ -29,7 +29,6 @@ import {
   EmptyState,
   Modal,
 } from "@/components/ui";
-import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
 import { buildApiUrl } from "@/services/apiConfig";
@@ -341,16 +340,6 @@ export default function Settings() {
       title: "Avatar Updated",
       description: 'Click "Save Changes" to confirm the update',
     });
-  };
-
-  const handleDeleteAccount = async () => {
-    if (isDeletingAccount) return;
-    if (deleteConfirmText !== "DELETE") return;
-
-    setShowDeleteModal(false);
-    setDeleteConfirmText("");
-  const handleDeleteAccount = () => {
-    setShowDeleteModal(true);
   };
 
   const confirmDeleteAccount = async () => {
@@ -868,49 +857,6 @@ export default function Settings() {
             )}
 
             {/* Danger Zone Tab */}
-            {/* Delete Account Confirmation Modal */}
-{showDeleteModal && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 space-y-4">
-      <h2 className="text-lg font-semibold text-destructive flex items-center gap-2">
-        <Trash2 className="h-5 w-5" />
-        Delete Account
-      </h2>
-      <p className="text-sm text-muted-foreground">
-        This action is <strong>permanent</strong> and cannot be undone. All your repositories, analysis data, and integrations will be deleted.
-      </p>
-      <div className="space-y-2">
-        <label className="text-sm font-medium">
-          Type <strong>DELETE</strong> to confirm:
-        </label>
-        <Input
-          value={deleteConfirmText}
-          onChange={(e) => setDeleteConfirmText(e.target.value)}
-          placeholder="DELETE"
-          className="border-destructive/50"
-        />
-      </div>
-      <div className="flex gap-3 justify-end">
-        <Button
-          variant="outline"
-          onClick={() => {
-            setShowDeleteModal(false);
-            setDeleteConfirmText("");
-          }}
-        >
-          Cancel
-        </Button>
-        <Button
-          variant="destructive"
-          onClick={handleDeleteAccount}
-          disabled={deleteConfirmText !== "DELETE" || isDeletingAccount}
-        >
-          {isDeletingAccount ? "Deleting..." : "Delete Account"}
-        </Button>
-      </div>
-    </div>
-  </div>
-)}
             {activeTab === "danger" && (
               <Card className="glass border-destructive/50">
                 <CardHeader>

@@ -120,6 +120,15 @@ export default function DependencyRiskPanel({ repositoryId, className = "" }: De
     return deps;
   }, [report, scopeFilter, searchQuery]);
 
+  const riskDistribution = useMemo(() => {
+    const dependencies = report?.dependencies ?? [];
+    const dist: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, none: 0 };
+    for (const d of dependencies) {
+      dist[d.riskLevel] = (dist[d.riskLevel] || 0) + 1;
+    }
+    return dist;
+  }, [report]);
+
   if (loading) {
     return (
       <Card className={`glass border border-border/70 ${className}`}>
@@ -154,15 +163,7 @@ export default function DependencyRiskPanel({ repositoryId, className = "" }: De
 
   if (!report) return null;
 
-  const { overallScore, overallRiskLevel, totalDependencies, vulnerableCount, outdatedCount, dependencies } = report;
-
-  const riskDistribution = useMemo(() => {
-    const dist: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, none: 0 };
-    for (const d of dependencies) {
-      dist[d.riskLevel] = (dist[d.riskLevel] || 0) + 1;
-    }
-    return dist;
-  }, [dependencies]);
+  const { overallScore, overallRiskLevel, totalDependencies, vulnerableCount, outdatedCount } = report;
 
   return (
     <Card className={`glass border border-border/70 ${className}`}>
