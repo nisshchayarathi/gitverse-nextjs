@@ -126,6 +126,8 @@ GitVerse is designed to make contributing to unfamiliar repos easier:
 
 That’s the MVP: turn repo complexity into a contributor roadmap.
 
+- Includes a Contributor Journey Simulator that generates category-specific learning paths and ranked file recommendations.
+
 ## Tech stack
 
 - Next.js 14 (App Router), React, TypeScript, Tailwind
