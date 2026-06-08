@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, EmptyState }
 import { InsightCard } from "./InsightCard";
 import { RepositorySummaryCard } from "./RepositorySummaryCard";
 import { deriveRepositoryInsights } from "../../lib/repositoryInsights";
+import DependencyRiskPanel from "./DependencyRiskPanel";
 import { BarChart3 } from "lucide-react";
 
 interface RepositoryInsightsDashboardProps {
@@ -23,6 +24,7 @@ export function RepositoryInsightsDashboard({
     return deriveRepositoryInsights(repositoryData);
   }, [repositoryData]);
 
+  const repoId = repositoryData?.id ? Number(repositoryData.id) : null;
   const hasData = (repositoryData?.files?.length || 0) > 0;
 
   if (!hasData) {
@@ -73,6 +75,9 @@ export function RepositoryInsightsDashboard({
           ))}
         </div>
       </div>
+
+      {/* Dependency Risk Panel */}
+      {repoId && <DependencyRiskPanel repositoryId={repoId} />}
 
       {/* Learning Tip */}
       <div className="rounded-lg border border-amber-300/40 bg-amber-500/5 p-4 space-y-2">

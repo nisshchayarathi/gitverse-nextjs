@@ -4,13 +4,11 @@ import "@/lib/env";
 import { ReactNode } from "react";
 import { Metadata } from "next";
 import { Inter, Source_Sans_3 } from "next/font/google";
-import { ThemeProvider } from "@/context/ThemeContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
 import { Toaster } from "@/components/ui/toaster";
-import { ScrollToTop } from "@/components/ui/ScrollToTop";
-import { FocusRingManager } from "@/components/ui/FocusRingManager";
-import ProgressBarProvider from "@/components/providers/ProgressBarProvider";
+import { SessionExpiryHandler } from "@/components/auth/SessionExpiryHandler";
 import "./globals.css";
 
 const inter = Inter({
@@ -51,6 +49,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ThemeProvider>
           <NextAuthProvider>
             <AuthProvider>
+<<<<<<< HEAD
               <FocusRingManager />
               <ProgressBarProvider>
                 <main id="main-content">
@@ -62,6 +61,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
               <Toaster />
               <ScrollToTop />
+=======
+              <SessionExpiryHandler />
+              {children}
+              <Toaster />
+>>>>>>> upstream/main
             </AuthProvider>
           </NextAuthProvider>
         </ThemeProvider>

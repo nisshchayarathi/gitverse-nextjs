@@ -184,13 +184,13 @@ describe("internalAuth utilities", () => {
   describe("validateRequiredSecrets", () => {
     it("returns empty array when all secrets are set in development", () => {
       process.env.INTERNAL_WORKER_SECRET = "worker-secret";
-      process.env.NODE_ENV = "development";
+      (process.env as any).NODE_ENV = "development";
 
       expect(validateRequiredSecrets()).toEqual([]);
     });
 
     it("returns missing secrets in production", () => {
-      process.env.NODE_ENV = "production";
+      (process.env as any).NODE_ENV = "production";
       delete process.env.INTERNAL_WORKER_SECRET;
       delete process.env.ANALYSIS_RUNNER_SECRET;
 
@@ -200,7 +200,7 @@ describe("internalAuth utilities", () => {
     });
 
     it("does not require ANALYSIS_RUNNER_SECRET in development", () => {
-      process.env.NODE_ENV = "development";
+      (process.env as any).NODE_ENV = "development";
       process.env.INTERNAL_WORKER_SECRET = "worker-secret";
       delete process.env.ANALYSIS_RUNNER_SECRET;
 
@@ -211,7 +211,7 @@ describe("internalAuth utilities", () => {
 
   describe("validateRequiredAnalysisSecrets", () => {
     it("returns error when ANALYSIS_RUNNER_SECRET is not set in production", () => {
-      process.env.NODE_ENV = "production";
+      (process.env as any).NODE_ENV = "production";
       delete process.env.ANALYSIS_RUNNER_SECRET;
 
       const result = validateRequiredAnalysisSecrets();
@@ -220,7 +220,7 @@ describe("internalAuth utilities", () => {
     });
 
     it("returns warning when ANALYSIS_RUNNER_SECRET is not set in development", () => {
-      process.env.NODE_ENV = "development";
+      (process.env as any).NODE_ENV = "development";
       delete process.env.ANALYSIS_RUNNER_SECRET;
 
       const result = validateRequiredAnalysisSecrets();

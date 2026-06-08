@@ -18,9 +18,8 @@ test.describe('Search Page – Authentication Guard', () => {
 
 test.describe('Search Page – Structure', () => {
 
-  test.beforeEach(async ({ page }) => {
-    // Navigate directly; if redirected to login that is fine —
-    // the structure tests below account for both states
+  test.beforeEach(async ({ page, context }) => {
+    await context.addCookies([{ name: 'mock-session', value: 'true', domain: 'localhost', path: '/' }]);
     await page.goto('/search')
   })
 
@@ -43,7 +42,8 @@ test.describe('Search Page – Structure', () => {
 
 test.describe('Search Page – Input Behaviour', () => {
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    await context.addCookies([{ name: 'mock-session', value: 'true', domain: 'localhost', path: '/' }]);
     await page.goto('/search')
   })
 
@@ -86,7 +86,8 @@ test.describe('Search Page – Input Behaviour', () => {
 
 test.describe('Search Page – Empty/Invalid Submission', () => {
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    await context.addCookies([{ name: 'mock-session', value: 'true', domain: 'localhost', path: '/' }]);
     await page.goto('/search')
   })
 
@@ -127,6 +128,9 @@ test.describe('Search Page – Empty/Invalid Submission', () => {
 })
 
 test.describe('Search Page – Responsive Design', () => {
+  test.beforeEach(async ({ context }) => {
+    await context.addCookies([{ name: 'mock-session', value: 'true', domain: 'localhost', path: '/' }]);
+  })
 
   test('should render correctly on mobile (375px)', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })

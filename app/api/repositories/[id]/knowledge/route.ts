@@ -45,7 +45,10 @@ export async function GET(
       };
     }
 
-    return NextResponse.json({ knowledge: formattedKnowledge });
+    return NextResponse.json({
+      knowledge: formattedKnowledge,
+      configWarning: repository.configWarning,
+    });
   } catch (error: any) {
     console.error("Failed to fetch repository knowledge:", error);
     return NextResponse.json({ error: "Failed to fetch repository knowledge" }, { status: 500 });

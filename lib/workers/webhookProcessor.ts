@@ -22,6 +22,7 @@ import { CheckRecoveryService } from "@/lib/services/check-recovery";
 import { PRImpactAnalysisService } from "@/lib/services/prImpactAnalysisService";
 import { RepositorySyncQueue } from "@/lib/services/repositorySyncQueue";
 import { classifyRetry } from "@/lib/utils/retry";
+import { generateWebhookKey, completeIdempotency, failIdempotency, releaseIdempotency } from "@/lib/utils/idempotency";
 
 
 
@@ -39,15 +40,22 @@ export async function processWebhookJob(eventId: string) {
   }
 
   if (webhookEvent.status !== "pending") {
-    // Already processed, ignore
     return { ok: true, ignored: true, reason: "already_processed" };
   }
 
-  // Mark as processing
-  await prisma.webhookEvent.update({
-    where: { id: eventId },
+  const { count } = await prisma.webhookEvent.updateMany({
+    where: { id: eventId, status: "pending" },
     data: { status: "processing" },
   });
+
+  if (count === 0) {
+    return { ok: true, ignored: true, reason: "already_processed" };
+  }
+
+  const deliveryId = webhookEvent.deliveryId;
+  const idempotencyKey = deliveryId ? generateWebhookKey(deliveryId, webhookEvent.event, webhookEvent.action || undefined) : null;
+  const markIdempotentCompleted = async () => { if (idempotencyKey) await completeIdempotency(idempotencyKey).catch(() => {}); };
+  const markIdempotentFailed = async () => { if (idempotencyKey) await failIdempotency(idempotencyKey).catch(() => {}); };
 
   const timeoutEstimator = new TimeoutEstimatorService();
   
@@ -81,6 +89,7 @@ export async function processWebhookJob(eventId: string) {
     });
 
     if (!enabledRepo) {
+      await markIdempotentCompleted();
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "completed", error: "Repo not enabled" },
@@ -98,6 +107,7 @@ export async function processWebhookJob(eventId: string) {
 
     // 1. AI Kill Switch Check
     if (process.env.DISABLE_AI_ANALYSIS === "true") {
+      await markIdempotentCompleted();
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "completed", error: "AI analysis is globally disabled" },
@@ -129,6 +139,7 @@ export async function processWebhookJob(eventId: string) {
     if (webhookEvent.event === "push") {
       const enqueued = await RepositorySyncQueue.enqueueSyncJob(enabledRepo.id, "push");
       
+      await markIdempotentCompleted();
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "completed" },
@@ -158,6 +169,7 @@ export async function processWebhookJob(eventId: string) {
         githubToken: installationToken,
       });
 
+      await markIdempotentCompleted();
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "completed" },
@@ -219,6 +231,7 @@ export async function processWebhookJob(eventId: string) {
       });
     } catch (e: any) {
       if (e?.code === "P2002") {
+        await markIdempotentCompleted();
         await prisma.webhookEvent.update({
           where: { id: eventId },
           data: { status: "completed", error: "Already reviewed (deduped)" },
@@ -352,6 +365,7 @@ export async function processWebhookJob(eventId: string) {
       const checkSummary = CheckSummaryService.generateSummary(finalPolicyOutput);
       await githubChecks.completeCheckRun(owner, repo, checkRunId, finalPolicyOutput.status, checkSummary);
 
+      await markIdempotentCompleted();
       await prisma.webhookEvent.update({
         where: { id: eventId },
         data: { status: "completed" },
@@ -383,6 +397,12 @@ export async function processWebhookJob(eventId: string) {
       maxRetries: webhookEvent?.maxRetries ?? 3,
       error,
     });
+
+    if (retryDecision.shouldRetry) {
+      if (idempotencyKey) await releaseIdempotency(idempotencyKey).catch(() => {});
+    } else {
+      await markIdempotentFailed();
+    }
 
     await prisma.webhookEvent.update({
       where: { id: eventId },

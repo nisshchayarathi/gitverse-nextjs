@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { decryptToken } from "@/lib/utils/tokenEncryption";
+import { decryptToken } from "@/lib/utils/envelopeEncryption";
 
 export async function getDecryptedGitHubToken(userId: number): Promise<string | null> {
   const account = await prisma.gitHubAccount.findUnique({
@@ -10,7 +10,7 @@ export async function getDecryptedGitHubToken(userId: number): Promise<string | 
   if (!account?.accessToken) return null;
 
   if (account.tokenEncrypted) {
-    return decryptToken(account.accessToken);
+    return await decryptToken(account.accessToken);
   }
 
   return account.accessToken;

@@ -9,7 +9,7 @@ function makePatch(overrides: Record<string, unknown> = {}) {
     startLine: 1,
     endLine: 1,
     confidenceScore: 90,
-    status: "pending" as const,
+    status: "valid" as const,
     ...overrides,
   };
 }

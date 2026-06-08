@@ -15,6 +15,7 @@ export default function RepositoryKnowledgeSettings() {
   const params = useParams();
   const repositoryId = params?.id as string;
   const [knowledge, setKnowledge] = useState<Knowledge | null>(null);
+  const [configWarning, setConfigWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export default function RepositoryKnowledgeSettings() {
       }
       const data = await response.json();
       setKnowledge(data.knowledge);
+      setConfigWarning(data.configWarning || null);
     } catch (err: any) {
       setError(err.message || "An error occurred");
     } finally {
@@ -48,6 +50,7 @@ export default function RepositoryKnowledgeSettings() {
       }
       const data = await response.json();
       setKnowledge(data.knowledge);
+      setConfigWarning(data.configWarning || null);
     } catch (err: any) {
       setError(err.message || "An error occurred while refreshing");
     } finally {
@@ -84,6 +87,16 @@ export default function RepositoryKnowledgeSettings() {
       {error && (
         <div className="bg-red-50 text-red-600 p-4 rounded mb-6 border border-red-200">
           {error}
+        </div>
+      )}
+
+      {configWarning && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-200 p-4 rounded mb-6 border border-amber-200 dark:border-amber-900/30 flex items-start gap-3">
+          <span className="text-amber-500 dark:text-amber-400 mt-0.5 text-lg">⚠️</span>
+          <div>
+            <h3 className="font-semibold text-sm">Configuration Warning</h3>
+            <p className="text-xs mt-1 opacity-90">{configWarning}</p>
+          </div>
         </div>
       )}
 

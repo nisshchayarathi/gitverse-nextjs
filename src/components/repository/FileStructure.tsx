@@ -834,8 +834,8 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     Total Modifications
                   </p>
                   <p className="text-lg font-semibold">
-                    {getFileCommitCount(selectedFile.path)}{" "}
-                    {getFileCommitCount(selectedFile.path) === 1
+                    {selectedFileStats?.commitCount || 0}{" "}
+                    {(selectedFileStats?.commitCount || 0) === 1
                       ? "commit"
                       : "commits"}
                   </p>
@@ -845,10 +845,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
                     Impact
                   </p>
                   <p className="text-lg font-semibold">
-                    {(
-                      getFileChangeStats(selectedFile.path).additions +
-                      getFileChangeStats(selectedFile.path).deletions
-                    ).toLocaleString()}{" "}
+                    {selectedFileTotalChanges.toLocaleString()}{" "}
                     changes
                   </p>
                 </div>
