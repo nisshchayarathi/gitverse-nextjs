@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth , sanitizeError } from "@/lib/middleware";
+import { requireAuth, sanitizeError } from "@/lib/middleware";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { apiError } from "@/lib/api-error";
 
@@ -17,13 +17,24 @@ export async function GET(
 
     const job = await analysisJobService.getJob({ jobId, userId: user.userId });
 
-  if (!job) {
-  return apiError(404, "Job not found");
-}
+    if (!job) {
+      return apiError(404, "Job not found");
+    }
 
-return NextResponse.json({ job });
-} catch (error: any) {
-  console.error("GET /analysis/:jobId error:", error);
-  return apiError(500, "Failed to fetch job");
-}
+    return NextResponse.json({ job });
+  } catch (error: any) {
+    console.error("GET /analysis/:jobId error:", error);
+
+    
+    if (
+      error.message?.toLowerCase().includes("unauthorized") || 
+      error.message?.toLowerCase().includes("session") ||
+      error.status === 401
+    ) {
+      return apiError(401, "Session expired. Please log in again.");
+    }
+
+   
+    return apiError(500, "Failed to fetch job");
+  }
 }
