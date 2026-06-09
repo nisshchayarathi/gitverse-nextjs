@@ -58,10 +58,24 @@ function validateEnv() {
   const hasKms = process.env.KMS_KEY_ID && process.env.KMS_KEY_ID.trim().length > 0;
   const hasLocalKey = process.env.TOKEN_ENCRYPTION_KEY && process.env.TOKEN_ENCRYPTION_KEY.trim().length > 0;
 
-  if (!hasKms && !hasLocalKey) {
-    throw new Error(
-      "❌ No encryption method configured. Set either KMS_KEY_ID (for KMS envelope encryption) or TOKEN_ENCRYPTION_KEY (for local key encryption)."
-    );
+  if (!hasKms) {
+    if (!hasLocalKey) {
+      throw new Error(
+        "❌ No encryption method configured. Set either KMS_KEY_ID (for KMS envelope encryption) or TOKEN_ENCRYPTION_KEY (for local key encryption)."
+      );
+    }
+    const key = process.env.TOKEN_ENCRYPTION_KEY!.trim();
+    if (key.length !== 64) {
+      throw new Error(
+        `❌ TOKEN_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes); got ${key.length} characters`
+      );
+    }
+    const HEX_REGEX = /^[0-9a-f]+$/i;
+    if (!HEX_REGEX.test(key)) {
+      throw new Error(
+        "❌ TOKEN_ENCRYPTION_KEY must be a valid hexadecimal string (0-9, a-f)"
+      );
+    }
   }
 
   console.log("✅ Environment variables validated successfully");
