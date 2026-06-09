@@ -5,11 +5,8 @@ import { PrismaNeonHttp, PrismaNeon } from "@prisma/adapter-neon";
 import { Pool as NeonPool } from "@neondatabase/serverless";
 import ws from "ws";
 
-<<<<<<< HEAD
-=======
 neonConfig.webSocketConstructor = ws;
 
->>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 type PrismaAdapterChoice = "pg" | "neon-http" | "neon-ws";
 
 function getAdapterChoice(connectionString: string): PrismaAdapterChoice {
@@ -102,11 +99,7 @@ function withRetry(client: PrismaClient) {
             try {
               return await query(args);
             } catch (error: any) {
-<<<<<<< HEAD
-              const isColdStartError =
-=======
               const isRetryableError =
->>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
                 error?.code === "P1001" ||
                 error?.code === "P2024" ||
                 error?.message?.toLowerCase().includes("timeout") ||
@@ -118,15 +111,9 @@ function withRetry(client: PrismaClient) {
                 throw error;
               }
               retries++;
-<<<<<<< HEAD
-              const backoff = Math.pow(2, retries) * 500; // 1s, 2s, 4s
-              console.warn(
-                `[Prisma Retry] DB connection error (attempt ${retries}/${maxRetries}). Retrying in ${backoff}ms...`,
-=======
               const backoff = Math.pow(2, retries) * baseBackoffMs;
               console.warn(
                 `[Prisma Retry] DB connection error (attempt ${retries}/${maxRetries}). Retrying in ${backoff}ms...`
->>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
               );
               await new Promise((r) => setTimeout(r, backoff));
             }
@@ -149,18 +136,6 @@ function createPrismaClient() {
   const poolConfig = getPoolConfig();
 
   if (adapterChoice === "neon-ws") {
-<<<<<<< HEAD
-    // PrismaNeon (v7) is a factory — its connect() creates the pool internally.
-    // Pass the pool config directly so it constructs the pool with the correct
-    // connectionString and webSocketConstructor.
-    const adapter = new PrismaNeon({
-      connectionString,
-      webSocketConstructor: ws,
-      connectionTimeoutMillis: normalizedConnectionTimeoutMs,
-      idleTimeoutMillis: process.env.NODE_ENV === "production" ? 30000 : 10000,
-      max: normalizedPoolMax,
-    } as any);
-=======
     const pool = new NeonPool({
       connectionString,
       connectionTimeoutMillis: poolConfig.connectionTimeoutMillis,
@@ -175,26 +150,16 @@ function createPrismaClient() {
     registerPool(pool as any, "neon-ws");
 
     const adapter = new PrismaNeon(pool as any);
->>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     return withRetry(
       new PrismaClient({
         adapter,
         log: ["error", "warn"],
-<<<<<<< HEAD
-      }),
-=======
       })
->>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     );
   }
 
   if (adapterChoice === "neon-http") {
-<<<<<<< HEAD
-    // 2. HTTP-based fetch adapter for Neon (no WebSocket, works in all bundled environments)
-    const adapter = new PrismaNeonHttp(connectionString, {});
-=======
     const adapter = new PrismaNeonHttp(connectionString, {} as any);
->>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     return withRetry(new PrismaClient({ adapter, log: ["error", "warn"] }));
   }
 
@@ -215,20 +180,11 @@ function createPrismaClient() {
   const adapter = new PrismaPg(pool);
   const prismaClientOptions: any = { adapter, log: ["error", "warn"] };
 
-<<<<<<< HEAD
-  return withRetry(
-    new PrismaClient({
-      adapter,
-      log: ["error", "warn"],
-    }),
-  );
-=======
   if (poolConfig.isTransactionMode) {
     prismaClientOptions.transactionOptions = { maxWait: 2000, timeout: 10000 };
   }
 
   return withRetry(new PrismaClient(prismaClientOptions));
->>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 }
 
 export type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
