@@ -28,6 +28,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui";
+import { toast } from "@/hooks/use-toast";
 
 
 export default function LandingPage() {
@@ -163,10 +164,21 @@ export default function LandingPage() {
       });
     }
 
-    // Demo-only CTA: keep it as UI (no navigation / no analysis).
     setIsLoading(true);
+    toast({
+      title: "Analysis queued",
+      description: "You'll be notified when the analysis is complete.",
+      type: "info",
+    });
+
+    // Demo-only CTA: keep it as UI (no navigation / no analysis).
     setTimeout(() => {
       setIsLoading(false);
+      toast({
+        title: "Analysis complete",
+        description: `${name || "Repository"} is ready to explore.`,
+        type: "success",
+      });
     }, 1500);
   };
 

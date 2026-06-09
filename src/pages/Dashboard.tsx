@@ -104,6 +104,11 @@ export default function Dashboard() {
       
       const triggerAutoAnalyze = async () => {
         setAnalyzing(true);
+        const pendingToast = toast({
+          title: "Analysis queued",
+          description: "You'll be notified when the analysis is complete.",
+          type: "info",
+        });
         try {
           const token = localStorage.getItem("gitverse_token");
           const cleanUrl = analyzeUrl.trim().replace(/\/$/, "").replace(/\.git$/, "");
@@ -131,6 +136,13 @@ export default function Dashboard() {
           );
 
           await fetchRepositories();
+
+          toast({
+            title: "Analysis complete",
+            description: `${name} is ready to explore.`,
+            type: "success",
+          });
+
           router.push(`/repo/${response.data.repository.id}`);
           setRepoUrl("");
         } catch (error: any) {
@@ -142,6 +154,7 @@ export default function Dashboard() {
           });
         } finally {
           setAnalyzing(false);
+          pendingToast.dismiss();
         }
       };
       
@@ -261,6 +274,11 @@ export default function Dashboard() {
     }
 
     setAnalyzing(true);
+    const pendingToast = toast({
+      title: "Analysis queued",
+      description: "You'll be notified when the analysis is complete.",
+      type: "info",
+    });
     try {
       const token = localStorage.getItem("gitverse_token");
 
@@ -297,6 +315,12 @@ export default function Dashboard() {
 
       await fetchRepositories();
 
+      toast({
+        title: "Analysis complete",
+        description: `${repoName} is ready to explore.`,
+        type: "success",
+      });
+
       router.push(`/repo/${response.data.repository.id}`);
 
       if (isExisting) {
@@ -319,6 +343,7 @@ export default function Dashboard() {
       });
     } finally {
       setAnalyzing(false);
+      pendingToast.dismiss();
     }
   };
   if (loading) {
