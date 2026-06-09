@@ -111,6 +111,26 @@ export function buildTreeFromFiles(
  * Prunes the deepest levels first. If at depth = 1 it still exceeds maxTokens, it truncates
  * the top-level files/directories count to strictly fit.
  */
+function getNodeLineLength(node: FileNode, indentLength: number): number {
+  if (node.type === "directory") {
+    return indentLength + 3 + node.name.length + 2; 
+  } else {
+    return indentLength + 3 + node.name.length + 10 + String(node.size || 0).length + 8;
+  }
+}
+
+function getTreeLengthAtDepth(nodes: FileNode[], maxDepth: number, currentDepth = 0, indentLength = 0): number {
+  if (currentDepth >= maxDepth) return 0;
+  let len = 0;
+  for (const node of nodes) {
+    len += getNodeLineLength(node, indentLength);
+    if (node.type === "directory" && node.children && node.children.length > 0) {
+      len += getTreeLengthAtDepth(node.children, maxDepth, currentDepth + 1, indentLength + 2);
+    }
+  }
+  return len;
+}
+
 export function truncateTree(
   tree: FileNode[],
   maxTokens: number
@@ -145,28 +165,32 @@ export function truncateTree(
     });
   };
 
-  // 1. Try pruning starting from a depth of 5 down to 1
+  // 1. Try finding optimal pruning depth (5 down to 1) using math length helper
+  let optimalDepth = -1;
   for (let depth = 5; depth >= 1; depth--) {
-    const cloned = cloneTree(tree);
-    const pruned = pruneToDepth(cloned, 0, depth);
-    const text = stringifyTree(pruned);
-    if (estimateTokens(text) <= maxTokens) {
-      return { truncatedTree: pruned, isTruncated: true };
+    const charLength = getTreeLengthAtDepth(tree, depth);
+    const tokens = Math.ceil(charLength / 4);
+    if (tokens <= maxTokens) {
+      optimalDepth = depth;
+      break;
     }
   }
 
+  if (optimalDepth !== -1) {
+    const pruned = pruneToDepth(tree, 0, optimalDepth);
+    return { truncatedTree: pruned, isTruncated: true };
+  }
+
   // 2. If depth 1 is still too large, prune top-level items sequentially until they fit
-  const topLevel = cloneTree(tree);
   const truncatedTopLevel: FileNode[] = [];
   let currentTokens = 0;
 
-  for (const node of topLevel) {
-    // For top-level directories, remove all children to fit minimally
+  for (const node of tree) {
     const minimalNode: FileNode =
       node.type === "directory" ? { ...node, children: [] } : node;
 
-    const nodeText = stringifyTree([minimalNode]);
-    const nodeTokens = estimateTokens(nodeText);
+    const nodeLength = getNodeLineLength(minimalNode, 0);
+    const nodeTokens = Math.ceil(nodeLength / 4);
 
     if (currentTokens + nodeTokens <= maxTokens) {
       truncatedTopLevel.push(minimalNode);
