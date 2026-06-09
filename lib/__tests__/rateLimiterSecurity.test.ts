@@ -424,3 +424,6 @@ describe("Rate limit namespace isolation — security critical", () => {
     expect(overLimit.remaining).toBe(0);
   });
 });
+
+export {};
+

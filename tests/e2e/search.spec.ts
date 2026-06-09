@@ -14,12 +14,10 @@ test.describe("Search Page – Authentication Guard", () => {
   });
 });
 
-test.describe("Search Page – Structure", () => {
-  test.beforeEach(async ({ page }) => {
-    // Navigate directly; if redirected to login that is fine —
-    // the structure tests below account for both states
-    await page.goto("/search");
-  });
+  test.beforeEach(async ({ page, context }) => {
+    await context.addCookies([{ name: 'mock-session', value: 'true', domain: 'localhost', path: '/' }]);
+    await page.goto('/search')
+  })
 
   test("should show a visible page body", async ({ page }) => {
     await expect(page.locator("body")).toBeVisible();
@@ -37,10 +35,10 @@ test.describe("Search Page – Structure", () => {
   });
 });
 
-test.describe("Search Page – Input Behaviour", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/search");
-  });
+  test.beforeEach(async ({ page, context }) => {
+    await context.addCookies([{ name: 'mock-session', value: 'true', domain: 'localhost', path: '/' }]);
+    await page.goto('/search')
+  })
 
   test("should display a search input field", async ({ page }) => {
     // Covers: input[type=search], input[type=text], input[placeholder*=search]
@@ -80,10 +78,10 @@ test.describe("Search Page – Input Behaviour", () => {
   });
 });
 
-test.describe("Search Page – Empty/Invalid Submission", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/search");
-  });
+  test.beforeEach(async ({ page, context }) => {
+    await context.addCookies([{ name: 'mock-session', value: 'true', domain: 'localhost', path: '/' }]);
+    await page.goto('/search')
+  })
 
   test("should handle empty form submission gracefully", async ({ page }) => {
     const submitBtn = page
@@ -116,22 +114,28 @@ test.describe("Search Page – Empty/Invalid Submission", () => {
     }
 
     // Should not navigate to a results/dashboard page with invalid input
-    await expect(page).not.toHaveURL(/dashboard|result|analyze/i);
-  });
-});
+    await expect(page).not.toHaveURL(/dashboard|result|analyze/i)
+  })
 
-test.describe("Search Page – Responsive Design", () => {
-  test("should render correctly on mobile (375px)", async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto("/search");
-    await expect(page.locator("body")).toBeVisible();
-    const input = page.locator("input").first();
-    await expect(input).toBeVisible({ timeout: 10000 });
-  });
+})
 
-  test("should render correctly on tablet (768px)", async ({ page }) => {
-    await page.setViewportSize({ width: 768, height: 1024 });
-    await page.goto("/search");
-    await expect(page.locator("body")).toBeVisible();
-  });
-});
+test.describe('Search Page – Responsive Design', () => {
+  test.beforeEach(async ({ context }) => {
+    await context.addCookies([{ name: 'mock-session', value: 'true', domain: 'localhost', path: '/' }]);
+  })
+
+  test('should render correctly on mobile (375px)', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await page.goto('/search')
+    await expect(page.locator('body')).toBeVisible()
+    const input = page.locator('input').first()
+    await expect(input).toBeVisible({ timeout: 10000 })
+  })
+
+  test('should render correctly on tablet (768px)', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 })
+    await page.goto('/search')
+    await expect(page.locator('body')).toBeVisible()
+  })
+
+})

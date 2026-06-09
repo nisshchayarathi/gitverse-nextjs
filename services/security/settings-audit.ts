@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 export interface SettingsChangeEntry {
   userId: number;
   repositoryId?: number;
-  organizationId?: number;
+  organizationId?: string;
   action: string;
   previousValue?: string;
   newValue?: string;
@@ -23,15 +23,16 @@ export class SettingsAuditService {
       await prisma.auditLog.create({
         data: {
           userId: entry.userId,
+          repositoryId: entry.repositoryId ?? null,
+          organizationId: entry.organizationId ?? null,
           action: entry.action,
-          details: JSON.stringify({
-            repositoryId: entry.repositoryId,
-            organizationId: entry.organizationId,
+          resource: "Settings",
+          details: {
             previousValue: entry.previousValue,
             newValue: entry.newValue,
             ipAddress: entry.ipAddress,
             timestamp: new Date().toISOString(),
-          }),
+          },
         },
       });
 
@@ -56,11 +57,7 @@ export class SettingsAuditService {
     limit: number = 50
   ) {
     return prisma.auditLog.findMany({
-      where: {
-        details: {
-          contains: `"repositoryId":${repositoryId}`,
-        },
-      },
+      where: { repositoryId },
       orderBy: { createdAt: "desc" },
       take: limit,
     });
@@ -70,15 +67,11 @@ export class SettingsAuditService {
    * Retrieves audit log entries for a specific organization.
    */
   public static async getLogsForOrganization(
-    organizationId: number,
+    organizationId: string,
     limit: number = 50
   ) {
     return prisma.auditLog.findMany({
-      where: {
-        details: {
-          contains: `"organizationId":${organizationId}`,
-        },
-      },
+      where: { organizationId },
       orderBy: { createdAt: "desc" },
       take: limit,
     });

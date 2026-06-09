@@ -96,7 +96,7 @@ describe("backupService", () => {
     it("runs pg_dump via exec and writes a compressed file", async () => {
       const content = "CREATE TABLE test (id int);\n";
       mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/backups\/(backup-.+?)\.sql/);
+        const m = cmd.match(/(backup-.+?)\.sql/);
         if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), content).then(() => ({ stdout: content, stderr: "" }));
         return Promise.resolve({ stdout: content, stderr: "" });
       });
@@ -112,7 +112,7 @@ describe("backupService", () => {
 
     it("writes a metadata JSON file alongside the backup", async () => {
       mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/backups\/(backup-.+?)\.sql/);
+        const m = cmd.match(/(backup-.+?)\.sql/);
         if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
         return Promise.resolve({ stdout: "data", stderr: "" });
       });
@@ -130,7 +130,7 @@ describe("backupService", () => {
     it("falls back to local storage when S3 bucket is not configured", async () => {
       delete process.env.BACKUP_S3_BUCKET;
       mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/backups\/(backup-.+?)\.sql/);
+        const m = cmd.match(/(backup-.+?)\.sql/);
         if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
         return Promise.resolve({ stdout: "data", stderr: "" });
       });
@@ -144,7 +144,7 @@ describe("backupService", () => {
       process.env.BACKUP_S3_BUCKET = "test-backup-bucket";
       process.env.BACKUP_S3_REGION = "us-east-1";
       mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/backups\/(backup-.+?)\.sql/);
+        const m = cmd.match(/(backup-.+?)\.sql/);
         if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
         return Promise.resolve({ stdout: "data", stderr: "" });
       });
@@ -161,7 +161,7 @@ describe("backupService", () => {
     it("logs and recovers when S3 upload fails", async () => {
       process.env.BACKUP_S3_BUCKET = "failing-bucket";
       mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/backups\/(backup-.+?)\.sql/);
+        const m = cmd.match(/(backup-.+?)\.sql/);
         if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
         return Promise.resolve({ stdout: "data", stderr: "" });
       });
@@ -184,7 +184,7 @@ describe("backupService", () => {
 
     it("generates unique backup IDs with timestamp and random suffix", async () => {
       mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/backups\/(backup-.+?)\.sql/);
+        const m = cmd.match(/(backup-.+?)\.sql/);
         if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
         return Promise.resolve({ stdout: "data", stderr: "" });
       });
@@ -198,14 +198,14 @@ describe("backupService", () => {
 
     it("sets a meaningful location path", async () => {
       mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/backups\/(backup-.+?)\.sql/);
+        const m = cmd.match(/(backup-.+?)\.sql/);
         if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
         return Promise.resolve({ stdout: "data", stderr: "" });
       });
 
       const result = await backupService.handleBackup();
       expect(result.location).toBeTruthy();
-      expect(result.location).toContain(BACKUP_DIR);
+      expect(result.location.replace(/\\/g, "/")).toContain(BACKUP_DIR.replace(/\\/g, "/"));
     });
 
     it("reports zero sizeBytes on failure", async () => {
@@ -218,7 +218,7 @@ describe("backupService", () => {
 
     it("cleanupOldBackups does not throw on empty backup dir", async () => {
       mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/backups\/(backup-.+?)\.sql/);
+        const m = cmd.match(/(backup-.+?)\.sql/);
         if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
         return Promise.resolve({ stdout: "data", stderr: "" });
       });

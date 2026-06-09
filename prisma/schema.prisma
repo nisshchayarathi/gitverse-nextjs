@@ -228,6 +228,8 @@ model Repository {
   size                         Int                           @default(0) // Size in bytes
   lastAnalyzedAt               DateTime?                     @map("last_analyzed_at")
   status                       String                        @default("pending") // pending, analyzing, completed, failed
+  isPinned                     Boolean                       @default(false) @map("is_pinned")
+  pinnedAt                     DateTime?                     @map("pinned_at")
   userId                       Int                           @map("user_id")
   user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
   parentId                     Int?                          @map("parent_id")

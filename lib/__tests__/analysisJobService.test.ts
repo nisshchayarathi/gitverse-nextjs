@@ -10,7 +10,7 @@ jest.mock("../prisma", () => ({
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
-      updateMany: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
   }),
 }));
@@ -36,7 +36,7 @@ function asMock<T>(fn: T): jest.Mock {
   return fn as any;
 }
 
-const { AnalysisJobService } = require("../services/analysisJobService");
+import { AnalysisJobService } from "../services/analysisJobService";
 
 beforeEach(() => {
   jest.clearAllMocks();

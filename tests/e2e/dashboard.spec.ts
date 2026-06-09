@@ -10,11 +10,11 @@ test.describe("Dashboard Page Tests", () => {
     });
   });
 
-  test.describe("Dashboard Page Structure", () => {
-    test.beforeEach(async ({ page }) => {
-      await page.goto("/login");
-      await page.goto("/dashboard");
-    });
+  test.describe('Dashboard Page Structure', () => {
+    test.beforeEach(async ({ page, context }) => {
+      await context.addCookies([{ name: 'mock-session', value: 'true', domain: 'localhost', path: '/' }]);
+      await page.goto('/dashboard');
+    })
 
     test("should render dashboard layout", async ({ page }) => {
       await expect(page.locator("body")).toBeVisible({ timeout: 10000 });
@@ -39,22 +39,22 @@ test.describe("Dashboard Page Tests", () => {
     });
   });
 
-  test.describe("Dashboard Functionality", () => {
-    test("should load recent repositories section", async ({ page }) => {
-      await page.goto("/login");
-      await page.goto("/dashboard");
-      const recentSection = page.locator("text=/recent/i").first();
-      await expect(recentSection)
-        .toBeVisible({ timeout: 10000 })
-        .catch(() => {
-          expect(page.locator("body")).toBeVisible();
-        });
-    });
+  test.describe('Dashboard Functionality', () => {
+    test.beforeEach(async ({ context }) => {
+      await context.addCookies([{ name: 'mock-session', value: 'true', domain: 'localhost', path: '/' }]);
+    })
 
-    test("should handle empty state gracefully", async ({ page }) => {
-      await page.goto("/login");
-      await page.goto("/dashboard");
-      await expect(page.locator("body")).toBeVisible();
-    });
-  });
-});
+    test('should load recent repositories section', async ({ page }) => {
+      await page.goto('/dashboard')
+      const recentSection = page.locator('text=/recent/i').first()
+      await expect(recentSection).toBeVisible({ timeout: 10000 }).catch(() => {
+        expect(page.locator('body')).toBeVisible()
+      })
+    })
+
+    test('should handle empty state gracefully', async ({ page }) => {
+      await page.goto('/dashboard')
+      await expect(page.locator('body')).toBeVisible()
+    })
+  })
+})

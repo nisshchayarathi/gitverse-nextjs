@@ -196,8 +196,10 @@ describe("GitService abort signal handling", () => {
         { signal: controller.signal },
       );
 
-      await new Promise((r) => setImmediate(r));
-      await new Promise((r) => setImmediate(r));
+      while (mockSpawn.mock.calls.length === 0) {
+        await new Promise(r => setImmediate(r));
+      }
+
       jest.useFakeTimers();
       controller.abort();
       jest.advanceTimersByTime(6000);
@@ -218,15 +220,13 @@ describe("GitService abort signal handling", () => {
         { signal: controller.signal },
       );
 
-      // Yield multiple times for the async function to reach spawn
-      for (let i = 0; i < 10; i++) {
-        await new Promise((r) => setImmediate(r));
+      while (mockSpawn.mock.calls.length === 0) {
+        await new Promise(r => setImmediate(r));
       }
+
       (proc.stderr as Readable).push(null);
       (proc.stdout as Readable).push(null);
-      for (let i = 0; i < 5; i++) {
-        await new Promise((r) => setImmediate(r));
-      }
+      await new Promise(r => setImmediate(r));
       proc.emit("close", 0);
 
       const result = await promise;

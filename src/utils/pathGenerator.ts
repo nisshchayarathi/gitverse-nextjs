@@ -129,8 +129,8 @@ export function generateContributionRoadmap(
 }
 
 export function findBeginnerIssues(
-  focusArea: FocusArea,
   repository?: RepositoryAnalysisData,
+  focusArea: FocusArea = "Frontend",
 ): RecommendedIssue[] {
   const candidateIssues = repository?.issues || [];
 

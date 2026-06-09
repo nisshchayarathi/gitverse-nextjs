@@ -74,6 +74,8 @@ describe("Workflow concurrency guarantees", () => {
           status: "QUEUED",
           lockedBy: null,
           lockedAt: null,
+          lockExpiresAt: null,
+          lockToken: null,
         },
       });
     });
@@ -104,6 +106,7 @@ describe("Workflow concurrency guarantees", () => {
       mockUpdateMany.mockResolvedValue({ count: 0 });
       mockTransaction.mockImplementation(async (cb: any) => {
         const tx = {
+          $executeRaw: jest.fn().mockResolvedValue(undefined),
           $queryRaw: jest.fn().mockResolvedValue([]),
           analysisJob: {
             findUnique: jest.fn().mockResolvedValue(null),
@@ -138,6 +141,7 @@ describe("Workflow concurrency guarantees", () => {
       mockUpdateMany.mockResolvedValue({ count: 0 });
       mockTransaction.mockImplementation(async (cb: any) => {
         const tx = {
+          $executeRaw: jest.fn().mockResolvedValue(undefined),
           $queryRaw: jest.fn().mockResolvedValue([{ id: "job-1" }]),
           analysisJob: {
             findUnique: jest.fn().mockResolvedValue(mockJob),
@@ -157,6 +161,7 @@ describe("Workflow concurrency guarantees", () => {
       mockUpdateMany.mockResolvedValue({ count: 0 });
       mockTransaction.mockImplementation(async (cb: any) => {
         const tx = {
+          $executeRaw: jest.fn().mockResolvedValue(undefined),
           $queryRaw: jest.fn().mockResolvedValue([]),
           analysisJob: {
             findUnique: jest.fn().mockResolvedValue(null),
@@ -310,6 +315,7 @@ describe("Workflow concurrency guarantees", () => {
       mockUpdateMany.mockResolvedValue({ count: 0 });
       mockTransaction.mockImplementation(async (cb: any) => {
         const tx = {
+          $executeRaw: jest.fn().mockResolvedValue(undefined),
           $queryRaw: jest.fn().mockResolvedValue([{ id: "job-lifecycle" }]),
           analysisJob: {
             findUnique: jest.fn().mockResolvedValue(mockJob),
@@ -341,6 +347,7 @@ describe("Workflow concurrency guarantees", () => {
           lockedAt: null,
           lockedBy: null,
           lockExpiresAt: null,
+          lockToken: null,
         },
       });
     });
@@ -367,6 +374,7 @@ describe("Workflow concurrency guarantees", () => {
           lockedAt: null,
           lockedBy: null,
           lockExpiresAt: null,
+          lockToken: null,
         },
       });
     });
@@ -392,6 +400,7 @@ describe("Workflow concurrency guarantees", () => {
           lockedAt: null,
           lockedBy: null,
           lockExpiresAt: null,
+          lockToken: null,
         },
       });
     });
@@ -448,6 +457,7 @@ describe("Workflow concurrency guarantees", () => {
           lockedAt: null,
           lockedBy: null,
           lockExpiresAt: null,
+          lockToken: null,
         },
       });
     });
@@ -460,3 +470,6 @@ describe("Workflow concurrency guarantees", () => {
     });
   });
 });
+
+export {};
+

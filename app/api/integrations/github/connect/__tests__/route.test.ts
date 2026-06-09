@@ -104,7 +104,7 @@ describe("POST /api/integrations/github/connect", () => {
       updatedAt: new Date(),
     });
     mockEncryptToken.mockImplementation(async (token: string) => `encrypted:${token}`);
-    (GitHubService as jest.Mock).mockImplementation(() => ({
+    (GitHubService as any).mockImplementation(() => ({
       getAuthenticatedUser: jest.fn().mockResolvedValue({ id: 12345, login: "testuser" }),
     }));
   });
