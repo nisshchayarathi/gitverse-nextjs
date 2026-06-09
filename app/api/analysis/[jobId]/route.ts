@@ -25,7 +25,8 @@ export async function GET(
   } catch (error: any) {
     console.error("GET /analysis/:jobId error:", error);
 
-    if (error.status === 401 || error.statusCode === 401) {
+   
+    if (error && (error.status === 401 || error.statusCode === 401)) {
       return apiError(401, "Session expired. Please log in again.");
     }
 
