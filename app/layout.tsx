@@ -5,7 +5,7 @@ import { Inter, Source_Sans_3 } from "next/font/google";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
-import SessionGuard from "@/components/SessionGuard"; 
+import SessionGuard from "@/components/auth/SessionGuard"; 
 import { Toaster } from "@/components/ui/toaster";
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import { FocusRingManager } from "@/components/ui/FocusRingManager";
