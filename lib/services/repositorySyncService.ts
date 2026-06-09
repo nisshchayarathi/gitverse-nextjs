@@ -18,7 +18,11 @@ export class RepositorySyncService {
       }
 
       const github = new GitHubService(githubToken);
-      const [owner, repo] = repoRecord.url.split("/").slice(-2); // naive extract
+      const ownerRepo = GitHubService.parseGitHubUrl(repoRecord.url);
+      if (!ownerRepo) {
+        throw new Error("Invalid GitHub repository URL");
+      }
+      const { owner, repo } = ownerRepo;
 
       // 1. Fetch latest changes (Incremental push simulation)
       // Since a full commit history sync is expensive, we would theoretically just fetch the push payload diffs
