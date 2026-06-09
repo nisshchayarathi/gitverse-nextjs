@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import redis from "../redis";
 import CircuitBreaker from "opossum";
 import { LRUCache } from "lru-cache";
 
@@ -58,22 +58,6 @@ export const RATE_LIMITS = {
   ANALYZE_REPOSITORY: { namespace: "repo:submission", maxRequests: 5, windowMs: 60_000 },
 } as const;
 
-let lastCleanupAt = 0;
-const CLEANUP_INTERVAL_MS = 60_000;
-
-async function maybeCleanupExpired(): Promise<void> {
-  const now = Date.now();
-  if (now - lastCleanupAt < CLEANUP_INTERVAL_MS) return;
-  lastCleanupAt = now;
-  try {
-    await prisma.rateLimit.deleteMany({
-      where: { expiresAt: { lt: new Date() } },
-    });
-  } catch {
-    // Best-effort cleanup, never block a rate limit check for this
-  }
-}
-
 function buildRateLimitKey(namespace: string, identifier: string): string {
   const sanitized = identifier.replace(/[^\w@.:\-]/g, "_");
   return `${namespace}:${sanitized}`;
@@ -94,20 +78,25 @@ const fallbackCache = new LRUCache<string, { count: number; resetAt: number }>({
   ttl: 1000 * 60 * 60,
 });
 
-const dbLimiterCircuit = new CircuitBreaker(
-  async ({ key, config, expiresAt }: { key: string, config: RateLimitConfig, expiresAt: Date }) => {
-    void maybeCleanupExpired();
+const redisLimiterCircuit = new CircuitBreaker(
+  async ({ key, config, expiresAt, ttlMs }: { key: string, config: RateLimitConfig, expiresAt: Date, ttlMs: number }) => {
+    const multi = redis.multi();
+    multi.incr(key);
+    multi.pexpire(key, Math.max(1, ttlMs));
+    const results = await multi.exec();
 
-    const result = await prisma.rateLimit.upsert({
-      where: { key_expiresAt: { key, expiresAt } },
-      update: { points: { increment: 1 } },
-      create: { key, points: 1, expiresAt },
-    });
+    if (!results || !results[0]) {
+      throw new Error("Redis transaction failed");
+    }
 
-    const allowed = result.points <= config.maxRequests;
+    const [err, val] = results[0];
+    if (err) throw err;
+    const points = val as number;
+
+    const allowed = points <= config.maxRequests;
     return {
       allowed,
-      remaining: Math.max(0, config.maxRequests - result.points),
+      remaining: Math.max(0, config.maxRequests - points),
       resetAt: expiresAt.getTime(),
       limit: config.maxRequests,
     };
@@ -134,20 +123,12 @@ export async function checkRateLimit(
   const key = buildRateLimitKey(config.namespace, identifier);
   const now = Date.now();
   const expiresAt = getWindowExpiry(now, config.windowMs);
+  const ttlMs = expiresAt.getTime() - now;
 
   try {
-    return await dbLimiterCircuit.fire({ key, config, expiresAt }) as RateLimitResult;
+    return await redisLimiterCircuit.fire({ key, config, expiresAt, ttlMs }) as RateLimitResult;
   } catch (error: any) {
-    if (error?.code === "P2002") {
-      return {
-        allowed: false,
-        remaining: 0,
-        resetAt: expiresAt.getTime(),
-        limit: config.maxRequests,
-      };
-    }
-
-    console.error("[RateLimit DB] Circuit Breaker opened or DB failed, falling back to LRU:", error.message);
+    console.error("[RateLimit Redis] Circuit Breaker opened or Redis failed, falling back to LRU:", error.message);
 
     try {
       const timeNow = Date.now();
@@ -170,7 +151,7 @@ export async function checkRateLimit(
         resetAt: record.resetAt,
       };
     } catch (fallbackErr) {
-      console.error("[RateLimit DB] LRU Fallback also failed:", fallbackErr);
+      console.error("[RateLimit Redis] LRU Fallback also failed:", fallbackErr);
       return {
         allowed: false,
         remaining: 0,
@@ -184,14 +165,11 @@ export async function checkRateLimit(
 
 /**
  * Reset module-level state between tests.
- * Clears the LRU cache, closes the circuit breaker, and resets the
- * cleanup interval guard so that the next call to maybeCleanupExpired
- * will run.
+ * Clears the LRU cache and closes the circuit breaker.
  */
 export function _resetStateForTesting(): void {
-  lastCleanupAt = 0;
   fallbackCache.clear();
-  dbLimiterCircuit.close();
+  redisLimiterCircuit.close();
 }
 
 /**
