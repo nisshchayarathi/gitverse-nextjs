@@ -25,16 +25,10 @@ export async function GET(
   } catch (error: any) {
     console.error("GET /analysis/:jobId error:", error);
 
-    
-    if (
-      error.message?.toLowerCase().includes("unauthorized") || 
-      error.message?.toLowerCase().includes("session") ||
-      error.status === 401
-    ) {
+    if (error.status === 401 || error.statusCode === 401) {
       return apiError(401, "Session expired. Please log in again.");
     }
 
-   
     return apiError(500, "Failed to fetch job");
   }
 }
