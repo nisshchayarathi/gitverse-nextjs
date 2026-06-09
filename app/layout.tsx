@@ -85,8 +85,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
         <ThemeProvider>
           <NextAuthProvider>
-            <SessionGuard> 
-              <AuthProvider>
+            <AuthProvider>
+              <SessionGuard>
                 <FocusRingManager />
                 <ProgressBarProvider>
                   <main id="main-content">
@@ -96,8 +96,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
                 <Toaster />
                 <ScrollToTop />
-              </AuthProvider>
-            </SessionGuard> 
+              </SessionGuard>
+            </AuthProvider> 
           </NextAuthProvider>
         </ThemeProvider>
       </body>
