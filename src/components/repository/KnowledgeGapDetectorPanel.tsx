@@ -169,7 +169,7 @@ export function KnowledgeGapDetectorPanel({ repository }: KnowledgeGapDetectorPa
           <div className="rounded-2xl border border-dashed border-border/60 bg-background/70 p-8 text-center">
             <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">
-              Click "Analyze Repository" to identify knowledge gaps and documentation opportunities.
+              Click &quot;Analyze Repository&quot; to identify knowledge gaps and documentation opportunities.
             </p>
           </div>
         )}

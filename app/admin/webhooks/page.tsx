@@ -43,10 +43,11 @@ export default function WebhookInspectorPage() {
 
   const take = 50;
 
-  const fetchEvents = useCallback(async (append = false) => {
+  const fetchEvents = useCallback(async (append = false, nextSkip?: number) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ take: String(take), skip: String(append ? skip : 0) });
+      const offset = append ? (nextSkip ?? skip) : 0;
+      const params = new URLSearchParams({ take: String(take), skip: String(offset) });
       if (statusFilter) params.set("status", statusFilter);
       if (eventFilter) params.set("event", eventFilter);
       if (idFilter) params.set("id", idFilter);
@@ -66,6 +67,7 @@ export default function WebhookInspectorPage() {
   useEffect(() => {
     setSkip(0);
     fetchEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, eventFilter, idFilter]);
 
   const toggleExpand = async (id: string) => {
@@ -302,8 +304,9 @@ export default function WebhookInspectorPage() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  setSkip((prev) => prev + take);
-                  fetchEvents(true);
+                  const next = skip + take;
+                  setSkip(next);
+                  fetchEvents(true, next);
                 }}
               >
                 Load more ({events.length} of {total})

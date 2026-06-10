@@ -264,10 +264,8 @@ export function GoodFirstIssueGenerator({
   repository,
   loading = false,
 }: GoodFirstIssueGeneratorProps) {
-  const files = (repository?.files || []) as RepositoryFile[];
-  const [selectedDifficulty, setSelectedDifficulty] = useState<
-    DifficultyCategory | "all"
-  >("all");
+  const files = useMemo(() => (repository?.files || []) as RepositoryFile[], [repository?.files]);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyCategory | "all">("all");
   const [showTips, setShowTips] = useState(true);
 
   const issues = useMemo(() => {
