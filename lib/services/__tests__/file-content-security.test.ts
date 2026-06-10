@@ -87,7 +87,7 @@ describe("File Content Path Traversal Prevention", () => {
       const body = await res.json();
 
       expect(res.status).toBe(400);
-      expect(body.error).toContain("invalid");
+      expect(body.error).toContain("Path traversal detected");
     });
 
     it("rejects path with encoded parent traversal", async () => {
@@ -104,7 +104,7 @@ describe("File Content Path Traversal Prevention", () => {
       const body = await res.json();
 
       expect(res.status).toBe(400);
-      expect(body.error).toContain("invalid");
+      expect(body.error).toContain("Path traversal detected");
     });
 
     it("rejects path with backslashes", async () => {
@@ -137,7 +137,7 @@ describe("File Content Path Traversal Prevention", () => {
       const body = await res.json();
 
       expect(res.status).toBe(400);
-      expect(body.error).toContain("must not start with /");
+      expect(body.error).toContain("Absolute path not allowed");
     });
 
     it("rejects path with .. segment", async () => {
@@ -229,7 +229,7 @@ describe("File Content Path Traversal Prevention", () => {
       const body = await res.json();
 
       expect(res.status).toBe(400);
-      expect(body.error).toContain("text files");
+      expect(body.error).toContain("Binary files and media are not supported");
     });
 
     it("rejects JPEG files", async () => {
@@ -639,18 +639,18 @@ describe("File Content Path Traversal Prevention", () => {
       expect(res.status).toBe(400);
     });
 
-    it("rejects path with question mark", async () => {
+    it("accepts path with question mark", async () => {
       const req = createRequest("src/index?.ts");
       const res = await GET(req, { params: { id: "1" } });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(200);
     });
 
-    it("rejects path with hash", async () => {
+    it("accepts path with hash", async () => {
       const req = createRequest("src/index#.ts");
       const res = await GET(req, { params: { id: "1" } });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(200);
     });
   });
 

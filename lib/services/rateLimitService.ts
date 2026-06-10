@@ -41,7 +41,7 @@ async function maybeCleanupStaleAttempts() {
   try {
     await cleanupStaleAttempts();
   } catch (error) {
-    console.error("Background cleanup failed:", error);
+    console.error("Background stale attempt cleanup failed:", error);
   }
 }
 
@@ -66,8 +66,8 @@ export async function isRateLimited(
 
     return count >= maxAttempts;
   } catch (error) {
-    console.error("Rate limit check failed, allowing request:", error);
-    return false;
+    console.error(`Rate limit check failed for key=${key} type=${type}:`, error);
+    throw error;
   }
 }
 
@@ -89,8 +89,8 @@ export async function isAnalysisRunnerRateLimited(
 
     return count >= maxJobsPerMinute;
   } catch (error) {
-    console.error("Analysis runner rate limit check failed:", error);
-    return false;
+    console.error(`Analysis runner rate limit check failed for worker=${workerId}:`, error);
+    throw error;
   }
 }
 
@@ -111,8 +111,8 @@ export async function countAttempts(
       },
     });
   } catch (error) {
-    console.error("Rate limit count failed:", error);
-    return 0;
+    console.error(`Rate limit count failed for key=${key} type=${type}:`, error);
+    throw error;
   }
 }
 
@@ -134,7 +134,8 @@ export async function recordAttempt(params: {
       },
     });
   } catch (error) {
-    console.error("Failed to record rate limit attempt:", error);
+    console.error(`Failed to record rate limit attempt key=${params.key} type=${params.type}:`, error);
+    throw error;
   }
 }
 
@@ -154,7 +155,8 @@ export async function recordAnalysisRunnerAttempt(
       },
     });
   } catch (error) {
-    console.error("Failed to record analysis runner attempt:", error);
+    console.error(`Failed to record analysis runner attempt worker=${workerId} job=${jobId}:`, error);
+    throw error;
   }
 }
 
@@ -171,7 +173,7 @@ export async function clearFailedAttempts(
       },
     });
   } catch (error) {
-    console.error("Failed to clear rate limit attempts:", error);
+    console.error(`Failed to clear rate limit attempts key=${key} type=${type}:`, error);
   }
 }
 

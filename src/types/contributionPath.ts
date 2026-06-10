@@ -7,13 +7,24 @@ export interface ContributionPreference {
   focusArea: FocusArea;
 }
 
+export interface RepositoryFile {
+  path: string;
+  name?: string;
+  language?: string;
+  size?: number;
+  type?: string;
+  importance?: number;
+  category?: string;
+  [key: string]: any;
+}
+
 export interface RepositoryAnalysisData {
   id?: string | number;
   name?: string;
   description?: string;
   url?: string;
   size?: number;
-  files?: Array<{ path: string; name?: string; language?: string }>;
+  files?: RepositoryFile[];
   languages?: Array<{ name: string; percentage: number }>;
   commits?: Array<{ hash?: string; message?: string; authorName?: string; committedAt?: string }>;
   contributors?: Array<{ name?: string; commits?: number }>;

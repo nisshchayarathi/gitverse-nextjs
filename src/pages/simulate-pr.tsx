@@ -50,14 +50,6 @@ export default function PRSimulator() {
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [copiedState, setCopiedState] = useState(false);
 
-  useEffect(() => {
-    if (!isAuthLoading && !isAuthenticated) {
-      router.push("/login");
-      return;
-    }
-    fetchRepositories();
-  }, [isAuthLoading, isAuthenticated, router, fetchRepositories]);
-
   const fetchRepositories = useCallback(async () => {
     try {
       setIsListLoading(true);
@@ -78,6 +70,14 @@ export default function PRSimulator() {
       setIsListLoading(false);
     }
   }, [toast]);
+
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push("/login");
+      return;
+    }
+    fetchRepositories();
+  }, [isAuthLoading, isAuthenticated, router, fetchRepositories]);
 
   const handleStartReview = async () => {
     if (!diffInput.trim()) {

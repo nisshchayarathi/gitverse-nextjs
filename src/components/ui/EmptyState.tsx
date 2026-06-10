@@ -1,9 +1,8 @@
 import React from 'react';
-import { LucideIcon } from 'lucide-react';
 import { Button } from './Button';
 
 interface EmptyStateProps {
-  icon: LucideIcon;
+  icon?: React.ReactElement | React.ElementType;
   title: string;
   description: string;
   actionLabel?: string;
@@ -13,7 +12,7 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({
-  icon: Icon,
+  icon,
   title,
   description,
   actionLabel,
@@ -21,15 +20,25 @@ export function EmptyState({
   suggestions,
   ariaLabel,
 }: EmptyStateProps) {
+  const IconComponent =
+    icon && !React.isValidElement(icon) ? (icon as React.ElementType) : null;
+  const renderedIcon = IconComponent ? (
+    <IconComponent className="h-8 w-8" />
+  ) : React.isValidElement(icon) ? (
+    icon
+  ) : null;
+
   return (
     <section
       role="region"
       aria-label={ariaLabel ?? `${title} empty state`}
       className="flex flex-col items-center justify-center p-8 sm:p-12 text-center rounded-2xl border border-border/50 bg-gradient-to-b from-card/40 to-card/10 shadow-md backdrop-blur-sm w-full min-h-[320px] transition-all duration-300 hover:border-primary/20 hover:shadow-lg"
     >
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 ring-8 ring-primary/5 mb-6 text-primary transition-transform duration-300 hover:scale-105">
-        <Icon className="h-7 w-7 text-primary" aria-hidden="true" />
-      </div>
+      {renderedIcon && (
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 ring-8 ring-primary/5 mb-6 text-primary transition-transform duration-300 hover:scale-105">
+          {renderedIcon}
+        </div>
+      )}
       <h2 className="text-xl sm:text-2xl font-heading font-bold text-foreground mb-3 tracking-tight">
         {title}
       </h2>

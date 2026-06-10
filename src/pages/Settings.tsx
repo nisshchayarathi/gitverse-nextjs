@@ -7,7 +7,7 @@ import Image from "next/image";
 import { User, Lock, Shield, Trash2, AlertCircle, Sun, Moon, Cpu } from "lucide-react";
 import { Save } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useTheme } from "@/context/ThemeContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Card,
   CardHeader,
@@ -20,9 +20,7 @@ import {
   EmptyState,
   Modal,
 } from "@/components/ui";
-import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import Image from "next/image";
 import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
@@ -334,10 +332,6 @@ export default function Settings() {
 });
   };
 
-  const handleDeleteAccount = () => {
-    setShowDeleteModal(true);
-  };
-
   const confirmDeleteAccount = async () => {
     if (isDeletingAccount) return;
 
@@ -356,7 +350,7 @@ export default function Settings() {
         description: "Your account has been deleted successfully.",
       });
 
-      window.location.href = "/signup";
+      window.location.href = "/account-deleted";
     } catch (error: any) {
       console.error("Error deleting account:", error);
       toast({
@@ -853,7 +847,7 @@ export default function Settings() {
                     </p>
                     <Button
                       variant="destructive"
-                      onClick={handleDeleteAccount}
+                      onClick={() => setShowDeleteModal(true)}
                       disabled={isDeletingAccount}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />

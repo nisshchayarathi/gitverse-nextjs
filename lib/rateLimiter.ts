@@ -11,6 +11,8 @@
 
 import redis from "@/lib/redis";
 import { NextRequest, NextResponse } from "next/server";
+import CircuitBreaker from "opossum";
+import { LRUCache } from "lru-cache";
 
 export type UserTier = "free" | "premium";
 
@@ -35,6 +37,8 @@ export interface RateLimitResult {
   limit: number;
   /** Seconds until the quota resets */
   resetInSec: number;
+  /** Optional flag: set if both primary and fallback rate limiters failed */
+  fallbackFailed?: boolean;
 }
 
 /**
@@ -69,6 +73,49 @@ function buildKey(config: RateLimitConfig): string {
   return `rl:${config.endpoint}:${subject}`;
 }
 
+// 1. LRU Cache Fallback
+// Stores object: { count: number, resetAt: number }
+const fallbackCache = new LRUCache<string, { count: number; resetAt: number }>({
+  max: 10000,
+  ttl: 1000 * 60 * 60, // 1 hour max TTL
+});
+
+// 2. Opossum Circuit Breaker
+const redisLimiterCircuit = new CircuitBreaker(
+  async (key: string, windowSec: number) => {
+    const pipeline = redis.pipeline();
+    pipeline.incr(key);
+    pipeline.ttl(key);
+    const results = await pipeline.exec();
+
+    if (!results) {
+      throw new Error("Redis pipeline returned null");
+    }
+
+    const [incrResult, ttlResult] = results;
+    // @ts-ignore
+    if (incrResult[0]) throw incrResult[0];
+    // @ts-ignore
+    if (ttlResult[0]) throw ttlResult[0];
+
+    const count = (incrResult[1] as number) ?? 0;
+    let ttl = (ttlResult[1] as number) ?? -1;
+
+    // Set expiry on the first request in this window
+    if (ttl < 0) {
+      await redis.expire(key, windowSec);
+      ttl = windowSec;
+    }
+
+    return { count, ttl };
+  },
+  {
+    timeout: 3000,       // 3 seconds timeout for Redis
+    errorThresholdPercentage: 50,
+    resetTimeout: 10000, // Wait 10s before trying again
+  }
+);
+
 /**
  * Core token-bucket check using Redis atomic operations.
  * Uses INCR + EXPIRE to implement a fixed sliding window.
@@ -85,52 +132,49 @@ export async function checkRateLimit(
   const key = buildKey(config);
 
   try {
-    // Atomic: increment current request count and set TTL if this is the first request
-    const pipeline = redis.pipeline();
-    pipeline.incr(key);
-    pipeline.ttl(key);
-    const results = await pipeline.exec();
-
-    if (!results) {
-      // Redis failure — fail open (allow request, log warning)
-      console.warn(
-        "[RateLimit] Redis pipeline returned null — failing open for key:",
-        key,
-      );
-      return {
-        allowed: true,
-        remaining: limit,
-        windowSec,
-        limit,
-        resetInSec: windowSec,
-      };
-    }
-
-    const [incrResult, ttlResult] = results;
-    const count = (incrResult[1] as number) ?? 0;
-    let ttl = (ttlResult[1] as number) ?? -1;
-
-    // Set expiry on the first request in this window
-    if (ttl < 0) {
-      await redis.expire(key, windowSec);
-      ttl = windowSec;
-    }
-
+    // 3. Try Redis with Circuit Breaker
+    const { count, ttl } = await redisLimiterCircuit.fire(key, windowSec);
+    
     const remaining = Math.max(0, limit - count);
     const allowed = count <= limit;
     const resetInSec = ttl > 0 ? ttl : windowSec;
 
     return { allowed, remaining, windowSec, limit, resetInSec };
-  } catch (err) {
-    // Redis unavailable — fail open to avoid outages
-    console.error("[RateLimit] Redis error — failing open:", err);
-    return {
-      allowed: true,
-      remaining: limit,
-      windowSec,
-      limit,
-      resetInSec: windowSec,
-    };
+  } catch (err: any) {
+    console.error("[RateLimit] Circuit Breaker opened or Redis failed, falling back to LRU:", err.message);
+
+    try {
+      // 4. Fallback to LRU Cache
+      const now = Date.now();
+      let record = fallbackCache.get(key);
+
+      if (!record || record.resetAt <= now) {
+        // Expired or missing
+        record = { count: 0, resetAt: now + windowSec * 1000 };
+      }
+
+      record.count += 1;
+      
+      // Update cache
+      fallbackCache.set(key, record, { ttl: record.resetAt - now });
+
+      const count = record.count;
+      const remaining = Math.max(0, limit - count);
+      const allowed = count <= limit;
+      const resetInSec = Math.ceil((record.resetAt - now) / 1000);
+
+      return { allowed, remaining, windowSec, limit, resetInSec };
+    } catch (fallbackErr) {
+      console.error("[RateLimit] LRU Fallback also failed:", fallbackErr);
+      return {
+        allowed: false, // Ensure we fail closed by default for safety on DB calls
+        remaining: 0,
+        windowSec,
+        limit,
+        resetInSec: windowSec,
+        fallbackFailed: true, // Both primary and fallback failed!
+      };
+    }
   }
 }
 
