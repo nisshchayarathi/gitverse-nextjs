@@ -221,7 +221,7 @@ describe("InternalAuth Edge Cases", () => {
   describe("validateRequiredSecrets edge cases", () => {
     it("returns empty array when all secrets are set", () => {
       process.env.INTERNAL_WORKER_SECRET = "worker-secret";
-      process.env.NODE_ENV = "development";
+      (process.env as any).NODE_ENV = "development";
       expect(validateRequiredSecrets()).toEqual([]);
     });
 
@@ -231,7 +231,7 @@ describe("InternalAuth Edge Cases", () => {
     });
 
     it("returns ANALYSIS_RUNNER_SECRET when not set in production", () => {
-      process.env.NODE_ENV = "production";
+      (process.env as any).NODE_ENV = "production";
       process.env.INTERNAL_WORKER_SECRET = "worker-secret";
       delete process.env.ANALYSIS_RUNNER_SECRET;
       expect(validateRequiredSecrets()).toContain("ANALYSIS_RUNNER_SECRET");

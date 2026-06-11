@@ -13,6 +13,7 @@
 
 import { createHmac, randomBytes } from "crypto";
 import prisma from "@/lib/prisma";
+import { encryptToken, decryptToken } from "@/lib/utils/envelopeEncryption";
 
 // ─── Base32 Encoding ────────────────────────────────────────────────────────
 
@@ -242,37 +243,104 @@ export async function verifyAndConsumeBackupCode(
 // ─── Database Helpers ────────────────────────────────────────────────────────
 
 /**
- * Retrieves MFA status for a user.
+ * Retrieves MFA enabled status for a user.
+ *
+ * This function intentionally selects only the `isEnabled` boolean column
+ * rather than the entire row.  Previously it fetched `totpSecret` as well
+ * to derive a `hasSecret` flag, but that leaked the encrypted secret bytes
+ * over the wire even when only the boolean was needed by the caller.
+ *
+ * @param userId  The user whose MFA status to check.
+ * @returns `{ isEnabled: boolean }` — never includes the secret.
+ *          Returns `{ isEnabled: false }` when no MfaConfig row exists
+ *          (convenience: caller does not need a separate null check for the
+ *          common case of "user has never set up MFA").
  */
 export async function getMfaStatus(
   userId: number,
-): Promise<{ isEnabled: boolean; hasSecret: boolean } | null> {
+): Promise<{ isEnabled: boolean } | null> {
   const config = await prisma.mfaConfig.findUnique({
     where: { userId },
-    select: { isEnabled: true, totpSecret: true },
+    select: { isEnabled: true },
   });
 
-  if (!config) return { isEnabled: false, hasSecret: false };
-  return { isEnabled: config.isEnabled, hasSecret: !!config.totpSecret };
+  if (!config) return { isEnabled: false };
+  return { isEnabled: config.isEnabled };
 }
 
 /**
  * Creates or replaces the TOTP secret for a user (pre-enrollment, not yet enabled).
+ *
+ * Encryption happens BEFORE the upsert — the plaintext secret never touches
+ * the database.  Uses `encryptToken` from the envelope-encryption layer
+ * (AES-256-GCM with IV + auth tag prepended as a single base64 blob).
+ *
+ * @param userId      The user to associate this config with.
+ * @param totpSecret  The Base32-encoded plaintext TOTP secret. It is
+ *                    encrypted synchronously before the database write.
+ *
+ * Security notes:
+ *   - `tokenEncrypted` is always set to `true` on write.  Rows written
+ *     before this field existed (or with `default(false)`) are detected
+ *     by `getDecryptedTotpSecret` which falls back to plaintext read.
+ *   - The plaintext `totpSecret` parameter is transient — it lives in the
+ *     calling route handler's memory and should not be logged or persisted.
  */
 export async function upsertMfaSecret(
   userId: number,
   totpSecret: string,
 ): Promise<void> {
+  const encrypted = await encryptToken(totpSecret);
   await prisma.mfaConfig.upsert({
     where: { userId },
-    create: { userId, totpSecret, isEnabled: false },
-    update: { totpSecret, isEnabled: false },
+    create: { userId, totpSecret: encrypted, tokenEncrypted: true, isEnabled: false },
+    update: { totpSecret: encrypted, tokenEncrypted: true, isEnabled: false },
   });
 }
 
 /**
+ * Reads the TOTP secret for a user and decrypts it if necessary.
+ *
+ * This is the single point of decryption for all MFA routes.  Previously
+ * each route (setup DELETE, verify POST) had its own inline decrypt logic
+ * that checked `tokenEncrypted` and called `decryptToken` directly.  That
+ * duplication risked one route falling out of sync with the others.
+ *
+ * Decryption strategy:
+ *   1. If `tokenEncrypted` is `true`, decrypt via `decryptToken` (envelope
+ *      encryption: AES-256-GCM with the current DEK).
+ *   2. If `tokenEncrypted` is `false`, return the stored value as-is.
+ *      This covers legacy rows that were written before application-layer
+ *      encryption was introduced.  The migration script
+ *      `scripts/encrypt-mfa-secrets.ts` should be run to flip these.
+ *
+ * @param userId  The user whose secret to retrieve.
+ * @returns The plaintext Base32 TOTP secret, or `null` if no config or
+ *          no stored secret exists.
+ */
+export async function getDecryptedTotpSecret(userId: number): Promise<string | null> {
+  const config = await prisma.mfaConfig.findUnique({
+    where: { userId },
+    select: { totpSecret: true, tokenEncrypted: true },
+  });
+  if (!config?.totpSecret) return null;
+  if (config.tokenEncrypted) return await decryptToken(config.totpSecret);
+  return config.totpSecret;
+}
+
+/**
  * Activates MFA for a user after verifying their first TOTP token.
- * Also stores backup codes.
+ *
+ * Sets `isEnabled` to `true`, stores the hashed backup codes, and records
+ * `lastVerifiedAt` as the current timestamp.  The TOTP secret is already
+ * in the database from the earlier `upsertMfaSecret` call during the setup
+ * flow — this function only flips the enabled flag and stores the codes.
+ *
+ * @param userId            The user whose MFA to activate.
+ * @param hashedBackupCodes Comma-separated SHA-256 hashes of backup codes.
+ *                          These are stored at-rest in plain SHA-256 format
+ *                          (not bcrypt) because verifying 8+ backup codes
+ *                          at once would be prohibitively slow with bcrypt.
  */
 export async function enableMfa(
   userId: number,
@@ -290,6 +358,18 @@ export async function enableMfa(
 
 /**
  * Disables and removes MFA for a user.
+ *
+ * Deletes the entire `MfaConfig` row, including the encrypted TOTP secret
+ * and all backup code hashes.  This is a hard delete (not a soft-disable)
+ * because there is no use case for re-activating a previously disabled MFA
+ * configuration with the same secret.
+ *
+ * Uses `deleteMany` (not `delete`) because Prisma's `delete` requires the
+ * row to exist, whereas `deleteMany` silently succeeds when the row is
+ * already gone — avoiding a race-condition error if two requests arrive
+ * simultaneously.
+ *
+ * @param userId  The user whose MFA configuration to remove.
  */
 export async function disableMfa(userId: number): Promise<void> {
   await prisma.mfaConfig.deleteMany({ where: { userId } });

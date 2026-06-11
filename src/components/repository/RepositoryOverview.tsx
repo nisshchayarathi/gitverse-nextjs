@@ -56,6 +56,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import { ContributorJourneyPanel } from "@/components/repository/ContributorJourneyPanel";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/hooks/use-toast";
 import { buildApiUrl } from "@/services/apiConfig";
@@ -917,6 +918,9 @@ export const RepositoryOverview = ({
           </CardContent>
         </Card>
       </div>
+
+      {/* Contributor Journey Simulator */}
+      <ContributorJourneyPanel repository={repositoryData} />
 
       {/* README */}
       <div className="grid grid-cols-1 gap-4 sm:gap-6">

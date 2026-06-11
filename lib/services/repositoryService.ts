@@ -199,7 +199,6 @@ export class RepositoryService {
     });
 
     if (existingRepository) {
-
       return existingRepository;
     }
 
@@ -248,7 +247,7 @@ export class RepositoryService {
     // Update status to analyzing
     await prisma.repository.update({
       where: { id: repositoryId },
-      data: { status: "analyzing" },
+      data: { status: "analyzing", configWarning: null },
     });
 
     const report = async (update: RepositoryAnalysisProgress) => {
@@ -305,7 +304,10 @@ export class RepositoryService {
         accessToken: token,
         onProgress: (pct, msg) => {
           const analysisPct = 5 + Math.round((pct / 100) * 3);
-          report({ progressPercent: Math.min(8, analysisPct), progressMessage: msg });
+          report({
+            progressPercent: Math.min(8, analysisPct),
+            progressMessage: msg,
+          });
         },
       });
 
@@ -334,18 +336,43 @@ export class RepositoryService {
 
       let knowledgeJson: ParsedRepositoryKnowledge | undefined = undefined;
       let knowledgeMd: ParsedRepositoryKnowledge | undefined = undefined;
+      let configWarning: string | null = null;
 
       try {
         const jsonPath = path.join(tempDir, ".gitverse.json");
         const jsonContent = await fs.readFile(jsonPath, "utf8");
-        knowledgeJson = gitverseConfigParser.parseJson(jsonContent);
-      } catch (e) { /* Ignore missing or invalid */ }
+        try {
+          knowledgeJson = gitverseConfigParser.parseJson(jsonContent);
+        } catch (e: any) {
+          const warnMsg = `Failed to parse .gitverse.json: ${e.message}`;
+          console.warn(warnMsg);
+          configWarning = warnMsg;
+        }
+      } catch (e: any) {
+        if (e.code !== "ENOENT") {
+          const warnMsg = `Failed to read .gitverse.json: ${e.message}`;
+          console.warn(warnMsg);
+          configWarning = warnMsg;
+        }
+      }
 
       try {
         const mdPath = path.join(tempDir, ".gitverse.md");
         const mdContent = await fs.readFile(mdPath, "utf8");
-        knowledgeMd = gitverseConfigParser.parseMarkdown(mdContent);
-      } catch (e) { /* Ignore missing or invalid */ }
+        try {
+          knowledgeMd = gitverseConfigParser.parseMarkdown(mdContent);
+        } catch (e: any) {
+          const warnMsg = `Failed to parse .gitverse.md: ${e.message}`;
+          console.warn(warnMsg);
+          configWarning = configWarning ? `${configWarning}; ${warnMsg}` : warnMsg;
+        }
+      } catch (e: any) {
+        if (e.code !== "ENOENT") {
+          const warnMsg = `Failed to read .gitverse.md: ${e.message}`;
+          console.warn(warnMsg);
+          configWarning = configWarning ? `${configWarning}; ${warnMsg}` : warnMsg;
+        }
+      }
 
       const parsedKnowledge = gitverseConfigParser.mergeKnowledge(knowledgeJson, knowledgeMd);
 
@@ -605,6 +632,7 @@ export class RepositoryService {
             lastAnalyzedAt: new Date(),
             defaultBranch,
             size: size,
+            configWarning: configWarning || null,
           },
         });
       });
@@ -669,7 +697,6 @@ export class RepositoryService {
       ttlCache.deleteByPrefix(`repo-stats:${repositoryId}:`);
 
       await report({ progressPercent: 100, progressMessage: "Completed" });
-
     } catch (error: any) {
       console.error(`Error analyzing repository ${repositoryId}:`, error);
       await prisma.repository.update({
@@ -687,7 +714,9 @@ export class RepositoryService {
       if (gitService) {
         await gitService.cleanup();
       } else {
-        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null);
+        await fs
+          .rm(tempDir, { recursive: true, force: true })
+          .catch(() => null);
       }
     }
   }

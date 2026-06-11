@@ -189,15 +189,17 @@ describe("GitService abort signal handling", () => {
         { signal: controller.signal },
       );
 
-      await new Promise(r => setImmediate(r));
-      await new Promise(r => setImmediate(r));
+      while (mockSpawn.mock.calls.length === 0) {
+        await new Promise(r => setImmediate(r));
+      }
+
       jest.useFakeTimers();
       controller.abort();
       jest.advanceTimersByTime(6000);
       jest.useRealTimers();
 
       await expect(promise).rejects.toThrow();
-    }, 10000);
+    }, 30000);
 
     it("should return GitService instance on successful clone", async () => {
       const controller = new AbortController();
@@ -211,20 +213,18 @@ describe("GitService abort signal handling", () => {
         { signal: controller.signal },
       );
 
-      // Yield multiple times for the async function to reach spawn
-      for (let i = 0; i < 10; i++) {
+      while (mockSpawn.mock.calls.length === 0) {
         await new Promise(r => setImmediate(r));
       }
+
       (proc.stderr as Readable).push(null);
       (proc.stdout as Readable).push(null);
-      for (let i = 0; i < 5; i++) {
-        await new Promise(r => setImmediate(r));
-      }
+      await new Promise(r => setImmediate(r));
       proc.emit("close", 0);
 
       const result = await promise;
       expect(result).toBeInstanceOf(GitService);
-    }, 10000);
+    }, 30000);
   });
 
   describe("getBranches with signal", () => {

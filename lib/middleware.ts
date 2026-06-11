@@ -4,14 +4,15 @@ import { getNextAuthSecret } from "./config/env";
 import type { JWTPayload } from "./auth";
 import prisma from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
+import { hashApiKey } from "@/lib/utils/api-key";
 
 export interface AuthenticatedRequest {
   user: JWTPayload;
 }
 
 /**
- * Resolves the authenticated user from either a JWT bearer token
- * or a NextAuth session cookie.
+ * Resolves the authenticated user from either a JWT bearer token,
+ * an API key, or a NextAuth session cookie.
  * Rejects tokens issued before the user's latest password change.
  * Uses secure token validation with tokenVersion verification.
  */
@@ -26,38 +27,62 @@ export async function getAuthUser(
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.substring(7);
     
-    try {
-      const payload = await verifyTokenWithUserValidation(token);
-      
-      if (payload) {
-        // Additional security check: verify user still exists
-        const dbUser = await prisma.user.findUnique({
-          where: { id: payload.userId },
-          select: {
-            id: true,
-            tokenVersion: true,
-            lockedUntil: true,
-          },
-        });
-
-        if (!dbUser) {
-          return null;
+    // Try API key lookup first (fast, no crypto overhead)
+    if (token.startsWith("gv_")) {
+      const hashed = hashApiKey(token);
+      try {
+        const apiKey = await prisma.apiKey.findUnique({ where: { hashedKey: hashed } });
+        if (apiKey && apiKey.expiresAt > new Date()) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: apiKey.userId },
+            select: { id: true, email: true, name: true, tokenVersion: true, lockedUntil: true },
+          });
+          if (dbUser && (!dbUser.lockedUntil || dbUser.lockedUntil <= new Date())) {
+            await prisma.apiKey.update({
+              where: { id: apiKey.id },
+              data: { lastUsedAt: new Date() },
+            });
+            userPayload = { userId: dbUser.id, email: dbUser.email, tokenVersion: dbUser.tokenVersion };
+          }
         }
-
-        if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
-          return null;
-        }
-
-        // Double-check tokenVersion matches (extra security)
-        if (payload.tokenVersion !== dbUser.tokenVersion) {
-          return null;
-        }
-
-        userPayload = payload;
+      } catch {
+        // DB error — fall through to other auth methods
       }
-    } catch (error) {
-      console.warn("[Auth] JWT validation error:", error);
-      return null;
+    }
+
+    // Try JWT token (existing behavior)
+    if (!userPayload) {
+      try {
+        const payload = await verifyTokenWithUserValidation(token);
+        
+        if (payload) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: payload.userId },
+            select: {
+              id: true,
+              tokenVersion: true,
+              lockedUntil: true,
+            },
+          });
+
+          if (!dbUser) {
+            return null;
+          }
+
+          if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
+            return null;
+          }
+
+          if (payload.tokenVersion !== dbUser.tokenVersion) {
+            return null;
+          }
+
+          userPayload = payload;
+        }
+      } catch (error) {
+        console.warn("[Auth] JWT validation error:", error);
+        return null;
+      }
     }
   }
 

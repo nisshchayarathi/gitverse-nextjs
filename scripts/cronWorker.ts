@@ -4,10 +4,24 @@ import prisma, { disconnectPrisma } from "../lib/prisma";
 import { analysisJobService } from "../lib/services/analysisJobService";
 import { repositoryService } from "../lib/services/repositoryService";
 
+/**
+ * Unique identifier for this worker instance. Used to claim and release
+ * analysis job locks so other workers do not pick up the same job.
+ */
 const WORKER_ID =
   process.env.WORKER_ID ||
   `cron-${os.hostname()}-${process.pid}-${Date.now()}`;
+
+/**
+ * Maximum wall-clock time the worker will keep claiming new jobs.
+ * Once this deadline passes, the current batch is the last.
+ */
 const TIMEOUT_MS = parseInt(process.env.CRON_WORKER_TIMEOUT_MS || "300000", 10);
+
+/**
+ * Maximum number of jobs to process in a single cycle.
+ * Prevents the worker from monopolising the database connection pool.
+ */
 const BATCH_LIMIT = parseInt(process.env.CRON_WORKER_BATCH || "5", 10);
 
 process.on("unhandledRejection", async (reason) => {

@@ -8,11 +8,13 @@ import {
   setGeminiAnalysisCache,
 } from "@/lib/services/geminiAnalysisCacheService";
 import { buildCacheKey } from "@/lib/utils/cacheKey";
-import { buildTreeFromFiles, truncateTree, stringifyTree } from "@/lib/utils/tokenLimits";
+import { buildTreeFromFiles, truncateTree, stringifyTree, estimateTokens } from "@/lib/utils/tokenLimits";
 import { validateContentType } from "@/lib/utils/aiRequestValidation";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 const CURRENT_MODEL_VERSION = "gemini-2.5-flash";
+const MAX_CONTEXT_COMMITS = 25;
+const MIN_CONTEXT_COMMITS = 5;
 
 
 export async function POST(request: NextRequest) {
@@ -57,6 +59,19 @@ export async function POST(request: NextRequest) {
 
     const analysisScope = typeof scope === "string" && scope.length > 0 ? scope : "full";
 
+    const treeTokens = estimateTokens(stringifiedTree);
+    const TOTAL_BUDGET = 10000;
+    const remainingTokens = TOTAL_BUDGET - treeTokens;
+    const ESTIMATED_TOKENS_PER_COMMIT = 30;
+
+    const dynamicCommitLimit = Math.max(
+      MIN_CONTEXT_COMMITS,
+      Math.min(
+        MAX_CONTEXT_COMMITS,
+        Math.floor(remainingTokens / ESTIMATED_TOKENS_PER_COMMIT)
+      )
+    );
+
     const context = {
       targetDirectory: (repository as any).targetDirectory ?? undefined,
       languages: repository.languages.map((l: any) => ({
@@ -67,7 +82,7 @@ export async function POST(request: NextRequest) {
         name: c.name,
         commits: c.commits,
       })),
-      commits: repository.commits.slice(0, 10).map((c: any) => ({
+      commits: repository.commits.slice(0, dynamicCommitLimit).map((c: any) => ({
         message: c.message,
         author: c.authorName,
         date: c.committedAt.toISOString(),

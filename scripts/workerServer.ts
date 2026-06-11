@@ -1,7 +1,9 @@
 import "dotenv/config";
+import os from "os";
 import http from "http";
 
 import { startAnalysisWorkerLoop } from "./analysisWorker";
+import { startWebhookWorkerLoop } from "../lib/workers/webhookWorker";
 import { disconnectPrisma, getPoolHealth, getPoolMetrics } from "../lib/prisma";
 
 const port = Number(process.env.PORT || "8080");
@@ -132,6 +134,7 @@ async function main() {
   });
 
   await startAnalysisWorkerLoop();
+  await startWebhookWorkerLoop({ workerId: `${os.hostname()}-webhook` });
 
   if (!stopping) {
     workerDone?.();

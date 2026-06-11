@@ -68,11 +68,10 @@ describe("Analysis Runner Rate Limiting", () => {
       expect(where.createdAt.gte).toBeInstanceOf(Date);
     });
 
-    it("handles database errors gracefully", async () => {
+    it("throws on database errors (fail-closed)", async () => {
       prisma.loginAttempt.count.mockRejectedValue(new Error("DB error"));
 
-      const result = await isAnalysisRunnerRateLimited("worker-1");
-      expect(result).toBe(false);
+      await expect(isAnalysisRunnerRateLimited("worker-1")).rejects.toThrow("DB error");
     });
 
     it("distinguishes between different workers", async () => {
@@ -119,12 +118,12 @@ describe("Analysis Runner Rate Limiting", () => {
       });
     });
 
-    it("handles database errors gracefully", async () => {
+    it("throws on database errors (fail-closed)", async () => {
       prisma.loginAttempt.create.mockRejectedValue(new Error("DB error"));
 
       await expect(
         recordAnalysisRunnerAttempt("worker-1", "job-123", true)
-      ).resolves.toBeUndefined();
+      ).rejects.toThrow("DB error");
     });
   });
 });

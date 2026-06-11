@@ -368,12 +368,31 @@ ${safeDiff}
 </DIFF_DATA>`;
 
     const gemini = new GeminiService();
-    const result = await gemini.chatRaw(prompt);
-    const parsed = safeParseReviewJson(result.text);
-    if (!parsed) {
-      throw new Error("AI response was not valid JSON");
+    try {
+      const result = await gemini.chatRaw(prompt);
+      const parsed = safeParseReviewJson(result.text);
+      if (!parsed) {
+        throw new Error("AI response was not valid JSON");
+      }
+      return parsed;
+    } catch (error: any) {
+      if (error.message && error.message.includes("High-confidence secret detected")) {
+        const { orgAuditLogService } = await import("./org-audit-log");
+        await orgAuditLogService.logEvent({
+          repositoryId: params.repositoryId,
+          action: "SECRET_LEAK_PREVENTED",
+          resource: "pull_request",
+          details: {
+            prNumber: params.number,
+            repoName: params.repo,
+            ownerName: params.owner,
+            message: "PR review halted due to high-confidence secret detected in diff.",
+            errorDetails: error.message
+          }
+        });
+      }
+      throw error;
     }
-    return parsed;
   };
 
   // Determine chunkSize based on mode
@@ -396,6 +415,27 @@ ${safeDiff}
   });
 
   if (!review) {
+    if (chunkResult.errorReason && chunkResult.errorReason.includes("High-confidence secret detected")) {
+      return {
+        review: {
+          summary: `**[CRITICAL SECURITY ALERT]**\nThe PR review was halted because a high-confidence secret was detected in the diff. The organization administrator has been alerted. Please remove the secret and rotate it immediately.`,
+          overallScore: 0,
+          issues: [{
+            title: "High-Confidence Secret Detected",
+            severity: "critical",
+            category: "security",
+            file: null,
+            line: null,
+            explanation: chunkResult.errorReason,
+            suggestion: "Remove the hardcoded secret from your code, remove it from git history if necessary, and rotate the exposed credential immediately."
+          }],
+          praise: []
+        },
+        prTitle: pr.title,
+        prUrl: pr.html_url
+      };
+    }
+
     // Fallback if completely failed
     return {
       review: {

@@ -29,15 +29,20 @@ export async function middleware(request: NextRequest) {
 
   let token: Awaited<ReturnType<typeof getToken>> | null = null;
 
-  try {
-    token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
-  } catch {
-    // If getToken fails (misconfigured secret, network issue, etc.) treat the
-    // user as unauthenticated rather than crashing the middleware.
-    token = null;
+  const mockSessionCookie = request.cookies?.get?.("mock-session")?.value;
+  if (process.env.PLAYWRIGHT_TEST === "true" && process.env.NODE_ENV !== "production" && mockSessionCookie === "true") {
+    token = { name: "Test User", email: "test@test.com", sub: "1" } as any;
+  } else {
+    try {
+      token = await getToken({
+        req: request,
+        secret: process.env.NEXTAUTH_SECRET,
+      });
+    } catch {
+      // If getToken fails (misconfigured secret, network issue, etc.) treat the
+      // user as unauthenticated rather than crashing the middleware.
+      token = null;
+    }
   }
 
   const isAuthenticated = !!token;
@@ -56,12 +61,12 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedRoute && !isAuthenticated) {
     const loginUrl = new URL("/login", request.url);
-    
+
     // 🔥 FIX: Include query parameters so deep links aren't destroyed on redirect
     const callbackPath = request.nextUrl.search
       ? `${pathname}${request.nextUrl.search}`
       : pathname;
-      
+
     loginUrl.searchParams.set("callbackUrl", callbackPath);
     return NextResponse.redirect(loginUrl);
   }

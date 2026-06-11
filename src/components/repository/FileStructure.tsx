@@ -822,6 +822,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
               />
             </div>
 
+
             <AIExplanationPanel
               isOpen={isAIPanelOpen}
               onClose={() => setIsAIPanelOpen(false)}
