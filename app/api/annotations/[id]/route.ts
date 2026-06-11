@@ -58,7 +58,7 @@ export async function PATCH(
       annotation: updated
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json({ annotation: updated });
   } catch (error: any) {
     return NextResponse.json({ error: "Failed to update annotation" }, { status: 500 });
   }
