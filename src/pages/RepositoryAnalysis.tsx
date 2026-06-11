@@ -33,6 +33,7 @@ import {
   XCircle,
   FileX2,
   MessageSquare,
+  Download,
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
@@ -134,10 +135,63 @@ export default function RepositoryAnalysis() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const pollingStartedAt = useRef<number | null>(null);
   const pollingJobRef = useRef<string | null>(null);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const exportMarkdown = async () => {
+  if (!job?.id) {
+    toast({
+      title: "Export failed",
+      description: "No analysis job available.",
+      variant: "destructive",
+    });
+    return;
+  }
 
+  try {
+    const token = localStorage.getItem("gitverse_token");
+
+    const response = await axios.get(
+      buildApiUrl(`/api/analysis/${job.id}?format=markdown`),
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        responseType: "text",
+      }
+    );
+
+    const blob = new Blob([response.data], {
+      type: "text/markdown",
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${repository?.name || "analysis-report"}.md`;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export successful",
+      description: "Markdown report downloaded successfully.",
+    });
+  } catch (error: any) {
+    toast({
+      title: "Export failed",
+      description:
+        error.response?.data?.error ||
+        "Failed to export markdown report.",
+      variant: "destructive",
+    });
+  }
+};
   useEffect(() => {
     fetchRepository();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -536,16 +590,26 @@ export default function RepositoryAnalysis() {
                   )}
               </div>
               </div>
-              {/* Delete button only if repository exists */}
-              {repository && (
-                <button
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="glass p-2 rounded-lg hover:bg-red-500/20 transition-all duration-300 text-red-500 hover:text-red-400 flex-shrink-0"
-                  title="Delete repository"
-                >
-                  <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
-                </button>
-              )}
+          
+    <div className="flex gap-2">
+  {job && (
+    <button
+      onClick={exportMarkdown}
+      className="glass p-2 rounded-lg hover:bg-primary/20 transition-all duration-300 text-primary"
+      title="Export Markdown Report"
+    >
+      <Download className="h-4 w-4 sm:h-5 sm:w-5" />
+    </button>
+  )}
+
+  <button
+    onClick={() => setShowDeleteDialog(true)}
+    className="glass p-2 rounded-lg hover:bg-red-500/20 transition-all duration-300 text-red-500 hover:text-red-400"
+    title="Delete repository"
+  >
+    <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+  </button>
+</div>
             </div>
 
             {isAnalyzing ? (

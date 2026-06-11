@@ -1,8 +1,9 @@
+import { RepositoryAnalysisData } from "@/types/contributionPath";
 import { simulateContributorJourney } from "../contributorJourneySimulator";
 
 describe("contributor journey simulator", () => {
   it("infers authentication category and ranks auth files highly", () => {
-    const repository = {
+    const repository: RepositoryAnalysisData = {
       files: [
         { path: "src/auth.ts", size: 18_000 },
         { path: "src/middleware.ts", size: 9_000 },
@@ -12,8 +13,20 @@ describe("contributor journey simulator", () => {
         { path: "src/utils/helpers.ts", size: 6_000 },
       ],
       commits: [
-        { message: "Fix auth provider flow" },
-        { message: "Improve login session handling" },
+        {
+          hash: "abc123",
+          message: "Fix auth provider flow",
+          author: "Test User",
+          date: new Date("2025-01-01"),
+          filesChanged: 1,
+        },
+        {
+          hash: "def456",
+          message: "Improve login session handling",
+          author: "Test User",
+          date: new Date("2025-01-02"),
+          filesChanged: 2,
+        },
       ],
     };
 
@@ -27,7 +40,17 @@ describe("contributor journey simulator", () => {
     expect(result.learningPath[0].file).toBe("src/auth.ts");
     expect(result.learningPath.length).toBe(5);
     expect(result.estimatedTime).toBeGreaterThanOrEqual(10);
-    expect(result.learningPath.some((step) => step.file === "src/middleware.ts")).toBe(true);
-    expect(result.learningPath.some((step) => step.file === "src/components/OAuthCallback.tsx")).toBe(true);
+
+    expect(
+      result.learningPath.some(
+        (step) => step.file === "src/middleware.ts"
+      )
+    ).toBe(true);
+
+    expect(
+      result.learningPath.some(
+        (step) => step.file === "src/components/OAuthCallback.tsx"
+      )
+    ).toBe(true);
   });
 });
