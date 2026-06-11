@@ -69,17 +69,28 @@ describe("POST /api/auth/mfa/setup", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetClientIp.mockReturnValue("127.0.0.1");
-    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 4, windowSec: 300, limit: 5, resetInSec: 300 });
+    mockCheckRateLimit.mockResolvedValue({
+      allowed: true,
+      remaining: 4,
+      windowSec: 300,
+      limit: 5,
+      resetInSec: 300,
+    });
     mockRequireAuth.mockResolvedValue({ userId: 1, email: "test@test.com" });
     mockUserFindUnique.mockResolvedValue({ email: "test@test.com" });
     mockGetMfaStatus.mockResolvedValue(null);
     mockGenerateTOTPSecret.mockReturnValue("JBSWY3DPEHPK3PXP");
-    mockBuildOtpAuthUri.mockReturnValue("otpauth://totp/test@test.com?secret=JBSWY3DPEHPK3PXP");
+    mockBuildOtpAuthUri.mockReturnValue(
+      "otpauth://totp/test@test.com?secret=JBSWY3DPEHPK3PXP",
+    );
     mockUpsertMfaSecret.mockResolvedValue(undefined);
   });
 
   it("returns 401 when not authenticated", async () => {
-    mockRequireAuth.mockRejectedValue({ status: 401, message: "Not authenticated" });
+    mockRequireAuth.mockRejectedValue({
+      status: 401,
+      message: "Not authenticated",
+    });
 
     const response = await POST(mockRequest());
     expect(response.status).toBe(401);
@@ -181,7 +192,13 @@ describe("DELETE /api/auth/mfa/setup", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetClientIp.mockReturnValue("127.0.0.1");
-    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 4, windowSec: 300, limit: 5, resetInSec: 300 });
+    mockCheckRateLimit.mockResolvedValue({
+      allowed: true,
+      remaining: 4,
+      windowSec: 300,
+      limit: 5,
+      resetInSec: 300,
+    });
     mockRequireAuth.mockResolvedValue({ userId: 1, email: "test@test.com" });
     mockGetMfaStatus.mockResolvedValue({ isEnabled: true });
     mockGetDecryptedTotpSecret.mockResolvedValue("JBSWY3DPEHPK3PXP");
@@ -190,7 +207,10 @@ describe("DELETE /api/auth/mfa/setup", () => {
   });
 
   it("returns 401 when not authenticated", async () => {
-    mockRequireAuth.mockRejectedValue({ status: 401, message: "Not authenticated" });
+    mockRequireAuth.mockRejectedValue({
+      status: 401,
+      message: "Not authenticated",
+    });
 
     const response = await DELETE(mockRequest({ token: "123456" }));
     expect(response.status).toBe(401);
@@ -212,6 +232,14 @@ describe("DELETE /api/auth/mfa/setup", () => {
   });
 
   it("calls checkRateLimit with mfa:setup endpoint", async () => {
+<<<<<<< HEAD
+    mockMfaConfigFindUnique.mockResolvedValue({
+      totpSecret: "secret",
+      isEnabled: true,
+    });
+
+=======
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     await DELETE(mockRequest({ token: "123456" }));
     expect(mockCheckRateLimit).toHaveBeenCalledWith(
       expect.objectContaining({ endpoint: "mfa:setup" }),
@@ -231,7 +259,14 @@ describe("DELETE /api/auth/mfa/setup", () => {
   });
 
   it("returns 409 when MFA is not enabled", async () => {
+<<<<<<< HEAD
+    mockMfaConfigFindUnique.mockResolvedValue({
+      totpSecret: "secret",
+      isEnabled: false,
+    });
+=======
     mockGetMfaStatus.mockResolvedValue({ isEnabled: false });
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
     const response = await DELETE(mockRequest({ token: "123456" }));
     expect(response.status).toBe(409);
@@ -247,6 +282,13 @@ describe("DELETE /api/auth/mfa/setup", () => {
   });
 
   it("returns 401 when TOTP token is invalid", async () => {
+<<<<<<< HEAD
+    mockMfaConfigFindUnique.mockResolvedValue({
+      totpSecret: "secret",
+      isEnabled: true,
+    });
+=======
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     mockVerifyTOTP.mockReturnValue(false);
 
     const response = await DELETE(mockRequest({ token: "123456" }));
@@ -256,6 +298,14 @@ describe("DELETE /api/auth/mfa/setup", () => {
   });
 
   it("disables MFA with valid token", async () => {
+<<<<<<< HEAD
+    mockMfaConfigFindUnique.mockResolvedValue({
+      totpSecret: "secret",
+      isEnabled: true,
+    });
+
+=======
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     const response = await DELETE(mockRequest({ token: "123456" }));
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -264,6 +314,14 @@ describe("DELETE /api/auth/mfa/setup", () => {
   });
 
   it("logs audit event on successful disable", async () => {
+<<<<<<< HEAD
+    mockMfaConfigFindUnique.mockResolvedValue({
+      totpSecret: "secret",
+      isEnabled: true,
+    });
+
+=======
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     await DELETE(mockRequest({ token: "123456" }));
     expect(mockLogAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({ action: "MFA_DISABLED" }),
@@ -271,6 +329,13 @@ describe("DELETE /api/auth/mfa/setup", () => {
   });
 
   it("logs audit event on MFA verification failure", async () => {
+<<<<<<< HEAD
+    mockMfaConfigFindUnique.mockResolvedValue({
+      totpSecret: "secret",
+      isEnabled: true,
+    });
+=======
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     mockVerifyTOTP.mockReturnValue(false);
 
     await DELETE(mockRequest({ token: "123456" }));

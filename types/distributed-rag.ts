@@ -13,7 +13,7 @@ export interface OrgRepository {
 export interface CrossRepoDependency {
   sourceRepo: string;
   targetRepo: string;
-  dependencyType: 'import' | 'api' | 'package' | 'sdk';
+  dependencyType: "import" | "api" | "package" | "sdk";
   sourceFile: string;
   targetFile?: string;
   description?: string;
@@ -21,7 +21,7 @@ export interface CrossRepoDependency {
 
 export interface KnowledgeGraphNode {
   id: string;
-  type: 'repository' | 'service' | 'api' | 'interface' | 'package' | 'file';
+  type: "repository" | "service" | "api" | "interface" | "package" | "file";
   metadata: Record<string, any>;
   dependencies: string[];
   dependents: string[];
@@ -30,7 +30,7 @@ export interface KnowledgeGraphNode {
 export interface CrossRepoImpactReport {
   modifiedRepository: string;
   potentiallyAffectedRepositories: string[];
-  risk: 'Low' | 'Medium' | 'High' | 'Critical';
+  risk: "Low" | "Medium" | "High" | "Critical";
   reason: string;
   details: string[];
 }

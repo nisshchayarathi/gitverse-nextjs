@@ -6,7 +6,10 @@ export class IssueClassifierService {
   /**
    * Analyzes an issue's title and body to classify it into a category and extract tags.
    */
-  async classifyIssue(title: string, body: string): Promise<IssueClassification> {
+  async classifyIssue(
+    title: string,
+    body: string,
+  ): Promise<IssueClassification> {
     const safeTitle = sanitizeTextContent(title);
     const safeBody = sanitizeTextContent(body);
     const prompt = `
@@ -33,17 +36,21 @@ Return ONLY valid JSON matching this schema (no markdown formatting, no code fen
     try {
       const gemini = getGeminiService();
       const result = await gemini.chatRaw(prompt);
-      
+
       let rawJson = result.text;
       // Clean markdown formatting if any
-      rawJson = rawJson.replace(/```json/gi, "").replace(/```/g, "").trim();
-      
+      rawJson = rawJson
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim();
+
       const parsed = JSON.parse(rawJson) as IssueClassification;
-      
+
       return {
         category: parsed.category || "unknown",
         tags: Array.isArray(parsed.tags) ? parsed.tags : [],
-        confidence: typeof parsed.confidence === "number" ? parsed.confidence : 50,
+        confidence:
+          typeof parsed.confidence === "number" ? parsed.confidence : 50,
       };
     } catch (error) {
       console.error("[IssueClassifierService] Error classifying issue:", error);

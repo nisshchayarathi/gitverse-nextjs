@@ -82,7 +82,7 @@ describe("Webhook Worker Authorization Flow", () => {
       const secret = "valid-secret";
 
       expect(validateAuthorizationHeader("NotBearer token", secret)).toBe(
-        false
+        false,
       );
     });
 
@@ -104,7 +104,7 @@ describe("Webhook Worker Authorization Flow", () => {
       const token = deriveBearerToken(secret);
 
       expect(validateAuthorizationHeader(token.toLowerCase(), secret)).toBe(
-        false
+        false,
       );
     });
   });

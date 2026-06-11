@@ -22,9 +22,14 @@ export class ComplianceAuditService {
           },
         },
       });
-      console.warn(`[ComplianceAudit] Logged violation for org ${violation.organizationId}: ${violation.reason}`);
+      console.warn(
+        `[ComplianceAudit] Logged violation for org ${violation.organizationId}: ${violation.reason}`,
+      );
     } catch (error) {
-      console.error("[ComplianceAudit] Failed to log compliance violation:", error);
+      console.error(
+        "[ComplianceAudit] Failed to log compliance violation:",
+        error,
+      );
     }
   }
 

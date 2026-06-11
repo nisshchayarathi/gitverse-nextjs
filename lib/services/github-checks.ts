@@ -1,5 +1,9 @@
 import { GitHubService } from "./githubService";
-import { CheckConclusion, CheckOutput, CheckStatus } from "@/types/github-checks";
+import {
+  CheckConclusion,
+  CheckOutput,
+  CheckStatus,
+} from "@/types/github-checks";
 
 export class GitHubChecksService {
   constructor(private githubService: GitHubService) {}
@@ -12,14 +16,14 @@ export class GitHubChecksService {
     owner: string,
     repo: string,
     headSha: string,
-    name: string = "GitVerse Security & Compliance Review"
+    name: string = "GitVerse Security & Compliance Review",
   ): Promise<number> {
     const checkRun = await this.githubService.createCheckRun(
       owner,
       repo,
       name,
       headSha,
-      "in_progress"
+      "in_progress",
     );
     return checkRun.id;
   }
@@ -32,7 +36,7 @@ export class GitHubChecksService {
     repo: string,
     checkRunId: number,
     conclusion: CheckConclusion,
-    output: CheckOutput
+    output: CheckOutput,
   ): Promise<void> {
     await this.githubService.updateCheckRun(
       owner,
@@ -40,7 +44,7 @@ export class GitHubChecksService {
       checkRunId,
       "completed",
       conclusion,
-      output
+      output,
     );
   }
 
@@ -52,7 +56,7 @@ export class GitHubChecksService {
     owner: string,
     repo: string,
     checkRunId: number,
-    errorMessage: string
+    errorMessage: string,
   ): Promise<void> {
     await this.githubService.updateCheckRun(
       owner,
@@ -64,7 +68,7 @@ export class GitHubChecksService {
         title: "Internal Error",
         summary: "The GitVerse worker failed to complete the analysis.",
         text: `### Error Details\n\n\`\`\`\n${errorMessage}\n\`\`\`\n\nPlease re-trigger the check by pushing a new commit or retrying from the Actions tab.`,
-      }
+      },
     );
   }
 }

@@ -1,3 +1,17 @@
+<<<<<<< HEAD
+// @jest-environment jsdom
+import { render, screen } from "@testing-library/react";
+
+jest.mock("next/link", () => ({
+  default: ({
+    children,
+    href,
+  }: {
+    children: React.ReactNode;
+    href: string;
+  }) => <a href={href}>{children}</a>,
+}));
+=======
 import React from "react";
 import { render, screen } from "@testing-library/react";
 
@@ -6,6 +20,7 @@ jest.mock("next/link", () => {
     React.createElement("a", { href, ...props }, children);
   return MockLink;
 });
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
 jest.mock("lucide-react", () => ({
   GitBranch: () => <svg data-testid="git-branch" />,
@@ -14,7 +29,16 @@ jest.mock("lucide-react", () => ({
 }));
 
 jest.mock("@/components/ui", () => ({
+<<<<<<< HEAD
+  Button: ({ children, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
+}));
+
+jest.mock("@/components/ThemeToggle", () => ({
+=======
   Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
   ThemeToggle: () => <button data-testid="theme-toggle">Toggle</button>,
 }));
 

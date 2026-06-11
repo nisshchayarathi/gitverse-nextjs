@@ -1,4 +1,13 @@
+<<<<<<< HEAD
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+  addRateLimitHeaders,
+} from "../rateLimit";
+=======
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS, addRateLimitHeaders, getWindowExpiry, _resetStateForTesting } from "../rateLimit";
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 import { NextResponse } from "next/server";
 
 const mockUpsert = jest.fn();
@@ -68,7 +77,10 @@ describe("checkRateLimit", () => {
   it("allows request when under limit", async () => {
     mockUpsert.mockResolvedValue({ points: 1, key: "repo:analyze:user1" });
 
-    const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    const result = await checkRateLimit(
+      "user1",
+      RATE_LIMITS.REPOSITORY_ANALYZE,
+    );
 
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(4);
@@ -79,27 +91,52 @@ describe("checkRateLimit", () => {
   it("allows request at boundary of limit", async () => {
     mockUpsert.mockResolvedValue({ points: 5, key: "repo:analyze:user1" });
 
-    const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    const result = await checkRateLimit(
+      "user1",
+      RATE_LIMITS.REPOSITORY_ANALYZE,
+    );
 
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(0);
     expect(result.limit).toBe(5);
   });
 
+<<<<<<< HEAD
+  it("rejects request when at limit", async () => {
+    mockCount.mockResolvedValue(5);
+    mockFindFirst.mockResolvedValue({
+      expiresAt: new Date(Date.now() + 30000),
+    });
+=======
   it("rejects request when points exceed limit", async () => {
     mockUpsert.mockResolvedValue({ points: 6, key: "repo:analyze:user1" });
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
-    const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    const result = await checkRateLimit(
+      "user1",
+      RATE_LIMITS.REPOSITORY_ANALYZE,
+    );
 
     expect(result.allowed).toBe(false);
     expect(result.remaining).toBe(0);
     expect(result.limit).toBe(5);
   });
 
+<<<<<<< HEAD
+  it("rejects request when over limit", async () => {
+    mockCount.mockResolvedValue(10);
+    mockFindFirst.mockResolvedValue({
+      expiresAt: new Date(Date.now() + 60000),
+    });
+=======
   it("rejects request when points far exceed limit", async () => {
     mockUpsert.mockResolvedValue({ points: 20, key: "repo:analyze:user1" });
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
-    const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    const result = await checkRateLimit(
+      "user1",
+      RATE_LIMITS.REPOSITORY_ANALYZE,
+    );
 
     expect(result.allowed).toBe(false);
     expect(result.remaining).toBe(0);
@@ -110,7 +147,10 @@ describe("checkRateLimit", () => {
     (p2002Error as any).code = "P2002";
     mockUpsert.mockRejectedValue(p2002Error);
 
-    const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    const result = await checkRateLimit(
+      "user1",
+      RATE_LIMITS.REPOSITORY_ANALYZE,
+    );
 
     expect(result.allowed).toBe(false);
     expect(result.remaining).toBe(0);
@@ -120,7 +160,10 @@ describe("checkRateLimit", () => {
   it("falls back to LRU on database errors", async () => {
     mockUpsert.mockRejectedValue(new Error("DB connection failed"));
 
-    const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    const result = await checkRateLimit(
+      "user1",
+      RATE_LIMITS.REPOSITORY_ANALYZE,
+    );
 
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(4);
@@ -163,16 +206,66 @@ describe("checkRateLimit", () => {
       if (k === "file:content:user-b") return Promise.resolve({ points: 101, key: k });
       return Promise.resolve({ points: 0, key: k });
     });
+<<<<<<< HEAD
+    mockCreate.mockResolvedValue({
+      id: "x",
+      key: "file:content:user-a",
+      points: 1,
+    });
+=======
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
     const resultA = await checkRateLimit("user-a", RATE_LIMITS.FILE_CONTENT);
     expect(resultA.allowed).toBe(true);
     expect(resultA.remaining).toBe(99);
 
+<<<<<<< HEAD
+    mockFindFirst.mockResolvedValue({
+      expiresAt: new Date(Date.now() + 30000),
+    });
+=======
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     const resultB = await checkRateLimit("user-b", RATE_LIMITS.FILE_CONTENT);
     expect(resultB.allowed).toBe(false);
     expect(resultB.remaining).toBe(0);
   });
 
+<<<<<<< HEAD
+  it("does not create duplicate records for same user in same window", async () => {
+    mockCount.mockResolvedValue(1);
+    mockCreate.mockResolvedValue({ id: "2", key: "test:user1", points: 1 });
+
+    const result = await checkRateLimit(
+      "user1",
+      RATE_LIMITS.REPOSITORY_ANALYZE,
+    );
+
+    expect(result.allowed).toBe(true);
+    expect(result.remaining).toBe(3);
+  });
+
+  it("queries with correct key format", async () => {
+    mockCount.mockResolvedValue(0);
+    mockCreate.mockResolvedValue({
+      id: "1",
+      key: "repo:analyze:alice",
+      points: 1,
+    });
+
+    await checkRateLimit("alice", {
+      namespace: "repo:analyze",
+      maxRequests: 5,
+      windowMs: 60_000,
+    });
+
+    expect(mockCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          key: "repo:analyze:alice",
+        }),
+      }),
+    );
+=======
   it("calls upsert with the correct composite key", async () => {
     mockUpsert.mockResolvedValue({ points: 1 });
 
@@ -184,13 +277,18 @@ describe("checkRateLimit", () => {
       update: { points: { increment: 1 } },
       create: { key: "repo:analyze:alice", points: 1, expiresAt: expiry },
     });
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
   });
 
   it("uses fixed-window expiry rather than per-request expiry", async () => {
     mockUpsert.mockResolvedValue({ points: 1 });
 
     const windowMs = 120_000;
-    await checkRateLimit("user1", { namespace: "test", maxRequests: 3, windowMs });
+    await checkRateLimit("user1", {
+      namespace: "test",
+      maxRequests: 3,
+      windowMs,
+    });
 
     const expectedExpiry = windowExpiry(windowMs);
     expect(mockUpsert).toHaveBeenCalledWith(
@@ -205,22 +303,53 @@ describe("checkRateLimit", () => {
   it("sanitizes special characters in the identifier", async () => {
     mockUpsert.mockResolvedValue({ points: 1 });
 
-    await checkRateLimit("user@x.y", { namespace: "test", maxRequests: 3, windowMs: 60_000 });
+    await checkRateLimit("user@x.y", {
+      namespace: "test",
+      maxRequests: 3,
+      windowMs: 60_000,
+    });
 
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
+<<<<<<< HEAD
+        where: expect.objectContaining({
+          key: "test:user@x.y",
+        }),
+      }),
+=======
         where: { key_expiresAt: { key: "test:user@x.y", expiresAt: expect.any(Date) } },
       })
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     );
   });
 
   it("sanitizes SQL metacharacters in the identifier", async () => {
     mockUpsert.mockResolvedValue({ points: 1 });
 
-    await checkRateLimit("a;b", { namespace: "test", maxRequests: 3, windowMs: 60_000 });
+    await checkRateLimit("a;b", {
+      namespace: "test",
+      maxRequests: 3,
+      windowMs: 60_000,
+    });
 
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
+<<<<<<< HEAD
+        where: expect.objectContaining({
+          key: "test:a_b",
+        }),
+      }),
+    );
+  });
+
+  it("handles very long identifier", async () => {
+    mockCount.mockResolvedValue(0);
+    mockCreate.mockResolvedValue({
+      id: "1",
+      key: expect.stringContaining("test:"),
+      points: 1,
+    });
+=======
         where: { key_expiresAt: { key: "test:a_b", expiresAt: expect.any(Date) } },
       })
     );
@@ -228,18 +357,53 @@ describe("checkRateLimit", () => {
 
   it("truncates excessively long identifiers", async () => {
     mockUpsert.mockResolvedValue({ points: 1 });
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
     const longId = "a".repeat(1000);
-    await checkRateLimit(longId, { namespace: "test", maxRequests: 3, windowMs: 60_000 });
+    await checkRateLimit(longId, {
+      namespace: "test",
+      maxRequests: 3,
+      windowMs: 60_000,
+    });
 
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
+<<<<<<< HEAD
+        data: expect.objectContaining({
+          key: expect.stringContaining("test:"),
+        }),
+      }),
+    );
+  });
+
+  it("uses expiresAt in where clause for count", async () => {
+    mockCount.mockResolvedValue(1);
+    mockCreate.mockResolvedValue({ id: "1", key: "test:user", points: 1 });
+
+    await checkRateLimit("user", {
+      namespace: "test",
+      maxRequests: 3,
+      windowMs: 60_000,
+    });
+
+    expect(mockCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          expiresAt: expect.objectContaining({ gte: expect.any(Date) }),
+        }),
+      }),
+    );
+  });
+
+  it("enforces all RATE_LIMITS configs have valid values", () => {
+=======
         where: { key_expiresAt: { key: expect.stringContaining("test:"), expiresAt: expect.any(Date) } },
       })
     );
   });
 
   it("validates all RATE_LIMITS configs have sensible values", () => {
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     for (const [name, config] of Object.entries(RATE_LIMITS)) {
       expect(config.namespace).toBeDefined();
       expect(config.maxRequests).toBeGreaterThan(0);
@@ -266,7 +430,7 @@ describe("rateLimitResponse", () => {
     expect(response.headers.get("X-RateLimit-Limit")).toBe("10");
     expect(response.headers.get("X-RateLimit-Remaining")).toBe("0");
     expect(response.headers.get("X-RateLimit-Reset")).toBe(
-      String(Math.ceil((Date.now() + 60000) / 1000))
+      String(Math.ceil((Date.now() + 60000) / 1000)),
     );
   });
 
@@ -312,7 +476,7 @@ describe("addRateLimitHeaders", () => {
     expect(response.headers.get("X-RateLimit-Limit")).toBe("10");
     expect(response.headers.get("X-RateLimit-Remaining")).toBe("8");
     expect(response.headers.get("X-RateLimit-Reset")).toBe(
-      String(Math.ceil((Date.now() + 60000) / 1000))
+      String(Math.ceil((Date.now() + 60000) / 1000)),
     );
   });
 });

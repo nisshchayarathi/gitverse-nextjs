@@ -1,6 +1,9 @@
 import { GitHubService } from "@/lib/services/githubService";
 import { GeminiService } from "@/lib/services/geminiService";
-import { getActivePoliciesForRepository, buildPolicyPromptSection } from "@/lib/services/reviewPolicyService";
+import {
+  getActivePoliciesForRepository,
+  buildPolicyPromptSection,
+} from "@/lib/services/reviewPolicyService";
 import yaml from "yaml";
 import { sanitizeTextContent } from "@/lib/utils/promptSanitization";
 
@@ -108,40 +111,40 @@ function safeParseReviewJson(text: string): PRReviewResponse | null {
 
 function shouldIgnoreFile(filename: string): boolean {
   const lower = filename.toLowerCase();
-  
+
   if (
-    lower.includes("package-lock.json") || 
-    lower.includes("yarn.lock") || 
-    lower.includes("pnpm-lock.yaml") || 
+    lower.includes("package-lock.json") ||
+    lower.includes("yarn.lock") ||
+    lower.includes("pnpm-lock.yaml") ||
     lower.includes("bun.lockb")
   ) {
     return true;
   }
-  
+
   if (
-    lower.startsWith("dist/") || 
-    lower.startsWith("build/") || 
-    lower.startsWith("out/") || 
+    lower.startsWith("dist/") ||
+    lower.startsWith("build/") ||
+    lower.startsWith("out/") ||
     lower.includes("/.next/") ||
-    lower.includes("node_modules/") || 
+    lower.includes("node_modules/") ||
     lower.includes("vendor/")
   ) {
     return true;
   }
-  
+
   if (
-    lower.endsWith(".min.js") || 
-    lower.endsWith(".min.css") || 
-    lower.endsWith(".svg") || 
-    lower.endsWith(".png") || 
-    lower.endsWith(".jpg") || 
-    lower.endsWith(".csv") || 
+    lower.endsWith(".min.js") ||
+    lower.endsWith(".min.css") ||
+    lower.endsWith(".svg") ||
+    lower.endsWith(".png") ||
+    lower.endsWith(".jpg") ||
+    lower.endsWith(".csv") ||
     lower.endsWith(".pdf") ||
     lower.endsWith(".map")
   ) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -161,7 +164,7 @@ function buildDiffForPrompt(
 
   const validFiles = files.filter((f) => !shouldIgnoreFile(f.filename));
   const selected = validFiles.slice(0, maxFiles);
-  
+
   const stats = files
 
     .map(
@@ -212,7 +215,12 @@ export async function reviewPullRequest(params: {
   githubToken?: string;
   repositoryId?: number;
   timeoutEstimator?: TimeoutEstimatorService;
-}): Promise<{ review: PRReviewResponse; prTitle: string; prUrl: string; tokensConsumed?: number }> {
+}): Promise<{
+  review: PRReviewResponse;
+  prTitle: string;
+  prUrl: string;
+  tokensConsumed?: number;
+}> {
   const github = new GitHubService(params.githubToken);
   const pr = await github.getPullRequest(
     params.owner,
@@ -236,15 +244,20 @@ export async function reviewPullRequest(params: {
 
   const metrics = prSizeAnalyzer.analyzeSize(prFiles);
   const mode = prSizeAnalyzer.determineReviewMode(metrics);
-  const timeoutEstimator = params.timeoutEstimator || new TimeoutEstimatorService();
+  const timeoutEstimator =
+    params.timeoutEstimator || new TimeoutEstimatorService();
 
   const { crossRepoImpactService } = await import("./cross-repo-impact");
-  const modifiedFileNames = prFiles.map(f => f.filename);
-  const impactReport = crossRepoImpactService.analyzeImpact(`${params.owner}/${params.repo}`, modifiedFileNames);
-  
-  const impactContext = impactReport.potentiallyAffectedRepositories.length > 0 
-    ? `\nCross-Repository Impact Risk: ${impactReport.risk}\nReason: ${impactReport.reason}\nPotentially Affected Downstream Repositories: ${impactReport.potentiallyAffectedRepositories.join(", ")}\n` 
-    : "";
+  const modifiedFileNames = prFiles.map((f) => f.filename);
+  const impactReport = crossRepoImpactService.analyzeImpact(
+    `${params.owner}/${params.repo}`,
+    modifiedFileNames,
+  );
+
+  const impactContext =
+    impactReport.potentiallyAffectedRepositories.length > 0
+      ? `\nCross-Repository Impact Risk: ${impactReport.risk}\nReason: ${impactReport.reason}\nPotentially Affected Downstream Repositories: ${impactReport.potentiallyAffectedRepositories.join(", ")}\n`
+      : "";
 
   // Fetch active organizational policies for this repository
   let policySection = "";
@@ -252,13 +265,23 @@ export async function reviewPullRequest(params: {
 
   // Attempt to fetch from gitverse.yml in the repository
   try {
-    const yamlContent = await github.getFileContent(params.owner, params.repo, "gitverse.yml", pr.head?.sha || pr.base?.sha);
+    const yamlContent = await github.getFileContent(
+      params.owner,
+      params.repo,
+      "gitverse.yml",
+      pr.head?.sha || pr.base?.sha,
+    );
     if (yamlContent) {
       const parsedYaml = yaml.parse(yamlContent);
-      if (parsedYaml?.reviewGuidelines && Array.isArray(parsedYaml.reviewGuidelines)) {
+      if (
+        parsedYaml?.reviewGuidelines &&
+        Array.isArray(parsedYaml.reviewGuidelines)
+      ) {
         yamlPolicies = parsedYaml.reviewGuidelines;
       } else if (parsedYaml?.rules && Array.isArray(parsedYaml.rules)) {
-        yamlPolicies = parsedYaml.rules.map((r: any) => typeof r === 'string' ? r : r.rule).filter(Boolean);
+        yamlPolicies = parsedYaml.rules
+          .map((r: any) => (typeof r === "string" ? r : r.rule))
+          .filter(Boolean);
       }
     }
   } catch (e) {
@@ -267,26 +290,39 @@ export async function reviewPullRequest(params: {
 
   if (params.repositoryId) {
     try {
-      const policies = await getActivePoliciesForRepository(params.repositoryId);
+      const policies = await getActivePoliciesForRepository(
+        params.repositoryId,
+      );
       policySection = buildPolicyPromptSection(policies);
     } catch (error) {
-      console.warn("[reviewPullRequest] Failed to fetch review policies:", error);
+      console.warn(
+        "[reviewPullRequest] Failed to fetch review policies:",
+        error,
+      );
     }
   }
 
   if (yamlPolicies.length > 0) {
     if (!policySection) {
-      policySection = "\nORGANIZATIONAL POLICIES (MUST ENFORCE):\nThe following custom rules are defined by the repository administrators. You MUST check for compliance with each rule. If a PR violates any rule, create an issue with severity matching the rule's severity level and category set to \"policy-violation\".\n\n";
+      policySection =
+        '\nORGANIZATIONAL POLICIES (MUST ENFORCE):\nThe following custom rules are defined by the repository administrators. You MUST check for compliance with each rule. If a PR violates any rule, create an issue with severity matching the rule\'s severity level and category set to "policy-violation".\n\n';
     }
     for (const rule of yamlPolicies) {
       policySection += `- [HIGH] ${rule}\n`;
     }
-    if (!policySection.includes("IMPORTANT: Policy violations should be flagged")) {
-      policySection += "\nIMPORTANT: Policy violations should be flagged with the exact severity specified. Use the \"suggestion\" field to explain how to fix the violation according to the organizational standard.\n";
+    if (
+      !policySection.includes("IMPORTANT: Policy violations should be flagged")
+    ) {
+      policySection +=
+        '\nIMPORTANT: Policy violations should be flagged with the exact severity specified. Use the "suggestion" field to explain how to fix the violation according to the organizational standard.\n';
     }
   }
 
-  const processChunk = async (chunkFiles: typeof prFiles, chunkIndex: number, totalChunks: number): Promise<PRReviewResponse | null> => {
+  const processChunk = async (
+    chunkFiles: typeof prFiles,
+    chunkIndex: number,
+    totalChunks: number,
+  ): Promise<PRReviewResponse | null> => {
     const { diff, stats } = buildDiffForPrompt(chunkFiles);
 
     if (!diff) {
@@ -296,7 +332,8 @@ export async function reviewPullRequest(params: {
       return null;
     }
 
-    const chunkNotice = totalChunks > 1 ? `(Chunk ${chunkIndex} of ${totalChunks})` : "";
+    const chunkNotice =
+      totalChunks > 1 ? `(Chunk ${chunkIndex} of ${totalChunks})` : "";
     const safeTitle = sanitizeTextContent(pr.title);
     const safeAuthor = sanitizeTextContent(pr.user?.login || "unknown");
     const safeBaseRef = sanitizeTextContent(pr.base?.ref || "?");
@@ -397,22 +434,26 @@ ${safeDiff}
 
   // Determine chunkSize based on mode
   let chunkSize = 50;
-  if (mode === 'Chunked') chunkSize = 100;
-  if (mode === 'Degraded') chunkSize = 50; // Use smaller chunks to fit whatever time is left
+  if (mode === "Chunked") chunkSize = 100;
+  if (mode === "Degraded") chunkSize = 50; // Use smaller chunks to fit whatever time is left
 
   let filesToProcess = prFiles;
-  if (mode === 'Degraded') {
+  if (mode === "Degraded") {
     // Only process the first N files to guarantee some review happens
-    filesToProcess = prFiles.slice(0, DEFAULT_REVIEW_THRESHOLDS.chunkedFileCount);
+    filesToProcess = prFiles.slice(
+      0,
+      DEFAULT_REVIEW_THRESHOLDS.chunkedFileCount,
+    );
   }
 
-  const { result: chunkResult, review } = await chunkedReviewService.executeChunkedReview({
-    files: filesToProcess,
-    timeoutEstimator,
-    chunkSize,
-    processChunk,
-    mode
-  });
+  const { result: chunkResult, review } =
+    await chunkedReviewService.executeChunkedReview({
+      files: filesToProcess,
+      timeoutEstimator,
+      chunkSize,
+      processChunk,
+      mode,
+    });
 
   if (!review) {
     if (chunkResult.errorReason && chunkResult.errorReason.includes("High-confidence secret detected")) {
@@ -439,21 +480,25 @@ ${safeDiff}
     // Fallback if completely failed
     return {
       review: {
-        summary: `The pull request diff was too large or complex for the AI to analyze fully, or the AI service timed out. Status: ${chunkResult.status}. Error: ${chunkResult.errorReason || 'Unknown'}`,
+        summary: `The pull request diff was too large or complex for the AI to analyze fully, or the AI service timed out. Status: ${chunkResult.status}. Error: ${chunkResult.errorReason || "Unknown"}`,
         overallScore: 50,
-        issues: [{
-          title: "PR Diff Too Large / Analysis Timeout",
-          severity: "medium",
-          category: "maintainability",
-          file: null,
-          line: null,
-          explanation: "The AI service encountered an error processing the size or complexity of this PR.",
-          suggestion: "Consider breaking this PR into smaller, more focused changes, or rely on manual code review."
-        }],
-        praise: []
+        issues: [
+          {
+            title: "PR Diff Too Large / Analysis Timeout",
+            severity: "medium",
+            category: "maintainability",
+            file: null,
+            line: null,
+            explanation:
+              "The AI service encountered an error processing the size or complexity of this PR.",
+            suggestion:
+              "Consider breaking this PR into smaller, more focused changes, or rely on manual code review.",
+          },
+        ],
+        praise: [],
       },
       prTitle: pr.title,
-      prUrl: pr.html_url
+      prUrl: pr.html_url,
     };
   }
 

@@ -31,14 +31,14 @@ export async function POST(request: NextRequest) {
     if (!newPassword) {
       return NextResponse.json(
         { error: "New password is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (newPassword.length < 8) {
       return NextResponse.json(
         { error: "Password must be at least 8 characters" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -47,10 +47,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!userDetails) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const passwordHash = userDetails.passwordHash;
@@ -61,42 +58,34 @@ export async function POST(request: NextRequest) {
           error:
             "This account uses OAuth. Password management is handled by your OAuth provider.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!currentPassword) {
       return NextResponse.json(
         { error: "Current password is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      currentPassword,
-      passwordHash
-    );
+    const isPasswordValid = await bcrypt.compare(currentPassword, passwordHash);
 
     if (!isPasswordValid) {
       return NextResponse.json(
         { error: "Current password is incorrect" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    const hashedPassword = await bcrypt.hash(
-      newPassword,
-      10
-    );
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await prisma.$transaction([
       prisma.user.update({
         where: { id: user.userId },
         data: {
           passwordHash: hashedPassword,
-          passwordChangedAt: new Date(
-            Math.floor(Date.now() / 1000) * 1000
-          ),
+          passwordChangedAt: new Date(Math.floor(Date.now() / 1000) * 1000),
           tokenVersion: {
             increment: 1,
           },
@@ -121,21 +110,18 @@ export async function POST(request: NextRequest) {
       message: "Password changed successfully",
     });
   } catch (error: any) {
-    console.error(
-      "Error changing password:",
-      sanitizeError(error)
-    );
+    console.error("Error changing password:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to change password" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

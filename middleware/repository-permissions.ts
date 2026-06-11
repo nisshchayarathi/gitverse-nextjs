@@ -16,19 +16,23 @@ export interface EnforcedPermissionResult {
 export async function enforceRepositoryPermission(
   request: NextRequest,
   repositoryId: number,
+<<<<<<< HEAD
+  requiredAction: "read" | "write",
+=======
   requiredAction: 'read' | 'write' | 'settings_read' | 'settings_write' | 'billing_read' | 'billing_write'
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 ): Promise<EnforcedPermissionResult> {
   try {
     const user = await requireAuth(request);
-    
+
     // 1. Perform authorization lookup flow
     const check = await RepositoryAccess.checkAccess(repositoryId, user.userId);
-    
+
     if (!check.allowed || !check.role) {
       AuthorizationAudit.log({
         userId: user.userId,
         repositoryId,
-        action: 'unauthorized_attempt',
+        action: "unauthorized_attempt",
         success: false,
         reason: check.reason || "Unauthorized access",
       });
@@ -39,13 +43,19 @@ export async function enforceRepositoryPermission(
         userId: user.userId,
         errorResponse: NextResponse.json(
           { error: "Repository not found" },
-          { status: 404 }
+          { status: 404 },
         ),
       };
     }
 
     // 2. Perform RBAC validation based on the required action
     let hasPermission = false;
+<<<<<<< HEAD
+    if (requiredAction === "write") {
+      hasPermission = RBAC.canModifyPolicy(check.role);
+    } else {
+      hasPermission = RBAC.canReadPolicy(check.role);
+=======
     let auditAction: 'policy_read' | 'policy_write' | 'settings_read' | 'settings_write' | 'billing_read' | 'billing_write' | 'unauthorized_attempt';
 
     switch (requiredAction) {
@@ -73,13 +83,14 @@ export async function enforceRepositoryPermission(
         hasPermission = RBAC.canReadPolicy(check.role);
         auditAction = 'policy_read';
         break;
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
     }
 
     if (!hasPermission) {
       AuthorizationAudit.log({
         userId: user.userId,
         repositoryId,
-        action: 'unauthorized_attempt',
+        action: "unauthorized_attempt",
         success: false,
         role: check.role,
         reason: `Insufficient role permissions for ${requiredAction} action`,
@@ -90,7 +101,7 @@ export async function enforceRepositoryPermission(
         userId: user.userId,
         errorResponse: NextResponse.json(
           { error: "Forbidden: Insufficient role permission" },
-          { status: 403 }
+          { status: 403 },
         ),
       };
     }
@@ -99,7 +110,11 @@ export async function enforceRepositoryPermission(
     AuthorizationAudit.log({
       userId: user.userId,
       repositoryId,
+<<<<<<< HEAD
+      action: requiredAction === "write" ? "policy_write" : "policy_read",
+=======
       action: auditAction,
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
       success: true,
       role: check.role,
     });
@@ -109,13 +124,16 @@ export async function enforceRepositoryPermission(
       userId: user.userId,
     };
   } catch (error: any) {
-    console.error("[enforceRepositoryPermission] Unexpected authorization error:", error);
+    console.error(
+      "[enforceRepositoryPermission] Unexpected authorization error:",
+      error,
+    );
     return {
       allowed: false,
       userId: 0,
       errorResponse: NextResponse.json(
         { error: "Internal authorization check failed" },
-        { status: 500 }
+        { status: 500 },
       ),
     };
   }

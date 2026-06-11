@@ -4,7 +4,12 @@
  */
 
 export type ExperienceLevel = "Beginner" | "Intermediate" | "Advanced";
-export type FocusArea = "Frontend" | "Backend" | "Full Stack" | "AI/ML" | "DevOps";
+export type FocusArea =
+  | "Frontend"
+  | "Backend"
+  | "Full Stack"
+  | "AI/ML"
+  | "DevOps";
 
 export interface ContributionPreference {
   name: string;

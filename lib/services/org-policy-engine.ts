@@ -7,14 +7,16 @@ export class OrganizationPolicyEngine {
    * Organization policies take precedence if policyLockEnabled is true.
    * If inheritedPolicy is true, org policies are used by default.
    */
-  async getEffectivePolicy(repositoryId: number): Promise<EffectiveRepositoryPolicy> {
+  async getEffectivePolicy(
+    repositoryId: number,
+  ): Promise<EffectiveRepositoryPolicy> {
     const assignment = await prisma.repositoryPolicyAssignment.findUnique({
       where: { repositoryId },
       include: {
         organization: {
-          include: { policies: true }
-        }
-      }
+          include: { policies: true },
+        },
+      },
     });
 
     if (!assignment || !assignment.organization.policies) {
@@ -34,17 +36,21 @@ export class OrganizationPolicyEngine {
     const isInherited = assignment.inheritedPolicy;
 
     // Determine final values based on lock status and inheritance
-    const enforceSecurityReviews = isLocked || isInherited
-      ? orgPolicy.enforceSecurityReviews
-      : (assignment.enforceSecurityReviews ?? orgPolicy.enforceSecurityReviews);
+    const enforceSecurityReviews =
+      isLocked || isInherited
+        ? orgPolicy.enforceSecurityReviews
+        : (assignment.enforceSecurityReviews ??
+          orgPolicy.enforceSecurityReviews);
 
-    const enforceSecretScanning = isLocked || isInherited
-      ? orgPolicy.enforceSecretScanning
-      : (assignment.enforceSecretScanning ?? orgPolicy.enforceSecretScanning);
+    const enforceSecretScanning =
+      isLocked || isInherited
+        ? orgPolicy.enforceSecretScanning
+        : (assignment.enforceSecretScanning ?? orgPolicy.enforceSecretScanning);
 
-    const blockCriticalSecrets = isLocked || isInherited
-      ? orgPolicy.blockCriticalSecrets
-      : (assignment.blockCriticalSecrets ?? orgPolicy.blockCriticalSecrets);
+    const blockCriticalSecrets =
+      isLocked || isInherited
+        ? orgPolicy.blockCriticalSecrets
+        : (assignment.blockCriticalSecrets ?? orgPolicy.blockCriticalSecrets);
 
     return {
       repositoryId,

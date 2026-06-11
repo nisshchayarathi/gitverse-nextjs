@@ -1,7 +1,4 @@
-import {
-  spawn,
-  type SpawnOptions,
-} from "child_process";
+import { spawn, type SpawnOptions } from "child_process";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { createReadStream } from "fs";
@@ -37,15 +34,12 @@ function countLinesReadStream(filePath: string): Promise<number> {
   });
 }
 
-function killProcess(
-  child: import("child_process").ChildProcess,
-): void {
+function killProcess(child: import("child_process").ChildProcess): void {
   child.kill("SIGTERM");
   setTimeout(() => {
     try {
       child.kill("SIGKILL");
-    } catch {
-    }
+    } catch {}
   }, FORCE_KILL_DELAY_MS);
 }
 
@@ -250,7 +244,7 @@ export class GitService {
   ): Promise<GitService> {
     const normalizedUrl = normalizeKnownRepoHttpUrl(url);
     let finalUrl = normalizedUrl || url;
-    
+
     // Inject access token for GitHub private repositories
     if (opts?.accessToken && finalUrl.includes("github.com")) {
       const parsedUrl = new URL(finalUrl);
@@ -267,7 +261,11 @@ export class GitService {
       const host = sshMatch[1];
       const owner = sshMatch[2];
       const repo = sshMatch[3];
-      const allowedHosts = new Set(["github.com", "gitlab.com", "bitbucket.org"]);
+      const allowedHosts = new Set([
+        "github.com",
+        "gitlab.com",
+        "bitbucket.org",
+      ]);
       if (!allowedHosts.has(host)) {
         throw new Error(`Repository host ${host} is not allowed`);
       }
@@ -364,19 +362,24 @@ export class GitService {
   /**
    * Check if a public GitHub repository exists and is accessible.
    */
-  static async checkGithubRepositoryExists(url: string, accessToken?: string): Promise<boolean> {
+  static async checkGithubRepositoryExists(
+    url: string,
+    accessToken?: string,
+  ): Promise<boolean> {
     const match = url.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
     if (!match) return false;
 
     const [, owner, repo] = match;
     const headers: Record<string, string> = { "User-Agent": "GitVerse" };
-    
+
     if (accessToken) {
       headers["Authorization"] = `token ${accessToken}`;
     }
 
     try {
-      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+        headers,
+      });
       return res.status === 200;
     } catch {
       return false;
@@ -386,9 +389,15 @@ export class GitService {
   /**
    * Get the remote repository size in bytes (via GitHub API if applicable).
    */
-  static async getRemoteRepositorySize(url: string, accessToken?: string): Promise<number | null> {
+  static async getRemoteRepositorySize(
+    url: string,
+    accessToken?: string,
+  ): Promise<number | null> {
     try {
-      const cleanUrl = url.trim().replace(/\/$/, "").replace(/\.git$/, "");
+      const cleanUrl = url
+        .trim()
+        .replace(/\/$/, "")
+        .replace(/\.git$/, "");
       const parts = cleanUrl.split("/");
       const repo = parts[parts.length - 1];
       const owner = parts[parts.length - 2];
@@ -401,7 +410,9 @@ export class GitService {
         headers["Authorization"] = `token ${accessToken}`;
       }
 
-      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+        headers,
+      });
       if (res.status === 200) {
         const data = await res.json();
         // GitHub API returns size in KB
@@ -422,11 +433,18 @@ export class GitService {
         ["symbolic-ref", "refs/remotes/origin/HEAD"],
         { timeout: DEFAULT_GIT_TIMEOUT_MS, signal },
       );
-      const defaultBranchName = defaultBranch.trim().replace(/^refs\/remotes\/origin\//, "");
+      const defaultBranchName = defaultBranch
+        .trim()
+        .replace(/^refs\/remotes\/origin\//, "");
 
       // Get both local and remote branches
       const { stdout } = await this.spawnGit(
-        ["for-each-ref", "--format=%(refname:short)|%(committerdate:iso)|%(objectname)", "refs/heads/", "refs/remotes/origin/"],
+        [
+          "for-each-ref",
+          "--format=%(refname:short)|%(committerdate:iso)|%(objectname)",
+          "refs/heads/",
+          "refs/remotes/origin/",
+        ],
         { timeout: DEFAULT_GIT_TIMEOUT_MS, signal },
       );
 
@@ -457,10 +475,10 @@ export class GitService {
         const batch = refEntries.slice(i, i + concurrencyLimit);
         const batchResults = await Promise.allSettled(
           batch.map((entry) =>
-            this.spawnGit(
-              ["rev-list", "--count", entry.fullName],
-              { timeout: DEFAULT_GIT_TIMEOUT_MS, signal },
-            ).then(({ stdout }) => parseInt(stdout.trim())),
+            this.spawnGit(["rev-list", "--count", entry.fullName], {
+              timeout: DEFAULT_GIT_TIMEOUT_MS,
+              signal,
+            }).then(({ stdout }) => parseInt(stdout.trim())),
           ),
         );
         countResults.push(...batchResults);
@@ -713,7 +731,13 @@ export class GitService {
   async getContributors(signal?: AbortSignal): Promise<ContributorData[]> {
     try {
       const { stdout } = await this.spawnGit(
-        ["log", "--format=%an|%ae|%aI", "--numstat", "-n", String(MAX_CONTRIBUTOR_COMMITS)],
+        [
+          "log",
+          "--format=%an|%ae|%aI",
+          "--numstat",
+          "-n",
+          String(MAX_CONTRIBUTOR_COMMITS),
+        ],
         { timeout: GIT_LOG_TIMEOUT_MS, signal },
       );
 
@@ -737,9 +761,13 @@ export class GitService {
           if (existing) {
             existing.commits++;
             existing.lastCommit =
-              commitDate > existing.lastCommit ? commitDate : existing.lastCommit;
+              commitDate > existing.lastCommit
+                ? commitDate
+                : existing.lastCommit;
             existing.firstCommit =
-              commitDate < existing.firstCommit ? commitDate : existing.firstCommit;
+              commitDate < existing.firstCommit
+                ? commitDate
+                : existing.firstCommit;
           } else {
             contributorMap.set(key, {
               name,
@@ -886,7 +914,10 @@ export class GitService {
     return languageMap[ext] || null;
   }
 
-  async getFileTree(scope?: string, signal?: AbortSignal): Promise<
+  async getFileTree(
+    scope?: string,
+    signal?: AbortSignal,
+  ): Promise<
     {
       path: string;
       name: string;
@@ -899,7 +930,10 @@ export class GitService {
     try {
       const args = ["ls-files"];
       if (scope) args.push(scope);
-      const { stdout } = await this.spawnGit(args, { timeout: DEFAULT_GIT_TIMEOUT_MS, signal });
+      const { stdout } = await this.spawnGit(args, {
+        timeout: DEFAULT_GIT_TIMEOUT_MS,
+        signal,
+      });
 
       const files: {
         path: string;
@@ -971,7 +1005,10 @@ export class GitService {
   /**
    * Detect programming languages in the repository
    */
-  async detectLanguages(scope?: string, signal?: AbortSignal): Promise<LanguageData[]> {
+  async detectLanguages(
+    scope?: string,
+    signal?: AbortSignal,
+  ): Promise<LanguageData[]> {
     try {
       const files = await this.getFileTree(scope, signal);
 
@@ -1018,7 +1055,9 @@ export class GitService {
       while (stack.length > 0) {
         const currentPath = stack.pop()!;
         try {
-          const entries = await fs.readdir(currentPath, { withFileTypes: true });
+          const entries = await fs.readdir(currentPath, {
+            withFileTypes: true,
+          });
           for (const entry of entries) {
             const entryPath = path.join(currentPath, entry.name);
             if (entry.isDirectory()) {

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  GitBranch, 
-  Trash2, 
-  History, 
+import {
+  GitBranch,
+  Trash2,
+  History,
   ExternalLink,
   Loader2,
-  FolderOpen
+  FolderOpen,
 } from "lucide-react";
 import { useRecentRepos, RecentRepository } from "@/hooks/useRecentRepos";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,7 +18,7 @@ export function RecentReposList() {
   const router = useRouter();
   const { repos, clearRepos, isLoaded } = useRecentRepos();
   const { isAuthenticated } = useAuth();
-  
+
   // Track loading state for each card to provide feedback during network lookups
   const [navigatingUrl, setNavigatingUrl] = useState<string | null>(null);
 
@@ -41,9 +41,9 @@ export function RecentReposList() {
 
   const handleCardClick = async (repo: RecentRepository) => {
     if (navigatingUrl) return;
-    
+
     setNavigatingUrl(repo.url);
-    
+
     try {
       // 1. If not authenticated, redirect to login with from param
       if (!isAuthenticated) {
@@ -64,7 +64,8 @@ export function RecentReposList() {
 
       const userRepos = response.data.data?.repositories || [];
       const existingRepo = userRepos.find(
-        (r: any) => r.url.toLowerCase().trim() === repo.url.toLowerCase().trim()
+        (r: any) =>
+          r.url.toLowerCase().trim() === repo.url.toLowerCase().trim(),
       );
 
       if (existingRepo) {
@@ -86,7 +87,7 @@ export function RecentReposList() {
           },
           {
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
 
         const newRepo = createResponse.data.repository;
@@ -94,7 +95,10 @@ export function RecentReposList() {
       }
     } catch (error: any) {
       console.error("Error navigating to recent repository:", error);
-      const errMsg = error.response?.data?.error || error.message || "Failed to load repository.";
+      const errMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to load repository.";
       toast({
         title: "Navigation Failed",
         description: errMsg,
@@ -105,7 +109,7 @@ export function RecentReposList() {
   };
 
   return (
-    <div 
+    <div
       className="mt-8 max-w-2xl mx-auto text-left animate-fade-in-up"
       style={{ animationDelay: "0.35s" }}
     >
@@ -127,13 +131,15 @@ export function RecentReposList() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {repos.map((repo, idx) => {
           const isCurrentLoading = navigatingUrl === repo.url;
-          
+
           return (
             <div
               key={`${repo.url}-${idx}`}
               onClick={() => handleCardClick(repo)}
               className={`group relative p-4 rounded-xl border glass glass-hover cursor-pointer overflow-hidden transition-all duration-300 transform hover:-translate-y-1 ${
-                isCurrentLoading ? "opacity-75 ring-1 ring-primary pointer-events-none" : ""
+                isCurrentLoading
+                  ? "opacity-75 ring-1 ring-primary pointer-events-none"
+                  : ""
               }`}
             >
               <div className="flex items-start justify-between gap-3">

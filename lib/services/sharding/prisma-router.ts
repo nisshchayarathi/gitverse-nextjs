@@ -61,8 +61,8 @@ export class PrismaShardRouter {
    * Cleans up all connections gracefully.
    */
   public async disconnectAll(): Promise<void> {
-    const disconnectPromises = Array.from(this.clients.values()).map(client =>
-      client.$disconnect()
+    const disconnectPromises = Array.from(this.clients.values()).map((client) =>
+      client.$disconnect(),
     );
     await Promise.all(disconnectPromises);
     this.clients.clear();

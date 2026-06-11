@@ -43,7 +43,7 @@ class GeminiService {
     message: string,
     context?: RepositoryContext,
     history: ChatMessage[] = [],
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<string> {
     try {
       // Add repository context to the prompt if provided
@@ -69,17 +69,17 @@ User Question: ${message}
           ...this.getAuthHeaders(),
         },
         signal,
-        body: JSON.stringify({ 
-          repositoryId: context?.id ? Number(context.id) : undefined, 
-          prompt: enhancedMessage, 
-          messages: history 
+        body: JSON.stringify({
+          repositoryId: context?.id ? Number(context.id) : undefined,
+          prompt: enhancedMessage,
+          messages: history,
         }),
       });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(
-          data?.error || data?.details || "Failed to get AI response"
+          data?.error || data?.details || "Failed to get AI response",
         );
       }
 
@@ -101,7 +101,7 @@ User Question: ${message}
     message: string,
     context?: RepositoryContext,
     history: ChatMessage[] = [],
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): AsyncGenerator<string> {
     try {
       // Server route isn't streaming; yield the full response once.
@@ -128,7 +128,7 @@ User Question: ${message}
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(
-          data?.error || data?.details || "Failed to analyze code"
+          data?.error || data?.details || "Failed to analyze code",
         );
       }
 
@@ -144,7 +144,10 @@ User Question: ${message}
     }
   }
 
-  async analyzeRepository(repositoryId: number, type: string): Promise<{ analysis: string; isTruncated: boolean }> {
+  async analyzeRepository(
+    repositoryId: number,
+    type: string,
+  ): Promise<{ analysis: string; isTruncated: boolean }> {
     try {
       const res = await fetch("/api/ai/analyze-repository", {
         method: "POST",
@@ -159,7 +162,7 @@ User Question: ${message}
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(
-          data?.error || data?.details || "Failed to analyze repository"
+          data?.error || data?.details || "Failed to analyze repository",
         );
       }
 
@@ -192,9 +195,7 @@ User Question: ${message}
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(
-          data?.error || "Failed to compare repositories"
-        );
+        throw new Error(data?.error || "Failed to compare repositories");
       }
 
       const text = data?.comparison;
@@ -206,12 +207,17 @@ User Question: ${message}
     } catch (error) {
       console.error("Repository comparison error:", error);
       throw new Error(
-        error instanceof Error ? error.message : "Failed to compare repositories"
+        error instanceof Error
+          ? error.message
+          : "Failed to compare repositories",
       );
     }
   }
 
-  async simulatePullRequest(repositoryId: number | undefined, diff: string): Promise<string> {
+  async simulatePullRequest(
+    repositoryId: number | undefined,
+    diff: string,
+  ): Promise<string> {
     try {
       const res = await fetch("/api/ai/simulate-pr", {
         method: "POST",
@@ -226,7 +232,7 @@ User Question: ${message}
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(
-          data?.error || "Failed to simulate pull request review"
+          data?.error || "Failed to simulate pull request review",
         );
       }
 
@@ -239,7 +245,9 @@ User Question: ${message}
     } catch (error) {
       console.error("PR simulator error:", error);
       throw new Error(
-        error instanceof Error ? error.message : "Failed to simulate pull request review"
+        error instanceof Error
+          ? error.message
+          : "Failed to simulate pull request review",
       );
     }
   }

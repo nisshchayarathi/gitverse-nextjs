@@ -56,7 +56,9 @@ export async function updateReviewPolicy(params: {
     where: { id: params.policyId },
     data: {
       ...(params.name !== undefined && { name: params.name }),
-      ...(params.description !== undefined && { description: params.description }),
+      ...(params.description !== undefined && {
+        description: params.description,
+      }),
       ...(params.rules !== undefined && { rules: params.rules as any }),
       ...(params.enabled !== undefined && { enabled: params.enabled }),
     },
@@ -126,7 +128,9 @@ export function buildPolicyPromptSection(policies: ReviewPolicyData[]): string {
     if (!policy.rules || !Array.isArray(policy.rules)) continue;
     for (const rule of policy.rules) {
       if (!rule.rule) continue;
-      ruleLines.push(`- [${rule.severity.toUpperCase()}] ${sanitizeTextContent(rule.rule)}`);
+      ruleLines.push(
+        `- [${rule.severity.toUpperCase()}] ${sanitizeTextContent(rule.rule)}`,
+      );
     }
   }
 

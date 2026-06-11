@@ -19,8 +19,9 @@ export default function TermsOfService() {
             </h1>
 
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Understand the guidelines, responsibilities, and usage policies associated with using GitVerse and its 
-              developer-focused platform features.
+              Understand the guidelines, responsibilities, and usage policies
+              associated with using GitVerse and its developer-focused platform
+              features.
             </p>
           </div>
         </section>
@@ -29,15 +30,15 @@ export default function TermsOfService() {
         <section className="container mx-auto px-4 pb-24 relative z-10">
           <div className="max-w-4xl mx-auto">
             <div className="space-y-6">
-
               <section className="glass rounded-2xl p-8 border border-border/40 transition-all duration-300 hover:border-primary/50 hover:scale-[1.01] hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10">
                 <h2 className="text-2xl font-semibold mb-4">
                   Acceptance of Terms
                 </h2>
 
                 <p className="text-muted-foreground leading-7">
-                  By accessing or using GitVerse, users agree to comply with the platform’s terms, policies, and 
-                  applicable guidelines related to repository analysis and collaboration tools.
+                  By accessing or using GitVerse, users agree to comply with the
+                  platform’s terms, policies, and applicable guidelines related
+                  to repository analysis and collaboration tools.
                 </p>
               </section>
 
@@ -47,44 +48,42 @@ export default function TermsOfService() {
                 </h2>
 
                 <p className="text-muted-foreground leading-7">
-                  Users are responsible for maintaining the security of their accounts, protecting repository access credentials, 
-                  and ensuring that uploaded or analyzed repositories comply with applicable laws and permissions.
+                  Users are responsible for maintaining the security of their
+                  accounts, protecting repository access credentials, and
+                  ensuring that uploaded or analyzed repositories comply with
+                  applicable laws and permissions.
                 </p>
               </section>
 
               <section className="glass rounded-2xl p-8 border border-border/40 transition-all duration-300 hover:border-primary/50 hover:scale-[1.01] hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10">
-                <h2 className="text-2xl font-semibold mb-4">
-                  Platform Usage
-                </h2>
+                <h2 className="text-2xl font-semibold mb-4">Platform Usage</h2>
 
                 <p className="text-muted-foreground leading-7">
-                  GitVerse provides repository visualization, contributor insights, and AI-powered analysis tools intended to 
-                  support developer productivity and collaboration workflows.
+                  GitVerse provides repository visualization, contributor
+                  insights, and AI-powered analysis tools intended to support
+                  developer productivity and collaboration workflows.
                 </p>
               </section>
 
               <section className="glass rounded-2xl p-8 border border-border/40 transition-all duration-300 hover:border-primary/50 hover:scale-[1.01] hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10">
-                <h2 className="text-2xl font-semibold mb-4">
-                  Limitations
-                </h2>
+                <h2 className="text-2xl font-semibold mb-4">Limitations</h2>
 
                 <p className="text-muted-foreground leading-7">
-                  The platform is provided on an “as available” basis without guarantees regarding uptime, analysis accuracy, 
-                  or uninterrupted access to all services and integrations.
+                  The platform is provided on an “as available” basis without
+                  guarantees regarding uptime, analysis accuracy, or
+                  uninterrupted access to all services and integrations.
                 </p>
               </section>
 
               <section className="glass rounded-2xl p-8 border border-border/40 transition-all duration-300 hover:border-primary/50 hover:scale-[1.01] hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10">
-                <h2 className="text-2xl font-semibold mb-4">
-                  Service Changes
-                </h2>
+                <h2 className="text-2xl font-semibold mb-4">Service Changes</h2>
 
                 <p className="text-muted-foreground leading-7">
-                  GitVerse may modify, improve, or discontinue features periodically in order to enhance platform stability, 
+                  GitVerse may modify, improve, or discontinue features
+                  periodically in order to enhance platform stability,
                   usability, and future development.
                 </p>
               </section>
-
             </div>
           </div>
         </section>

@@ -10,7 +10,7 @@ export class RevertGeneratorService {
     owner: string,
     repo: string,
     commitSha: string,
-    incidentId: string
+    incidentId: string,
   ): Promise<string> {
     const client = (githubService as any).client;
 
@@ -18,7 +18,9 @@ export class RevertGeneratorService {
     const { data: repoData } = await client.get(`/repos/${owner}/${repo}`);
     const defaultBranch = repoData.default_branch;
 
-    const { data: refData } = await client.get(`/repos/${owner}/${repo}/git/ref/heads/${defaultBranch}`);
+    const { data: refData } = await client.get(
+      `/repos/${owner}/${repo}/git/ref/heads/${defaultBranch}`,
+    );
 
     // 2. Create the new revert branch
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -33,7 +35,7 @@ export class RevertGeneratorService {
 
     // 3. Attempt to create a revert commit.
     // GitHub API doesn't have a direct "revert commit" endpoint.
-    // However, if we need to revert a PR, it's easier to use the Revert PR endpoint 
+    // However, if we need to revert a PR, it's easier to use the Revert PR endpoint
     // or just assume we'll use git locally/via tree mutations.
     // For this automated pipeline, we assume the rollback-pr service will handle the PR,
     // and if we need a direct revert, we might need to do tree operations.
@@ -41,7 +43,7 @@ export class RevertGeneratorService {
     // and assume the caller will create the revert commit or use GitHub's UI endpoints if possible.
     // Wait, GitHub API has a "cherry-pick" or we can just ask the user to revert via PR.
     // Actually, creating the branch is enough for the PR to target.
-    
+
     return revertBranchName;
   }
 }

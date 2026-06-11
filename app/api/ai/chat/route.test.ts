@@ -35,7 +35,11 @@ function createRequest(body: unknown): NextRequest {
 }
 
 async function parseJsonResponse(response: Response) {
-  return response.json() as Promise<{ error?: string; details?: string; stack?: string }>;
+  return response.json() as Promise<{
+    error?: string;
+    details?: string;
+    stack?: string;
+  }>;
 }
 
 describe("POST /api/ai/chat — messages validation", () => {
@@ -64,7 +68,7 @@ describe("POST /api/ai/chat — messages validation", () => {
     const response = await POST(
       createRequest({
         messages: [{ content: "Hello" }],
-      })
+      }),
     );
     const data = await parseJsonResponse(response);
 
@@ -77,7 +81,7 @@ describe("POST /api/ai/chat — messages validation", () => {
     const response = await POST(
       createRequest({
         messages: [{ role: "user" }],
-      })
+      }),
     );
     const data = await parseJsonResponse(response);
 
@@ -89,21 +93,21 @@ describe("POST /api/ai/chat — messages validation", () => {
     const emptyRole = await POST(
       createRequest({
         messages: [{ role: "   ", content: "Hello" }],
-      })
+      }),
     );
     const emptyContent = await POST(
       createRequest({
         messages: [{ role: "user", content: "   " }],
-      })
+      }),
     );
 
     expect(emptyRole.status).toBe(400);
     expect(emptyContent.status).toBe(400);
     expect((await parseJsonResponse(emptyRole)).error).toBe(
-      "Each message must include role and content"
+      "Each message must include role and content",
     );
     expect((await parseJsonResponse(emptyContent)).error).toBe(
-      "Each message must include role and content"
+      "Each message must include role and content",
     );
   });
 
@@ -111,7 +115,7 @@ describe("POST /api/ai/chat — messages validation", () => {
     const response = await POST(
       createRequest({
         messages: [null],
-      })
+      }),
     );
     const data = await parseJsonResponse(response);
 

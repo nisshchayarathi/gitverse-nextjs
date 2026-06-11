@@ -9,7 +9,13 @@ jest.mock("@/lib/logger", () => ({
   },
 }));
 
-const TEST_DIR = path.join(process.cwd(), "public", "uploads", "avatars", "test-user");
+const TEST_DIR = path.join(
+  process.cwd(),
+  "public",
+  "uploads",
+  "avatars",
+  "test-user",
+);
 
 beforeAll(async () => {
   await fs.mkdir(TEST_DIR, { recursive: true });
@@ -31,7 +37,9 @@ describe("storeAvatar", () => {
     const buffer = Buffer.from("test-image-data");
     const result = await storeAvatar(buffer, userId, "image/jpeg");
 
-    expect(result.url).toMatch(new RegExp(`^/uploads/avatars/${userId}/\\d+_[a-z0-9]+\\.jpg$`));
+    expect(result.url).toMatch(
+      new RegExp(`^/uploads/avatars/${userId}/\\d+_[a-z0-9]+\\.jpg$`),
+    );
     expect(result.filePath).toBeDefined();
 
     const fileContent = await fs.readFile(result.filePath);
@@ -42,13 +50,22 @@ describe("storeAvatar", () => {
 
   it("creates the destination directory if it does not exist", async () => {
     const userId = 88888;
-    const dir = path.join(process.cwd(), "public", "uploads", "avatars", String(userId));
+    const dir = path.join(
+      process.cwd(),
+      "public",
+      "uploads",
+      "avatars",
+      String(userId),
+    );
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
 
     const buffer = Buffer.from("new-dir-test");
     const result = await storeAvatar(buffer, userId, "image/png");
 
-    const dirExists = await fs.stat(dir).then(() => true).catch(() => false);
+    const dirExists = await fs
+      .stat(dir)
+      .then(() => true)
+      .catch(() => false);
     expect(dirExists).toBe(true);
 
     await fs.unlink(result.filePath).catch(() => {});
@@ -110,7 +127,9 @@ describe("storeAvatar", () => {
 
   it("writes correct binary content", async () => {
     const userId = 33333;
-    const binaryContent = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const binaryContent = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ]);
     const result = await storeAvatar(binaryContent, userId, "image/png");
 
     const written = await fs.readFile(result.filePath);

@@ -1,5 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, X, Minimize2, Maximize2, Sparkles, Square } from "lucide-react";
+import {
+  Send,
+  Loader2,
+  X,
+  Minimize2,
+  Maximize2,
+  Sparkles,
+  Square,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -67,7 +75,6 @@ export function AIRepositoryOverlay({ repository }: AIRepositoryOverlayProps) {
     }
     setIsLoading(false);
   };
-
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -157,11 +164,13 @@ export function AIRepositoryOverlay({ repository }: AIRepositoryOverlayProps) {
               author: c.author || c.authorName,
               date: c.date || c.committedAt,
             })),
-          topContributors: contributorsArray.slice(0, 5).map((c: RepositoryContributor) => ({
-            name: c.name,
-            commits: c.commits,
-            percentage: c.percentage,
-          })),
+          topContributors: contributorsArray
+            .slice(0, 5)
+            .map((c: RepositoryContributor) => ({
+              name: c.name,
+              commits: c.commits,
+              percentage: c.percentage,
+            })),
           branches: repository.branches?.map((b: RepositoryBranch) => b.name),
         };
 
@@ -212,18 +221,23 @@ User Question: ${currentInput}`;
         const conversationHistory = recentMessages
           .map(
             (msg) =>
-              `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`
+              `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`,
           )
           .join("\n\n");
 
         contextualPrompt = `${conversationHistory}\n\n${currentInput}`;
       }
 
-      const stream = geminiService.chatStream(contextualPrompt, {
-        id: repository.id ? Number(repository.id) : undefined,
-        name: repository.name,
-        languages: repository.languages?.map(l => l.name) || [],
-      }, [], controller.signal);
+      const stream = geminiService.chatStream(
+        contextualPrompt,
+        {
+          id: repository.id ? Number(repository.id) : undefined,
+          name: repository.name,
+          languages: repository.languages?.map((l) => l.name) || [],
+        },
+        [],
+        controller.signal,
+      );
 
       for await (const chunk of stream) {
         fullResponse += chunk;
@@ -257,7 +271,9 @@ User Question: ${currentInput}`;
         toast({
           title: "Error",
           description:
-            error instanceof Error ? error.message : "Failed to get AI response",
+            error instanceof Error
+              ? error.message
+              : "Failed to get AI response",
           variant: "destructive",
         });
       }
@@ -284,7 +300,9 @@ User Question: ${currentInput}`;
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[[rehypeSanitize, chatMarkdownSchema]]}
         components={{
-          p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+          p: ({ children }) => (
+            <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
+          ),
           a: ({ href, children, ...props }) => (
             <a
               href={href}
@@ -307,8 +325,7 @@ User Question: ${currentInput}`;
           code: ({ className, children, ...props }) => {
             const text = String(children ?? "");
             const isBlock =
-              (typeof className === "string" &&
-                className.includes("hljs")) ||
+              (typeof className === "string" && className.includes("hljs")) ||
               text.includes("\n");
             if (isBlock) {
               const codeString = text.replace(/\n$/, "");
@@ -327,14 +344,21 @@ User Question: ${currentInput}`;
               );
             }
             return (
-              <code className="bg-white/5 px-1 py-0.5 rounded text-sm font-mono" {...props}>
+              <code
+                className="bg-white/5 px-1 py-0.5 rounded text-sm font-mono"
+                {...props}
+              >
                 {children}
               </code>
             );
           },
         }}
         urlTransform={(url) => {
-          if (url.startsWith("javascript:") || url.startsWith("data:") || url.startsWith("vbscript:")) {
+          if (
+            url.startsWith("javascript:") ||
+            url.startsWith("data:") ||
+            url.startsWith("vbscript:")
+          ) {
             return "";
           }
           return url;
@@ -459,7 +483,7 @@ User Question: ${currentInput}`;
               onSubmit={handleSubmit}
               className="p-4 border-t border-white/10 bg-background/80"
             >
-               <div className="flex gap-2">
+              <div className="flex gap-2">
                 <input
                   type="text"
                   value={input}

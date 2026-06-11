@@ -8,7 +8,7 @@ export interface ShardInfo {
   weight: number;
 }
 
-export type MigrationState = 
+export type MigrationState =
   | "PENDING"
   | "READING_SOURCE"
   | "COPYING_DATA"

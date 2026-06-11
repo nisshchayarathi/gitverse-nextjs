@@ -136,7 +136,7 @@ export function CodeAnalysisPanel() {
         return (
           <p key={i} className="mb-2">
             {parts.map((part, j) =>
-              j % 2 === 0 ? part : <strong key={j}>{part}</strong>
+              j % 2 === 0 ? part : <strong key={j}>{part}</strong>,
             )}
           </p>
         );
@@ -175,7 +175,7 @@ export function CodeAnalysisPanel() {
                 >
                   {part}
                 </code>
-              )
+              ),
             )}
           </p>
         );
@@ -191,7 +191,7 @@ export function CodeAnalysisPanel() {
   };
 
   const selectedOption = analysisOptions.find(
-    (opt) => opt.type === analysisType
+    (opt) => opt.type === analysisType,
   )!;
 
   return (
@@ -300,38 +300,37 @@ export function CodeAnalysisPanel() {
           </h3>
 
           {results.length === 0 ? (
-  <div className="flex flex-col items-center justify-center text-center py-12 px-4">
-    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-4">
-      <Sparkles className="h-7 w-7 text-primary" />
-    </div>
+            <div className="flex flex-col items-center justify-center text-center py-12 px-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-4">
+                <Sparkles className="h-7 w-7 text-primary" />
+              </div>
 
-    <h3 className="text-lg font-semibold mb-2">
-      No AI analysis yet
-    </h3>
+              <h3 className="text-lg font-semibold mb-2">No AI analysis yet</h3>
 
-    <p className="text-sm text-muted-foreground max-w-sm mb-6">
-      Paste your code and run an AI-powered analysis to get explanations,
-      bug detection, documentation, and improvement suggestions.
-    </p>
+              <p className="text-sm text-muted-foreground max-w-sm mb-6">
+                Paste your code and run an AI-powered analysis to get
+                explanations, bug detection, documentation, and improvement
+                suggestions.
+              </p>
 
-    <button
-      onClick={() => {
-        const textarea = document.querySelector("textarea");
-        if (textarea) {
-          (textarea as HTMLTextAreaElement).focus();
-        }
-      }}
-      className="glass px-5 py-2 rounded-lg hover:bg-primary/20 transition-all duration-300"
-      aria-label="Start AI analysis"
-    >
-      Start Analysis
-    </button>
-  </div>
-) : (
+              <button
+                onClick={() => {
+                  const textarea = document.querySelector("textarea");
+                  if (textarea) {
+                    (textarea as HTMLTextAreaElement).focus();
+                  }
+                }}
+                className="glass px-5 py-2 rounded-lg hover:bg-primary/20 transition-all duration-300"
+                aria-label="Start AI analysis"
+              >
+                Start Analysis
+              </button>
+            </div>
+          ) : (
             <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar">
               {results.map((result, index) => {
                 const option = analysisOptions.find(
-                  (opt) => opt.type === result.type
+                  (opt) => opt.type === result.type,
                 )!;
                 return (
                   <Card key={index} className="glass p-4 bg-white/5">

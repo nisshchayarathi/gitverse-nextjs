@@ -29,7 +29,10 @@ interface CommitActivityHeatmapProps {
 }
 
 // Generate commit activity data from repository commits
-const generateCommitData = (commits: HeatmapCommit[], now: Date): CommitData[] => {
+const generateCommitData = (
+  commits: HeatmapCommit[],
+  now: Date,
+): CommitData[] => {
   const data: CommitData[] = [];
   const commitsByDate = new Map<string, number>();
 
@@ -101,7 +104,7 @@ export function CommitActivityHeatmap({
     const containerWidth = svgRef.current?.parentElement?.clientWidth || 1200;
     const width = Math.max(
       containerWidth - margin.left - margin.right,
-      900 - margin.left - margin.right
+      900 - margin.left - margin.right,
     );
     const height = 200 - margin.top - margin.bottom;
 
@@ -117,7 +120,7 @@ export function CommitActivityHeatmap({
     const weeksData = d3.group(data, (d) => {
       const date = new Date(d.date);
       const weekNum = Math.floor(
-        (now.getTime() - date.getTime()) / (7 * 24 * 60 * 60 * 1000)
+        (now.getTime() - date.getTime()) / (7 * 24 * 60 * 60 * 1000),
       );
       return weekNum;
     });
@@ -222,7 +225,7 @@ export function CommitActivityHeatmap({
           .attr("rx", 2)
           .attr(
             "fill",
-            d.count === 0 ? "rgba(255,255,255,0.1)" : colorScale(d.count)
+            d.count === 0 ? "rgba(255,255,255,0.1)" : colorScale(d.count),
           )
           .attr("stroke", "rgba(0,0,0,0.5)")
           .attr("stroke-width", 1)
@@ -247,7 +250,7 @@ export function CommitActivityHeatmap({
                   year: "numeric",
                   month: "short",
                   day: "numeric",
-                }
+                },
               );
               tooltip.html(`
                 <div class="space-y-1">
@@ -366,7 +369,9 @@ export function CommitActivityHeatmap({
     return (
       repository?.commits?.filter((commit: HeatmapCommit) => {
         const dateVal = commit.committedAt || commit.createdAt;
-        const commitDate = dateVal ? new Date(dateVal).toISOString().split("T")[0] : "";
+        const commitDate = dateVal
+          ? new Date(dateVal).toISOString().split("T")[0]
+          : "";
         return commitDate === date;
       }) || []
     );
@@ -437,17 +442,19 @@ export function CommitActivityHeatmap({
                       <span className="font-mono">{commit.shortHash}</span>
                       <span className="hidden sm:inline">•</span>
                       <span>
-                        {commit.committedAt || commit.createdAt ? new Date(commit.committedAt || commit.createdAt || "").toLocaleTimeString(
-                          "en-US",
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        ) : "Unknown"}
+                        {commit.committedAt || commit.createdAt
+                          ? new Date(
+                              commit.committedAt || commit.createdAt || "",
+                            ).toLocaleTimeString("en-US", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "Unknown"}
                       </span>
                     </div>
                   </div>
-                  {(commit.additions || 0) > 0 || (commit.deletions || 0) > 0 ? (
+                  {(commit.additions || 0) > 0 ||
+                  (commit.deletions || 0) > 0 ? (
                     <div className="flex items-center gap-2 text-xs flex-shrink-0">
                       {(commit.additions || 0) > 0 && (
                         <span className="text-green-400">
@@ -468,25 +475,24 @@ export function CommitActivityHeatmap({
         </div>
       )}
 
-<div
-  ref={tooltipRef}
-  className="
+      <div
+        ref={tooltipRef}
+        className="
     fixed p-3 rounded-lg pointer-events-none shadow-xl border
     translate-x-[-100px] translate-y-[-200px]
     sm:translate-x-[-350px] sm:translate-y-[-320px]
   "
-  style={{
-    opacity: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
-    color: "white",
-    zIndex: 9999,
-    backdropFilter: "blur(8px)",
-    left: "0px",
-    top: "0px",
-    whiteSpace: "nowrap",
-  }}
-/>
-
+        style={{
+          opacity: 1,
+          backgroundColor: "rgba(0, 0, 0, 0.9)",
+          color: "white",
+          zIndex: 9999,
+          backdropFilter: "blur(8px)",
+          left: "0px",
+          top: "0px",
+          whiteSpace: "nowrap",
+        }}
+      />
     </Card>
   );
 }

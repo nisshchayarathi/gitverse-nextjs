@@ -19,7 +19,11 @@ import { GitService } from "@/lib/services/gitService";
 import { logger } from "@/lib/logger";
 import { apiError, apiSuccess } from "@/lib/utils/apiResponse";
 import { isValidGitScope } from "@/lib/utils/validators";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 function kickLocalRunner(request: NextRequest) {
   if (process.env.NODE_ENV === "production") return;
   const origin = new URL(request.url).origin;
@@ -72,17 +76,23 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    const burstRl = await checkRateLimit(String(user.userId), RATE_LIMITS.REPOSITORY_CREATE_BURST);
+    const burstRl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.REPOSITORY_CREATE_BURST,
+    );
     if (!burstRl.allowed) return rateLimitResponse(burstRl);
 
     const attemptsCount = await countAttempts(
       String(user.userId),
       "REPOSITORY_ANALYSIS",
-      24 * 60 * 60 * 1000
+      24 * 60 * 60 * 1000,
     );
 
     if (attemptsCount >= 5) {
-      return apiError("Analysis rate limit exceeded. Please try again later.", 429);
+      return apiError(
+        "Analysis rate limit exceeded. Please try again later.",
+        429,
+      );
     }
 
     const body = await request.json();
@@ -111,15 +121,18 @@ export async function POST(request: NextRequest) {
     // Backend check to catch non-existent or private repositories
     let exists = false;
     let isPrivate = false;
-    
+
     // First try without token (public check)
     exists = await GitService.checkGithubRepositoryExists(normalizedUrl);
-    
+
     if (!exists) {
       // Try with user's github token (private check)
       const token = await getGithubAccessToken(user.userId);
       if (token) {
-        exists = await GitService.checkGithubRepositoryExists(normalizedUrl, token);
+        exists = await GitService.checkGithubRepositoryExists(
+          normalizedUrl,
+          token,
+        );
         if (exists) {
           isPrivate = true;
         }
@@ -128,8 +141,11 @@ export async function POST(request: NextRequest) {
 
     if (!exists) {
       return NextResponse.json(
-        { error: "GitHub repository not found or not accessible. If it is private, please sign in with GitHub." },
-        { status: 404 }
+        {
+          error:
+            "GitHub repository not found or not accessible. If it is private, please sign in with GitHub.",
+        },
+        { status: 404 },
       );
     }
 

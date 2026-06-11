@@ -20,12 +20,12 @@ function getEncryptionKey(): Buffer {
   const trimmed = key.trim();
   if (trimmed.length !== KEY_HEX_LENGTH) {
     throw new Error(
-      `TOKEN_ENCRYPTION_KEY must be ${KEY_HEX_LENGTH} hex characters (${KEY_BYTE_LENGTH} bytes); got ${trimmed.length} characters`
+      `TOKEN_ENCRYPTION_KEY must be ${KEY_HEX_LENGTH} hex characters (${KEY_BYTE_LENGTH} bytes); got ${trimmed.length} characters`,
     );
   }
   if (!HEX_REGEX.test(trimmed)) {
     throw new Error(
-      "TOKEN_ENCRYPTION_KEY must be a hexadecimal string (0-9, a-f)"
+      "TOKEN_ENCRYPTION_KEY must be a hexadecimal string (0-9, a-f)",
     );
   }
   return Buffer.from(trimmed, "hex");

@@ -7,7 +7,7 @@ export class IncidentIngestionService {
    */
   public processWebhook(
     source: "sentry" | "datadog" | "pagerduty" | "generic",
-    payload: any
+    payload: any,
   ): IncidentPayload {
     console.log(`[IncidentIngestion] Received webhook from source: ${source}`);
 
@@ -47,9 +47,14 @@ export class IncidentIngestionService {
       id: payload.id || `dd-${Date.now()}`,
       title: payload.title || "Datadog Monitor Alert",
       severity: this.mapSeverity(payload.priority || "normal"),
-      affectedService: payload.tags?.find((t: string) => t.startsWith("service:"))?.split(":")[1],
+      affectedService: payload.tags
+        ?.find((t: string) => t.startsWith("service:"))
+        ?.split(":")[1],
       timestamp: new Date().toISOString(), // Fallback if timestamp not easily available
-      environment: payload.tags?.find((t: string) => t.startsWith("env:"))?.split(":")[1] || "production",
+      environment:
+        payload.tags
+          ?.find((t: string) => t.startsWith("env:"))
+          ?.split(":")[1] || "production",
       source: "datadog",
       metadata: payload,
     };
@@ -86,8 +91,9 @@ export class IncidentIngestionService {
   private mapSeverity(level: string): "critical" | "high" | "medium" | "low" {
     if (!level) return "medium";
     const lowerLevel = level.toLowerCase();
-    
-    if (["fatal", "critical", "p1", "high"].includes(lowerLevel)) return "critical";
+
+    if (["fatal", "critical", "p1", "high"].includes(lowerLevel))
+      return "critical";
     if (["error", "p2"].includes(lowerLevel)) return "high";
     if (["warning", "p3", "medium"].includes(lowerLevel)) return "medium";
     return "low";

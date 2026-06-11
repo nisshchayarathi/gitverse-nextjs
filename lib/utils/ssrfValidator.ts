@@ -1,4 +1,4 @@
-import * as dns from 'dns/promises';
+import * as dns from "dns/promises";
 
 /**
  * Checks whether an IP address belongs to a private, loopback, or cloud-metadata block.
@@ -38,13 +38,18 @@ export function isPrivateIP(ip: string): boolean {
   }
 
   // Basic IPv6 checks
-  if (ip === '::1' || ip === '0:0:0:0:0:0:0:1') {
+  if (ip === "::1" || ip === "0:0:0:0:0:0:0:1") {
     return true; // IPv6 loopback
   }
-  if (ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd')) {
+  if (ip.toLowerCase().startsWith("fc") || ip.toLowerCase().startsWith("fd")) {
     return true; // Unique local address
   }
-  if (ip.toLowerCase().startsWith('fe8') || ip.toLowerCase().startsWith('fe9') || ip.toLowerCase().startsWith('fea') || ip.toLowerCase().startsWith('feb')) {
+  if (
+    ip.toLowerCase().startsWith("fe8") ||
+    ip.toLowerCase().startsWith("fe9") ||
+    ip.toLowerCase().startsWith("fea") ||
+    ip.toLowerCase().startsWith("feb")
+  ) {
     return true; // Link local address
   }
 
@@ -66,7 +71,7 @@ export async function validateSafeUrl(urlString: string): Promise<boolean> {
     return false; // Invalid URL
   }
 
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
     return false;
   }
 
@@ -74,14 +79,14 @@ export async function validateSafeUrl(urlString: string): Promise<boolean> {
 
   try {
     const records = await dns.lookup(hostname, { all: true });
-    
+
     // Check all resolved IPs for the hostname
     for (const record of records) {
       if (isPrivateIP(record.address)) {
         return false;
       }
     }
-    
+
     return true;
   } catch (error) {
     // If DNS resolution fails, consider it unsafe

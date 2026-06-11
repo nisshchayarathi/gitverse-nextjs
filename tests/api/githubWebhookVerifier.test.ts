@@ -5,7 +5,7 @@ import crypto from "crypto";
 describe("GithubWebhookVerifier", () => {
   const secret = "test-secret";
   const rawBody = JSON.stringify({ action: "test" });
-  
+
   beforeAll(() => {
     process.env.GITHUB_WEBHOOK_SECRET = secret;
   });

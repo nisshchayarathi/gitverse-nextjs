@@ -48,11 +48,19 @@ function startHealthServer(): http.Server {
         `prisma_pool_waiting_clients ${health.waitingClients}`,
       ];
       for (const m of metrics) {
-        lines.push(`# HELP prisma_pool_connections_total{adapter="${m.adapter}"} Total connections per adapter`);
+        lines.push(
+          `# HELP prisma_pool_connections_total{adapter="${m.adapter}"} Total connections per adapter`,
+        );
         lines.push(`# TYPE prisma_pool_connections_total gauge`);
-        lines.push(`prisma_pool_connections_total{adapter="${m.adapter}"} ${m.totalConnections}`);
-        lines.push(`prisma_pool_idle_connections_total{adapter="${m.adapter}"} ${m.idleConnections}`);
-        lines.push(`prisma_pool_waiting_clients_total{adapter="${m.adapter}"} ${m.waitingClients}`);
+        lines.push(
+          `prisma_pool_connections_total{adapter="${m.adapter}"} ${m.totalConnections}`,
+        );
+        lines.push(
+          `prisma_pool_idle_connections_total{adapter="${m.adapter}"} ${m.idleConnections}`,
+        );
+        lines.push(
+          `prisma_pool_waiting_clients_total{adapter="${m.adapter}"} ${m.waitingClients}`,
+        );
       }
       res.statusCode = 200;
       res.setHeader("content-type", "text/plain; charset=utf-8");
@@ -61,9 +69,7 @@ function startHealthServer(): http.Server {
     }
 
     if (req.url === "/drain") {
-      const drainMsg = stopping
-        ? "already draining"
-        : "drain initiated";
+      const drainMsg = stopping ? "already draining" : "drain initiated";
       res.statusCode = 200;
       res.setHeader("content-type", "text/plain; charset=utf-8");
       res.end(drainMsg);

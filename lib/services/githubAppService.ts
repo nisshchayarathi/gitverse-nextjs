@@ -31,10 +31,7 @@ export class GitHubAppService {
     const now = Math.floor(Date.now() / 1000);
 
     // Reuse cached JWT if still valid for at least 60 more seconds
-    if (
-      this.cachedJwt &&
-      now < this.cachedJwtExpiresAt - 60
-    ) {
+    if (this.cachedJwt && now < this.cachedJwtExpiresAt - 60) {
       return this.cachedJwt;
     }
 

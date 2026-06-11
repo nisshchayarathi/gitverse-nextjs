@@ -1,7 +1,14 @@
 export interface ArchitectureModule {
   name: string;
   path: string;
-  type: "Component" | "Service" | "Hook" | "Utility" | "API Route" | "Page" | "Unknown";
+  type:
+    | "Component"
+    | "Service"
+    | "Hook"
+    | "Utility"
+    | "API Route"
+    | "Page"
+    | "Unknown";
   size: number;
   complexity: number;
   dependencies: string[];

@@ -12,7 +12,7 @@ export function addClient(repositoryId: string, client: Client) {
 export function removeClient(repositoryId: string, clientId: string) {
   if (!clients.has(repositoryId)) return;
   const repoClients = clients.get(repositoryId)!;
-  const index = repoClients.findIndex(c => c.id === clientId);
+  const index = repoClients.findIndex((c) => c.id === clientId);
   if (index !== -1) {
     repoClients.splice(index, 1);
   }
@@ -23,7 +23,7 @@ export function broadcastAnnotationEvent(repositoryId: string, event: any) {
   if (!repoClients) return;
 
   const message = `data: ${JSON.stringify(event)}\n\n`;
-  repoClients.forEach(client => {
+  repoClients.forEach((client) => {
     try {
       client.controller.enqueue(new TextEncoder().encode(message));
     } catch (e) {

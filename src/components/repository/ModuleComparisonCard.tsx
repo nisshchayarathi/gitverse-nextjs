@@ -1,10 +1,13 @@
 "use client";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui";
 import {
-  ModuleMetadata,
-  getComplexityColor,
-} from "@/config/moduleMetadata";
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui";
+import { ModuleMetadata, getComplexityColor } from "@/config/moduleMetadata";
 
 interface ModuleComparisonCardProps {
   module: ModuleMetadata;
@@ -22,9 +25,7 @@ export function ModuleComparisonCard({
   return (
     <Card
       className={`glass border border-border/70 transition-all duration-300 ${
-        highlight
-          ? "ring-2 ring-primary/50 shadow-lg"
-          : "hover:shadow-md"
+        highlight ? "ring-2 ring-primary/50 shadow-lg" : "hover:shadow-md"
       } ${className}`}
     >
       <CardHeader>

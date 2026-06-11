@@ -21,10 +21,12 @@ export function deriveRepositoryInsights(repositoryData: any): {
   const files = repositoryData?.files || [];
   const commits = repositoryData?.commits || [];
   const contributors = repositoryData?.contributors || [];
-  
 
   // Calculate module distribution
-  const moduleMap = new Map<string, { files: number; size: number; changes: number }>();
+  const moduleMap = new Map<
+    string,
+    { files: number; size: number; changes: number }
+  >();
 
   files.forEach((file: any) => {
     const parts = String(file.path || "").split("/");
@@ -41,35 +43,38 @@ export function deriveRepositoryInsights(repositoryData: any): {
 
   // Count changes per module from commits
   commits.forEach((commit: any) => {
-    const fileChanges = (commit.filesChanged || 0);
+    const fileChanges = commit.filesChanged || 0;
     if (fileChanges > 0) {
       commit.message?.split(" ").forEach((word: string) => {
-        Object.keys(Object.fromEntries(moduleMap.entries())).forEach((module) => {
-          if (word.toLowerCase().includes(module.toLowerCase())) {
-            const current = moduleMap.get(module)!;
-            current.changes += fileChanges / 10; // Normalize
-          }
-        });
+        Object.keys(Object.fromEntries(moduleMap.entries())).forEach(
+          (module) => {
+            if (word.toLowerCase().includes(module.toLowerCase())) {
+              const current = moduleMap.get(module)!;
+              current.changes += fileChanges / 10; // Normalize
+            }
+          },
+        );
       });
     }
   });
 
   // Find most active module (most changes)
   const mostActiveModule = Array.from(moduleMap.entries()).reduce(
-    (prev, [name, data]) => (data.changes > prev[1].changes ? [name, data] : prev),
-    ["unknown", { files: 0, size: 0, changes: 0 }]
+    (prev, [name, data]) =>
+      data.changes > prev[1].changes ? [name, data] : prev,
+    ["unknown", { files: 0, size: 0, changes: 0 }],
   );
 
   // Find largest module (most size)
   const largestModule = Array.from(moduleMap.entries()).reduce(
     (prev, [name, data]) => (data.size > prev[1].size ? [name, data] : prev),
-    ["unknown", { files: 0, size: 0, changes: 0 }]
+    ["unknown", { files: 0, size: 0, changes: 0 }],
   );
 
   // Most connected (most files)
   const mostConnectedModule = Array.from(moduleMap.entries()).reduce(
     (prev, [name, data]) => (data.files > prev[1].files ? [name, data] : prev),
-    ["unknown", { files: 0, size: 0, changes: 0 }]
+    ["unknown", { files: 0, size: 0, changes: 0 }],
   );
 
   // Contribution hotspot (highest commit activity)

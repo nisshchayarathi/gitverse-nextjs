@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json(
         { error: "Invalid or expired authentication token" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { error: "Failed to process logout request" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

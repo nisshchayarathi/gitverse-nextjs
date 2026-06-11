@@ -18,7 +18,7 @@ describe("lib/utils/signedState", () => {
     const state = createSignedState(payload);
 
     expect(state).toContain(".");
-    
+
     const result = verifySignedState<{ userId: string; action: string }>(state);
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -30,7 +30,7 @@ describe("lib/utils/signedState", () => {
   it("should fail validation if signature is tampered", () => {
     const payload = { userId: "123" };
     const state = createSignedState(payload);
-    
+
     const [body] = state.split(".");
     const tamperedState = `${body}.tamperedsig`;
 

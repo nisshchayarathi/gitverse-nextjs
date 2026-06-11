@@ -5,7 +5,9 @@ export class RegionRouterService {
   /**
    * Determine the active data residency region for a given organization.
    */
-  public async getOrganizationRegion(organizationId: string): Promise<DataResidencyRegion> {
+  public async getOrganizationRegion(
+    organizationId: string,
+  ): Promise<DataResidencyRegion> {
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
       select: { dataResidencyRegion: true },
@@ -23,15 +25,17 @@ export class RegionRouterService {
    * Determine the active data residency region for a given repository.
    * Inherits from organization unless overriden.
    */
-  public async getRepositoryRegion(repositoryId: number): Promise<DataResidencyRegion> {
+  public async getRepositoryRegion(
+    repositoryId: number,
+  ): Promise<DataResidencyRegion> {
     const repo = await prisma.repository.findUnique({
       where: { id: repositoryId },
-      select: { 
+      select: {
         inheritedRegion: true,
         overrideAllowed: true,
         policyAssignment: {
-          select: { organizationId: true }
-        }
+          select: { organizationId: true },
+        },
       },
     });
 
@@ -61,7 +65,7 @@ export class RegionRouterService {
     if (context.repositoryId) {
       return this.getRepositoryRegion(context.repositoryId);
     }
-    
+
     if (context.organizationId) {
       return this.getOrganizationRegion(context.organizationId);
     }

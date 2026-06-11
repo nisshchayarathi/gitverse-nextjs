@@ -45,7 +45,7 @@ function isValidAvatarUrl(avatar: string): boolean {
     const pathname = parsedUrl.pathname.toLowerCase();
 
     return ALLOWED_IMAGE_EXTENSIONS.some((extension) =>
-      pathname.endsWith(extension)
+      pathname.endsWith(extension),
     );
   } catch {
     return false;
@@ -62,12 +62,12 @@ export async function PUT(request: NextRequest) {
         userIdStr,
         "CHANGE_PASSWORD",
         PROFILE_UPDATE_RATE_LIMIT_MAX,
-        PROFILE_UPDATE_RATE_LIMIT_WINDOW_MS
+        PROFILE_UPDATE_RATE_LIMIT_WINDOW_MS,
       )
     ) {
       return NextResponse.json(
         { error: "Too many profile update attempts. Please try again later." },
-        { status: 429, headers: { "Retry-After": "900" } }
+        { status: 429, headers: { "Retry-After": "900" } },
       );
     }
 
@@ -77,7 +77,7 @@ export async function PUT(request: NextRequest) {
     } catch {
       return NextResponse.json(
         { error: "Invalid or empty request body" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -86,42 +86,47 @@ export async function PUT(request: NextRequest) {
     if (!name || !email) {
       return NextResponse.json(
         { error: "Name and email are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (typeof name !== "string" || name.trim().length === 0) {
       return NextResponse.json(
         { error: "Name must be a non-empty string" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (name.length > 100) {
       return NextResponse.json(
         { error: "Name must be less than 100 characters" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (typeof email !== "string" || !email.includes("@")) {
       return NextResponse.json(
         { error: "Invalid email format" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (email.length > 254) {
       return NextResponse.json(
         { error: "Email must be less than 254 characters" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    if ("avatar" in body && avatar !== undefined && avatar !== null && typeof avatar !== "string") {
+    if (
+      "avatar" in body &&
+      avatar !== undefined &&
+      avatar !== null &&
+      typeof avatar !== "string"
+    ) {
       return NextResponse.json(
         { error: "Avatar must be a valid image URL" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -131,7 +136,7 @@ export async function PUT(request: NextRequest) {
           error:
             "Avatar must be a valid HTTP/HTTPS image URL or supported image data URL",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -139,21 +144,21 @@ export async function PUT(request: NextRequest) {
       if (typeof newPassword !== "string") {
         return NextResponse.json(
           { error: "New password must be a string" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       if (newPassword.length < 8) {
         return NextResponse.json(
           { error: "Password must be at least 8 characters" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       if (newPassword.length > 128) {
         return NextResponse.json(
           { error: "Password must be less than 128 characters" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -162,7 +167,7 @@ export async function PUT(request: NextRequest) {
       if (typeof currentPassword !== "string") {
         return NextResponse.json(
           { error: "Current password must be a string" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -177,7 +182,7 @@ export async function PUT(request: NextRequest) {
     if (existingUser) {
       return NextResponse.json(
         { error: "Email is already in use" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -194,10 +199,7 @@ export async function PUT(request: NextRequest) {
     });
 
     if (!current) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const isEmailChanging =
@@ -214,15 +216,14 @@ export async function PUT(request: NextRequest) {
           userIdStr,
           "CHANGE_PASSWORD",
           EMAIL_CHANGE_RATE_LIMIT_MAX,
-          EMAIL_CHANGE_RATE_LIMIT_WINDOW_MS
+          EMAIL_CHANGE_RATE_LIMIT_WINDOW_MS,
         )
       ) {
         return NextResponse.json(
           {
-            error:
-              "Too many email change attempts. Please try again later.",
+            error: "Too many email change attempts. Please try again later.",
           },
-          { status: 429, headers: { "Retry-After": "3600" } }
+          { status: 429, headers: { "Retry-After": "3600" } },
         );
       }
     }
@@ -237,16 +238,15 @@ export async function PUT(request: NextRequest) {
         });
         return NextResponse.json(
           {
-            error:
-              "Current password is required to change your email address",
+            error: "Current password is required to change your email address",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       const isPasswordValid = await bcrypt.compare(
         currentPassword,
-        current.passwordHash!
+        current.passwordHash!,
       );
 
       if (!isPasswordValid) {
@@ -258,7 +258,7 @@ export async function PUT(request: NextRequest) {
         });
         return NextResponse.json(
           { error: "Current password is incorrect" },
-          { status: 401 }
+          { status: 401 },
         );
       }
 
@@ -272,14 +272,14 @@ export async function PUT(request: NextRequest) {
             error:
               "Changing email will unlink your Google account. Please provide a new password to secure your account.",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       if (newPassword.length < 8) {
         return NextResponse.json(
           { error: "Password must be at least 8 characters" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -289,7 +289,7 @@ export async function PUT(request: NextRequest) {
             "For security, Google-only accounts must re-authenticate with Google before changing email. Please sign in with Google again to verify your identity.",
           code: "REAUTH_REQUIRED",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -300,14 +300,14 @@ export async function PUT(request: NextRequest) {
             error:
               "Changing email will unlink your Google account. Please provide a new password to set for your account.",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       if (newPassword.length < 8) {
         return NextResponse.json(
           { error: "Password must be at least 8 characters" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -337,7 +337,7 @@ export async function PUT(request: NextRequest) {
       if (typeof avatar !== "string") {
         return NextResponse.json(
           { error: "Invalid avatar format" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -347,7 +347,7 @@ export async function PUT(request: NextRequest) {
         if (!mimeTypeMatch || !mimeTypeMatch[1].startsWith("image/")) {
           return NextResponse.json(
             { error: "Avatar must be an image data URL" },
-            { status: 400 }
+            { status: 400 },
           );
         }
 
@@ -356,7 +356,7 @@ export async function PUT(request: NextRequest) {
         if (!base64Data) {
           return NextResponse.json(
             { error: "Invalid avatar data URL" },
-            { status: 400 }
+            { status: 400 },
           );
         }
 
@@ -365,7 +365,7 @@ export async function PUT(request: NextRequest) {
         if (sizeInBytes > 500 * 1024) {
           return NextResponse.json(
             { error: "Avatar image is too large" },
-            { status: 413 }
+            { status: 413 },
           );
         }
 
@@ -404,8 +404,12 @@ export async function PUT(request: NextRequest) {
         });
       } catch (auditError) {
         logger.error(
-          { err: sanitizeError(auditError), route: "app/api/users/profile/route.ts", action: "create-audit-log" },
-          "Failed to create audit log"
+          {
+            err: sanitizeError(auditError),
+            route: "app/api/users/profile/route.ts",
+            action: "create-audit-log",
+          },
+          "Failed to create audit log",
         );
       }
     }
@@ -420,19 +424,16 @@ export async function PUT(request: NextRequest) {
   } catch (error: any) {
     logger.error(
       { err: sanitizeError(error), route: "app/api/users/profile/route.ts" },
-      "Error updating profile"
+      "Error updating profile",
     );
 
     if (error?.code === "P2025") {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     return NextResponse.json(
       { error: "Failed to update profile" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

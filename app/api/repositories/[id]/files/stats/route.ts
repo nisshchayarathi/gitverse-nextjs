@@ -4,8 +4,8 @@ import { repositoryService } from "@/lib/services/repositoryService";
 
 const securityHeaders = {
   "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-  "Pragma": "no-cache",
-  "Expires": "0",
+  Pragma: "no-cache",
+  Expires: "0",
 };
 
 const MAX_PATHS = 1000;

@@ -1,5 +1,5 @@
 // Polyfill globals for NextRequest
-if (typeof Request === 'undefined') {
+if (typeof Request === "undefined") {
   global.Request = class Request {} as any;
   global.Response = class Response {} as any;
 }

@@ -8,7 +8,7 @@ export type BookmarkedModules = string[];
 
 export function useModuleBookmarks() {
   const [bookmarkedModules, setBookmarkedModules] = useState<BookmarkedModules>(
-    []
+    [],
   );
 
   // Load bookmarks on mount
@@ -46,7 +46,7 @@ export function useModuleBookmarks() {
 
   const removeBookmark = (moduleName: string) => {
     setBookmarkedModules((current) =>
-      current.filter((name) => name !== moduleName)
+      current.filter((name) => name !== moduleName),
     );
   };
 

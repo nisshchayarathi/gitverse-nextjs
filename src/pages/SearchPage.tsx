@@ -25,8 +25,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from '@/components/ui/dropdown-menu'
-
+} from "@/components/ui/dropdown-menu";
 
 interface Repository {
   id: string;
@@ -60,7 +59,7 @@ export default function SearchPage() {
   }, []);
 
   const fetchRepositories = async () => {
-     setError("");
+    setError("");
     try {
       const token = localStorage.getItem("gitverse_token");
       const response = await axios.get(buildApiUrl("/api/repositories"), {
@@ -69,26 +68,23 @@ export default function SearchPage() {
       // API returns { data: { repositories: [...] } } via apiSuccess wrapper
       const repos = response.data.data?.repositories || [];
       setRepositories(Array.isArray(repos) ? repos : []);
-    }  
-    catch (error: any) {
-  console.error("Error fetching repositories:", error);
+    } catch (error: any) {
+      console.error("Error fetching repositories:", error);
 
-  setRepositories([]);
+      setRepositories([]);
 
-  const message =
-    error?.response?.data?.message ||
-    "Failed to load repositories. Please check your connection and try again.";
+      const message =
+        error?.response?.data?.message ||
+        "Failed to load repositories. Please check your connection and try again.";
 
-  setError(message);
+      setError(message);
 
-  toast({
-    title: "Error",
-    description: message,
-    variant: "destructive",
-  });
-}
-
-finally {
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
     }
   };
@@ -99,7 +95,7 @@ finally {
           repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (repo.description || "")
             .toLowerCase()
-            .includes(searchQuery.toLowerCase())
+            .includes(searchQuery.toLowerCase()),
       )
     : [];
 
@@ -136,68 +132,68 @@ finally {
                   className="pl-10 bg-background/50"
                 />
               </div>
-            <div className="flex gap-2 flex-row flex-wrap justify-end">
-  <div className="flex gap-2">
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => setViewMode("grid")}
-      aria-label="Grid view"
-      className={
-        viewMode === "grid"
-          ? "bg-primary/10 text-primary border-primary"
-          : ""
-      }
-    >
-      <Grid className="h-4 w-4" />
-    </Button>
+              <div className="flex gap-2 flex-row flex-wrap justify-end">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewMode("grid")}
+                    aria-label="Grid view"
+                    className={
+                      viewMode === "grid"
+                        ? "bg-primary/10 text-primary border-primary"
+                        : ""
+                    }
+                  >
+                    <Grid className="h-4 w-4" />
+                  </Button>
 
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => setViewMode("list")}
-      aria-label="List view"
-      className={
-        viewMode === "list"
-          ? "bg-primary/10 text-primary border-primary"
-          : ""
-      }
-    >
-      <List className="h-4 w-4" />
-    </Button>
-  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewMode("list")}
+                    aria-label="List view"
+                    className={
+                      viewMode === "list"
+                        ? "bg-primary/10 text-primary border-primary"
+                        : ""
+                    }
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
 
- <DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <Button
-  variant="outline"
-  size="sm"
-  aria-label="Sort repositories"
->
-  {sortBy === "recent"
-    ? "Recent"
-    : sortBy === "stars"
-    ? "Most Stars"
-    : "Name"}
-</Button>
-  </DropdownMenuTrigger>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label="Sort repositories"
+                    >
+                      {sortBy === "recent"
+                        ? "Recent"
+                        : sortBy === "stars"
+                          ? "Most Stars"
+                          : "Name"}
+                    </Button>
+                  </DropdownMenuTrigger>
 
-  <DropdownMenuContent align="end">
-    <DropdownMenuItem onClick={() => setSortBy("recent")}>
-      Recent
-    </DropdownMenuItem>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setSortBy("recent")}>
+                      Recent
+                    </DropdownMenuItem>
 
-    <DropdownMenuItem onClick={() => setSortBy("stars")}>
-      Most Stars
-    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy("stars")}>
+                      Most Stars
+                    </DropdownMenuItem>
 
-    <DropdownMenuItem onClick={() => setSortBy("name")}>
-      Name
-    </DropdownMenuItem>
-  </DropdownMenuContent>
-</DropdownMenu>
-</div>
-</div>
+                    <DropdownMenuItem onClick={() => setSortBy("name")}>
+                      Name
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
           </CardContent>
         </Card>
         {/* Results Count */}
@@ -270,11 +266,9 @@ finally {
               ))}
             </div>
           )
-) : error ? (
-  <div className="text-center py-12 text-red-500">
-    {error}
-  </div>
-) : sortedRepositories.length === 0 ? (
+        ) : error ? (
+          <div className="text-center py-12 text-red-500">{error}</div>
+        ) : sortedRepositories.length === 0 ? (
           searchQuery ? (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <EmptyState
@@ -288,7 +282,7 @@ finally {
                 actionLabel="Clear Search"
                 onAction={() => setSearchQuery("")}
               />
-              
+
               {repositories.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between px-2 sm:px-0">
@@ -340,7 +334,8 @@ finally {
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <Clock className="h-3 w-3" />
                               {new Date(
-                                (repo as any).lastAnalyzedAt || (repo as any).createdAt
+                                (repo as any).lastAnalyzedAt ||
+                                  (repo as any).createdAt,
                               ).toLocaleDateString()}
                             </div>
                           </div>
@@ -415,7 +410,7 @@ finally {
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
                       {new Date(
-                        (repo as any).lastAnalyzedAt || (repo as any).createdAt
+                        (repo as any).lastAnalyzedAt || (repo as any).createdAt,
                       ).toLocaleDateString()}
                     </div>
                   </div>
@@ -475,7 +470,7 @@ finally {
                           <Clock className="h-4 w-4" />
                           {new Date(
                             (repo as any).lastAnalyzedAt ||
-                              (repo as any).createdAt
+                              (repo as any).createdAt,
                           ).toLocaleDateString()}
                         </div>
                       </div>

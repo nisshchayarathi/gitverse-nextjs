@@ -29,15 +29,22 @@ export const AISettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="AI Summary Settings" size="md">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="AI Summary Settings"
+      size="md"
+    >
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Configure your LLM provider to generate module summaries. Keys are stored securely in your browser&apos;s local storage and are never sent to our servers.
+          Configure your LLM provider to generate module summaries. Keys are
+          stored securely in your browser&apos;s local storage and are never
+          sent to our servers.
         </p>
-        
+
         <div>
           <label className="block text-sm font-medium mb-1">Provider</label>
-          <select 
+          <select
             value={provider}
             onChange={(e) => setProvider(e.target.value as AIProviderType)}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm"
@@ -49,8 +56,10 @@ export const AISettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
         {provider === "gemini" && (
           <div>
-            <label className="block text-sm font-medium mb-1">Gemini API Key</label>
-            <Input 
+            <label className="block text-sm font-medium mb-1">
+              Gemini API Key
+            </label>
+            <Input
               type="password"
               placeholder="AIzaSy..."
               value={geminiKey}
@@ -61,8 +70,10 @@ export const AISettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
         {provider === "openai" && (
           <div>
-            <label className="block text-sm font-medium mb-1">OpenAI API Key</label>
-            <Input 
+            <label className="block text-sm font-medium mb-1">
+              OpenAI API Key
+            </label>
+            <Input
               type="password"
               placeholder="sk-..."
               value={openaiKey}
@@ -72,7 +83,9 @@ export const AISettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
         )}
 
         <div className="flex justify-end gap-2 pt-4">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={handleSave}>Save Settings</Button>
         </div>
       </div>

@@ -20,8 +20,7 @@ export const FOLDER_IMPORTANCE: Record<string, FolderImportanceInfo> = {
   services: {
     level: 4,
     label: "Core Module",
-    description:
-      "Contains business logic and shared application services.",
+    description: "Contains business logic and shared application services.",
   },
   api: {
     level: 4,
@@ -121,15 +120,13 @@ export const FOLDER_IMPORTANCE: Record<string, FolderImportanceInfo> = {
 };
 
 export function getFolderImportance(
-  folderName: string
+  folderName: string,
 ): FolderImportanceInfo | null {
   const normalized = folderName.toLowerCase().trim();
   return FOLDER_IMPORTANCE[normalized] || null;
 }
 
-export function getCategoryColor(
-  category: ImportanceCategory
-): {
+export function getCategoryColor(category: ImportanceCategory): {
   bg: string;
   text: string;
   ring: string;

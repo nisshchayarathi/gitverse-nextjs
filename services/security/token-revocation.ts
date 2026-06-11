@@ -24,9 +24,11 @@ export class TokenRevocation {
   public static async requestRevocation(
     provider: string,
     secret: string,
-    configOverride?: Partial<RevocationConfig>
+    configOverride?: Partial<RevocationConfig>,
   ): Promise<{ success: boolean; actionTaken: string; log: string }> {
-    const config = this.mockConfigList.find(c => c.provider.toLowerCase() === provider.toLowerCase()) || {
+    const config = this.mockConfigList.find(
+      (c) => c.provider.toLowerCase() === provider.toLowerCase(),
+    ) || {
       provider,
       allowAutoRevoke: false,
       adminApproved: false,
@@ -36,12 +38,16 @@ export class TokenRevocation {
     const masked = this.maskSecret(secret);
 
     // 1. Audit Logging
-    console.warn(`[SECURITY AUDIT] Credential revocation requested for provider: ${provider} (Secret: ${masked})`);
+    console.warn(
+      `[SECURITY AUDIT] Credential revocation requested for provider: ${provider} (Secret: ${masked})`,
+    );
 
     // 2. Strict Check for Opt-in and Approval
     if (!finalConfig.allowAutoRevoke || !finalConfig.adminApproved) {
       const reason = `Automatic token revocation is blocked. Revocation must be configurable and requires explicit admin/repository approval.`;
-      console.warn(`[SECURITY AUDIT] Revocation BLOCKED for ${provider}: ${reason}`);
+      console.warn(
+        `[SECURITY AUDIT] Revocation BLOCKED for ${provider}: ${reason}`,
+      );
       return {
         success: false,
         actionTaken: "RECOMMEND_REVOCATION",
@@ -51,8 +57,10 @@ export class TokenRevocation {
 
     // 3. Simulated/Mock Revocation Flow upon explicit approval
     const log = `[SUCCESS] Token revocation initiated successfully for approved ${provider} credential.`;
-    console.error(`[SECURITY AUDIT] [SUCCESS] Revoked exposed token ${masked} on ${provider}.`);
-    
+    console.error(
+      `[SECURITY AUDIT] [SUCCESS] Revoked exposed token ${masked} on ${provider}.`,
+    );
+
     return {
       success: true,
       actionTaken: "REVOKED",
@@ -63,8 +71,14 @@ export class TokenRevocation {
   /**
    * Configures revocation settings for a provider.
    */
-  public static configureProvider(provider: string, allowAutoRevoke: boolean, adminApproved: boolean): void {
-    const idx = this.mockConfigList.findIndex(c => c.provider.toLowerCase() === provider.toLowerCase());
+  public static configureProvider(
+    provider: string,
+    allowAutoRevoke: boolean,
+    adminApproved: boolean,
+  ): void {
+    const idx = this.mockConfigList.findIndex(
+      (c) => c.provider.toLowerCase() === provider.toLowerCase(),
+    );
     if (idx !== -1) {
       this.mockConfigList[idx] = { provider, allowAutoRevoke, adminApproved };
     } else {

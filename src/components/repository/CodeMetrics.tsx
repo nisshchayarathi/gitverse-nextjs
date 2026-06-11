@@ -79,21 +79,21 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
         lines: lang.lines || 0,
         color: getLanguageColor(lang.name),
       };
-    }
+    },
   );
 
   const totalFiles = repository?.files?.length || 0;
   const sourceFiles =
     repository?.files?.filter((f: any) =>
-      f.path?.match(/\.(ts|tsx|js|jsx|py|java|go|rs)$/i)
+      f.path?.match(/\.(ts|tsx|js|jsx|py|java|go|rs)$/i),
     )?.length || 0;
   const testFiles =
     repository?.files?.filter((f: any) =>
-      f.path?.match(/\.(test|spec)\.(ts|tsx|js|jsx)$/i)
+      f.path?.match(/\.(test|spec)\.(ts|tsx|js|jsx)$/i),
     )?.length || 0;
   const configFiles =
     repository?.files?.filter((f: any) =>
-      f.path?.match(/\.(json|yaml|yml|toml|ini|env)$/i)
+      f.path?.match(/\.(json|yaml|yml|toml|ini|env)$/i),
     )?.length || 0;
   const docFiles =
     repository?.files?.filter((f: any) => f.path?.match(/\.(md|txt|doc)$/i))
@@ -106,7 +106,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
     (sum: number, file: any) => {
       return sum + (file.lines || 0);
     },
-    0
+    0,
   );
 
   // Calculate percentages that sum to exactly 100%
@@ -122,7 +122,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
 
   // Round to 2 decimal places
   const roundedPercentages = rawPercentages.map(
-    (p) => Math.round(p * 100) / 100
+    (p) => Math.round(p * 100) / 100,
   );
 
   // Adjust to ensure sum is exactly 100%
@@ -131,7 +131,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
     const diff = 100 - sum;
     // Add difference to the largest percentage
     const maxIndex = roundedPercentages.indexOf(
-      Math.max(...roundedPercentages)
+      Math.max(...roundedPercentages),
     );
     roundedPercentages[maxIndex] =
       Math.round((roundedPercentages[maxIndex] + diff) * 100) / 100;
@@ -212,17 +212,17 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
   // Calculate code complexity based on file sizes
   const complexityFiles =
     repository?.files?.filter((f: any) =>
-      f.path?.match(/\.(ts|tsx|js|jsx|py|java|go|rs)$/i)
+      f.path?.match(/\.(ts|tsx|js|jsx|py|java|go|rs)$/i),
     ) || [];
 
   const lowComplexity = complexityFiles.filter(
-    (f: any) => (f.lines || 0) < 200
+    (f: any) => (f.lines || 0) < 200,
   ).length;
   const mediumComplexity = complexityFiles.filter(
-    (f: any) => (f.lines || 0) >= 200 && (f.lines || 0) < 500
+    (f: any) => (f.lines || 0) >= 200 && (f.lines || 0) < 500,
   ).length;
   const highComplexity = complexityFiles.filter(
-    (f: any) => (f.lines || 0) >= 500
+    (f: any) => (f.lines || 0) >= 500,
   ).length;
 
   const totalComplexityFiles =
@@ -244,7 +244,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
 
   // Calculate real dependencies from repository
   const packageJsonFile = repository?.files?.find(
-    (f: any) => f.path?.toLowerCase() === "package.json"
+    (f: any) => f.path?.toLowerCase() === "package.json",
   ) as any;
   const totalDependencies =
     (packageJsonFile?.dependencies?.length || 0) +
@@ -254,7 +254,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
     total: totalDependencies || repository?.languages?.length || 0,
     outdated: null,
     vulnerable: null,
-};
+  };
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "good":
@@ -543,7 +543,7 @@ export function CodeMetrics({ repository }: CodeMetricsProps) {
         const estimatedTestCount = hasTests ? totalTestFiles * 12 : 0;
         const passingRate = hasTests ? 95 : 0;
         const passingTests = Math.floor(
-          (estimatedTestCount * passingRate) / 100
+          (estimatedTestCount * passingRate) / 100,
         );
         const failingTests = estimatedTestCount - passingTests;
         const coveragePercentage =

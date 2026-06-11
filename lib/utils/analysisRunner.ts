@@ -8,8 +8,8 @@ function getRequiredSecret(): string {
     if (process.env.NODE_ENV === "production") {
       console.error(
         "[AnalysisRunner] ANALYSIS_RUNNER_SECRET is not set. " +
-        "The endpoint will reject all requests until it is configured. " +
-        "Generate one with: openssl rand -hex 32"
+          "The endpoint will reject all requests until it is configured. " +
+          "Generate one with: openssl rand -hex 32",
       );
     }
     return "";

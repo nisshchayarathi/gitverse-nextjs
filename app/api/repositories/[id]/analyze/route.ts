@@ -5,17 +5,24 @@ import { analysisJobService } from "@/lib/services/analysisJobService";
 import { ttlCache } from "@/lib/utils/ttlCache";
 import { apiError } from "@/lib/api-error";
 import { isValidGitScope } from "@/lib/utils/validators";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const user = await requireAuth(request);
     const id = parseInt(params.id);
 
-    const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.REPOSITORY_ANALYZE);
+    const rl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.REPOSITORY_ANALYZE,
+    );
     if (!rl.allowed) return rateLimitResponse(rl);
 
     if (isNaN(id)) {
@@ -30,8 +37,14 @@ export async function POST(
 
     const { scope } = await request.json();
 
-    if (scope != null && (typeof scope !== "string" || !isValidGitScope(scope))) {
-      return apiError(400, "Invalid scope. Only alphanumeric characters, underscore, dot, slash, and hyphen are allowed.");
+    if (
+      scope != null &&
+      (typeof scope !== "string" || !isValidGitScope(scope))
+    ) {
+      return apiError(
+        400,
+        "Invalid scope. Only alphanumeric characters, underscore, dot, slash, and hyphen are allowed.",
+      );
     }
 
     const job = await analysisJobService.createRepositoryAnalysisJob({
@@ -45,7 +58,7 @@ export async function POST(
 
     return NextResponse.json(
       { message: "Job queued", jobId: job.id, status: job.status },
-      { status: 202 }
+      { status: 202 },
     );
   } catch (error: any) {
     console.error("Analyze repository error:", sanitizeError(error));

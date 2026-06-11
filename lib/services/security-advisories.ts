@@ -1,11 +1,17 @@
-import { SecurityAdvisory, VulnerabilitySeverity } from "../../types/security-upgrade";
+import {
+  SecurityAdvisory,
+  VulnerabilitySeverity,
+} from "../../types/security-upgrade";
 
 export class SecurityAdvisoryService {
   /**
    * Fetch known security advisories for a given package and version.
    * In a real implementation, this would query GitHub GraphQL Security Advisories API or npm audit registry.
    */
-  async getAdvisoriesForPackage(packageName: string, currentVersion: string): Promise<SecurityAdvisory[]> {
+  async getAdvisoriesForPackage(
+    packageName: string,
+    currentVersion: string,
+  ): Promise<SecurityAdvisory[]> {
     const advisories: SecurityAdvisory[] = [];
 
     // Mocked critical advisory for demonstration
@@ -22,7 +28,7 @@ export class SecurityAdvisoryService {
     }
 
     if (packageName === "axios" && currentVersion.startsWith("1.5.")) {
-       advisories.push({
+      advisories.push({
         id: "GHSA-wf5p-g6vw-rhxx",
         cveId: "CVE-2023-45857",
         summary: "Axios Cross-Site Request Forgery",

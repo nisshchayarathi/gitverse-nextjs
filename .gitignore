@@ -1,8 +1,26 @@
+<<<<<<< HEAD
+# ============================================================
+# Dependencies
+# ============================================================
+=======
 # dependencies
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 node_modules/
 .pnp
 .pnp.js
 
+<<<<<<< HEAD
+# ============================================================
+# Next.js build output
+# ============================================================
+.next/
+out/
+build/
+
+# ============================================================
+# Environment files — never commit secrets
+# ============================================================
+=======
 # testing
 coverage/
 test-results/
@@ -23,19 +41,85 @@ tsconfig.tsbuildinfo
 # misc
 .DS_Store
 *.pem
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+<<<<<<< HEAD
+# Keep .env.example (template only, no real secrets)
+!.env.example
+
+# ============================================================
+# Testing & coverage
+# ============================================================
+coverage/
+playwright-report/
+test-results/
+test-output.txt
+
+# ============================================================
+# TypeScript
+# ============================================================
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# ============================================================
+# Build / compiled output
+# ============================================================
+dist/
+dist-worker/
+
+# ============================================================
+# Logs
+# ============================================================
+*.log
+=======
 
 # debug
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .pnpm-debug.log*
 
+<<<<<<< HEAD
+# ============================================================
+# Deployment platforms
+# ============================================================
+.vercel/
+
+# ============================================================
+# Editors & OS artifacts
+# ============================================================
+.DS_Store
+Thumbs.db
+.vscode/*
+# Keep shared editor settings
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# ============================================================
+# Temporary / scratch files
+# ============================================================
+fix_tests.js
+fix_tests.py
+fix_tests2.py
+batch_create.ts
+DevPath/
+devtrack/
+gitverse-nextjs/
+
+# ============================================================
+# Package manager lock files (keep one, ignore the rest)
+# If your team uses npm, keep package-lock.json and ignore pnpm-lock.yaml.
+# If your team uses pnpm, keep pnpm-lock.yaml and ignore package-lock.json.
+# Uncomment the one you don't use:
+# pnpm-lock.yaml
+# package-lock.json
+=======
 # typescript
 *.tsbuildinfo
 next-env.d.ts
@@ -50,3 +134,4 @@ next-env.d.ts
 *.swo
 *~
 
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da

@@ -14,21 +14,33 @@ import prisma from "@/lib/prisma";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const user = await requireAuth(request);
-    const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.REPOSITORY_KNOWLEDGE_REFRESH);
+    const rl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.REPOSITORY_KNOWLEDGE_REFRESH,
+    );
     if (!rl.allowed) return rateLimitResponse(rl);
     const repositoryId = parseInt(params.id, 10);
 
     if (isNaN(repositoryId)) {
-      return NextResponse.json({ error: "Invalid repository ID" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid repository ID" },
+        { status: 400 },
+      );
     }
 
-    const repository = await repositoryService.getRepository(repositoryId, user.userId);
+    const repository = await repositoryService.getRepository(
+      repositoryId,
+      user.userId,
+    );
     if (!repository) {
-      return NextResponse.json({ error: "Repository not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Repository not found" },
+        { status: 404 },
+      );
     }
 
     // Clone the repo just to read the knowledge configs
@@ -44,7 +56,10 @@ export async function POST(
 
     try {
       const refreshController = new AbortController();
-      const refreshTimeout = setTimeout(() => refreshController.abort(), 5 * 60 * 1000);
+      const refreshTimeout = setTimeout(
+        () => refreshController.abort(),
+        5 * 60 * 1000,
+      );
 
       try {
         const token = await getGithubAccessToken(user.userId);
@@ -57,10 +72,10 @@ export async function POST(
       } finally {
         clearTimeout(refreshTimeout);
       }
-      
+
       let knowledgeJson = undefined;
       let knowledgeMd = undefined;
-      
+
       try {
         const jsonPath = path.join(tempDir, ".gitverse.json");
         const jsonContent = await fs.readFile(jsonPath, "utf8");
@@ -110,7 +125,9 @@ export async function POST(
       if (gitService) {
         await gitService.cleanup();
       } else {
-        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null);
+        await fs
+          .rm(tempDir, { recursive: true, force: true })
+          .catch(() => null);
       }
     }
 
@@ -124,6 +141,9 @@ export async function POST(
     return NextResponse.json({ success: true, knowledge: formattedKnowledge, configWarning });
   } catch (error: any) {
     console.error("Failed to refresh repository knowledge:", error);
-    return NextResponse.json({ error: "Failed to refresh repository knowledge" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to refresh repository knowledge" },
+      { status: 500 },
+    );
   }
 }

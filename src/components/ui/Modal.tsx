@@ -1,12 +1,12 @@
-import React, { useEffect, useRef } from 'react'
-import { X } from 'lucide-react'
+import React, { useEffect, useRef } from "react";
+import { X } from "lucide-react";
 
 interface ModalProps {
-  isOpen: boolean
-  onClose: () => void
-  title?: string
-  children: React.ReactNode
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  children: React.ReactNode;
+  size?: "sm" | "md" | "lg" | "xl";
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -14,70 +14,73 @@ export const Modal: React.FC<ModalProps> = ({
   onClose,
   title,
   children,
-  size = 'md',
+  size = "md",
 }) => {
-  const modalRef = useRef<HTMLDivElement>(null)
-  const lastFocusedElement = useRef<HTMLElement | null>(null)
+  const modalRef = useRef<HTMLDivElement>(null);
+  const lastFocusedElement = useRef<HTMLElement | null>(null);
 
   const sizeStyles = {
-    sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl'
-  }
+    sm: "max-w-md",
+    md: "max-w-lg",
+    lg: "max-w-2xl",
+    xl: "max-w-4xl",
+  };
 
   // Manage accessibility focus trapping and scroll locking
   useEffect(() => {
     if (isOpen) {
       // Save the element that had focus before the modal opened
-      lastFocusedElement.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      document.body.style.overflow = 'hidden'
-      
+      lastFocusedElement.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      document.body.style.overflow = "hidden";
+
       // Focus the first focusable element inside the modal
       const focusable = modalRef.current?.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      )
-      ;(focusable?.[0] ?? modalRef.current)?.focus()
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      (focusable?.[0] ?? modalRef.current)?.focus();
     } else {
-      document.body.style.overflow = 'unset'
+      document.body.style.overflow = "unset";
       // Restore focus when the modal closes
-      lastFocusedElement.current?.focus()
+      lastFocusedElement.current?.focus();
     }
 
     return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [isOpen])
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
 
   // Handles closing on Escape and cycles Tab navigation within the modal bounds
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      onClose()
-      return
+    if (event.key === "Escape") {
+      onClose();
+      return;
     }
 
-    if (event.key !== 'Tab' || !modalRef.current) return
+    if (event.key !== "Tab" || !modalRef.current) return;
 
     const focusable = modalRef.current.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
 
-    if (focusable.length === 0) return
+    if (focusable.length === 0) return;
 
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
 
     if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
+      event.preventDefault();
+      last.focus();
     } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
+      event.preventDefault();
+      first.focus();
     }
-  }
+  };
 
   // Guard clause: Do not render anything if the modal is closed
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -103,8 +106,8 @@ export const Modal: React.FC<ModalProps> = ({
               <h3 className="text-lg font-semibold text-secondary-900 dark:text-white">
                 {title}
               </h3>
-              <button 
-                onClick={onClose} 
+              <button
+                onClick={onClose}
                 className="text-secondary-400 hover:text-secondary-500"
               >
                 <X className="h-5 w-5" />
@@ -113,11 +116,9 @@ export const Modal: React.FC<ModalProps> = ({
           )}
 
           {/* Content */}
-          <div className="p-6">
-            {children}
-          </div>
+          <div className="p-6">{children}</div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

@@ -13,7 +13,10 @@ import { invalidateGeminiAnalysisCacheForRepository } from "./geminiAnalysisCach
 import { FileChangeType } from "@prisma/client";
 import { repoSyncLimiter } from "../utils/concurrencyLimiter";
 import { withDbRetry } from "../utils/dbRetry";
-import { gitverseConfigParser, ParsedRepositoryKnowledge } from "../parsers/gitverseConfigParser";
+import {
+  gitverseConfigParser,
+  ParsedRepositoryKnowledge,
+} from "../parsers/gitverseConfigParser";
 import { repositoryKnowledgeService } from "./repositoryKnowledgeService";
 import { getGithubAccessToken } from "./githubAuthService";
 import { detectMonorepoPackages } from "../utils/monorepoUtils";
@@ -136,13 +139,21 @@ export class RepositoryService {
       // Check repository size before cloning
       const MAX_REPO_SIZE = 500 * 1024 * 1024; // 500 MB limit
       const token = await getGithubAccessToken(userId);
-      const remoteSize = await GitService.getRemoteRepositorySize(repository.url, token);
+      const remoteSize = await GitService.getRemoteRepositorySize(
+        repository.url,
+        token,
+      );
       if (remoteSize !== null && remoteSize > MAX_REPO_SIZE) {
-        throw new Error(`Repository exceeds maximum allowed size of 500MB (${(remoteSize / 1024 / 1024).toFixed(2)}MB).`);
+        throw new Error(
+          `Repository exceeds maximum allowed size of 500MB (${(remoteSize / 1024 / 1024).toFixed(2)}MB).`,
+        );
       }
 
       const readmeController = new AbortController();
-      const readmeTimeout = setTimeout(() => readmeController.abort(), 5 * 60 * 1000);
+      const readmeTimeout = setTimeout(
+        () => readmeController.abort(),
+        5 * 60 * 1000,
+      );
 
       try {
         gitService = await GitService.cloneRepository(repository.url, tempDir, {
@@ -160,9 +171,8 @@ export class RepositoryService {
         : null;
 
       const readme =
-        (scopedPath
-          ? await this.tryReadmeFromRepoPath(scopedPath)
-          : null) ?? (await this.tryReadmeFromRepoPath(tempDir));
+        (scopedPath ? await this.tryReadmeFromRepoPath(scopedPath) : null) ??
+        (await this.tryReadmeFromRepoPath(tempDir));
 
       const updated = await prisma.repository.update({
         where: { id: repositoryId },
@@ -234,7 +244,11 @@ export class RepositoryService {
   async analyzeRepository(
     repositoryId: number,
     userId: number,
-    opts?: { onProgress?: RepositoryAnalysisProgressReporter; scope?: string; timeoutMs?: number },
+    opts?: {
+      onProgress?: RepositoryAnalysisProgressReporter;
+      scope?: string;
+      timeoutMs?: number;
+    },
   ) {
     const repository = await prisma.repository.findFirst({
       where: { id: repositoryId, userId },
@@ -259,7 +273,10 @@ export class RepositoryService {
       }
     };
 
-    await report({ progressPercent: 1, progressMessage: "Starting analysis..." });
+    await report({
+      progressPercent: 1,
+      progressMessage: "Starting analysis...",
+    });
 
     const timeoutMs = opts?.timeoutMs ?? 15 * 60 * 1000; // 15 minutes default
     const controller = new AbortController();
@@ -270,7 +287,9 @@ export class RepositoryService {
 
     const checkAborted = () => {
       if (signal.aborted) {
-        throw new Error(`Repository analysis timed out after ${timeoutMs / 60000} minutes`);
+        throw new Error(
+          `Repository analysis timed out after ${timeoutMs / 60000} minutes`,
+        );
       }
     };
 
@@ -289,9 +308,14 @@ export class RepositoryService {
       // Check repository size before cloning to prevent disk exhaustion DoS
       const MAX_REPO_SIZE = 500 * 1024 * 1024; // 500 MB limit
       const token = await getGithubAccessToken(userId);
-      const remoteSize = await GitService.getRemoteRepositorySize(repository.url, token);
+      const remoteSize = await GitService.getRemoteRepositorySize(
+        repository.url,
+        token,
+      );
       if (remoteSize !== null && remoteSize > MAX_REPO_SIZE) {
-        throw new Error(`Repository exceeds maximum allowed size of 500MB (${(remoteSize / 1024 / 1024).toFixed(2)}MB).`);
+        throw new Error(
+          `Repository exceeds maximum allowed size of 500MB (${(remoteSize / 1024 / 1024).toFixed(2)}MB).`,
+        );
       }
 
       // Clone repository
@@ -328,11 +352,17 @@ export class RepositoryService {
       // Check for monorepo workspaces if this is the root project
       let subPackages: string[] = [];
       if (!repository.targetDirectory) {
-        await report({ progressPercent: 9, progressMessage: "Detecting Monorepo sub-packages..." });
+        await report({
+          progressPercent: 9,
+          progressMessage: "Detecting Monorepo sub-packages...",
+        });
         subPackages = await detectMonorepoPackages(tempDir);
       }
 
-      await report({ progressPercent: 10, progressMessage: "Checking AI context configuration" });
+      await report({
+        progressPercent: 10,
+        progressMessage: "Checking AI context configuration",
+      });
 
       let knowledgeJson: ParsedRepositoryKnowledge | undefined = undefined;
       let knowledgeMd: ParsedRepositoryKnowledge | undefined = undefined;
@@ -374,7 +404,10 @@ export class RepositoryService {
         }
       }
 
-      const parsedKnowledge = gitverseConfigParser.mergeKnowledge(knowledgeJson, knowledgeMd);
+      const parsedKnowledge = gitverseConfigParser.mergeKnowledge(
+        knowledgeJson,
+        knowledgeMd,
+      );
 
       checkAborted();
 
@@ -403,7 +436,10 @@ export class RepositoryService {
         progressPercent: 65,
         progressMessage: "Scanning files",
       });
-      const files = await gitService.getFileTree(opts?.scope || repository.targetDirectory || undefined, signal);
+      const files = await gitService.getFileTree(
+        opts?.scope || repository.targetDirectory || undefined,
+        signal,
+      );
       checkAborted();
 
       await report({
@@ -417,7 +453,10 @@ export class RepositoryService {
 
       const [contributors, languages] = await Promise.all([
         gitService.getContributors(signal),
-        gitService.detectLanguages(repository.targetDirectory ?? undefined, signal),
+        gitService.detectLanguages(
+          repository.targetDirectory ?? undefined,
+          signal,
+        ),
       ]);
 
       checkAborted();
@@ -493,7 +532,10 @@ export class RepositoryService {
               select: { id: true, hash: true },
             });
             const commitIdByHash = new Map(
-              insertedCommits.map((c: { hash: string; id: number }) => [c.hash, c.id]),
+              insertedCommits.map((c: { hash: string; id: number }) => [
+                c.hash,
+                c.id,
+              ]),
             );
 
             const fileChanges = chunk.flatMap(
@@ -546,26 +588,37 @@ export class RepositoryService {
         // Insert contributors
         if (contributors.length > 0) {
           const totalContributions = contributors.reduce(
-            (sum: number, c: { commits: number }) => sum + c.commits, 0,
+            (sum: number, c: { commits: number }) => sum + c.commits,
+            0,
           );
           await prisma.contributor.createMany({
-            data: contributors.map((contributor: { commits: number; name: string; email: string; additions: number; deletions: number; firstCommit: Date; lastCommit: Date }) => {
-              const percentage =
-                totalContributions > 0
-                  ? (contributor.commits / totalContributions) * 100
-                  : 0;
-              return {
-                name: contributor.name,
-                email: contributor.email,
-                commits: contributor.commits,
-                additions: contributor.additions,
-                deletions: contributor.deletions,
-                percentage,
-                firstCommit: contributor.firstCommit,
-                lastCommit: contributor.lastCommit,
-                repositoryId,
-              };
-            }),
+            data: contributors.map(
+              (contributor: {
+                commits: number;
+                name: string;
+                email: string;
+                additions: number;
+                deletions: number;
+                firstCommit: Date;
+                lastCommit: Date;
+              }) => {
+                const percentage =
+                  totalContributions > 0
+                    ? (contributor.commits / totalContributions) * 100
+                    : 0;
+                return {
+                  name: contributor.name,
+                  email: contributor.email,
+                  commits: contributor.commits,
+                  additions: contributor.additions,
+                  deletions: contributor.deletions,
+                  percentage,
+                  firstCommit: contributor.firstCommit,
+                  lastCommit: contributor.lastCommit,
+                  repositoryId,
+                };
+              },
+            ),
           });
         }
 
@@ -581,7 +634,8 @@ export class RepositoryService {
             0,
           );
           const rawPercentages = filteredLanguages.map(
-            (lang: { bytes: number }) => (totalBytes > 0 ? (lang.bytes / totalBytes) * 100 : 0),
+            (lang: { bytes: number }) =>
+              totalBytes > 0 ? (lang.bytes / totalBytes) * 100 : 0,
           );
 
           const roundedPercentages = rawPercentages.map(
@@ -589,7 +643,8 @@ export class RepositoryService {
           );
 
           const pctSum = roundedPercentages.reduce(
-            (acc: number, val: number) => acc + val, 0,
+            (acc: number, val: number) => acc + val,
+            0,
           );
           if (pctSum > 0 && pctSum !== 100 && roundedPercentages.length > 0) {
             const diff = 100 - pctSum;
@@ -603,7 +658,10 @@ export class RepositoryService {
           }
 
           const languagesWithAdjustedPercentage = filteredLanguages.map(
-            (lang: { name: string; bytes: number; lines: number }, index: number) => ({
+            (
+              lang: { name: string; bytes: number; lines: number },
+              index: number,
+            ) => ({
               name: lang.name,
               bytes: lang.bytes,
               lines: lang.lines,
@@ -613,7 +671,12 @@ export class RepositoryService {
 
           await prisma.language.createMany({
             data: languagesWithAdjustedPercentage.map(
-              (language: { name: string; percentage: number; bytes: number; lines: number }) => ({
+              (language: {
+                name: string;
+                percentage: number;
+                bytes: number;
+                lines: number;
+              }) => ({
                 name: language.name,
                 percentage: language.percentage,
                 bytes: language.bytes,
@@ -639,9 +702,15 @@ export class RepositoryService {
 
       // Save repository knowledge if found
       try {
-        await repositoryKnowledgeService.upsertKnowledge(repositoryId, parsedKnowledge);
+        await repositoryKnowledgeService.upsertKnowledge(
+          repositoryId,
+          parsedKnowledge,
+        );
       } catch (err) {
-        console.warn(`Failed to save repository knowledge for ${repositoryId}:`, err);
+        console.warn(
+          `Failed to save repository knowledge for ${repositoryId}:`,
+          err,
+        );
       }
 
       // Cache invalidation (outside transaction — best-effort, non-critical)
@@ -663,7 +732,10 @@ export class RepositoryService {
 
       // Automatically queue AnalysisJobs for any detected Monorepo sub-packages
       if (subPackages.length > 0) {
-        await report({ progressPercent: 98, progressMessage: "Queueing sub-package analysis..." });
+        await report({
+          progressPercent: 98,
+          progressMessage: "Queueing sub-package analysis...",
+        });
         for (const pkgPath of subPackages) {
           try {
             const subRepo = await this.createRepository({
@@ -676,7 +748,7 @@ export class RepositoryService {
 
             await prisma.repository.update({
               where: { id: subRepo.id },
-              data: { parentId: repository.id }
+              data: { parentId: repository.id },
             });
 
             await prisma.analysisJob.create({
@@ -688,7 +760,10 @@ export class RepositoryService {
               },
             });
           } catch (e) {
-            console.warn(`Failed to queue analysis for sub-package ${pkgPath}:`, e);
+            console.warn(
+              `Failed to queue analysis for sub-package ${pkgPath}:`,
+              e,
+            );
           }
         }
       }
@@ -727,7 +802,7 @@ export class RepositoryService {
   async generateArchitectureIteratively(
     repositoryId: number,
     userId: number,
-    opts?: { onProgress?: RepositoryAnalysisProgressReporter }
+    opts?: { onProgress?: RepositoryAnalysisProgressReporter },
   ) {
     const repository = await prisma.repository.findFirst({
       where: { id: repositoryId, userId },
@@ -735,8 +810,8 @@ export class RepositoryService {
         files: true,
         commits: { take: 50 },
         languages: { take: 20 },
-        contributors: { take: 20 }
-      }
+        contributors: { take: 20 },
+      },
     });
 
     if (!repository) {
@@ -745,11 +820,16 @@ export class RepositoryService {
 
     const report = async (update: RepositoryAnalysisProgress) => {
       if (opts?.onProgress) {
-        try { await opts.onProgress(update); } catch { }
+        try {
+          await opts.onProgress(update);
+        } catch {}
       }
     };
 
-    await report({ progressPercent: 10, progressMessage: "Grouping files into chunks..." });
+    await report({
+      progressPercent: 10,
+      progressMessage: "Grouping files into chunks...",
+    });
 
     const flatFiles = repository.files || [];
     const chunkSize = 100;
@@ -760,7 +840,10 @@ export class RepositoryService {
     }
 
     if (chunks.length === 0) {
-      await report({ progressPercent: 100, progressMessage: "No files to analyze." });
+      await report({
+        progressPercent: 100,
+        progressMessage: "No files to analyze.",
+      });
       return;
     }
 
@@ -770,14 +853,14 @@ export class RepositoryService {
 
     // Clear previous chunks for this repo
     await prisma.repositoryArchitectureChunk.deleteMany({
-      where: { repositoryId }
+      where: { repositoryId },
     });
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       await report({
         progressPercent: 10 + Math.floor((completedChunks / totalChunks) * 60),
-        progressMessage: `Analyzing chunk ${i + 1} of ${totalChunks}...`
+        progressMessage: `Analyzing chunk ${i + 1} of ${totalChunks}...`,
       });
 
       let aiResponse = await geminiService.analyzeRepository({
@@ -785,7 +868,7 @@ export class RepositoryService {
         type: "architecture-chunk",
         context: {
           fileTree: chunk.map((f: any) => f.path).join("\n"),
-        }
+        },
       });
 
       aiResponse = aiResponse
@@ -797,21 +880,26 @@ export class RepositoryService {
         data: {
           repositoryId,
           chunkPath: `chunk-${i}`,
-          summary: aiResponse
-        }
+          summary: aiResponse,
+        },
       });
 
       completedChunks++;
     }
 
-    await report({ progressPercent: 70, progressMessage: "Synthesizing final architecture map..." });
+    await report({
+      progressPercent: 70,
+      progressMessage: "Synthesizing final architecture map...",
+    });
 
     const savedChunks = await prisma.repositoryArchitectureChunk.findMany({
       where: { repositoryId },
-      orderBy: { id: "asc" }
+      orderBy: { id: "asc" },
     });
 
-    const combinedSummaries = savedChunks.map(c => `Chunk ${c.chunkPath}:\n${c.summary}`).join("\n\n---\n\n");
+    const combinedSummaries = savedChunks
+      .map((c) => `Chunk ${c.chunkPath}:\n${c.summary}`)
+      .join("\n\n---\n\n");
 
     let finalAiResponse = await geminiService.analyzeRepository({
       repositoryId,
@@ -831,7 +919,7 @@ export class RepositoryService {
           name: c.name,
           commits: c.commits,
         })),
-      }
+      },
     });
 
     finalAiResponse = finalAiResponse
@@ -843,14 +931,17 @@ export class RepositoryService {
       where: { repositoryId },
       create: {
         repositoryId,
-        projectDescription: finalAiResponse
+        projectDescription: finalAiResponse,
       },
       update: {
-        projectDescription: finalAiResponse
-      }
+        projectDescription: finalAiResponse,
+      },
     });
 
-    await report({ progressPercent: 100, progressMessage: "Completed architecture generation." });
+    await report({
+      progressPercent: 100,
+      progressMessage: "Completed architecture generation.",
+    });
   }
 
   /**
@@ -1004,7 +1095,10 @@ export class RepositoryService {
   }
 
   /** Raw DB fetch for repository stats — called by getRepositoryStats. */
-  private async _fetchRepositoryStats(id: number, userId: number): Promise<RepoStats> {
+  private async _fetchRepositoryStats(
+    id: number,
+    userId: number,
+  ): Promise<RepoStats> {
     const repository = await prisma.repository.findFirst({
       where: { id, userId },
     });
@@ -1049,11 +1143,7 @@ export class RepositoryService {
   /**
    * Get aggregate file-level statistics across the full repository history.
    */
-  async getFileStats(
-    repositoryId: number,
-    userId: number,
-    paths: string[],
-  ) {
+  async getFileStats(repositoryId: number, userId: number, paths: string[]) {
     const repository = await prisma.repository.findFirst({
       where: { id: repositoryId, userId },
       select: { id: true },

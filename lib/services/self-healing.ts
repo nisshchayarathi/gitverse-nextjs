@@ -2,7 +2,10 @@ import { PRReviewResponse } from "@/lib/services/prReviewService";
 import { GitHubService } from "@/lib/services/githubService";
 import { PatchGeneratorService } from "./patch-generator";
 import { PatchValidatorService } from "./patch-validator";
-import { SELF_HEAL_MIN_SEVERITY, SelfHealingPatch } from "../../types/self-healing";
+import {
+  SELF_HEAL_MIN_SEVERITY,
+  SelfHealingPatch,
+} from "../../types/self-healing";
 
 export class SelfHealingService {
   private generator = new PatchGeneratorService();
@@ -16,12 +19,16 @@ export class SelfHealingService {
     githubToken: string;
     reviewResponse: PRReviewResponse;
   }): Promise<SelfHealingPatch[]> {
-    const { owner, repo, pullNumber, headSha, githubToken, reviewResponse } = params;
+    const { owner, repo, pullNumber, headSha, githubToken, reviewResponse } =
+      params;
     const github = new GitHubService(githubToken);
 
     // 1. Identify eligible issues
     const eligibleIssues = reviewResponse.issues.filter(
-      issue => SELF_HEAL_MIN_SEVERITY.includes(issue.severity) && issue.file && issue.line
+      (issue) =>
+        SELF_HEAL_MIN_SEVERITY.includes(issue.severity) &&
+        issue.file &&
+        issue.line,
     );
 
     if (eligibleIssues.length === 0) {
@@ -34,21 +41,37 @@ export class SelfHealingService {
     for (const issue of eligibleIssues) {
       try {
         // We use the headSha to fetch the exact file state at the time of the review
-        const fileContent = await github.getFileContent(owner, repo, issue.file!, headSha);
+        const fileContent = await github.getFileContent(
+          owner,
+          repo,
+          issue.file!,
+          headSha,
+        );
         if (!fileContent) continue;
 
-        const generatedPatch = await this.generator.generatePatch(issue, fileContent);
+        const generatedPatch = await this.generator.generatePatch(
+          issue,
+          fileContent,
+        );
         if (!generatedPatch) continue;
 
-        const validatedPatch = this.validator.validatePatch(generatedPatch, fileContent);
-        
+        const validatedPatch = this.validator.validatePatch(
+          generatedPatch,
+          fileContent,
+        );
+
         if (validatedPatch.status === "valid") {
           successfulPatches.push(validatedPatch);
         } else {
-          console.log(`[SelfHealing] Patch rejected for ${issue.file}:${issue.line} due to status: ${validatedPatch.status}`);
+          console.log(
+            `[SelfHealing] Patch rejected for ${issue.file}:${issue.line} due to status: ${validatedPatch.status}`,
+          );
         }
       } catch (err) {
-        console.error(`[SelfHealing] Failed to process patch for issue ${issue.title}`, err);
+        console.error(
+          `[SelfHealing] Failed to process patch for issue ${issue.title}`,
+          err,
+        );
       }
     }
 
@@ -74,10 +97,15 @@ ${patch.suggestionBody}
           patch.file,
           suggestionBody,
           patch.endLine,
-          patch.startLine && patch.startLine < patch.endLine ? patch.startLine : undefined
+          patch.startLine && patch.startLine < patch.endLine
+            ? patch.startLine
+            : undefined,
         );
       } catch (err) {
-        console.error(`[SelfHealing] Failed to post suggestion to GitHub for ${patch.file}:${patch.endLine}`, err);
+        console.error(
+          `[SelfHealing] Failed to post suggestion to GitHub for ${patch.file}:${patch.endLine}`,
+          err,
+        );
       }
     }
 

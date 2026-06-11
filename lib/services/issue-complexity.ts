@@ -6,7 +6,10 @@ export class IssueComplexityService {
   /**
    * Estimates the complexity and difficulty of an issue based on its content.
    */
-  async estimateComplexity(title: string, body: string): Promise<ComplexityEstimation> {
+  async estimateComplexity(
+    title: string,
+    body: string,
+  ): Promise<ComplexityEstimation> {
     const safeTitle = sanitizeTextContent(title);
     const safeBody = sanitizeTextContent(body);
     const prompt = `
@@ -34,20 +37,27 @@ Return ONLY valid JSON matching this schema (no markdown formatting, no code fen
     try {
       const gemini = getGeminiService();
       const result = await gemini.chatRaw(prompt);
-      
+
       let rawJson = result.text;
-      rawJson = rawJson.replace(/```json/gi, "").replace(/```/g, "").trim();
-      
+      rawJson = rawJson
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim();
+
       const parsed = JSON.parse(rawJson) as ComplexityEstimation;
-      
+
       return {
         complexity: parsed.complexity || "M",
         contributorDifficulty: parsed.contributorDifficulty || "Unknown",
         beginnerFriendly: Boolean(parsed.beginnerFriendly),
-        confidence: typeof parsed.confidence === "number" ? parsed.confidence : 50,
+        confidence:
+          typeof parsed.confidence === "number" ? parsed.confidence : 50,
       };
     } catch (error) {
-      console.error("[IssueComplexityService] Error estimating complexity:", error);
+      console.error(
+        "[IssueComplexityService] Error estimating complexity:",
+        error,
+      );
       return {
         complexity: "M",
         contributorDifficulty: "Unknown",

@@ -1,7 +1,11 @@
 import { githubService } from "./githubService";
 import { getRevertGeneratorService } from "./revert-generator";
 import { getIncidentReportService } from "./incident-report";
-import { IncidentPayload, IncidentCorrelation, RollbackResult } from "@/types/incident-response";
+import {
+  IncidentPayload,
+  IncidentCorrelation,
+  RollbackResult,
+} from "@/types/incident-response";
 
 export class RollbackPrService {
   /**
@@ -12,9 +16,11 @@ export class RollbackPrService {
     owner: string,
     repo: string,
     incident: IncidentPayload,
-    correlation: IncidentCorrelation
+    correlation: IncidentCorrelation,
   ): Promise<RollbackResult> {
-    console.log(`[RollbackPr] Starting rollback for PR #${correlation.likelyPrNumber}`);
+    console.log(
+      `[RollbackPr] Starting rollback for PR #${correlation.likelyPrNumber}`,
+    );
 
     if (!correlation.likelyPrNumber) {
       return {
@@ -23,8 +29,11 @@ export class RollbackPrService {
       };
     }
 
-    const MIN_ROLLBACK_CONFIDENCE = parseInt(process.env.MIN_ROLLBACK_CONFIDENCE || "85", 10);
-    
+    const MIN_ROLLBACK_CONFIDENCE = parseInt(
+      process.env.MIN_ROLLBACK_CONFIDENCE || "85",
+      10,
+    );
+
     if (correlation.confidenceScore < MIN_ROLLBACK_CONFIDENCE) {
       return {
         success: false,
@@ -32,39 +41,40 @@ export class RollbackPrService {
       };
     }
 
-     try {
-       const client = (githubService as any).client;
+    try {
+      const client = (githubService as any).client;
 
-       // 1. Generate Revert Branch
-       const revertGenerator = getRevertGeneratorService();
-       const revertBranchName = await revertGenerator.createRevertBranch(
-         installationId,
-         owner,
-         repo,
-         correlation.likelyCommitSha || "",
-         incident.id
-       );
+      // 1. Generate Revert Branch
+      const revertGenerator = getRevertGeneratorService();
+      const revertBranchName = await revertGenerator.createRevertBranch(
+        installationId,
+        owner,
+        repo,
+        correlation.likelyCommitSha || "",
+        incident.id,
+      );
 
-       // 2. Get repository information to determine default branch
-       const repository = await githubService.getRepository(owner, repo);
-       const baseBranch = repository.default_branch;
+      // 2. Get repository information to determine default branch
+      const repository = await githubService.getRepository(owner, repo);
+      const baseBranch = repository.default_branch;
 
-       // 3. Generate Incident Report for PR Body
-       const reportService = getIncidentReportService();
-       const prBody = reportService.generatePrDescription(incident, correlation);
+      // 3. Generate Incident Report for PR Body
+      const reportService = getIncidentReportService();
+      const prBody = reportService.generatePrDescription(incident, correlation);
 
-       // 4. Create Emergency PR
-       const { data: pr } = await client.post(`/repos/${owner}/${repo}/pulls`, {
-         title: `🚨 Emergency Rollback: Revert PR #${correlation.likelyPrNumber} after production incident`,
-         head: revertBranchName,
-         base: baseBranch,
-         body: prBody,
-       });
+      // 4. Create Emergency PR
+      const { data: pr } = await client.post(`/repos/${owner}/${repo}/pulls`, {
+        title: `🚨 Emergency Rollback: Revert PR #${correlation.likelyPrNumber} after production incident`,
+        head: revertBranchName,
+        base: baseBranch,
+        body: prBody,
+      });
 
       console.log(`[RollbackPr] Created emergency rollback PR: ${pr.html_url}`);
 
       // 4. Auto-merge logic
-      const AUTO_ROLLBACK_ENABLED = process.env.AUTO_ROLLBACK_ENABLED === "true";
+      const AUTO_ROLLBACK_ENABLED =
+        process.env.AUTO_ROLLBACK_ENABLED === "true";
       let autoMerged = false;
 
       if (AUTO_ROLLBACK_ENABLED) {
@@ -74,9 +84,14 @@ export class RollbackPrService {
             merge_method: "squash",
           });
           autoMerged = true;
-          console.log(`[RollbackPr] Auto-merged emergency rollback PR #${pr.number}`);
+          console.log(
+            `[RollbackPr] Auto-merged emergency rollback PR #${pr.number}`,
+          );
         } catch (mergeError) {
-          console.error(`[RollbackPr] Auto-merge failed for PR #${pr.number}:`, mergeError);
+          console.error(
+            `[RollbackPr] Auto-merge failed for PR #${pr.number}:`,
+            mergeError,
+          );
         }
       }
 
@@ -87,7 +102,6 @@ export class RollbackPrService {
         prNumber: pr.number,
         autoMerged,
       };
-
     } catch (error: any) {
       console.error("[RollbackPr] Failed to execute rollback:", error);
       return {

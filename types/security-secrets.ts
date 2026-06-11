@@ -1,23 +1,23 @@
-export type SecretSeverity = 'Critical' | 'High' | 'Medium' | 'Low';
+export type SecretSeverity = "Critical" | "High" | "Medium" | "Low";
 
-export type SecretProvider = 
-  | 'AWS'
-  | 'GCP'
-  | 'Azure'
-  | 'GitHub'
-  | 'GitLab'
-  | 'Vercel'
-  | 'Netlify'
-  | 'Stripe'
-  | 'Razorpay'
-  | 'Twilio'
-  | 'SendGrid'
-  | 'MongoDB'
-  | 'PostgreSQL'
-  | 'JWT'
-  | 'Generic API Key'
-  | 'OAuth Secret'
-  | 'Unknown';
+export type SecretProvider =
+  | "AWS"
+  | "GCP"
+  | "Azure"
+  | "GitHub"
+  | "GitLab"
+  | "Vercel"
+  | "Netlify"
+  | "Stripe"
+  | "Razorpay"
+  | "Twilio"
+  | "SendGrid"
+  | "MongoDB"
+  | "PostgreSQL"
+  | "JWT"
+  | "Generic API Key"
+  | "OAuth Secret"
+  | "Unknown";
 
 export interface SecretDetectionResult {
   provider: SecretProvider;

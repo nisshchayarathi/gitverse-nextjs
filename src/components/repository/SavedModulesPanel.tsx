@@ -1,7 +1,15 @@
 "use client";
 
 import { Star, Trash2 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, EmptyState, Button } from "@/components/ui";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  EmptyState,
+  Button,
+} from "@/components/ui";
 import { BookmarkedModules } from "@/hooks/useModuleBookmarks";
 
 interface SavedModulesPanelProps {
@@ -18,7 +26,9 @@ export function SavedModulesPanel({
   const hasBookmarks = bookmarkedModules.length > 0;
 
   return (
-    <Card className={`glass border border-border/70 transition-all duration-300 ${className}`}>
+    <Card
+      className={`glass border border-border/70 transition-all duration-300 ${className}`}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Star className="h-5 w-5 fill-yellow-500 text-yellow-500" />

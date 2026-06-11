@@ -42,14 +42,13 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
       style={{
         transform: visible ? "translateX(0)" : "translateX(110%)",
         opacity: visible ? 1 : 0,
-        transition: "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease",
+        transition:
+          "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease",
       }}
       className={[
         "flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border min-w-[220px] max-w-xs",
         "bg-slate-900 text-white",
-        isSuccess
-          ? "border-emerald-500/40"
-          : "border-red-500/40",
+        isSuccess ? "border-emerald-500/40" : "border-red-500/40",
       ].join(" ")}
     >
       {/* Icon */}
@@ -63,7 +62,13 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
         aria-hidden="true"
       >
         {isSuccess ? (
-          <svg viewBox="0 0 16 16" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            width="14"
+            height="14"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <path
               d="M3 8.5L6.5 12L13 5"
               stroke="currentColor"
@@ -73,7 +78,13 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
             />
           </svg>
         ) : (
-          <svg viewBox="0 0 16 16" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            width="14"
+            height="14"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <path
               d="M8 4V8M8 11.5V12"
               stroke="currentColor"
@@ -88,7 +99,9 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
       <div className="text-sm font-medium leading-snug flex-1 flex flex-col gap-1">
         {toast.title && <span className="font-semibold">{toast.title}</span>}
         {(toast.description || toast.message) && (
-          <span className="opacity-90">{toast.description || toast.message}</span>
+          <span className="opacity-90">
+            {toast.description || toast.message}
+          </span>
         )}
       </div>
 
@@ -98,7 +111,13 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
         aria-label="Dismiss notification"
         className="flex-shrink-0 text-slate-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 rounded"
       >
-        <svg viewBox="0 0 16 16" fill="none" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          width="14"
+          height="14"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path
             d="M4 4L12 12M12 4L4 12"
             stroke="currentColor"

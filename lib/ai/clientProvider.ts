@@ -7,7 +7,7 @@ export class ClientAIProvider {
   static async generateModuleSummary(
     provider: string,
     apiKey: string,
-    context: AIContext
+    context: AIContext,
   ): Promise<{ summary: string }> {
     // This is a client-side AI helper. Actual implementation would call an AI API.
     return {

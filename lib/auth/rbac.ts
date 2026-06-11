@@ -1,8 +1,17 @@
 import prisma from "@/lib/prisma";
 
-export type Role = "ORG_ADMIN" | "REPO_ADMIN" | "MAINTAINER" | "CONTRIBUTOR" | "READER";
+export type Role =
+  | "ORG_ADMIN"
+  | "REPO_ADMIN"
+  | "MAINTAINER"
+  | "CONTRIBUTOR"
+  | "READER";
 
-export async function hasRepoRole(userId: number, repositoryId: number, allowedRoles: Role[]): Promise<boolean> {
+export async function hasRepoRole(
+  userId: number,
+  repositoryId: number,
+  allowedRoles: Role[],
+): Promise<boolean> {
   const repo = await prisma.repository.findUnique({
     where: { id: repositoryId },
     select: { userId: true },
@@ -16,7 +25,7 @@ export async function hasRepoRole(userId: number, repositoryId: number, allowedR
   const member = await prisma.organizationMember.findFirst({
     where: {
       userId,
-      organization: { repositories: { some: { repositoryId } } }
+      organization: { repositories: { some: { repositoryId } } },
     },
     select: { role: true },
   });
@@ -26,7 +35,11 @@ export async function hasRepoRole(userId: number, repositoryId: number, allowedR
   return allowedRoles.includes(member.role as Role);
 }
 
-export async function requireRepoRole(userId: number, repositoryId: number, allowedRoles: Role[]): Promise<void> {
+export async function requireRepoRole(
+  userId: number,
+  repositoryId: number,
+  allowedRoles: Role[],
+): Promise<void> {
   const hasRole = await hasRepoRole(userId, repositoryId, allowedRoles);
   if (!hasRole) {
     throw new Error("Forbidden: Insufficient permissions.");

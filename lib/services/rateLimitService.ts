@@ -49,7 +49,7 @@ export async function isRateLimited(
   key: string,
   type: AttemptType,
   maxAttempts: number,
-  windowMs: number
+  windowMs: number,
 ): Promise<boolean> {
   try {
     void maybeCleanupStaleAttempts();
@@ -97,7 +97,7 @@ export async function isAnalysisRunnerRateLimited(
 export async function countAttempts(
   key: string,
   type: AttemptType,
-  windowMs: number
+  windowMs: number,
 ): Promise<number> {
   try {
     void maybeCleanupStaleAttempts();
@@ -162,7 +162,7 @@ export async function recordAnalysisRunnerAttempt(
 
 export async function clearFailedAttempts(
   key: string,
-  type: AttemptType
+  type: AttemptType,
 ): Promise<void> {
   try {
     await prisma.loginAttempt.deleteMany({

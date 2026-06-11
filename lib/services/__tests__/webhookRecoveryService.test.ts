@@ -35,7 +35,7 @@ describe("Webhook Recovery Service", () => {
     it("uses custom config for recovery delays", () => {
       const recoveryConfig = {
         baseDelayMs: 60_000 as number,
-        maxDelayMs: 30 * 60 * 1000 as number,
+        maxDelayMs: (30 * 60 * 1000) as number,
       };
 
       const before = Date.now();
@@ -53,7 +53,9 @@ describe("Webhook Recovery Service", () => {
       };
 
       const result = nextRetryDate(100, recoveryConfig);
-      expect(result.getTime() - Date.now()).toBeLessThanOrEqual(recoveryConfig.maxDelayMs + 100);
+      expect(result.getTime() - Date.now()).toBeLessThanOrEqual(
+        recoveryConfig.maxDelayMs + 100,
+      );
     });
   });
 
@@ -101,16 +103,17 @@ describe("Webhook Recovery Service", () => {
       for (let i = 0; i < 5; i++) {
         const delay = Math.min(
           recoveryConfig.maxDelayMs,
-          recoveryConfig.baseDelayMs * Math.pow(recoveryConfig.backoffMultiplier, i)
+          recoveryConfig.baseDelayMs *
+            Math.pow(recoveryConfig.backoffMultiplier, i),
         );
         delays.push(delay);
       }
 
-      expect(delays[0]).toBe(60000);    // 1 minute
-      expect(delays[1]).toBe(120000);   // 2 minutes
-      expect(delays[2]).toBe(240000);   // 4 minutes
-      expect(delays[3]).toBe(480000);   // 8 minutes
-      expect(delays[4]).toBe(960000);   // 16 minutes
+      expect(delays[0]).toBe(60000); // 1 minute
+      expect(delays[1]).toBe(120000); // 2 minutes
+      expect(delays[2]).toBe(240000); // 4 minutes
+      expect(delays[3]).toBe(480000); // 8 minutes
+      expect(delays[4]).toBe(960000); // 16 minutes
     });
 
     it("caps at max delay", () => {
@@ -121,7 +124,7 @@ describe("Webhook Recovery Service", () => {
 
       const delay = Math.min(
         recoveryConfig.maxDelayMs,
-        recoveryConfig.baseDelayMs * Math.pow(2, 100)
+        recoveryConfig.baseDelayMs * Math.pow(2, 100),
       );
 
       expect(delay).toBe(recoveryConfig.maxDelayMs);

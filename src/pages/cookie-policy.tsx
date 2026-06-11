@@ -19,7 +19,8 @@ export default function CookiePolicy() {
             </h1>
 
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Understand how GitVerse uses cookies and similar technologies to improve platform functionality and user experience.
+              Understand how GitVerse uses cookies and similar technologies to
+              improve platform functionality and user experience.
             </p>
           </div>
         </section>
@@ -28,15 +29,15 @@ export default function CookiePolicy() {
         <section className="container mx-auto px-4 pb-24 relative z-10">
           <div className="max-w-4xl mx-auto">
             <div className="space-y-6">
-
               <section className="glass rounded-2xl p-8 border border-border/40 transition-all duration-300 hover:border-primary/50 hover:scale-[1.01] hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10">
                 <h2 className="text-2xl font-semibold mb-4">
                   What Are Cookies
                 </h2>
 
                 <p className="text-muted-foreground leading-7">
-                  Cookies are small data files stored on your device that help websites remember preferences, maintain 
-                  sessions, and improve usability.
+                  Cookies are small data files stored on your device that help
+                  websites remember preferences, maintain sessions, and improve
+                  usability.
                 </p>
               </section>
 
@@ -46,8 +47,9 @@ export default function CookiePolicy() {
                 </h2>
 
                 <p className="text-muted-foreground leading-7">
-                  Essential cookies help enable core platform functionality such as authentication, navigation, and 
-                  maintaining secure user sessions.
+                  Essential cookies help enable core platform functionality such
+                  as authentication, navigation, and maintaining secure user
+                  sessions.
                 </p>
               </section>
 
@@ -57,8 +59,9 @@ export default function CookiePolicy() {
                 </h2>
 
                 <p className="text-muted-foreground leading-7">
-                  Analytics-related cookies may be used to better understand platform usage patterns and improve overall 
-                  user experience and performance.
+                  Analytics-related cookies may be used to better understand
+                  platform usage patterns and improve overall user experience
+                  and performance.
                 </p>
               </section>
 
@@ -68,22 +71,21 @@ export default function CookiePolicy() {
                 </h2>
 
                 <p className="text-muted-foreground leading-7">
-                  Users can manage or disable cookies through browser settings, though some platform features may function 
-                  differently when cookies are restricted.
+                  Users can manage or disable cookies through browser settings,
+                  though some platform features may function differently when
+                  cookies are restricted.
                 </p>
               </section>
 
               <section className="glass rounded-2xl p-8 border border-border/40 transition-all duration-300 hover:border-primary/50 hover:scale-[1.01] hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10">
-                <h2 className="text-2xl font-semibold mb-4">
-                  Policy Updates
-                </h2>
+                <h2 className="text-2xl font-semibold mb-4">Policy Updates</h2>
 
                 <p className="text-muted-foreground leading-7">
-                  This cookie policy may be updated periodically to reflect changes in technologies, platform features, or 
-                  legal requirements.
+                  This cookie policy may be updated periodically to reflect
+                  changes in technologies, platform features, or legal
+                  requirements.
                 </p>
               </section>
-
             </div>
           </div>
         </section>

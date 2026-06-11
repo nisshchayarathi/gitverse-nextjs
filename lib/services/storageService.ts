@@ -2,7 +2,8 @@ import fs from "fs/promises";
 import path from "path";
 import { logger } from "@/lib/logger";
 
-const UPLOAD_BASE_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), "public", "uploads");
+const UPLOAD_BASE_DIR =
+  process.env.UPLOAD_DIR || path.join(process.cwd(), "public", "uploads");
 
 const MIME_EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -49,7 +50,9 @@ export async function storeAvatar(
   };
 }
 
-export function parseDataUrl(dataUrl: string): { buffer: Buffer; mimeType: string } | null {
+export function parseDataUrl(
+  dataUrl: string,
+): { buffer: Buffer; mimeType: string } | null {
   const match = dataUrl.match(/^data:([^;,]+)(?:;[^;]*)*;base64,(.+)$/);
   if (!match) return null;
   const mimeType = match[1];

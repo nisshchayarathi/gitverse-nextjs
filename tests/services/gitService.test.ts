@@ -56,12 +56,12 @@ John Doe|john@example.com|2026-06-01T10:00:00Z
 
     expect(contributors).toHaveLength(2);
 
-    const john = contributors.find(c => c.email === "john@example.com")!;
+    const john = contributors.find((c) => c.email === "john@example.com")!;
     expect(john.commits).toBe(2);
     expect(john.additions).toBe(23); // 5 + 10 + 8
     expect(john.deletions).toBe(6); // 2 + 3 + 1
 
-    const jane = contributors.find(c => c.email === "jane@example.com")!;
+    const jane = contributors.find((c) => c.email === "jane@example.com")!;
     expect(jane.commits).toBe(1);
     expect(jane.additions).toBe(20);
     expect(jane.deletions).toBe(5);

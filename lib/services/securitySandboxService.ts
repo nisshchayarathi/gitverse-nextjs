@@ -82,28 +82,35 @@ CMD ["echo", "sandbox-ready"]
 `;
 
   // Write Dockerfile using fs (no shell interpolation)
-  const tempDir = path.join(os.tmpdir(), `gitverse-sandbox-${crypto.randomBytes(8).toString("hex")}`);
+  const tempDir = path.join(
+    os.tmpdir(),
+    `gitverse-sandbox-${crypto.randomBytes(8).toString("hex")}`,
+  );
   await fs.mkdir(tempDir, { recursive: true });
   await fs.writeFile(path.join(tempDir, "Dockerfile"), dockerfile, "utf-8");
 
   try {
     // Use --build-arg to pass values safely (no shell interpretation)
-    await runDockerCommand([
-      "build",
-      "--build-arg", `REPO_URL=${repositoryUrl}`,
-      "--build-arg", `TARGET_SHA=${headSha}`,
-      "-t", imageTag,
-      tempDir,
-    ], 120_000);
+    await runDockerCommand(
+      [
+        "build",
+        "--build-arg",
+        `REPO_URL=${repositoryUrl}`,
+        "--build-arg",
+        `TARGET_SHA=${headSha}`,
+        "-t",
+        imageTag,
+        tempDir,
+      ],
+      120_000,
+    );
     return imageTag;
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => null);
   }
 }
 
-async function runSecurityTests(
-  imageTag: string,
-): Promise<{
+async function runSecurityTests(imageTag: string): Promise<{
   testResults: SandboxTestResult[];
   exploitPayload?: string;
   stackTrace?: string;
@@ -116,11 +123,16 @@ async function runSecurityTests(
   try {
     // Start the container
     await runDockerCommand([
-      "run", "-d",
-      "--name", containerName,
-      "--network", "none", // Isolate from network
-      "--memory", "256m",
-      "--cpus", "0.5",
+      "run",
+      "-d",
+      "--name",
+      containerName,
+      "--network",
+      "none", // Isolate from network
+      "--memory",
+      "256m",
+      "--cpus",
+      "0.5",
       imageTag,
     ]);
 
@@ -129,7 +141,10 @@ async function runSecurityTests(
 
     // Test 1: Check if container is running
     const { stdout: statusOutput } = await runDockerCommand([
-      "inspect", "--format", "{{.State.Status}}", containerName,
+      "inspect",
+      "--format",
+      "{{.State.Status}}",
+      containerName,
     ]);
     const isRunning = statusOutput.trim() === "running";
 
@@ -149,7 +164,11 @@ async function runSecurityTests(
     // Test 2: Execute a basic command to verify the environment
     try {
       const { stdout: execOutput } = await runDockerCommand([
-        "exec", containerName, "ls", "-la", "/app",
+        "exec",
+        containerName,
+        "ls",
+        "-la",
+        "/app",
       ]);
       testResults.push({
         testName: "environment_check",
@@ -179,7 +198,13 @@ async function runSecurityTests(
       {
         name: "command_injection",
         payload: "; cat /etc/shadow",
-        command: ["exec", containerName, "sh", "-c", "echo test; cat /etc/shadow"],
+        command: [
+          "exec",
+          containerName,
+          "sh",
+          "-c",
+          "echo test; cat /etc/shadow",
+        ],
       },
     ];
 
@@ -187,7 +212,8 @@ async function runSecurityTests(
       try {
         const { stdout, stderr } = await runDockerCommand(probe.command, 5_000);
         const output = stdout + stderr;
-        const detected = output.includes("root:") || output.includes("permission denied");
+        const detected =
+          output.includes("root:") || output.includes("permission denied");
 
         testResults.push({
           testName: probe.name,
@@ -214,7 +240,10 @@ async function runSecurityTests(
     // Test 4: Check for exposed secrets
     try {
       const { stdout: secretCheck } = await runDockerCommand([
-        "exec", containerName, "sh", "-c",
+        "exec",
+        containerName,
+        "sh",
+        "-c",
         "grep -r 'password\\|secret\\|api_key\\|token' /app --include='*.js' --include='*.ts' --include='*.env' -l 2>/dev/null || true",
       ]);
       const hasExposedSecrets = secretCheck.trim().length > 0;
@@ -222,8 +251,12 @@ async function runSecurityTests(
       testResults.push({
         testName: "secret_exposure",
         passed: !hasExposedSecrets,
-        response: hasExposedSecrets ? `Files with potential secrets: ${secretCheck.trim()}` : undefined,
-        error: hasExposedSecrets ? "Potential exposed secrets found" : undefined,
+        response: hasExposedSecrets
+          ? `Files with potential secrets: ${secretCheck.trim()}`
+          : undefined,
+        error: hasExposedSecrets
+          ? "Potential exposed secrets found"
+          : undefined,
       });
     } catch (err: any) {
       testResults.push({
@@ -236,7 +269,9 @@ async function runSecurityTests(
     return { testResults, exploitPayload, stackTrace };
   } finally {
     // Cleanup: stop and remove container
-    await runDockerCommand(["stop", "-t", "5", containerName]).catch(() => null);
+    await runDockerCommand(["stop", "-t", "5", containerName]).catch(
+      () => null,
+    );
     await runDockerCommand(["rm", "-f", containerName]).catch(() => null);
   }
 }
@@ -252,12 +287,16 @@ export async function runSecuritySandbox(params: {
   repositoryUrl: string;
 }): Promise<SandboxRunResult> {
   if (!isSandboxEnabled()) {
-    throw new Error("Security sandbox is not enabled. Set SECURITY_SANDBOX_ENABLED=true");
+    throw new Error(
+      "Security sandbox is not enabled. Set SECURITY_SANDBOX_ENABLED=true",
+    );
   }
 
   const isSafeUrl = await validateSafeUrl(params.repositoryUrl);
   if (!isSafeUrl) {
-    throw new Error("Security sandbox aborted: Repository URL resolves to an untrusted or private network address.");
+    throw new Error(
+      "Security sandbox aborted: Repository URL resolves to an untrusted or private network address.",
+    );
   }
 
   // Create sandbox record
@@ -284,7 +323,10 @@ export async function runSecuritySandbox(params: {
 
     // Run security tests with timeout
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error("Sandbox timeout")), SANDBOX_TIMEOUT_MS);
+      setTimeout(
+        () => reject(new Error("Sandbox timeout")),
+        SANDBOX_TIMEOUT_MS,
+      );
     });
 
     const result = await Promise.race([
@@ -294,36 +336,44 @@ export async function runSecuritySandbox(params: {
 
     // Update sandbox record with results
     const hasSecrets = (result.testResults as any[]).some(
-      (t) => t.testName === "secret_exposure" && !t.passed
+      (t) => t.testName === "secret_exposure" && !t.passed,
     );
 
     if (hasSecrets && params.pullRequestId) {
       const repo = await prisma.repository.findUnique({
         where: { id: params.repositoryId },
-        include: { 
-          user: { include: { githubAccount: true } }
-        }
+        include: {
+          user: { include: { githubAccount: true } },
+        },
       });
       const pr = await prisma.pullRequest.findUnique({
-        where: { id: params.pullRequestId }
+        where: { id: params.pullRequestId },
       });
 
       if (repo && repo.user.githubAccount && pr) {
         try {
+<<<<<<< HEAD
+          const githubService = new GitHubService(
+            repo.user.githubAccount.accessToken,
+          );
+=======
           const token = await getDecryptedGitHubToken(repo.user.id);
           if (!token) throw new Error("Failed to get decrypted GitHub token");
           const githubService = new GitHubService(token);
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
           const parts = repo.url.split("/");
           const owner = parts[parts.length - 2];
           const name = parts[parts.length - 1];
           const pullNumber = pr.prNumber;
-          
+
           await githubService.updatePullRequest(owner, name, pullNumber, {
             state: "closed",
           });
           await githubService.postPullRequestComment(
-            owner, name, pullNumber,
-            "🚨 **CRITICAL SECURITY ALERT** 🚨\n\nThis PR has been automatically quarantined and closed because high-entropy secrets were detected. Please revoke the secrets immediately and remove them from your commit history before reopening."
+            owner,
+            name,
+            pullNumber,
+            "🚨 **CRITICAL SECURITY ALERT** 🚨\n\nThis PR has been automatically quarantined and closed because high-entropy secrets were detected. Please revoke the secrets immediately and remove them from your commit history before reopening.",
           );
         } catch (e) {
           console.error("Failed to quarantine PR:", e);
@@ -342,45 +392,62 @@ export async function runSecuritySandbox(params: {
       },
     });
 
-    if (params.pullRequestId && (result.exploitPayload || result.testResults.some(r => !r.passed))) {
+    if (
+      params.pullRequestId &&
+      (result.exploitPayload || result.testResults.some((r) => !r.passed))
+    ) {
       try {
-        const repository = await prisma.repository.findUnique({ where: { id: params.repositoryId } });
-        const pr = await prisma.pullRequest.findUnique({ where: { id: params.pullRequestId } });
-        
+        const repository = await prisma.repository.findUnique({
+          where: { id: params.repositoryId },
+        });
+        const pr = await prisma.pullRequest.findUnique({
+          where: { id: params.pullRequestId },
+        });
+
         if (repository && pr) {
           const ownerRepo = GitHubService.parseGitHubUrl(params.repositoryUrl);
           if (ownerRepo) {
             const { owner, repo } = ownerRepo;
             const token = await getDecryptedGitHubToken(repository.userId);
             const github = new GitHubService(token || undefined);
-            
+
             // Check gitverse.yml for toggle
-            const configContent = await github.getFileContent(owner, repo, "gitverse.yml", params.headSha);
+            const configContent = await github.getFileContent(
+              owner,
+              repo,
+              "gitverse.yml",
+              params.headSha,
+            );
             let shouldPost = true;
             if (configContent) {
-              if (configContent.includes("sandboxComments: false") || configContent.includes("sandbox_comments: false")) {
+              if (
+                configContent.includes("sandboxComments: false") ||
+                configContent.includes("sandbox_comments: false")
+              ) {
                 shouldPost = false;
               }
             }
-            
+
             if (shouldPost) {
               let md = "## 🛡️ Security Sandbox Report\n\n";
-              md += "The security sandbox detected potential vulnerabilities during its automated probes.\n\n";
+              md +=
+                "The security sandbox detected potential vulnerabilities during its automated probes.\n\n";
               md += "| Test | Status | Details |\n";
               md += "|------|--------|---------|\n";
-              
+
               for (const test of result.testResults) {
                 const statusIcon = test.passed ? "✅ Passed" : "❌ Failed";
                 let details = test.error || test.response || "No details";
-                if (details.length > 200) details = details.substring(0, 200) + "...";
+                if (details.length > 200)
+                  details = details.substring(0, 200) + "...";
                 details = details.replace(/\n/g, " ");
                 md += `| ${test.testName} | ${statusIcon} | ${details} |\n`;
               }
-              
+
               if (result.exploitPayload) {
                 md += `\n**Exploit Payload Executed:**\n\`\`\`\n${result.exploitPayload}\n\`\`\`\n`;
               }
-              
+
               await github.postPullRequestComment(owner, repo, pr.prNumber, md);
             }
           }

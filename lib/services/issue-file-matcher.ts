@@ -9,7 +9,7 @@ export class IssueFileMatcherService {
   async matchFiles(
     title: string,
     body: string,
-    repositoryFiles: Array<{ path: string }>
+    repositoryFiles: Array<{ path: string }>,
   ): Promise<FileMatch[]> {
     if (!repositoryFiles || repositoryFiles.length === 0) {
       return [];
@@ -25,7 +25,24 @@ export class IssueFileMatcherService {
       .filter(
         (w: string) =>
           w.length > 3 &&
-          !["what", "how", "where", "why", "who", "show", "tell", "explain", "code", "file", "repo", "repository", "this", "that", "there", "with"].includes(w)
+          ![
+            "what",
+            "how",
+            "where",
+            "why",
+            "who",
+            "show",
+            "tell",
+            "explain",
+            "code",
+            "file",
+            "repo",
+            "repository",
+            "this",
+            "that",
+            "there",
+            "with",
+          ].includes(w),
       );
 
     let candidatePaths = filePaths;
@@ -80,10 +97,13 @@ Return ONLY valid JSON matching this schema (no markdown formatting, no code fen
       const result = await gemini.chatRaw(prompt);
 
       let rawJson = result.text;
-      rawJson = rawJson.replace(/```json/gi, "").replace(/```/g, "").trim();
+      rawJson = rawJson
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim();
 
       const parsed = JSON.parse(rawJson) as FileMatch[];
-      
+
       if (!Array.isArray(parsed)) {
         return [];
       }

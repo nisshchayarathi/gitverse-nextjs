@@ -19,12 +19,12 @@ async function handleDriftDetection(request: NextRequest) {
     if (process.env.NODE_ENV === "production") {
       return NextResponse.json(
         { error: "Unauthorized - ANALYSIS_RUNNER_SECRET not configured" },
-        { status: 500 }
+        { status: 500 },
       );
     }
     return NextResponse.json(
       { error: "Unauthorized - ANALYSIS_RUNNER_SECRET not configured" },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -39,27 +39,33 @@ async function handleDriftDetection(request: NextRequest) {
       installationId: { not: null },
     },
     orderBy: {
-      updatedAt: "asc"
+      updatedAt: "asc",
     },
     include: {
-      user: true
-    }
+      user: true,
+    },
   });
 
   if (!repoToScan || !repoToScan.installationId) {
-    return NextResponse.json({ ok: true, message: "No eligible repositories found for drift detection." });
+    return NextResponse.json({
+      ok: true,
+      message: "No eligible repositories found for drift detection.",
+    });
   }
 
   const internalRepo = await prisma.repository.findFirst({
     where: {
       url: {
-        contains: repoToScan.repoFullName
-      }
-    }
+        contains: repoToScan.repoFullName,
+      },
+    },
   });
 
   if (!internalRepo) {
-    return NextResponse.json({ ok: true, message: "Repository not fully indexed yet." });
+    return NextResponse.json({
+      ok: true,
+      message: "Repository not fully indexed yet.",
+    });
   }
 
   const [owner, repoName] = repoToScan.repoFullName.split("/");
@@ -77,10 +83,12 @@ async function handleDriftDetection(request: NextRequest) {
 
     await prisma.gitHubRepo.update({
       where: { id: repoToScan.id },
-      data: { updatedAt: new Date() }
+      data: { updatedAt: new Date() },
     });
 
-    console.log(`[DocumentationDriftJob] Completed for ${repoToScan.repoFullName}: Analyzed ${result.filesAnalyzed} files, found ${result.driftedFiles} drifting files.`);
+    console.log(
+      `[DocumentationDriftJob] Completed for ${repoToScan.repoFullName}: Analyzed ${result.filesAnalyzed} files, found ${result.driftedFiles} drifting files.`,
+    );
     if (result.prUrl) {
       console.log(`[DocumentationDriftJob] Created PR: ${result.prUrl}`);
     }
@@ -88,11 +96,13 @@ async function handleDriftDetection(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       repository: repoToScan.repoFullName,
-      ...result
+      ...result,
     });
-
   } catch (error: any) {
     console.error("[DocumentationDriftJob] Failed:", error);
-    return NextResponse.json({ error: error.message || "Failed to run drift detection" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Failed to run drift detection" },
+      { status: 500 },
+    );
   }
 }

@@ -50,7 +50,8 @@ export function CopyUrlButton({
   const handleCopy = useCallback(async () => {
     if (state !== "idle") return; // prevent double-fire during feedback window
 
-    const target = url ?? (typeof window !== "undefined" ? window.location.href : "");
+    const target =
+      url ?? (typeof window !== "undefined" ? window.location.href : "");
 
     try {
       if (navigator?.clipboard?.writeText) {
@@ -59,7 +60,8 @@ export function CopyUrlButton({
         // Fallback for older browsers / insecure contexts
         const textarea = document.createElement("textarea");
         textarea.value = target;
-        textarea.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;";
+        textarea.style.cssText =
+          "position:fixed;left:-9999px;top:-9999px;opacity:0;";
         document.body.appendChild(textarea);
         textarea.focus();
         textarea.select();
@@ -97,8 +99,8 @@ export function CopyUrlButton({
           isCopied
             ? "Link copied to clipboard"
             : isError
-            ? "Failed to copy link"
-            : "Copy analysis link to clipboard"
+              ? "Failed to copy link"
+              : "Copy analysis link to clipboard"
         }
         aria-pressed={isCopied}
         title={isCopied ? "Copied!" : isError ? "Failed to copy" : "Copy link"}
@@ -112,13 +114,13 @@ export function CopyUrlButton({
           isCopied
             ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-400 focus:ring-emerald-500 cursor-default"
             : isError
-            ? "bg-red-500/15 border-red-500/50 text-red-400 focus:ring-red-500 cursor-default"
-            : [
-                "bg-slate-800/60 border-slate-700 text-slate-300",
-                "hover:bg-slate-700/80 hover:border-slate-500 hover:text-white",
-                "active:scale-95",
-                "focus:ring-blue-500",
-              ].join(" "),
+              ? "bg-red-500/15 border-red-500/50 text-red-400 focus:ring-red-500 cursor-default"
+              : [
+                  "bg-slate-800/60 border-slate-700 text-slate-300",
+                  "hover:bg-slate-700/80 hover:border-slate-500 hover:text-white",
+                  "active:scale-95",
+                  "focus:ring-blue-500",
+                ].join(" "),
         ].join(" ")}
       >
         {/* Icon */}
@@ -184,17 +186,15 @@ export function CopyUrlButton({
         </span>
 
         {/* Label */}
-        <span>
-          {isCopied ? "Copied!" : isError ? "Failed to copy" : label}
-        </span>
+        <span>{isCopied ? "Copied!" : isError ? "Failed to copy" : label}</span>
 
         {/* Screen-reader live region for state changes */}
         <span aria-live="polite" aria-atomic="true" className="sr-only">
           {isCopied
             ? "Link copied to clipboard."
             : isError
-            ? "Could not copy link. Please copy the URL manually."
-            : ""}
+              ? "Could not copy link. Please copy the URL manually."
+              : ""}
         </span>
       </button>
     </div>

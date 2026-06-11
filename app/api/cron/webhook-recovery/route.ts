@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     console.error("[cron/webhook-recovery] Recovery failed:", error);
     return NextResponse.json(
       { error: "Recovery failed", details: error?.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -54,9 +54,12 @@ export default function PRSimulator() {
     try {
       setIsListLoading(true);
       const token = localStorage.getItem("gitverse_token");
-      const response = await axios.get(buildApiUrl("/api/repositories?limit=100"), {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const response = await axios.get(
+        buildApiUrl("/api/repositories?limit=100"),
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
       const repos = response.data.data?.repositories || [];
       setRepoList(Array.isArray(repos) ? repos : []);
     } catch (error) {
@@ -103,7 +106,7 @@ export default function PRSimulator() {
           repositoryId: selectedRepoId ? Number(selectedRepoId) : undefined,
           diff: diffInput,
         },
-        { headers }
+        { headers },
       );
 
       setAnalysisResult(response.data?.review || "");
@@ -111,7 +114,9 @@ export default function PRSimulator() {
       console.error("Failed to simulate pull request:", error);
       toast({
         title: "Simulator Error",
-        description: error.response?.data?.error || "Failed to analyze the pull request diff.",
+        description:
+          error.response?.data?.error ||
+          "Failed to analyze the pull request diff.",
         variant: "destructive",
       });
     } finally {
@@ -208,7 +213,8 @@ export default function PRSimulator() {
               AI Pull Request <span className="text-gradient">Simulator</span>
             </h1>
             <p className="text-muted-foreground mt-2 max-w-2xl">
-              Paste your local git diff output or upload a patch file to run a simulated code review before pushing or creating a pull request.
+              Paste your local git diff output or upload a patch file to run a
+              simulated code review before pushing or creating a pull request.
             </p>
           </div>
           {hasAnalyzed && (
@@ -239,13 +245,20 @@ export default function PRSimulator() {
 
                 {/* Optional Repository Context */}
                 <div className="space-y-2">
-                  <label htmlFor="repoSelect" className="text-sm font-medium text-foreground block">
+                  <label
+                    htmlFor="repoSelect"
+                    className="text-sm font-medium text-foreground block"
+                  >
                     Repository Context (Optional)
                   </label>
                   <select
                     id="repoSelect"
                     value={selectedRepoId}
-                    onChange={(e) => setSelectedRepoId(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) =>
+                      setSelectedRepoId(
+                        e.target.value === "" ? "" : Number(e.target.value),
+                      )
+                    }
                     disabled={isListLoading}
                     className="w-full bg-background border border-border/50 rounded-lg p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none transition-all"
                   >
@@ -257,7 +270,8 @@ export default function PRSimulator() {
                     ))}
                   </select>
                   <span className="text-[10px] text-muted-foreground leading-normal block">
-                    Providing a repository context helps Gemini cross-reference changes with codebase technology configurations.
+                    Providing a repository context helps Gemini cross-reference
+                    changes with codebase technology configurations.
                   </span>
                 </div>
 
@@ -285,22 +299,30 @@ export default function PRSimulator() {
 
               {/* Instructions Panel */}
               <div className="glass border border-border/50 rounded-2xl p-6 space-y-4">
-                <h4 className="font-bold text-sm text-foreground">How to generate a git diff:</h4>
+                <h4 className="font-bold text-sm text-foreground">
+                  How to generate a git diff:
+                </h4>
                 <div className="space-y-3 text-xs text-muted-foreground leading-relaxed">
                   <div className="space-y-1">
-                    <p className="font-semibold text-foreground">Uncommitted changes in local directory:</p>
+                    <p className="font-semibold text-foreground">
+                      Uncommitted changes in local directory:
+                    </p>
                     <code className="block bg-white/5 p-2 rounded font-mono text-[11px] text-primary">
                       git diff
                     </code>
                   </div>
                   <div className="space-y-1">
-                    <p className="font-semibold text-foreground">Staged changes:</p>
+                    <p className="font-semibold text-foreground">
+                      Staged changes:
+                    </p>
                     <code className="block bg-white/5 p-2 rounded font-mono text-[11px] text-primary">
                       git diff --cached
                     </code>
                   </div>
                   <div className="space-y-1">
-                    <p className="font-semibold text-foreground">Compare branch with main branch:</p>
+                    <p className="font-semibold text-foreground">
+                      Compare branch with main branch:
+                    </p>
                     <code className="block bg-white/5 p-2 rounded font-mono text-[11px] text-primary">
                       git diff main...my-feature-branch
                     </code>
@@ -312,8 +334,12 @@ export default function PRSimulator() {
             {/* Diff Entry Panel */}
             <div className="lg:col-span-2 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-foreground">Enter Git Diff / Patch Content</span>
-                <span className="text-xs text-muted-foreground">Supports pasting or drag & drop</span>
+                <span className="text-sm font-semibold text-foreground">
+                  Enter Git Diff / Patch Content
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Supports pasting or drag & drop
+                </span>
               </div>
 
               {/* Drag and Drop Area */}
@@ -323,7 +349,9 @@ export default function PRSimulator() {
                 onDragLeave={handleDrag}
                 onDrop={handleDrop}
                 className={`glass border rounded-2xl overflow-hidden transition-all duration-300 ${
-                  dragActive ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border/50"
+                  dragActive
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-border/50"
                 }`}
               >
                 {/* File Uploader and Text input area */}
@@ -341,7 +369,8 @@ export default function PRSimulator() {
                         <Upload className="h-6 w-6 text-primary" />
                       </div>
                       <p className="text-sm font-medium text-foreground">
-                        Drag and drop your diff/patch file here, or click to upload
+                        Drag and drop your diff/patch file here, or click to
+                        upload
                       </p>
                       <p className="text-xs text-muted-foreground mt-1.5">
                         Accepts .diff, .patch, or .txt files (max 2MB)
@@ -375,9 +404,12 @@ export default function PRSimulator() {
                     <GitPullRequest className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-foreground">Simulated AI Pull Request Review</h3>
+                    <h3 className="text-xl font-bold text-foreground">
+                      Simulated AI Pull Request Review
+                    </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Principal architect quality feedback, bug detections, and automated PR descriptions.
+                      Principal architect quality feedback, bug detections, and
+                      automated PR descriptions.
                     </p>
                   </div>
                 </div>
@@ -389,7 +421,11 @@ export default function PRSimulator() {
                     className="p-2.5 rounded-lg bg-white/5 border border-border/50 hover:bg-white/10 disabled:opacity-50 text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5 text-xs font-semibold"
                     title="Copy Full AI Review"
                   >
-                    {copiedState ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                    {copiedState ? (
+                      <Check className="h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
                     {copiedState ? "Copied!" : "Copy Review"}
                   </button>
                   <button
@@ -398,7 +434,9 @@ export default function PRSimulator() {
                     className="p-2.5 rounded-lg bg-white/5 border border-border/50 hover:bg-white/10 disabled:opacity-50 text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5 text-xs font-semibold"
                     title="Re-run Simulation"
                   >
-                    <RotateCw className={`h-4 w-4 ${isAnalyzing ? "animate-spin" : ""}`} />
+                    <RotateCw
+                      className={`h-4 w-4 ${isAnalyzing ? "animate-spin" : ""}`}
+                    />
                     Re-run
                   </button>
                 </div>
@@ -408,7 +446,10 @@ export default function PRSimulator() {
                 <div className="space-y-4 py-8">
                   <div className="flex items-center gap-2.5 text-sm text-primary">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Gemini is scanning code diffs, tracking regressions, and building summaries...</span>
+                    <span>
+                      Gemini is scanning code diffs, tracking regressions, and
+                      building summaries...
+                    </span>
                   </div>
                   <div className="space-y-2">
                     <div className="h-4 bg-white/5 animate-pulse rounded-lg w-full" />
@@ -427,13 +468,24 @@ export default function PRSimulator() {
                       h1: ({ children }) => {
                         // Dynamically add icons or styles based on heading name
                         const text = String(children);
-                        let icon = <CheckCircle className="h-5 w-5 text-primary shrink-0" />;
+                        let icon = (
+                          <CheckCircle className="h-5 w-5 text-primary shrink-0" />
+                        );
                         if (text.toLowerCase().includes("bug")) {
-                          icon = <AlertTriangle className="h-5 w-5 text-accent shrink-0" />;
+                          icon = (
+                            <AlertTriangle className="h-5 w-5 text-accent shrink-0" />
+                          );
                         } else if (text.toLowerCase().includes("security")) {
-                          icon = <Flame className="h-5 w-5 text-red-500 shrink-0" />;
-                        } else if (text.toLowerCase().includes("github pr") || text.toLowerCase().includes("automated")) {
-                          icon = <GitPullRequest className="h-5 w-5 text-emerald-500 shrink-0" />;
+                          icon = (
+                            <Flame className="h-5 w-5 text-red-500 shrink-0" />
+                          );
+                        } else if (
+                          text.toLowerCase().includes("github pr") ||
+                          text.toLowerCase().includes("automated")
+                        ) {
+                          icon = (
+                            <GitPullRequest className="h-5 w-5 text-emerald-500 shrink-0" />
+                          );
                         }
                         return (
                           <h1 className="text-xl font-bold font-heading text-foreground mt-8 mb-4 border-b border-border/50 pb-2 first:mt-0 flex items-center gap-2.5">
@@ -452,7 +504,9 @@ export default function PRSimulator() {
                           {children}
                         </h3>
                       ),
-                      p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
+                      p: ({ children }) => (
+                        <p className="mb-4 leading-relaxed">{children}</p>
+                      ),
                       a: ({ href, children, ...props }) => (
                         <a
                           href={href}
@@ -465,12 +519,18 @@ export default function PRSimulator() {
                         </a>
                       ),
                       ul: ({ children }) => (
-                        <ul className="list-disc pl-5 space-y-2 my-4">{children}</ul>
+                        <ul className="list-disc pl-5 space-y-2 my-4">
+                          {children}
+                        </ul>
                       ),
                       ol: ({ children }) => (
-                        <ol className="list-decimal pl-5 space-y-2 my-4">{children}</ol>
+                        <ol className="list-decimal pl-5 space-y-2 my-4">
+                          {children}
+                        </ol>
                       ),
-                      li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                      li: ({ children }) => (
+                        <li className="leading-relaxed">{children}</li>
+                      ),
                       code: ({ className, children, ...props }) => {
                         const isBlock = String(children).includes("\n");
                         if (isBlock) {
@@ -491,7 +551,8 @@ export default function PRSimulator() {
                       },
                     }}
                   >
-                    {analysisResult || "No review results were generated. Please re-run the simulator."}
+                    {analysisResult ||
+                      "No review results were generated. Please re-run the simulator."}
                   </ReactMarkdown>
                 </div>
               )}

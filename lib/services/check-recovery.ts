@@ -11,18 +11,24 @@ export class CheckRecoveryService {
     repo: string,
     checkRunId: number,
     githubToken: string,
-    errorObj: any
+    errorObj: any,
   ): Promise<void> {
     try {
       const githubService = new GitHubService(githubToken);
       const checksService = new GitHubChecksService(githubService);
 
-      const errorMessage = errorObj instanceof Error ? errorObj.message : String(errorObj);
-      
+      const errorMessage =
+        errorObj instanceof Error ? errorObj.message : String(errorObj);
+
       await checksService.failCheckRun(owner, repo, checkRunId, errorMessage);
-      console.log(`[CheckRecovery] Successfully recovered and failed check run ${checkRunId} for ${owner}/${repo}`);
+      console.log(
+        `[CheckRecovery] Successfully recovered and failed check run ${checkRunId} for ${owner}/${repo}`,
+      );
     } catch (recoveryError) {
-      console.error(`[CheckRecovery] CRITICAL: Failed to recover check run ${checkRunId}. It may be permanently pending.`, recoveryError);
+      console.error(
+        `[CheckRecovery] CRITICAL: Failed to recover check run ${checkRunId}. It may be permanently pending.`,
+        recoveryError,
+      );
     }
   }
 }

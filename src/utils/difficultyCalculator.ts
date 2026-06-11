@@ -5,7 +5,8 @@ import {
   RepositoryMetadata,
 } from "@/types/firstPRSimulator";
 
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+const clamp = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
 
 export const calculateDifficulty = (
   predictedFiles: FilePrediction[],
@@ -19,21 +20,37 @@ export const calculateDifficulty = (
   let score = fileCount * 7;
   score += clamp(repoSize / 50, 0, 20);
 
-  if (labelText.includes("security") || labelText.includes("performance") || labelText.includes("database")) {
+  if (
+    labelText.includes("security") ||
+    labelText.includes("performance") ||
+    labelText.includes("database")
+  ) {
     score += 12;
   }
-  if (labelText.includes("ui") || labelText.includes("frontend") || labelText.includes("dashboard")) {
+  if (
+    labelText.includes("ui") ||
+    labelText.includes("frontend") ||
+    labelText.includes("dashboard")
+  ) {
     score += 4;
   }
   if (labelText.includes("api") || labelText.includes("backend")) {
     score += 8;
   }
 
-  if (repository?.languages?.some((language) => language.name.toLowerCase().includes("sql"))) {
+  if (
+    repository?.languages?.some((language) =>
+      language.name.toLowerCase().includes("sql"),
+    )
+  ) {
     score += 5;
   }
 
-  if (issueAnalysis?.keywords.some((keyword) => keyword.includes("refactor") || keyword.includes("cleanup"))) {
+  if (
+    issueAnalysis?.keywords.some(
+      (keyword) => keyword.includes("refactor") || keyword.includes("cleanup"),
+    )
+  ) {
     score += 8;
   }
 
@@ -47,7 +64,9 @@ export const calculateDifficulty = (
   return "Advanced";
 };
 
-export const estimateArchitecturalComplexity = (repository?: RepositoryMetadata) => {
+export const estimateArchitecturalComplexity = (
+  repository?: RepositoryMetadata,
+) => {
   const repoSize = repository?.files?.length ?? 0;
   if (repoSize > 450) {
     return "High";

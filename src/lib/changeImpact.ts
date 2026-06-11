@@ -29,7 +29,16 @@ export interface ChangeImpactResult {
 }
 
 const pathSeparator = "/";
-const pathExtensions = ["", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json"];
+const pathExtensions = [
+  "",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".json",
+];
 
 const normalizePath = (value: string): string =>
   value
@@ -67,7 +76,8 @@ const parseImportSources = (file: RepositoryFile): string[] => {
   }
 
   const importSources: string[] = [];
-  const importPattern = /(?:import\s+(?:[^'"]+\s+from\s+)?|export\s+(?:\*\s+from\s+|\{[^}]*\}\s+from\s+)|require\()\s*['"]([^'"]+)['"]/g;
+  const importPattern =
+    /(?:import\s+(?:[^'"]+\s+from\s+)?|export\s+(?:\*\s+from\s+|\{[^}]*\}\s+from\s+)|require\()\s*['"]([^'"]+)['"]/g;
   let match: RegExpExecArray | null;
 
   while ((match = importPattern.exec(file.content))) {
@@ -113,15 +123,30 @@ const findMatchingFilePath = (
 
   const tryCandidates = (candidatePath: string): string | null => {
     const normalizedCandidate = normalizePath(candidatePath);
-    const exact = filePaths.find((filePath) => filePath === normalizedCandidate);
+    const exact = filePaths.find(
+      (filePath) => filePath === normalizedCandidate,
+    );
     if (exact) return exact;
+<<<<<<< HEAD
+    return (
+      filePaths.find((filePath) =>
+        filePath.endsWith(`/${normalizedCandidate}`),
+      ) ?? null
+    );
+=======
     return filePaths.find((filePath) => filePath.endsWith(`/${normalizedCandidate}`)) ?? null;
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
   };
 
   if (cleaned.startsWith(".")) {
-    const segments = [...currentDir.split(pathSeparator), ...cleaned.split(pathSeparator)];
+    const segments = [
+      ...currentDir.split(pathSeparator),
+      ...cleaned.split(pathSeparator),
+    ];
     const resolvedSegments = resolvePathSegments(segments);
-    for (const candidate of candidateFilePaths(resolvedSegments.join(pathSeparator))) {
+    for (const candidate of candidateFilePaths(
+      resolvedSegments.join(pathSeparator),
+    )) {
       const match = tryCandidates(candidate);
       if (match) return match;
     }
@@ -194,13 +219,23 @@ export const buildDependencyGraph = (
 
 const getCriticalModuleWeight = (filePath: string): number => {
   const normalized = filePath.toLowerCase();
-  if (/(^|\/)auth(\/|$)|(^|\/)security(\/|$)|(^|\/)session(\/|$)/.test(normalized)) {
+  if (
+    /(^|\/)auth(\/|$)|(^|\/)security(\/|$)|(^|\/)session(\/|$)/.test(normalized)
+  ) {
     return 4;
   }
-  if (/(^|\/)middleware(\/|$)|(^|\/)api(\/|$)|(^|\/)routes(\/|$)|(^|\/)services(\/|$)|(^|\/)config(\/|$)/.test(normalized)) {
+  if (
+    /(^|\/)middleware(\/|$)|(^|\/)api(\/|$)|(^|\/)routes(\/|$)|(^|\/)services(\/|$)|(^|\/)config(\/|$)/.test(
+      normalized,
+    )
+  ) {
     return 3;
   }
-  if (/(^|\/)utils?(\/|$)|(^|\/)lib(\/|$)|(^|\/)shared(\/|$)|(^|\/)core(\/|$)/.test(normalized)) {
+  if (
+    /(^|\/)utils?(\/|$)|(^|\/)lib(\/|$)|(^|\/)shared(\/|$)|(^|\/)core(\/|$)/.test(
+      normalized,
+    )
+  ) {
     return 2;
   }
   return 1;
@@ -221,13 +256,21 @@ const inferAffectedAreas = (
 
   candidates.forEach((path) => {
     const normalized = path.toLowerCase();
-    if (/(^|\/)auth(\/|$)|(^|\/)sign(in|out)?(\/|$)|(^|\/)login(\/|$)/.test(normalized)) {
+    if (
+      /(^|\/)auth(\/|$)|(^|\/)sign(in|out)?(\/|$)|(^|\/)login(\/|$)/.test(
+        normalized,
+      )
+    ) {
       labels.add("Authentication");
     }
     if (/(^|\/)session(\/|$)|token(\/|$)|cookie(\/|$)/.test(normalized)) {
       labels.add("Session Management");
     }
-    if (/(^|\/)middleware(\/|$)|(^|\/)edge(\/|$)|(^|\/)server(\/|$)/.test(normalized)) {
+    if (
+      /(^|\/)middleware(\/|$)|(^|\/)edge(\/|$)|(^|\/)server(\/|$)/.test(
+        normalized,
+      )
+    ) {
       labels.add("Middleware");
     }
     if (/(^|\/)api(\/|$)|(^|\/)endpoint(\/|$)/.test(normalized)) {
@@ -307,7 +350,9 @@ export const calculateChangeImpact = (
     return null;
   }
 
-  const directDependencies = Array.from(new Set(graph.dependentsMap.get(filePath) || []));
+  const directDependencies = Array.from(
+    new Set(graph.dependentsMap.get(filePath) || []),
+  );
   const reachable = new Map<string, number>();
   let maxDepth = 0;
 
@@ -334,7 +379,10 @@ export const calculateChangeImpact = (
   const criticalModuleWeight = getCriticalModuleWeight(filePath);
   const riskScore = directCount * 2 + indirectCount + criticalModuleWeight;
   const riskLevel = determineRiskLevel(riskScore);
-  const affectedAreas = inferAffectedAreas(filePath, Array.from(reachable.keys()));
+  const affectedAreas = inferAffectedAreas(
+    filePath,
+    Array.from(reachable.keys()),
+  );
   const recommendedTests = buildRecommendedTests(affectedAreas, riskLevel);
 
   return {

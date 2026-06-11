@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, EmptyState, Button } from "@/components/ui";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  EmptyState,
+  Button,
+} from "@/components/ui";
 import { ModuleSelector } from "./ModuleSelector";
 import { ModuleComparisonCard } from "./ModuleComparisonCard";
 import { getModuleMetadata } from "@/config/moduleMetadata";
@@ -85,8 +93,8 @@ export function ModuleComparisonTool() {
                         <span className="text-foreground font-semibold">
                           {metadataOne.name}
                         </span>{" "}
-                        has <strong>{metadataOne.complexity}</strong> complexity,
-                        while{" "}
+                        has <strong>{metadataOne.complexity}</strong>{" "}
+                        complexity, while{" "}
                         <span className="text-foreground font-semibold">
                           {metadataTwo.name}
                         </span>{" "}
@@ -102,8 +110,8 @@ export function ModuleComparisonTool() {
                         <span className="text-foreground font-semibold">
                           {metadataOne.name}
                         </span>{" "}
-                        is marked as{" "}
-                        <strong>{metadataOne.importance}</strong>, while{" "}
+                        is marked as <strong>{metadataOne.importance}</strong>,
+                        while{" "}
                         <span className="text-foreground font-semibold">
                           {metadataTwo.name}
                         </span>{" "}
@@ -123,9 +131,7 @@ export function ModuleComparisonTool() {
                           {metadataOne.name}
                         </span>{" "}
                         is better for{" "}
-                        <strong>
-                          {metadataOne.recommendedFor.join(", ")}
-                        </strong>{" "}
+                        <strong>{metadataOne.recommendedFor.join(", ")}</strong>{" "}
                         contributors.
                       </p>
                     </div>

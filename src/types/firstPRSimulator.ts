@@ -38,7 +38,11 @@ export interface RepositoryMetadata {
   commits?: Array<{
     hash?: string;
     message?: string;
-    fileChanges?: Array<{ path: string; additions?: number; deletions?: number }>;
+    fileChanges?: Array<{
+      path: string;
+      additions?: number;
+      deletions?: number;
+    }>;
   }>;
 }
 

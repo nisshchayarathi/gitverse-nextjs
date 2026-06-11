@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, sanitizeError } from "@/lib/middleware";
-import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
+import {
+  GitHubService,
+  GitHubRateLimitError,
+} from "@/lib/services/githubService";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
 import { logger } from "@/lib/logger";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 function kickLocalRunner(request: NextRequest) {
   if (process.env.NODE_ENV === "production") return;
   const origin = new URL(request.url).origin;
@@ -33,7 +40,10 @@ function kickProductionWorker() {
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
-    const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.GITHUB_IMPORT);
+    const rl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.GITHUB_IMPORT,
+    );
     if (!rl.allowed) return rateLimitResponse(rl);
     const body = await request.json();
     const { url, token } = body;
@@ -41,14 +51,14 @@ export async function POST(request: NextRequest) {
     if (!url) {
       return NextResponse.json(
         { error: "Repository URL is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!token) {
       return NextResponse.json(
         { error: "GitHub token is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -56,7 +66,7 @@ export async function POST(request: NextRequest) {
     if (!parsed) {
       return NextResponse.json(
         { error: "Invalid GitHub URL" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -79,20 +89,23 @@ export async function POST(request: NextRequest) {
     kickLocalRunner(request);
     kickProductionWorker();
 
-    return NextResponse.json({ repository, jobId: job.id, jobStatus: job.status, source: "github" }, { status: 201 });
+    return NextResponse.json(
+      { repository, jobId: job.id, jobStatus: job.status, source: "github" },
+      { status: 201 },
+    );
   } catch (error: any) {
     console.error("GitHub import error:", sanitizeError(error));
 
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(
         { error: error.message, retryAfter: error.retryAfterSeconds },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to import from GitHub" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

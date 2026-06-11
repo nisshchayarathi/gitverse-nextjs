@@ -424,9 +424,17 @@ export class GitHubService {
   /**
    * Get collaborators for a repository
    */
-  async getCollaborators(owner: string, repo: string): Promise<Array<{ login: string; permissions: { admin: boolean; push: boolean; pull: boolean } }>> {
+  async getCollaborators(
+    owner: string,
+    repo: string,
+  ): Promise<
+    Array<{
+      login: string;
+      permissions: { admin: boolean; push: boolean; pull: boolean };
+    }>
+  > {
     const response = await this.client.get(
-      `/repos/${owner}/${repo}/collaborators`
+      `/repos/${owner}/${repo}/collaborators`,
     );
     return response.data;
   }
@@ -438,11 +446,11 @@ export class GitHubService {
     owner: string,
     repo: string,
     pullNumber: number,
-    data: { state?: "open" | "closed"; title?: string; body?: string }
+    data: { state?: "open" | "closed"; title?: string; body?: string },
   ): Promise<GitHubPullRequest> {
     const response = await this.client.patch(
       `/repos/${owner}/${repo}/pulls/${pullNumber}`,
-      data
+      data,
     );
     return response.data;
   }
@@ -649,9 +657,17 @@ export class GitHubService {
   /**
    * Post a comment on an issue
    */
-  
-  async createIssue(owner: string, repo: string, title: string, body: string): Promise<any> {
-    const response = await this.client.post(`/repos/${owner}/${repo}/issues`, { title, body });
+
+  async createIssue(
+    owner: string,
+    repo: string,
+    title: string,
+    body: string,
+  ): Promise<any> {
+    const response = await this.client.post(`/repos/${owner}/${repo}/issues`, {
+      title,
+      body,
+    });
     return response.data;
   }
 

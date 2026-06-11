@@ -32,7 +32,9 @@ describe("retry utilities", () => {
     });
 
     it("returns true for temporarily unavailable errors", () => {
-      expect(isRetryableError(new Error("Service temporarily unavailable"))).toBe(true);
+      expect(
+        isRetryableError(new Error("Service temporarily unavailable")),
+      ).toBe(true);
       expect(isRetryableError(new Error("503 Service Unavailable"))).toBe(true);
     });
 
@@ -139,8 +141,12 @@ describe("retry utilities", () => {
       const after = Date.now();
 
       expect(result).toBeInstanceOf(Date);
-      expect(result.getTime()).toBeGreaterThanOrEqual(before + DEFAULT_RETRY_CONFIG.baseDelayMs);
-      expect(result.getTime()).toBeLessThanOrEqual(after + DEFAULT_RETRY_CONFIG.baseDelayMs + 100);
+      expect(result.getTime()).toBeGreaterThanOrEqual(
+        before + DEFAULT_RETRY_CONFIG.baseDelayMs,
+      );
+      expect(result.getTime()).toBeLessThanOrEqual(
+        after + DEFAULT_RETRY_CONFIG.baseDelayMs + 100,
+      );
     });
 
     it("uses custom config", () => {

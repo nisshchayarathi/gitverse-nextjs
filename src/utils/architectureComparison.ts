@@ -64,19 +64,29 @@ const generateRecommendations = (
   const recommendations: string[] = [];
 
   if (complexityChange > 20) {
-    recommendations.push("Review architectural boundaries and module responsibilities.");
+    recommendations.push(
+      "Review architectural boundaries and module responsibilities.",
+    );
   }
   if (addedModules > 8) {
-    recommendations.push("Consider consolidating related modules to reduce fragmentation.");
+    recommendations.push(
+      "Consider consolidating related modules to reduce fragmentation.",
+    );
   }
   if (circularAdded > 0) {
-    recommendations.push("Refactor to break circular dependencies using interfaces or event buses.");
+    recommendations.push(
+      "Refactor to break circular dependencies using interfaces or event buses.",
+    );
   }
   if (avgCoupling > 2.5) {
-    recommendations.push("High coupling detected. Evaluate dependency injection or facade patterns.");
+    recommendations.push(
+      "High coupling detected. Evaluate dependency injection or facade patterns.",
+    );
   }
   if (addedModules > 0 && circularAdded === 0) {
-    recommendations.push("Maintain the current module organization — new additions follow good patterns.");
+    recommendations.push(
+      "Maintain the current module organization — new additions follow good patterns.",
+    );
   }
 
   return recommendations.slice(0, 4);
@@ -86,8 +96,12 @@ export const compareSnapshots = (
   previousSnapshot: ArchitectureSnapshot,
   currentSnapshot: ArchitectureSnapshot,
 ): DriftReport => {
-  const previousModuleMap = new Map(previousSnapshot.modules.map((m) => [m.path, m]));
-  const currentModuleMap = new Map(currentSnapshot.modules.map((m) => [m.path, m]));
+  const previousModuleMap = new Map(
+    previousSnapshot.modules.map((m) => [m.path, m]),
+  );
+  const currentModuleMap = new Map(
+    currentSnapshot.modules.map((m) => [m.path, m]),
+  );
 
   const addedModules = Array.from(currentModuleMap.values()).filter(
     (m) => !previousModuleMap.has(m.path),
@@ -99,7 +113,10 @@ export const compareSnapshots = (
     .filter((m) => previousModuleMap.has(m.path))
     .filter((m) => {
       const prev = previousModuleMap.get(m.path)!;
-      return prev.complexity !== m.complexity || prev.dependencies.length !== m.dependencies.length;
+      return (
+        prev.complexity !== m.complexity ||
+        prev.dependencies.length !== m.dependencies.length
+      );
     })
     .map((m) => ({
       module: m,
@@ -110,27 +127,41 @@ export const compareSnapshots = (
   const complexityMetrics: ComplexityMetrics = {
     current: currentSnapshot.metrics.complexityScore,
     previous: previousSnapshot.metrics.complexityScore,
-    change: currentSnapshot.metrics.complexityScore - previousSnapshot.metrics.complexityScore,
+    change:
+      currentSnapshot.metrics.complexityScore -
+      previousSnapshot.metrics.complexityScore,
     percentageChange:
       previousSnapshot.metrics.complexityScore > 0
-        ? ((currentSnapshot.metrics.complexityScore - previousSnapshot.metrics.complexityScore) /
+        ? ((currentSnapshot.metrics.complexityScore -
+            previousSnapshot.metrics.complexityScore) /
             previousSnapshot.metrics.complexityScore) *
           100
         : 0,
     trend:
-      currentSnapshot.metrics.complexityScore > previousSnapshot.metrics.complexityScore
+      currentSnapshot.metrics.complexityScore >
+      previousSnapshot.metrics.complexityScore
         ? "Increasing"
-        : currentSnapshot.metrics.complexityScore < previousSnapshot.metrics.complexityScore
+        : currentSnapshot.metrics.complexityScore <
+            previousSnapshot.metrics.complexityScore
           ? "Decreasing"
           : "Stable",
   };
 
   const dependencyGrowth = {
-    added: Math.max(0, currentSnapshot.metrics.dependencyCount - previousSnapshot.metrics.dependencyCount),
-    removed: Math.max(0, previousSnapshot.metrics.dependencyCount - currentSnapshot.metrics.dependencyCount),
+    added: Math.max(
+      0,
+      currentSnapshot.metrics.dependencyCount -
+        previousSnapshot.metrics.dependencyCount,
+    ),
+    removed: Math.max(
+      0,
+      previousSnapshot.metrics.dependencyCount -
+        currentSnapshot.metrics.dependencyCount,
+    ),
     percentageChange:
       previousSnapshot.metrics.dependencyCount > 0
-        ? ((currentSnapshot.metrics.dependencyCount - previousSnapshot.metrics.dependencyCount) /
+        ? ((currentSnapshot.metrics.dependencyCount -
+            previousSnapshot.metrics.dependencyCount) /
             previousSnapshot.metrics.dependencyCount) *
           100
         : 0,
@@ -139,11 +170,13 @@ export const compareSnapshots = (
   const circularDependencyChanges = {
     added: Math.max(
       0,
-      currentSnapshot.metrics.circularDependencyCount - previousSnapshot.metrics.circularDependencyCount,
+      currentSnapshot.metrics.circularDependencyCount -
+        previousSnapshot.metrics.circularDependencyCount,
     ),
     removed: Math.max(
       0,
-      previousSnapshot.metrics.circularDependencyCount - currentSnapshot.metrics.circularDependencyCount,
+      previousSnapshot.metrics.circularDependencyCount -
+        currentSnapshot.metrics.circularDependencyCount,
     ),
   };
 

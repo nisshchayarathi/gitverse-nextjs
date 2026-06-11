@@ -55,7 +55,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return; // Still loading session
       }
 
-      if (session?.user && session.expires && new Date(session.expires).getTime() > Date.now()) {
+      if (
+        session?.user &&
+        session.expires &&
+        new Date(session.expires).getTime() > Date.now()
+      ) {
         setUser({
           id: session.user.id || "",
           name: session.user.name || "",

@@ -13,7 +13,9 @@ import {
   calculateComplexityScore,
 } from "@/utils/complexityCalculator";
 
-export const buildArchitectureDriftReport = (files: RepositoryFile[]): {
+export const buildArchitectureDriftReport = (
+  files: RepositoryFile[],
+): {
   currentSnapshot: ArchitectureSnapshot;
   health: ArchitecturalHealthMetrics;
 } => {
@@ -31,7 +33,11 @@ export const buildArchitectureDriftReport = (files: RepositoryFile[]): {
 };
 
 export const buildDriftTimeline = (
-  fileSnapshots: Array<{ files: RepositoryFile[]; label: string; commitHash?: string }>,
+  fileSnapshots: Array<{
+    files: RepositoryFile[];
+    label: string;
+    commitHash?: string;
+  }>,
 ): ArchitectureTimeline => {
   const snapshots = fileSnapshots.map((snapshot) =>
     generateArchitectureSnapshot(
@@ -73,7 +79,14 @@ export const getSummaryMetrics = (snapshot: ArchitectureSnapshot) => {
 export const getRecommendedActions = (
   report: DriftReport,
 ): Array<{ action: string; priority: "High" | "Medium" | "Low" }> => {
+<<<<<<< HEAD
+  const actions: Array<{
+    action: string;
+    priority: "High" | "Medium" | "Low";
+  }> = [];
+=======
   const actions: Array<{ action: string; priority: "High" | "Medium" | "Low" }> = [];
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
 
   if (report.riskLevel === "High") {
     actions.push({
@@ -119,6 +132,8 @@ export const buildHealthTimeline = (
   return snapshots.map((snapshot) => ({
     label: snapshot.label,
     score: calculateComplexityScore(snapshot),
-    trend: snapshot.commitHash ? `Commit: ${snapshot.commitHash.slice(0, 7)}` : "Snapshot",
+    trend: snapshot.commitHash
+      ? `Commit: ${snapshot.commitHash.slice(0, 7)}`
+      : "Snapshot",
   }));
 };

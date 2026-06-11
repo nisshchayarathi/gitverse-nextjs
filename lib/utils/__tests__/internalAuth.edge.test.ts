@@ -37,7 +37,7 @@ describe("InternalAuth Edge Cases", () => {
 
     it("handles binary data in secret", () => {
       const binarySecret = Buffer.from([0x00, 0x01, 0x02, 0xff]).toString(
-        "latin1"
+        "latin1",
       );
       const token = deriveBearerToken(binarySecret);
       expect(token).toMatch(/^Bearer [a-f0-9]{64}$/);
@@ -52,14 +52,14 @@ describe("InternalAuth Edge Cases", () => {
     it("produces deterministic output", () => {
       const secret = "deterministic-test";
       const tokens = Array.from({ length: 10 }, () =>
-        deriveBearerToken(secret)
+        deriveBearerToken(secret),
       );
       expect(new Set(tokens).size).toBe(1);
     });
 
     it("produces different output for different secrets", () => {
       const tokens = Array.from({ length: 10 }, (_, i) =>
-        deriveBearerToken(`secret-${i}`)
+        deriveBearerToken(`secret-${i}`),
       );
       expect(new Set(tokens).size).toBe(10);
     });
@@ -71,9 +71,9 @@ describe("InternalAuth Edge Cases", () => {
     });
 
     it("handles undefined auth header", () => {
-      expect(
-        validateAuthorizationHeader(undefined as any, "secret")
-      ).toBe(false);
+      expect(validateAuthorizationHeader(undefined as any, "secret")).toBe(
+        false,
+      );
     });
 
     it("handles empty string auth header", () => {
@@ -94,7 +94,7 @@ describe("InternalAuth Edge Cases", () => {
       const secret = "test-secret";
       const token = deriveBearerToken(secret);
       expect(validateAuthorizationHeader(token.toLowerCase(), secret)).toBe(
-        false
+        false,
       );
     });
 

@@ -5,30 +5,40 @@ import { repositoryService } from "@/lib/services/repositoryService";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const user = await requireAuth(request);
     const repositoryId = parseInt(params.id, 10);
 
     if (isNaN(repositoryId)) {
-      return NextResponse.json({ error: "Invalid repository ID" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid repository ID" },
+        { status: 400 },
+      );
     }
 
-    const repository = await repositoryService.getRepository(repositoryId, user.userId);
+    const repository = await repositoryService.getRepository(
+      repositoryId,
+      user.userId,
+    );
     if (!repository) {
-      return NextResponse.json({ error: "Repository not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Repository not found" },
+        { status: 404 },
+      );
     }
 
-    const knowledge = await repositoryKnowledgeService.getKnowledge(repositoryId);
-    
+    const knowledge =
+      await repositoryKnowledgeService.getKnowledge(repositoryId);
+
     // Parse JSON strings back to objects for API response
     let formattedKnowledge = null;
     if (knowledge) {
       const parseField = (val: any) => {
         if (!val) return null;
         if (Array.isArray(val)) return val;
-        if (typeof val === 'string') {
+        if (typeof val === "string") {
           try {
             return JSON.parse(val);
           } catch {
@@ -51,6 +61,9 @@ export async function GET(
     });
   } catch (error: any) {
     console.error("Failed to fetch repository knowledge:", error);
-    return NextResponse.json({ error: "Failed to fetch repository knowledge" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch repository knowledge" },
+      { status: 500 },
+    );
   }
 }

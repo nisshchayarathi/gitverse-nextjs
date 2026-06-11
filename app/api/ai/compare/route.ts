@@ -9,7 +9,11 @@ import {
 import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
 import { getClientIp } from "@/lib/services/rateLimitService";
 import { sanitizeTextContent } from "@/lib/utils/promptSanitization";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 const COMPARE_RATE_LIMIT = 5;
 const COMPARE_WINDOW_MS = 60_000;
@@ -19,20 +23,26 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    const globalRl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.AI_GLOBAL,
+    );
     if (!globalRl.allowed) return rateLimitResponse(globalRl);
 
     const contentTypeError = validateContentType(request);
     if (contentTypeError) return contentTypeError;
 
     const allowed = await checkAiRateLimit(
-      String(user.userId), "userId", "compare",
-      COMPARE_RATE_LIMIT, COMPARE_WINDOW_MS
+      String(user.userId),
+      "userId",
+      "compare",
+      COMPARE_RATE_LIMIT,
+      COMPARE_WINDOW_MS,
     );
     if (!allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please wait before comparing again." },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
@@ -42,7 +52,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json(
         { error: "Invalid or empty request body" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -51,14 +61,14 @@ export async function POST(request: NextRequest) {
     if (!repositoryIds || !Array.isArray(repositoryIds)) {
       return NextResponse.json(
         { error: "repositoryIds must be an array" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (repositoryIds.length < 2) {
       return NextResponse.json(
         { error: "At least two repository IDs are required for comparison" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -67,7 +77,7 @@ export async function POST(request: NextRequest) {
         {
           error: `Maximum ${MAX_REPOSITORIES} repositories can be compared at once. You provided ${repositoryIds.length}.`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -77,7 +87,7 @@ export async function POST(request: NextRequest) {
       if (isNaN(repoId)) {
         return NextResponse.json(
           { error: `Invalid repository ID: ${id}` },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -85,28 +95,30 @@ export async function POST(request: NextRequest) {
       if (!repo) {
         return NextResponse.json(
           { error: `Repository not found: ${id}` },
-          { status: 404 }
+          { status: 404 },
         );
       }
       repositories.push(repo);
     }
 
-    const reposContext = repositories.map((repo, idx) => {
-      const langText = repo.languages
-        .map((l: any) => `${l.name} (${l.percentage}%)`)
-        .join(", ");
+    const reposContext = repositories
+      .map((repo, idx) => {
+        const langText = repo.languages
+          .map((l: any) => `${l.name} (${l.percentage}%)`)
+          .join(", ");
 
-      const branchText = repo.branches.map((b: any) => b.name).join(", ");
-      const commitCount = repo.commits?.length || 0;
-      const fileCount = repo.files?.length || 0;
-      const contributorCount = repo.contributors?.length || 0;
+        const branchText = repo.branches.map((b: any) => b.name).join(", ");
+        const commitCount = repo.commits?.length || 0;
+        const fileCount = repo.files?.length || 0;
+        const contributorCount = repo.contributors?.length || 0;
 
-      return `Repository #${idx + 1}: "${repo.name}"
+        return `Repository #${idx + 1}: "${repo.name}"
 - Description: ${repo.description || "N/A"}
 - Tech Stack/Languages: ${langText || "N/A"}
 - Stats: ${commitCount} commits, ${contributorCount} contributors, ${fileCount} files, ${repo.branches.length} branches
 - Branches: ${branchText || "N/A"}`;
-    }).join("\n\n");
+      })
+      .join("\n\n");
 
     const safeContext = sanitizeTextContent(reposContext);
     const prompt = `You are a principal software architect assistant.
@@ -143,13 +155,13 @@ Keep the response comprehensive, deeply architectural, and structured with clear
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to generate comparison analysis" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

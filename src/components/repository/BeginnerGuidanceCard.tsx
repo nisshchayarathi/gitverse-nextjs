@@ -1,4 +1,10 @@
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui";
 import { DifficultyBadge, DifficultyLevel } from "./DifficultyBadge";
 import { ArchitectureGuidanceCard } from "./ArchitectureGuidanceCard";
 

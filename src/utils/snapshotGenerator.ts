@@ -1,5 +1,8 @@
 import { RepositoryFile } from "@/types/firstPRSimulator";
-import { ArchitectureModule, ArchitectureSnapshot } from "@/types/architectureDrift";
+import {
+  ArchitectureModule,
+  ArchitectureSnapshot,
+} from "@/types/architectureDrift";
 import { buildDependencyGraph } from "@/lib/changeImpact";
 
 const normalizePath = (value: string): string =>
@@ -13,7 +16,10 @@ const normalizePath = (value: string): string =>
 const determineModuleType = (filePath: string): ArchitectureModule["type"] => {
   const normalized = filePath.toLowerCase();
 
-  if (/(^|\/)app\/api\//.test(normalized) || /(^|\/)pages\/api\//.test(normalized)) {
+  if (
+    /(^|\/)app\/api\//.test(normalized) ||
+    /(^|\/)pages\/api\//.test(normalized)
+  ) {
     return "API Route";
   }
   if (/\/(hooks?)\//.test(normalized)) {
@@ -43,13 +49,17 @@ const calculateModuleComplexity = (
   const depComplexity = Math.min(dependencyCount / 10, 1);
   const dependerComplexity = Math.min(dependentCount / 5, 1);
 
-  return Math.round((sizeComplexity * 0.4 + depComplexity * 0.4 + dependerComplexity * 0.2) * 100);
+  return Math.round(
+    (sizeComplexity * 0.4 + depComplexity * 0.4 + dependerComplexity * 0.2) *
+      100,
+  );
 };
 
 const extractModuleExports = (filePath: string, content?: string): string[] => {
   if (!content) return [];
 
-  const exportPattern = /export\s+(?:const|function|class|interface|type)\s+(\w+)/g;
+  const exportPattern =
+    /export\s+(?:const|function|class|interface|type)\s+(\w+)/g;
   const exports: string[] = [];
   let match;
 
@@ -75,7 +85,11 @@ export const generateArchitectureSnapshot = (
     const dependencies = graph.importMap.get(normalizedPath) || [];
     const dependents = graph.dependentsMap.get(normalizedPath) || [];
     const type = determineModuleType(normalizedPath);
-    const complexity = calculateModuleComplexity(file, dependencies.length, dependents.length);
+    const complexity = calculateModuleComplexity(
+      file,
+      dependencies.length,
+      dependents.length,
+    );
 
     modules.push({
       name: normalizedPath.split("/").pop() || normalizedPath,
@@ -90,15 +104,19 @@ export const generateArchitectureSnapshot = (
     });
   });
 
-  const dependencies = Array.from(graph.importMap.entries()).flatMap(([source, targets]) =>
-    targets.map((target) => ({
-      source,
-      target,
-      weight: 1,
-    })),
+  const dependencies = Array.from(graph.importMap.entries()).flatMap(
+    ([source, targets]) =>
+      targets.map((target) => ({
+        source,
+        target,
+        weight: 1,
+      })),
   );
 
-  const circularDependencies = detectCircularDependencies(graph.dependentsMap, graph.importMap);
+  const circularDependencies = detectCircularDependencies(
+    graph.dependentsMap,
+    graph.importMap,
+  );
   modules.forEach((mod) => {
     if (circularDependencies.has(mod.path)) {
       mod.isCircular = true;
@@ -108,9 +126,15 @@ export const generateArchitectureSnapshot = (
   const metrics = {
     moduleCount: modules.length,
     dependencyCount: dependencies.length,
-    averageCoupling: modules.length > 0 ? dependencies.length / modules.length : 0,
+    averageCoupling:
+      modules.length > 0 ? dependencies.length / modules.length : 0,
     circularDependencyCount: circularDependencies.size,
-    complexityScore: modules.length > 0 ? Math.round(modules.reduce((sum, m) => sum + m.complexity, 0) / modules.length) : 0,
+    complexityScore:
+      modules.length > 0
+        ? Math.round(
+            modules.reduce((sum, m) => sum + m.complexity, 0) / modules.length,
+          )
+        : 0,
   };
 
   return {
@@ -162,7 +186,9 @@ const detectCircularDependencies = (
   return circular;
 };
 
-export const createInitialSnapshot = (files: RepositoryFile[]): ArchitectureSnapshot => {
+export const createInitialSnapshot = (
+  files: RepositoryFile[],
+): ArchitectureSnapshot => {
   return generateArchitectureSnapshot(files, "Initial Snapshot");
 };
 
@@ -170,5 +196,10 @@ export const createSnapshotFromTimestamp = (
   files: RepositoryFile[],
   timestamp: Date,
 ): ArchitectureSnapshot => {
-  return generateArchitectureSnapshot(files, `Snapshot - ${timestamp.toLocaleDateString()}`, undefined, undefined);
+  return generateArchitectureSnapshot(
+    files,
+    `Snapshot - ${timestamp.toLocaleDateString()}`,
+    undefined,
+    undefined,
+  );
 };

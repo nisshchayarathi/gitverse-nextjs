@@ -1,6 +1,9 @@
 import { HTMLAttributes } from "react";
 
-interface ChecklistItemProps extends Omit<HTMLAttributes<HTMLLabelElement>, "onToggle"> {
+interface ChecklistItemProps extends Omit<
+  HTMLAttributes<HTMLLabelElement>,
+  "onToggle"
+> {
   id: string;
   label: string;
   checked: boolean;
@@ -28,7 +31,9 @@ export function ChecklistItem({
         onChange={() => onToggle(id)}
         className="h-4 w-4 rounded border-muted-foreground text-primary focus:ring-primary"
       />
-      <span className={`text-sm ${checked ? "text-foreground" : "text-muted-foreground"}`}>
+      <span
+        className={`text-sm ${checked ? "text-foreground" : "text-muted-foreground"}`}
+      >
         {label}
       </span>
     </label>

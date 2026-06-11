@@ -13,23 +13,32 @@ export class DocumentationPRService {
     githubToken: string;
     repositoryDefaultBranch?: string;
   }): Promise<string | null> {
-    const { owner, repo, filePath, patch, githubToken, repositoryDefaultBranch = "main" } = params;
+    const {
+      owner,
+      repo,
+      filePath,
+      patch,
+      githubToken,
+      repositoryDefaultBranch = "main",
+    } = params;
     const github = new GitHubService(githubToken);
 
     try {
       // 1. Get the latest commit SHA of the default branch
       const branches = await github.getBranches(owner, repo);
-      const defaultBranchInfo = branches.find(b => b.name === repositoryDefaultBranch);
+      const defaultBranchInfo = branches.find(
+        (b) => b.name === repositoryDefaultBranch,
+      );
       if (!defaultBranchInfo) {
         throw new Error(`Default branch ${repositoryDefaultBranch} not found.`);
       }
-      
+
       const headSha = defaultBranchInfo.commit.sha;
 
       // 2. Create a new branch
       const timestamp = new Date().getTime();
       // Replace non-alphanumeric chars for branch name safety
-      const safePath = filePath.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+      const safePath = filePath.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
       const newBranchName = `docs/auto-drift-fix-${safePath}-${timestamp}`;
 
       await github.createBranch(owner, repo, newBranchName, headSha);
@@ -43,7 +52,7 @@ export class DocumentationPRService {
         commitMessage,
         patch.suggestedContent,
         newBranchName,
-        headSha
+        headSha,
       );
 
       // 4. Create the Pull Request
@@ -56,18 +65,20 @@ export class DocumentationPRService {
         prTitle,
         prBody,
         newBranchName,
-        repositoryDefaultBranch
+        repositoryDefaultBranch,
       );
 
       return pr.html_url;
-
     } catch (error) {
       console.error("[DocumentationPR] Failed to create PR:", error);
       return null;
     }
   }
 
-  private generatePRDescription(filePath: string, patch: DocumentationPatch): string {
+  private generatePRDescription(
+    filePath: string,
+    patch: DocumentationPatch,
+  ): string {
     return `## Documentation Drift Report
 
 ### Files Updated

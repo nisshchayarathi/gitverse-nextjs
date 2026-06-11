@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { apiError } from "@/lib/api-error";
 import { GitHubRateLimitError } from "@/lib/services/githubService";
@@ -36,7 +36,7 @@ export async function POST(
     if (error instanceof GitHubRateLimitError) {
       return NextResponse.json(
         { error: error.message, retryAfter: error.retryAfterSeconds },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
@@ -105,4 +105,3 @@ export async function PUT(
     return apiError(500, "Failed to save README");
   }
 }
-

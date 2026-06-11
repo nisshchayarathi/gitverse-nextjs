@@ -19,7 +19,7 @@ describe("EntropyAnalysisService", () => {
     it("should return higher entropy for random strings", () => {
       const lowEntropy = service.calculateEntropy("aaaaaaaa");
       const highEntropy = service.calculateEntropy("aT8!@#\$");
-      
+
       expect(highEntropy).toBeGreaterThan(lowEntropy);
     });
 
@@ -46,7 +46,9 @@ describe("EntropyAnalysisService", () => {
     });
 
     it("should return high entropy for alphanumeric strings", () => {
-      const entropy = service.calculateEntropy("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
+      const entropy = service.calculateEntropy(
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+      );
       expect(entropy).toBeGreaterThan(5);
     });
   });
@@ -72,7 +74,10 @@ describe("EntropyAnalysisService", () => {
     });
 
     it("should detect high entropy base64-like strings", () => {
-      const result = service.isSuspiciouslyHighEntropy("YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODkwYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=", 4.0);
+      const result = service.isSuspiciouslyHighEntropy(
+        "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODkwYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=",
+        4.0,
+      );
       expect(result).toBe(true);
     });
   });
@@ -89,7 +94,9 @@ describe("EntropyAnalysisService", () => {
     });
 
     it("should return 95 for very high entropy strings", () => {
-      const result = service.getEntropyConfidenceScore("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#\$%^&*()");
+      const result = service.getEntropyConfidenceScore(
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#\$%^&*()",
+      );
       expect(result).toBe(95);
     });
 
@@ -101,7 +108,7 @@ describe("EntropyAnalysisService", () => {
         service.getEntropyConfidenceScore("abcdefghijklmnop"),
         service.getEntropyConfidenceScore("abcdefghijklmnopqrstuvwxyz"),
       ];
-      
+
       for (let i = 1; i < scores.length; i++) {
         expect(scores[i]).toBeGreaterThanOrEqual(scores[i - 1]);
       }
@@ -118,7 +125,7 @@ describe("EntropyAnalysisService", () => {
     it("exported instance should produce same results as new instance", () => {
       const testString = "test@123";
       expect(entropyAnalysis.calculateEntropy(testString)).toBe(
-        service.calculateEntropy(testString)
+        service.calculateEntropy(testString),
       );
     });
 

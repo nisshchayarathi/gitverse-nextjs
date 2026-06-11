@@ -16,21 +16,41 @@ export class ShardRegistry {
   }
 
   private initializeShards() {
-    // In a real environment, these would be loaded from environment variables 
+    // In a real environment, these would be loaded from environment variables
     // or a configuration database to allow dynamic expansion.
     // Example: process.env.SHARD_URLS = "shard1=url1,shard2=url2"
-    
+
     const mockShards: ShardInfo[] = [
-      { id: "shard-1", url: process.env.DATABASE_URL_SHARD_1 || process.env.DATABASE_URL || "", isAvailable: true, status: "ACTIVE", weight: 100 },
-      { id: "shard-2", url: process.env.DATABASE_URL_SHARD_2 || process.env.DATABASE_URL || "", isAvailable: true, status: "ACTIVE", weight: 100 },
-      { id: "shard-3", url: process.env.DATABASE_URL_SHARD_3 || process.env.DATABASE_URL || "", isAvailable: true, status: "ACTIVE", weight: 100 },
+      {
+        id: "shard-1",
+        url: process.env.DATABASE_URL_SHARD_1 || process.env.DATABASE_URL || "",
+        isAvailable: true,
+        status: "ACTIVE",
+        weight: 100,
+      },
+      {
+        id: "shard-2",
+        url: process.env.DATABASE_URL_SHARD_2 || process.env.DATABASE_URL || "",
+        isAvailable: true,
+        status: "ACTIVE",
+        weight: 100,
+      },
+      {
+        id: "shard-3",
+        url: process.env.DATABASE_URL_SHARD_3 || process.env.DATABASE_URL || "",
+        isAvailable: true,
+        status: "ACTIVE",
+        weight: 100,
+      },
     ];
 
-    mockShards.forEach(shard => this.shards.set(shard.id, shard));
+    mockShards.forEach((shard) => this.shards.set(shard.id, shard));
   }
 
   public getActiveShards(): ShardInfo[] {
-    return Array.from(this.shards.values()).filter(s => s.status === "ACTIVE" && s.isAvailable);
+    return Array.from(this.shards.values()).filter(
+      (s) => s.status === "ACTIVE" && s.isAvailable,
+    );
   }
 
   public getAllShards(): ShardInfo[] {
@@ -41,7 +61,11 @@ export class ShardRegistry {
     return this.shards.get(id);
   }
 
-  public updateShardStatus(id: ShardId, isAvailable: boolean, status?: ShardInfo["status"]) {
+  public updateShardStatus(
+    id: ShardId,
+    isAvailable: boolean,
+    status?: ShardInfo["status"],
+  ) {
     const shard = this.shards.get(id);
     if (shard) {
       shard.isAvailable = isAvailable;

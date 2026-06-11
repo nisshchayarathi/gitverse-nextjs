@@ -7,15 +7,21 @@ let mockRateLimitResponse: jest.Mock;
 
 jest.mock("@/lib/middleware/rateLimit", () => ({
   checkRateLimit: (...args: any[]) => {
-    if (!mockCheckRateLimit) throw new Error("mockCheckRateLimit not initialized");
+    if (!mockCheckRateLimit)
+      throw new Error("mockCheckRateLimit not initialized");
     return mockCheckRateLimit(...args);
   },
   rateLimitResponse: (...args: any[]) => {
-    if (!mockRateLimitResponse) throw new Error("mockRateLimitResponse not initialized");
+    if (!mockRateLimitResponse)
+      throw new Error("mockRateLimitResponse not initialized");
     return mockRateLimitResponse(...args);
   },
   RATE_LIMITS: {
-    AVATAR_UPLOAD: { namespace: "upload:avatar", maxRequests: 5, windowMs: 3_600_000 },
+    AVATAR_UPLOAD: {
+      namespace: "upload:avatar",
+      maxRequests: 5,
+      windowMs: 3_600_000,
+    },
   },
 }));
 
@@ -77,7 +83,14 @@ describe("POST /api/upload/avatar", () => {
     (validateImageContent as jest.Mock).mockResolvedValue({ valid: true, mimeType: "image/png" });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 4, limit: 5, resetAt: Date.now() + 3600000 });
     mockRateLimitResponse.mockReturnValue(
-      new Response(JSON.stringify({ error: true, message: "Too many requests", code: 429 }), { status: 429 })
+      new Response(
+        JSON.stringify({
+          error: true,
+          message: "Too many requests",
+          code: 429,
+        }),
+        { status: 429 },
+      ),
     );
   });
 
@@ -141,7 +154,9 @@ describe("POST /api/upload/avatar", () => {
         error: "Invalid file type",
       });
 
-      const file = new File(["test"], "document.pdf", { type: "application/pdf" });
+      const file = new File(["test"], "document.pdf", {
+        type: "application/pdf",
+      });
       const formData = new FormData();
       formData.append("file", file);
 
@@ -164,7 +179,9 @@ describe("POST /api/upload/avatar", () => {
       });
 
       const largeContent = new ArrayBuffer(600 * 1024);
-      const file = new File([largeContent], "large.jpg", { type: "image/jpeg" });
+      const file = new File([largeContent], "large.jpg", {
+        type: "image/jpeg",
+      });
       const formData = new FormData();
       formData.append("file", file);
 
@@ -234,10 +251,12 @@ describe("POST /api/upload/avatar", () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        body: formData,
-      }));
+      await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          body: formData,
+        }),
+      );
 
       const callArg = (storeAvatar as jest.Mock).mock.calls[0][0];
       expect(Buffer.isBuffer(callArg)).toBe(true);
@@ -280,7 +299,8 @@ describe("POST /api/upload/avatar", () => {
         mimeType: "image/png",
       });
 
-      const dataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+      const dataUrl =
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
       const request = new NextRequest("http://localhost/api/upload/avatar", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -303,7 +323,8 @@ describe("POST /api/upload/avatar", () => {
     it("does not store raw data URL in response", async () => {
       (validateDataUrl as jest.Mock).mockReturnValue({ valid: true });
 
-      const dataUrl = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/4gIcSUNDX1BST0ZJTEUAAQEAA";
+      const dataUrl =
+        "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/4gIcSUNDX1BST0ZJTEUAAQEAA";
       const request = new NextRequest("http://localhost/api/upload/avatar", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -339,11 +360,13 @@ describe("POST /api/upload/avatar", () => {
         error: "Invalid data URL",
       });
 
-      await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dataUrl: "invalid" }),
-      }));
+      await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ dataUrl: "invalid" }),
+        }),
+      );
 
       expect(parseDataUrl).not.toHaveBeenCalled();
       expect(storeAvatar).not.toHaveBeenCalled();
@@ -428,11 +451,13 @@ describe("POST /api/upload/avatar", () => {
         },
       });
 
-      await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: "https://example.com/avatar.jpg" }),
-      }));
+      await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: "https://example.com/avatar.jpg" }),
+        }),
+      );
 
       expect(fetchAndValidateAvatarUrl).toHaveBeenCalled();
       expect(storeAvatar).toHaveBeenCalled();
@@ -447,10 +472,12 @@ describe("POST /api/upload/avatar", () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        body: formData,
-      }));
+      await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          body: formData,
+        }),
+      );
 
       expect(mockCheckRateLimit).toHaveBeenCalledWith(
         String(mockUser.userId),
@@ -459,7 +486,12 @@ describe("POST /api/upload/avatar", () => {
     });
 
     it("returns 429 when rate limited", async () => {
-      mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0, limit: 5, resetAt: Date.now() + 3600000 });
+      mockCheckRateLimit.mockResolvedValue({
+        allowed: false,
+        remaining: 0,
+        limit: 5,
+        resetAt: Date.now() + 3600000,
+      });
 
       (validateImageFile as jest.Mock).mockReturnValue({ valid: true });
 
@@ -467,10 +499,12 @@ describe("POST /api/upload/avatar", () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        body: formData,
-      }));
+      const response = await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          body: formData,
+        }),
+      );
 
       expect(response.status).toBe(429);
       expect(mockRateLimitResponse).toHaveBeenCalled();
@@ -525,10 +559,12 @@ describe("POST /api/upload/avatar", () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        body: formData,
-      }));
+      await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          body: formData,
+        }),
+      );
 
       expect(storeAvatar).toHaveBeenCalledWith(
         expect.any(Buffer),
@@ -550,10 +586,12 @@ describe("POST /api/upload/avatar", () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        body: formData,
-      }));
+      const response = await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          body: formData,
+        }),
+      );
 
       const data = await response.json();
       expect(data.avatarUrl).toBe(customUrl);
@@ -577,25 +615,40 @@ describe("POST /api/upload/avatar", () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      const fileResp = await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        body: formData,
-      }));
+      const fileResp = await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          body: formData,
+        }),
+      );
       const fileData = await fileResp.json();
 
-      const dataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-      const duResp = await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dataUrl }),
-      }));
+      const dataUrl =
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+      const duResp = await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ dataUrl }),
+        }),
+      );
       const duData = await duResp.json();
 
       expect(fileData.avatarUrl).toBe(fileUrl);
       expect(duData.avatarUrl).toBe(dataUrlResponse);
       expect(storeAvatar).toHaveBeenCalledTimes(2);
-      expect(storeAvatar).toHaveBeenNthCalledWith(1, expect.any(Buffer), 123, "image/jpeg");
-      expect(storeAvatar).toHaveBeenNthCalledWith(2, expect.any(Buffer), 123, "image/png");
+      expect(storeAvatar).toHaveBeenNthCalledWith(
+        1,
+        expect.any(Buffer),
+        123,
+        "image/jpeg",
+      );
+      expect(storeAvatar).toHaveBeenNthCalledWith(
+        2,
+        expect.any(Buffer),
+        123,
+        "image/png",
+      );
     });
   });
 
@@ -607,10 +660,12 @@ describe("POST /api/upload/avatar", () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        body: formData,
-      }));
+      await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          body: formData,
+        }),
+      );
 
       const { logger } = require("@/lib/logger");
       expect(logger.info).toHaveBeenCalledWith(
@@ -626,11 +681,13 @@ describe("POST /api/upload/avatar", () => {
         mimeType: "image/png",
       });
 
-      await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dataUrl: "data:image/png;base64,abc" }),
-      }));
+      await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ dataUrl: "data:image/png;base64,abc" }),
+        }),
+      );
 
       const { logger } = require("@/lib/logger");
       expect(logger.info).toHaveBeenCalledWith(
@@ -650,11 +707,13 @@ describe("POST /api/upload/avatar", () => {
         },
       });
 
-      await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: "https://example.com/avatar.jpg" }),
-      }));
+      await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: "https://example.com/avatar.jpg" }),
+        }),
+      );
 
       const { logger } = require("@/lib/logger");
       expect(logger.info).toHaveBeenCalledWith(
@@ -709,10 +768,12 @@ describe("POST /api/upload/avatar", () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        body: formData,
-      }));
+      const response = await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          body: formData,
+        }),
+      );
 
       const data = await response.json();
       expect(data.success).toBe(true);
@@ -727,11 +788,13 @@ describe("POST /api/upload/avatar", () => {
         mimeType: "image/webp",
       });
 
-      const response = await POST(new NextRequest("http://localhost/api/upload/avatar", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dataUrl: "data:image/webp;base64,UklGRhoA" }),
-      }));
+      const response = await POST(
+        new NextRequest("http://localhost/api/upload/avatar", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ dataUrl: "data:image/webp;base64,UklGRhoA" }),
+        }),
+      );
 
       const data = await response.json();
       expect(response.status).toBe(200);

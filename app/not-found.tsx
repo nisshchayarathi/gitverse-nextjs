@@ -1,6 +1,6 @@
-import Link from 'next/link'
-import { FileX } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import Link from "next/link";
+import { FileX } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 export default function NotFound() {
   return (
@@ -14,5 +14,5 @@ export default function NotFound() {
         <Button>Go home</Button>
       </Link>
     </div>
-  )
+  );
 }

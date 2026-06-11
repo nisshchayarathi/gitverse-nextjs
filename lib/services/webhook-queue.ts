@@ -74,6 +74,29 @@ export class WebhookQueueService {
     event: string,
     action: string | undefined,
     baseUrl: string,
+  enqueueWebhook(payload: any, event: string, action: string | undefined, baseUrl: string, deliveryId?: string) {
+    globalForQueue.webhookBuffer.push({
+      event: event || "unknown",
+      action: action,
+      payload,
+      status: "pending",
+      deliveryId,
+    });
+
+    if (!globalForQueue.webhookFlushTimeout) {
+      globalForQueue.webhookFlushTimeout = setTimeout(() => {
+        this.flushWebhooks(baseUrl).catch(console.error);
+      }, 500); // Batch after 500ms
+    }
+  }
+
+  private async flushWebhooks(baseUrl: string) {
+    const batch = globalForQueue.webhookBuffer.splice(
+      0,
+      globalForQueue.webhookBuffer.length,
+    );
+    globalForQueue.webhookFlushTimeout = null;
+// =======
     deliveryId?: string,
   ) {
     if (deliveryId) {
@@ -85,6 +108,7 @@ export class WebhookQueueService {
         return;
       }
     }
+// >>>>>>> main
 
     const created = await prisma.webhookEvent.create({
       data: {

@@ -1,4 +1,11 @@
-export type SecretProvider = "AWS" | "GitHub" | "Stripe" | "SendGrid" | "Twilio" | "DatabaseURL" | "Generic";
+export type SecretProvider =
+  | "AWS"
+  | "GitHub"
+  | "Stripe"
+  | "SendGrid"
+  | "Twilio"
+  | "DatabaseURL"
+  | "Generic";
 
 export interface SecretFinding {
   provider: SecretProvider;

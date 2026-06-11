@@ -108,11 +108,13 @@ export async function POST(request: NextRequest) {
   const event = request.headers.get("x-github-event");
   const secret = process.env.GITHUB_WEBHOOK_SECRET || "";
 
-  const isValid = await GithubWebhookVerifier.verifySignature(request, rawBody) || verifyGitHubWebhookSignature({
-    rawBody,
-    signature256Header: signature,
-    webhookSecret: secret,
-  });
+  const isValid =
+    (await GithubWebhookVerifier.verifySignature(request, rawBody)) ||
+    verifyGitHubWebhookSignature({
+      rawBody,
+      signature256Header: signature,
+      webhookSecret: secret,
+    });
 
   if (!isValid) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
@@ -142,7 +144,7 @@ export async function POST(request: NextRequest) {
   }
 
   const action = payload.action;
-  
+
   if (event === "pull_request") {
     if (!shouldHandlePullRequestAction(action)) {
       return NextResponse.json(
@@ -235,13 +237,15 @@ export async function POST(request: NextRequest) {
    */
   try {
     const baseUrl = process.env.NEXTAUTH_URL || `http://${request.headers.get("host") || "localhost:3000"}`;
+// =======
     await webhookQueue.enqueueWebhook(payload, event || "unknown", action, baseUrl, deliveryId);
+// >>>>>>> main
 
     webhookRetryService.requeueFailedJobs().catch(() => {});
 
     return NextResponse.json(
       { ok: true, message: "Webhook accepted and queued for processing" },
-      { status: 202 }
+      { status: 202 },
     );
   } catch (error) {
     console.error("Error queueing webhook event:", error);
@@ -250,7 +254,7 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json(
       { error: "Failed to queue webhook event" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -40,10 +40,17 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const svgSelectionRef = useRef<any>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
-  
+
   const [annotations, setAnnotations] = useState<MapAnnotation[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [popover, setPopover] = useState<{ isOpen: boolean, x: number, y: number, initialData?: Partial<MapAnnotation>, targetId?: string, targetType?: 'node'|'edge' } | null>(null);
+  const [popover, setPopover] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    initialData?: Partial<MapAnnotation>;
+    targetId?: string;
+    targetType?: "node" | "edge";
+  } | null>(null);
   const nodesRef = useRef<any[]>([]);
   const linksRef = useRef<any[]>([]);
   const [, setTick] = useState(0);
@@ -53,24 +60,43 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
 
   const selectedCommit = useMemo(() => {
     if (!selectedCommitHash || !repository?.commits) return null;
-    return repository.commits.find((c: any) => c.hash === selectedCommitHash || c.shortHash === selectedCommitHash) || null;
+    return (
+      repository.commits.find(
+        (c: any) =>
+          c.hash === selectedCommitHash || c.shortHash === selectedCommitHash,
+      ) || null
+    );
   }, [selectedCommitHash, repository?.commits]);
 
   const changedFiles = useMemo(() => {
     if (!selectedCommit) return null;
     return new Map(
-      (selectedCommit.fileChanges || []).map((fc: any) => [fc.path, fc.changeType || fc.type])
+      (selectedCommit.fileChanges || []).map((fc: any) => [
+        fc.path,
+        fc.changeType || fc.type,
+      ]),
     );
   }, [selectedCommit]);
 
-  const { 
-    filters, toggleDirectory, toggleFileType, toggleDomain, resetFilters 
+  const {
+    filters,
+    toggleDirectory,
+    toggleFileType,
+    toggleDomain,
+    resetFilters,
   } = useGraphFilters();
 
   const {
-    expandedNodes, toggleExpand, collapseAll, focusNode, setFocus, clearFocus, goBack, canGoBack
+    expandedNodes,
+    toggleExpand,
+    collapseAll,
+    focusNode,
+    setFocus,
+    clearFocus,
+    goBack,
+    canGoBack,
   } = useGraphDrilldown();
-  
+
   const completeGraph = useMemo(() => {
     const analyzer = new GraphAnalyzer();
     return analyzer.buildDependencyGraph(repository?.files || []);
@@ -78,20 +104,26 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
 
   const graphData = useMemo(() => {
     const filterService = new GraphFilteringService();
-    return filterService.applyFilters(completeGraph.nodes, completeGraph.links, {
-      expandedNodes,
-      hiddenDirectories: filters.hiddenDirectories,
-      hiddenFileTypes: filters.hiddenFileTypes,
-      visibleDomains: filters.visibleDomains
-    });
+    return filterService.applyFilters(
+      completeGraph.nodes,
+      completeGraph.links,
+      {
+        expandedNodes,
+        hiddenDirectories: filters.hiddenDirectories,
+        hiddenFileTypes: filters.hiddenFileTypes,
+        visibleDomains: filters.visibleDomains,
+      },
+    );
   }, [completeGraph, expandedNodes, filters]);
 
   const exportGraph = async (format: "png" | "svg") => {
     if (!exportRef.current) return;
 
     setIsExporting(true);
-    const toastId = toast.loading(`Exporting graph as ${format.toUpperCase()}...`);
-    
+    const toastId = toast.loading(
+      `Exporting graph as ${format.toUpperCase()}...`,
+    );
+
     try {
       // Create options for higher resolution output, especially for PNG
       const options = {
@@ -101,8 +133,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         style: {
           margin: "0",
           borderRadius: "0",
-          boxShadow: "none"
-        }
+          boxShadow: "none",
+        },
       };
 
       // We wait a tiny bit to ensure React state has flushed (e.g. MapControls is hidden if we chose to hide them, though we exclude them by not wrapping them in exportRef)
@@ -118,11 +150,13 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       link.download = `gitverse${repoName}-map.${format}`;
       link.href = dataUrl;
       link.click();
-      
+
       toast.success(`Graph exported successfully!`, { id: toastId });
     } catch (error) {
       console.error("Export failed:", error);
-      toast.error("Failed to export the graph. Please try again.", { id: toastId });
+      toast.error("Failed to export the graph. Please try again.", {
+        id: toastId,
+      });
     } finally {
       setIsExporting(false);
     }
@@ -131,22 +165,27 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   useEffect(() => {
     if (!repository?.id) return;
     annotationService.getAnnotations(repository.id).then(setAnnotations);
-    
-    const unsubscribe = annotationService.subscribeToAnnotations(repository.id, (event) => {
-      if (event.type === 'created' || event.type === 'updated') {
-        setAnnotations(prev => {
-          const idx = prev.findIndex(a => a.id === event.annotation.id);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = event.annotation;
-            return next;
-          }
-          return [...prev, event.annotation];
-        });
-      } else if (event.type === 'deleted') {
-        setAnnotations(prev => prev.filter(a => a.id !== event.annotationId));
-      }
-    });
+
+    const unsubscribe = annotationService.subscribeToAnnotations(
+      repository.id,
+      (event) => {
+        if (event.type === "created" || event.type === "updated") {
+          setAnnotations((prev) => {
+            const idx = prev.findIndex((a) => a.id === event.annotation.id);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = event.annotation;
+              return next;
+            }
+            return [...prev, event.annotation];
+          });
+        } else if (event.type === "deleted") {
+          setAnnotations((prev) =>
+            prev.filter((a) => a.id !== event.annotationId),
+          );
+        }
+      },
+    );
 
     return () => unsubscribe();
   }, [repository?.id]);
@@ -233,7 +272,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           x: event.clientX,
           y: event.clientY,
           targetId: `${d.source.id}->${d.target.id}`,
-          targetType: 'edge'
+          targetType: "edge",
         });
       });
 
@@ -293,12 +332,12 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           x: event.clientX,
           y: event.clientY,
           targetId: d.id,
-          targetType: 'node'
+          targetType: "node",
         });
       })
       .on("click", (event: any, d: any) => {
         if (event.defaultPrevented) return; // Dragged
-        if (d.type === 'folder') {
+        if (d.type === "folder") {
           toggleExpand(d.id);
         }
         setFocus(d.id);
@@ -402,7 +441,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         .attr("y2", (d: any) => d.target.y);
 
       node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
-      setTick(t => t + 1); // trigger react render for annotations
+      setTick((t) => t + 1); // trigger react render for annotations
     });
 
     // Zoom behavior
@@ -411,7 +450,11 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .scaleExtent([0.5, 3])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
-        setTransform({ x: event.transform.x, y: event.transform.y, k: event.transform.k });
+        setTransform({
+          x: event.transform.x,
+          y: event.transform.y,
+          k: event.transform.k,
+        });
       });
 
     svg.call(zoom as any);
@@ -447,18 +490,22 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     // Determine nodes related to focusNode
     const relatedNodes = new Set<string>();
     relatedNodes.add(focusNode);
-    
-    linksRef.current.forEach(l => {
+
+    linksRef.current.forEach((l) => {
       if (l.source.id === focusNode) relatedNodes.add(l.target.id);
       if (l.target.id === focusNode) relatedNodes.add(l.source.id);
     });
 
-    node.transition().duration(300)
-      .style("opacity", (d: any) => relatedNodes.has(d.id) ? 1 : 0.2);
-    
-    link.transition().duration(300)
-      .attr("stroke-opacity", (d: any) => 
-        (d.source.id === focusNode || d.target.id === focusNode) ? 1 : 0.1
+    node
+      .transition()
+      .duration(300)
+      .style("opacity", (d: any) => (relatedNodes.has(d.id) ? 1 : 0.2));
+
+    link
+      .transition()
+      .duration(300)
+      .attr("stroke-opacity", (d: any) =>
+        d.source.id === focusNode || d.target.id === focusNode ? 1 : 0.1,
       );
   }, [focusNode]);
 
@@ -472,20 +519,24 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
 
     if (!changedFiles) {
       // Restore normal opacity/colors
-      node.transition().duration(300)
+      node
+        .transition()
+        .duration(300)
         .style("opacity", 1)
         .selectAll("circle")
         .attr("stroke", "rgba(255,255,255,0.3)")
         .attr("stroke-width", 2);
-      
+
       link.transition().duration(300).attr("stroke-opacity", 0.6);
       return;
     }
 
     // Highlight modified files
-    node.transition().duration(300)
+    node
+      .transition()
+      .duration(300)
       .style("opacity", (d: any) => {
-        if (d.type === 'file') {
+        if (d.type === "file") {
           return changedFiles.has(d.path) ? 1 : 0.2;
         }
         if (d.type === 'folder') {
@@ -498,41 +549,49 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       })
       .selectAll("circle")
       .attr("stroke", (d: any) => {
-         if (d.type === 'file' && changedFiles.has(d.path)) {
-           const type = changedFiles.get(d.path);
-           if (type === 'ADDED' || type === 'added') return '#22c55e'; // green
-           if (type === 'DELETED' || type === 'deleted') return '#ef4444'; // red
-           return '#eab308'; // yellow for modified
-         }
-         return "rgba(255,255,255,0.3)";
+        if (d.type === "file" && changedFiles.has(d.path)) {
+          const type = changedFiles.get(d.path);
+          if (type === "ADDED" || type === "added") return "#22c55e"; // green
+          if (type === "DELETED" || type === "deleted") return "#ef4444"; // red
+          return "#eab308"; // yellow for modified
+        }
+        return "rgba(255,255,255,0.3)";
       })
-      .attr("stroke-width", (d: any) => (d.type === 'file' && changedFiles.has(d.path) ? 3 : 2));
-      
+      .attr("stroke-width", (d: any) =>
+        d.type === "file" && changedFiles.has(d.path) ? 3 : 2,
+      );
+
     // Dim links
     link.transition().duration(300).attr("stroke-opacity", 0.1);
   }, [changedFiles, focusNode]);
 
   const handleZoomIn = () => {
     if (svgRef.current) {
-      d3.select(svgRef.current).transition().call(d3.zoom().scaleBy as any, 1.2);
+      d3.select(svgRef.current)
+        .transition()
+        .call(d3.zoom().scaleBy as any, 1.2);
     }
   };
 
   const handleZoomOut = () => {
     if (svgRef.current) {
-      d3.select(svgRef.current).transition().call(d3.zoom().scaleBy as any, 0.8);
+      d3.select(svgRef.current)
+        .transition()
+        .call(d3.zoom().scaleBy as any, 0.8);
     }
   };
 
   const handleReset = () => {
     if (svgRef.current) {
-      d3.select(svgRef.current).transition().call(d3.zoom().transform as any, d3.zoomIdentity);
+      d3.select(svgRef.current)
+        .transition()
+        .call(d3.zoom().transform as any, d3.zoomIdentity);
     }
   };
 
   const handleSaveAnnotation = async (data: Partial<MapAnnotation>) => {
     if (!repository?.id || !popover) return;
-    
+
     try {
       if (popover.initialData?.id) {
         await annotationService.updateAnnotation(popover.initialData.id, data);
@@ -542,7 +601,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           ...data,
           repositoryId: repository.id,
           targetId: popover.targetId,
-          targetType: popover.targetType
+          targetType: popover.targetType,
         });
         toast.success("Annotation created");
       }
@@ -614,44 +673,55 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
                 viewBox="0 0 900 600"
                 preserveAspectRatio="xMidYMid meet"
               />
-              <div 
+              <div
                 className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible"
                 style={{
                   transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`,
-                  transformOrigin: '0 0'
+                  transformOrigin: "0 0",
                 }}
               >
-                {annotations.map(a => {
+                {annotations.map((a) => {
                   let x = 0;
                   let y = 0;
-                  if (a.targetType === 'node') {
-                    const node = nodesRef.current.find(n => n.id === a.targetId);
+                  if (a.targetType === "node") {
+                    const node = nodesRef.current.find(
+                      (n) => n.id === a.targetId,
+                    );
                     if (node) {
                       x = node.x;
                       y = node.y;
                     }
-                  } else if (a.targetType === 'edge') {
-                    const parts = a.targetId.split('->');
-                    const link = linksRef.current.find(l => l.source.id === parts[0] && l.target.id === parts[1]);
+                  } else if (a.targetType === "edge") {
+                    const parts = a.targetId.split("->");
+                    const link = linksRef.current.find(
+                      (l) =>
+                        l.source.id === parts[0] && l.target.id === parts[1],
+                    );
                     if (link) {
                       x = (link.source.x + link.target.x) / 2;
                       y = (link.source.y + link.target.y) / 2;
                     }
                   }
                   if (x === 0 && y === 0) return null; // Wait for nodes to be initialized
-                  
+
                   return (
-                    <div key={a.id} className="absolute pointer-events-auto" style={{ left: x, top: y }}>
-                      <AnnotationMarker 
-                        annotation={a} 
-                        x={0} 
-                        y={0} 
-                        onClick={() => setPopover({
-                          isOpen: true,
-                          x: 0, // In this case we might want to center the popover or use mouse coordinates
-                          y: 0,
-                          initialData: a
-                        })} 
+                    <div
+                      key={a.id}
+                      className="absolute pointer-events-auto"
+                      style={{ left: x, top: y }}
+                    >
+                      <AnnotationMarker
+                        annotation={a}
+                        x={0}
+                        y={0}
+                        onClick={() =>
+                          setPopover({
+                            isOpen: true,
+                            x: 0, // In this case we might want to center the popover or use mouse coordinates
+                            y: 0,
+                            initialData: a,
+                          })
+                        }
                       />
                     </div>
                   );
@@ -661,42 +731,44 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             <div className="absolute bottom-2 right-3 text-[10px] text-white/70 pointer-events-none">
               GitVerse • {repository?.name || "Repository"}
             </div>
-            
-            <FilterPanel 
-              filters={filters} 
-              toggleDirectory={toggleDirectory} 
-              toggleFileType={toggleFileType} 
-              toggleDomain={toggleDomain} 
-              resetFilters={resetFilters} 
+
+            <FilterPanel
+              filters={filters}
+              toggleDirectory={toggleDirectory}
+              toggleFileType={toggleFileType}
+              toggleDomain={toggleDomain}
+              resetFilters={resetFilters}
             />
 
-            <DrilldownControls 
-              canGoBack={canGoBack} 
-              onGoBack={goBack} 
-              onClearFocus={clearFocus} 
-              focusNode={focusNode} 
+            <DrilldownControls
+              canGoBack={canGoBack}
+              onGoBack={goBack}
+              onClearFocus={clearFocus}
+              focusNode={focusNode}
               onResetGraph={() => {
                 collapseAll();
                 resetFilters();
                 clearFocus();
-              }} 
+              }}
             />
 
-            <MiniMap 
-              nodes={nodesRef.current} 
-              links={linksRef.current} 
-              width={svgRef.current?.parentElement?.clientWidth || 800} 
-              height={Math.min((svgRef.current?.parentElement?.clientWidth || 800) * 0.75, 600)} 
-              svgRef={svgRef} 
-              transform={transform} 
+            <MiniMap
+              nodes={nodesRef.current}
+              links={linksRef.current}
+              width={svgRef.current?.parentElement?.clientWidth || 800}
+              height={Math.min(
+                (svgRef.current?.parentElement?.clientWidth || 800) * 0.75,
+                600,
+              )}
+              svgRef={svgRef}
+              transform={transform}
             />
-
           </div>
 
-          <MapControls 
-            onZoomIn={handleZoomIn} 
-            onZoomOut={handleZoomOut} 
-            onReset={handleReset} 
+          <MapControls
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onReset={handleReset}
             onExportPng={() => exportGraph("png")}
             onExportSvg={() => exportGraph("svg")}
             isExporting={isExporting}
@@ -704,14 +776,15 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         </div>
 
         <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
-          💡 Drag nodes to reposition • Scroll to zoom • Hover for details • Right-click to annotate
+          💡 Drag nodes to reposition • Scroll to zoom • Hover for details •
+          Right-click to annotate
         </p>
 
         {repository?.commits && repository.commits.length > 0 && (
-          <TimeTravelTimeline 
-            commits={repository.commits} 
+          <TimeTravelTimeline
+            commits={repository.commits}
             selectedCommitHash={selectedCommitHash}
-            onCommitSelect={setSelectedCommitHash} 
+            onCommitSelect={setSelectedCommitHash}
           />
         )}
 
@@ -731,25 +804,47 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         />
 
         {popover?.isOpen && (
-          <AnnotationPopover 
-            x={popover.initialData ? transform.x + (nodesRef.current.find(n => n.id === popover.initialData?.targetId)?.x || 0) * transform.k : popover.x}
-            y={popover.initialData ? transform.y + (nodesRef.current.find(n => n.id === popover.initialData?.targetId)?.y || 0) * transform.k : popover.y}
+          <AnnotationPopover
+            x={
+              popover.initialData
+                ? transform.x +
+                  (nodesRef.current.find(
+                    (n) => n.id === popover.initialData?.targetId,
+                  )?.x || 0) *
+                    transform.k
+                : popover.x
+            }
+            y={
+              popover.initialData
+                ? transform.y +
+                  (nodesRef.current.find(
+                    (n) => n.id === popover.initialData?.targetId,
+                  )?.y || 0) *
+                    transform.k
+                : popover.y
+            }
             initialData={popover.initialData}
             onSave={handleSaveAnnotation}
             onCancel={() => setPopover(null)}
-            onDelete={popover.initialData?.id ? handleDeleteAnnotation : undefined}
+            onDelete={
+              popover.initialData?.id ? handleDeleteAnnotation : undefined
+            }
           />
         )}
 
-        <AnnotationPanel 
-          isOpen={panelOpen} 
-          onClose={() => setPanelOpen(false)} 
-          annotations={annotations} 
+        <AnnotationPanel
+          isOpen={panelOpen}
+          onClose={() => setPanelOpen(false)}
+          annotations={annotations}
           onSelect={(a) => {
-            let x = 0, y = 0;
-            if (a.targetType === 'node') {
-              const node = nodesRef.current.find(n => n.id === a.targetId);
-              if (node) { x = node.x; y = node.y; }
+            let x = 0,
+              y = 0;
+            if (a.targetType === "node") {
+              const node = nodesRef.current.find((n) => n.id === a.targetId);
+              if (node) {
+                x = node.x;
+                y = node.y;
+              }
             }
             // Animate D3 zoom to annotation
             if (svgRef.current && (x !== 0 || y !== 0)) {
@@ -758,9 +853,15 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
               d3.select(svgRef.current)
                 .transition()
                 .duration(750)
-                .call(d3.zoom().transform as any, d3.zoomIdentity.translate(width/2, height/2).scale(1.5).translate(-x, -y));
+                .call(
+                  d3.zoom().transform as any,
+                  d3.zoomIdentity
+                    .translate(width / 2, height / 2)
+                    .scale(1.5)
+                    .translate(-x, -y),
+                );
             }
-          }} 
+          }}
         />
         
         {/* Screen reader announcement region */}

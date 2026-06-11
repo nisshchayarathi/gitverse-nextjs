@@ -1,17 +1,20 @@
-import { OrgRepository, DistributedIndexResult } from "../../types/distributed-rag";
+import {
+  OrgRepository,
+  DistributedIndexResult,
+} from "../../types/distributed-rag";
 import { repositoryRegistry } from "./repository-registry";
 import { orgKnowledgeGraph } from "./org-knowledge-graph";
 
 export class DistributedIndexer {
   async indexRepository(repo: OrgRepository): Promise<DistributedIndexResult> {
     console.log(`[DistributedIndexer] Indexing repository: ${repo.fullName}`);
-    
+
     orgKnowledgeGraph.addNode({
       id: repo.fullName,
-      type: 'repository',
+      type: "repository",
       metadata: { owner: repo.owner, defaultBranch: repo.defaultBranch },
       dependencies: [],
-      dependents: []
+      dependents: [],
     });
 
     return {
@@ -20,7 +23,7 @@ export class DistributedIndexer {
       filesIndexed: 100, // Mock metrics for now
       tokensIndexed: 50000,
       dependenciesMapped: 10,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 

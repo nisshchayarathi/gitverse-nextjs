@@ -147,6 +147,50 @@ export async function POST(request: NextRequest) {
               Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000),
             ),
           },
+<<<<<<< HEAD
+        },
+      );
+    }
+
+    if (!user.passwordHash) {
+      const hasGoogleAccount =
+        (await prisma.account.count({
+          where: {
+            userId: user.id,
+            provider: "google",
+          },
+        })) > 0;
+
+      if (hasGoogleAccount) {
+        return apiError(
+          401,
+          "Email already exists. Please sign in with Google.",
+        );
+      }
+    }
+
+    const passwordHash = user.passwordHash;
+
+    if (!passwordHash) {
+      return apiError(401, "Invalid email or password");
+    }
+
+    const isValidPassword = await bcrypt.compare(password, passwordHash);
+
+    if (!isValidPassword) {
+      const newFailedCount = (user.failedLoginAttempts ?? 0) + 1;
+      const shouldLock = newFailedCount >= LOCKOUT_THRESHOLD;
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: newFailedCount,
+          lastFailedAttemptAt: new Date(),
+          ...(shouldLock
+            ? { lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS) }
+            : {}),
+=======
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
         },
       );
     }

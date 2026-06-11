@@ -39,7 +39,7 @@ export class QuotaService {
   static validateRateLimitParams(
     key: string,
     limit: number,
-    windowMs: number
+    windowMs: number,
   ): string | null {
     if (typeof key !== "string") {
       return "Rate limit key must be a string";
@@ -107,8 +107,8 @@ export class QuotaService {
   static sanitizeKey(key: string): string {
     return key
       .replace(/[\x00-\x1f\x7f]/g, "") // Remove control characters
-      .trim()                            // Trim whitespace first
-      .replace(/\s+/g, ":");             // Replace remaining internal whitespace with colon
+      .trim() // Trim whitespace first
+      .replace(/\s+/g, ":"); // Replace remaining internal whitespace with colon
   }
 
   /**
@@ -125,9 +125,13 @@ export class QuotaService {
   static async checkWebhookRateLimit(
     key: string,
     limit: number,
-    windowMs: number
+    windowMs: number,
   ): Promise<boolean> {
-    const validationError = QuotaService.validateRateLimitParams(key, limit, windowMs);
+    const validationError = QuotaService.validateRateLimitParams(
+      key,
+      limit,
+      windowMs,
+    );
     if (validationError) {
       console.error("Rate limit validation failed:", validationError);
       return false;
@@ -144,9 +148,7 @@ export class QuotaService {
         .deleteMany({
           where: { expiresAt: { lt: now } },
         })
-        .catch((err) =>
-          console.error("Rate limit cleanup failed:", err)
-        );
+        .catch((err) => console.error("Rate limit cleanup failed:", err));
 
       // Count active records for this key.
       // This is the "check" in the TOCTOU pattern. A concurrent request
@@ -197,7 +199,7 @@ export class QuotaService {
    * Returns the number of deleted records.
    */
   static async cleanupExpiredRateLimits(
-    batchSize: number = DEFAULT_CLEANUP_BATCH_SIZE
+    batchSize: number = DEFAULT_CLEANUP_BATCH_SIZE,
   ): Promise<number> {
     if (batchSize <= 0 || batchSize > 10000) {
       throw new Error("Batch size must be between 1 and 10,000");
@@ -222,7 +224,7 @@ export class QuotaService {
   static async getRateLimitStatus(
     key: string,
     limit: number,
-    windowMs: number
+    windowMs: number,
   ): Promise<RateLimitStatus> {
     const sanitizedKey = QuotaService.sanitizeKey(key);
     const now = new Date();
@@ -236,7 +238,8 @@ export class QuotaService {
       });
 
       const remaining = Math.max(0, limit - count);
-      const utilizationPercent = limit > 0 ? Math.round((count / limit) * 100) : 0;
+      const utilizationPercent =
+        limit > 0 ? Math.round((count / limit) * 100) : 0;
 
       return {
         key: sanitizedKey,
@@ -375,14 +378,14 @@ export class QuotaService {
     const parsed = parseInt(envValue, 10);
     if (isNaN(parsed) || parsed <= 0) {
       console.warn(
-        `Invalid AI_QUOTA_PER_WINDOW value: "${envValue}". Using default of 250.`
+        `Invalid AI_QUOTA_PER_WINDOW value: "${envValue}". Using default of 250.`,
       );
       return 250;
     }
 
     if (parsed > 100000) {
       console.warn(
-        `AI_QUOTA_PER_WINDOW value ${parsed} exceeds maximum of 100,000. Capping.`
+        `AI_QUOTA_PER_WINDOW value ${parsed} exceeds maximum of 100,000. Capping.`,
       );
       return 100000;
     }
@@ -394,7 +397,9 @@ export class QuotaService {
    * Gets the current quota status for an installation.
    * Useful for monitoring, dashboards, and user-facing quota displays.
    */
-  static async getQuotaStatus(installationId: bigint): Promise<QuotaStatus | null> {
+  static async getQuotaStatus(
+    installationId: bigint,
+  ): Promise<QuotaStatus | null> {
     const validationError = QuotaService.validateInstallationId(installationId);
     if (validationError) {
       return null;
@@ -415,9 +420,10 @@ export class QuotaService {
       const remainingRequests = isExpired
         ? maxRequests
         : Math.max(0, maxRequests - quota.requestsUsed);
-      const utilizationPercent = maxRequests > 0
-        ? Math.round((quota.requestsUsed / maxRequests) * 100)
-        : 0;
+      const utilizationPercent =
+        maxRequests > 0
+          ? Math.round((quota.requestsUsed / maxRequests) * 100)
+          : 0;
       const timeUntilResetMs = isExpired
         ? 0
         : Math.max(0, quota.quotaWindowEnd.getTime() - now.getTime());
@@ -492,7 +498,7 @@ export class QuotaService {
    */
   static async recordTokenUsage(
     installationId: bigint,
-    tokens: number
+    tokens: number,
   ): Promise<void> {
     if (tokens < 0) {
       console.error("Token count must be non-negative, got:", tokens);
@@ -555,7 +561,7 @@ export class QuotaService {
    * Returns a map of installationId → status.
    */
   static async getBulkQuotaStatus(
-    installationIds: bigint[]
+    installationIds: bigint[],
   ): Promise<Map<bigint, QuotaStatus | null>> {
     const results = new Map<bigint, QuotaStatus | null>();
 
@@ -571,9 +577,7 @@ export class QuotaService {
         where: { installationId: { in: uniqueIds } },
       });
 
-      const quotaMap = new Map(
-        quotas.map((q) => [q.installationId, q])
-      );
+      const quotaMap = new Map(quotas.map((q) => [q.installationId, q]));
 
       const maxRequests = QuotaService.getQuotaMax();
       const now = new Date();
@@ -589,9 +593,10 @@ export class QuotaService {
         const remainingRequests = isExpired
           ? maxRequests
           : Math.max(0, maxRequests - quota.requestsUsed);
-        const utilizationPercent = maxRequests > 0
-          ? Math.round((quota.requestsUsed / maxRequests) * 100)
-          : 0;
+        const utilizationPercent =
+          maxRequests > 0
+            ? Math.round((quota.requestsUsed / maxRequests) * 100)
+            : 0;
         const timeUntilResetMs = isExpired
           ? 0
           : Math.max(0, quota.quotaWindowEnd.getTime() - now.getTime());

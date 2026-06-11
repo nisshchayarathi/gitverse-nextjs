@@ -1,8 +1,16 @@
 import { RepositoryRole } from "../../types/repository-permissions";
 
 export class RBAC {
-  private static policyModifyRoles: RepositoryRole[] = ["ORG_ADMIN", "REPO_ADMIN"];
-  private static policyReadRoles: RepositoryRole[] = ["ORG_ADMIN", "REPO_ADMIN", "CONTRIBUTOR", "VIEWER"];
+  private static policyModifyRoles: RepositoryRole[] = [
+    "ORG_ADMIN",
+    "REPO_ADMIN",
+  ];
+  private static policyReadRoles: RepositoryRole[] = [
+    "ORG_ADMIN",
+    "REPO_ADMIN",
+    "CONTRIBUTOR",
+    "VIEWER",
+  ];
 
   /**
    * Admin-only roles that can modify repository/org settings and billing.

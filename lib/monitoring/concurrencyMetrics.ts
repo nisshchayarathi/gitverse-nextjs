@@ -7,7 +7,10 @@ export class ConcurrencyMetrics {
   }
 
   decrementActive(queueName: string) {
-    this.activeWorkers[queueName] = Math.max(0, (this.activeWorkers[queueName] || 0) - 1);
+    this.activeWorkers[queueName] = Math.max(
+      0,
+      (this.activeWorkers[queueName] || 0) - 1,
+    );
   }
 
   incrementQueued(queueName: string) {
@@ -15,7 +18,10 @@ export class ConcurrencyMetrics {
   }
 
   decrementQueued(queueName: string) {
-    this.queuedJobs[queueName] = Math.max(0, (this.queuedJobs[queueName] || 0) - 1);
+    this.queuedJobs[queueName] = Math.max(
+      0,
+      (this.queuedJobs[queueName] || 0) - 1,
+    );
   }
 
   getMetrics() {
@@ -27,7 +33,9 @@ export class ConcurrencyMetrics {
   }
 
   logMetrics(queueName: string) {
-    console.log(`[ConcurrencyMetrics] Queue: ${queueName} | Active: ${this.activeWorkers[queueName] || 0} | Queued: ${this.queuedJobs[queueName] || 0}`);
+    console.log(
+      `[ConcurrencyMetrics] Queue: ${queueName} | Active: ${this.activeWorkers[queueName] || 0} | Queued: ${this.queuedJobs[queueName] || 0}`,
+    );
   }
 }
 

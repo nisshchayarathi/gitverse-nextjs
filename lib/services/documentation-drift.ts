@@ -33,13 +33,13 @@ export class DocumentationDriftService {
       where: {
         repositoryId,
         extension: {
-          in: [".ts", ".tsx", ".js", ".jsx", ".md"]
-        }
+          in: [".ts", ".tsx", ".js", ".jsx", ".md"],
+        },
       },
       take: 10,
       orderBy: {
-        updatedAt: 'desc' // Analyze recently updated files
-      }
+        updatedAt: "desc", // Analyze recently updated files
+      },
     });
 
     if (filesToAnalyze.length === 0) {
@@ -60,26 +60,42 @@ export class DocumentationDriftService {
 
     for (const fileRecord of filesToAnalyze) {
       filesAnalyzed++;
-      
+
       try {
         // 1. Fetch file content
-        const content = await github.getFileContent(owner, repo, fileRecord.path);
+        const content = await github.getFileContent(
+          owner,
+          repo,
+          fileRecord.path,
+        );
         if (!content) continue;
 
         // 2. Analyze for drift
-        const driftResult = await this.analyzer.analyzeDrift(fileRecord.path, content);
-        
-        if (driftResult.hasDrift && driftResult.driftConfidence >= DRIFT_CONFIDENCE_THRESHOLD) {
+        const driftResult = await this.analyzer.analyzeDrift(
+          fileRecord.path,
+          content,
+        );
+
+        if (
+          driftResult.hasDrift &&
+          driftResult.driftConfidence >= DRIFT_CONFIDENCE_THRESHOLD
+        ) {
           driftedFiles++;
 
           // Prevent opening multiple PRs per run (to avoid spam)
           if (!prUrl) {
             // 3. Generate fix
-            const patch = await this.generator.generatePatch(fileRecord.path, content, driftResult);
+            const patch = await this.generator.generatePatch(
+              fileRecord.path,
+              content,
+              driftResult,
+            );
 
             if (patch.suggestedFixConfidence >= FIX_CONFIDENCE_THRESHOLD) {
               // 4. Create PR
-              console.log(`[DocumentationDrift] Generating PR for ${fileRecord.path}`);
+              console.log(
+                `[DocumentationDrift] Generating PR for ${fileRecord.path}`,
+              );
               const url = await this.prService.createPR({
                 owner,
                 repo,
@@ -87,17 +103,22 @@ export class DocumentationDriftService {
                 patch,
                 githubToken: token,
               });
-              
+
               if (url) {
                 prUrl = url;
               }
             } else {
-               console.log(`[DocumentationDrift] Fix confidence ${patch.suggestedFixConfidence} below threshold for ${fileRecord.path}`);
+              console.log(
+                `[DocumentationDrift] Fix confidence ${patch.suggestedFixConfidence} below threshold for ${fileRecord.path}`,
+              );
             }
           }
         }
       } catch (err) {
-        console.error(`[DocumentationDrift] Error analyzing ${fileRecord.path}:`, err);
+        console.error(
+          `[DocumentationDrift] Error analyzing ${fileRecord.path}:`,
+          err,
+        );
       }
     }
 

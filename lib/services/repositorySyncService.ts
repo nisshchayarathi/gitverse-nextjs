@@ -5,12 +5,16 @@ import { repositoryKnowledgeService } from "./repositoryKnowledgeService";
 import { RepositorySyncQueue } from "./repositorySyncQueue";
 
 export class RepositorySyncService {
-  public static async processSyncJob(jobId: string, repositoryId: number, githubToken: string): Promise<void> {
+  public static async processSyncJob(
+    jobId: string,
+    repositoryId: number,
+    githubToken: string,
+  ): Promise<void> {
     try {
       await RepositorySyncQueue.markProcessing(jobId);
 
       const repoRecord = await prisma.repository.findUnique({
-        where: { id: repositoryId }
+        where: { id: repositoryId },
       });
 
       if (!repoRecord) {
@@ -38,15 +42,18 @@ export class RepositorySyncService {
       // Assume push changes `src/index.ts`. We use the DependencyGraphAnalyzer to refresh logic.
       // (Mocking the changed files for now as we don't have the push diff payload explicitly passed in this worker step)
       const changedFilesMock = ["src/index.ts"];
-      const impact = await DependencyGraphAnalyzer.analyzeImpact(`${owner}/${repo}`, changedFilesMock);
+      const impact = await DependencyGraphAnalyzer.analyzeImpact(
+        `${owner}/${repo}`,
+        changedFilesMock,
+      );
 
       // 4. Update Database Last Synchronized Time
       await prisma.repository.update({
         where: { id: repositoryId },
         data: {
           lastSynchronizedAt: new Date(),
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
       await RepositorySyncQueue.markCompleted(jobId);

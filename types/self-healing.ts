@@ -8,7 +8,7 @@ export interface SelfHealingPatch {
   suggestionBody: string; // The exact code to replace with
   explanation: string;
   confidenceScore: number;
-  status: "valid" | "invalid_syntax" | "low_confidence";
+  status: "valid" | "invalid_syntax" | "low_confidence" | "pending";
 }
 
 export const SELF_HEAL_MIN_SEVERITY = ["critical", "high"];

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, requireAuth, HttpError } from "@/lib/middleware";
 
 const mockFindUnique = jest.fn();
-const mockTokenVersionCache = new Map<string, { version: number; fetchedAt: number }>();
+const mockTokenVersionCache = new Map<
+  string,
+  { version: number; fetchedAt: number }
+>();
 
 jest.mock("@/lib/prisma", () => ({
   __esModule: true,
@@ -36,12 +39,17 @@ function mockRequest(authHeader?: string): NextRequest {
   const cookies = new Map<string, string>();
   return {
     headers: {
-      get: (name: string) => (name === "authorization" ? authHeader || null : null),
+      get: (name: string) =>
+        name === "authorization" ? authHeader || null : null,
     },
     cookies: {
       get: (name: string) => cookies.get(name) || undefined,
-      delete: (name: string) => { cookies.delete(name); },
-      set: (name: string, value: string) => { cookies.set(name, value); },
+      delete: (name: string) => {
+        cookies.delete(name);
+      },
+      set: (name: string, value: string) => {
+        cookies.set(name, value);
+      },
     },
   } as unknown as NextRequest;
 }
@@ -103,7 +111,9 @@ describe("getAuthUser", () => {
     });
 
     it("returns null when JWT validation throws", async () => {
-      verifyTokenWithUserValidation.mockRejectedValue(new Error("Invalid token"));
+      verifyTokenWithUserValidation.mockRejectedValue(
+        new Error("Invalid token"),
+      );
       const result = await getAuthUser(mockRequest("Bearer bad-token"));
       expect(result).toBeNull();
     });
@@ -198,7 +208,11 @@ describe("requireAuth", () => {
       email: "test@test.com",
       tokenVersion: 1,
     });
-    mockFindUnique.mockResolvedValue({ id: 1, tokenVersion: 1, lockedUntil: null });
+    mockFindUnique.mockResolvedValue({
+      id: 1,
+      tokenVersion: 1,
+      lockedUntil: null,
+    });
 
     const result = await requireAuth(mockRequest("Bearer token"));
     expect(result.userId).toBe(1);

@@ -1,40 +1,40 @@
-import axios, { AxiosInstance } from 'axios'
+import axios, { AxiosInstance } from "axios";
 
 export interface BitbucketRepository {
-  uuid: string
-  name: string
-  full_name: string
-  description: string | null
+  uuid: string;
+  name: string;
+  full_name: string;
+  description: string | null;
   links: {
-    html: { href: string }
-    clone: Array<{ name: string; href: string }>
-  }
+    html: { href: string };
+    clone: Array<{ name: string; href: string }>;
+  };
   mainbranch?: {
-    name: string
-  }
-  is_private: boolean
-  size: number
-  created_on: string
-  updated_on: string
+    name: string;
+  };
+  is_private: boolean;
+  size: number;
+  created_on: string;
+  updated_on: string;
   owner: {
-    username: string
-    display_name: string
-  }
+    username: string;
+    display_name: string;
+  };
 }
 
 export class BitbucketService {
-  private client: AxiosInstance
-  private token?: string
+  private client: AxiosInstance;
+  private token?: string;
 
   constructor(token?: string) {
-    this.token = token
+    this.token = token;
     this.client = axios.create({
-      baseURL: 'https://api.bitbucket.org/2.0',
+      baseURL: "https://api.bitbucket.org/2.0",
       headers: {
-        Accept: 'application/json',
+        Accept: "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
       },
-    })
+    });
   }
 
   /**
@@ -42,58 +42,65 @@ export class BitbucketService {
    */
   async getAuthenticatedUser(): Promise<any> {
     if (!this.token) {
-      throw new Error('Bitbucket token required for authentication')
+      throw new Error("Bitbucket token required for authentication");
     }
 
-    const response = await this.client.get('/user')
-    return response.data
+    const response = await this.client.get("/user");
+    return response.data;
   }
 
   /**
    * Get repository
    */
-  async getRepository(workspace: string, repoSlug: string): Promise<BitbucketRepository> {
-    const response = await this.client.get(`/repositories/${workspace}/${repoSlug}`)
-    return response.data
+  async getRepository(
+    workspace: string,
+    repoSlug: string,
+  ): Promise<BitbucketRepository> {
+    const response = await this.client.get(
+      `/repositories/${workspace}/${repoSlug}`,
+    );
+    return response.data;
   }
 
   /**
    * List user repositories
    */
   async listUserRepositories(params?: {
-    per_page?: number
-    page?: number
+    per_page?: number;
+    page?: number;
   }): Promise<{ values: BitbucketRepository[] }> {
-    const response = await this.client.get('/repositories', {
+    const response = await this.client.get("/repositories", {
       params: {
         pagelen: params?.per_page || 20,
         page: params?.page || 1,
       },
-    })
+    });
 
-    return response.data
+    return response.data;
   }
 
   /**
    * Parse Bitbucket URL
    */
-  static parseBitbucketUrl(url: string): { workspace: string; repoSlug: string } | null {
+  static parseBitbucketUrl(
+    url: string,
+  ): { workspace: string; repoSlug: string } | null {
     const patterns = [
       /bitbucket\.org\/([^\/]+)\/([^\/]+?)(?:\.git)?$/,
       /bitbucket\.org\/([^\/]+)\/([^\/]+)/,
-    ]
+    ];
 
     for (const pattern of patterns) {
-      const match = url.match(pattern)
+      const match = url.match(pattern);
       if (match) {
         return {
           workspace: match[1],
-          repoSlug: match[2].replace(/\.git$/, ''),
-        }
+          repoSlug: match[2].replace(/\.git$/, ""),
+        };
       }
     }
 
-    return null
+    return null;
   }
 
   /**
@@ -101,12 +108,12 @@ export class BitbucketService {
    */
   async validateToken(): Promise<boolean> {
     try {
-      await this.getAuthenticatedUser()
-      return true
+      await this.getAuthenticatedUser();
+      return true;
     } catch {
-      return false
+      return false;
     }
   }
 }
 
-export const bitbucketService = new BitbucketService()
+export const bitbucketService = new BitbucketService();

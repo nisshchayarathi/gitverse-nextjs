@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { requireAuth, sanitizeError } from "@/lib/middleware";
-import {
-  isRateLimited,
-  recordAttempt,
-} from "@/lib/services/rateLimitService";
+import { isRateLimited, recordAttempt } from "@/lib/services/rateLimitService";
 import { RedactSensitiveFields } from "@/services/security/redact-sensitive-fields";
 
 const MAX_ATTEMPTS = 3;
@@ -83,7 +80,9 @@ export async function DELETE(request: NextRequest) {
     const user = await requireAuth(request);
     const userId = user.userId.toString();
 
-    if (await isRateLimited(userId, "DELETE_ACCOUNT", MAX_ATTEMPTS, WINDOW_MS)) {
+    if (
+      await isRateLimited(userId, "DELETE_ACCOUNT", MAX_ATTEMPTS, WINDOW_MS)
+    ) {
       return NextResponse.json(
         { error: "Too many attempts. Please try again later." },
         { status: 429, headers: { "Retry-After": "900" } },
@@ -107,10 +106,7 @@ export async function DELETE(request: NextRequest) {
     });
 
     if (!fullUser) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     if (fullUser.passwordHash) {
@@ -154,10 +150,7 @@ export async function DELETE(request: NextRequest) {
     console.error("Error deleting account:", sanitizeError(error));
 
     if (error?.code === "P2025") {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     return NextResponse.json(

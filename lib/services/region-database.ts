@@ -16,7 +16,7 @@ export class RegionDatabaseService {
     const config = REGION_CONFIGS[region];
     const databaseUrl = process.env[config.databaseUrlEnvKey];
 
-    // If a region-specific URL is not provided in env, 
+    // If a region-specific URL is not provided in env,
     // it falls back to the default DATABASE_URL for development safety
     const connectionUrl = databaseUrl || process.env.DATABASE_URL;
 

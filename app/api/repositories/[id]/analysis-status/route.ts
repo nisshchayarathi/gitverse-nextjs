@@ -9,7 +9,7 @@ export const maxDuration = 300; // max duration for edge/serverless functions if
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const user = await requireAuth(request);
@@ -33,7 +33,9 @@ export async function GET(
       async start(controller) {
         const encoder = new TextEncoder();
         const sendEvent = (data: any) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
+          );
         };
 
         let isClosed = false;
@@ -64,7 +66,10 @@ export async function GET(
             }
           } catch (error) {
             console.error("Error polling job status:", error);
-            sendEvent({ status: "FAILED", error: "Internal error checking job status" });
+            sendEvent({
+              status: "FAILED",
+              error: "Internal error checking job status",
+            });
             controller.close();
             isClosed = true;
           }
@@ -84,7 +89,7 @@ export async function GET(
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
+        Connection: "keep-alive",
       },
     });
   } catch (error: any) {

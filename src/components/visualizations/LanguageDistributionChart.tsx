@@ -8,13 +8,13 @@ interface LanguageData {
   lines: number;
   color: string;
 }
-interface RepositoryLanguage{
-  name:string;
+interface RepositoryLanguage {
+  name: string;
   percentage: number;
-  lines?:number
+  lines?: number;
 }
 
-interface RepositoryData{
+interface RepositoryData {
   languages?: RepositoryLanguage[];
 }
 
@@ -49,7 +49,7 @@ export function LanguageDistributionChart({
       percentage: lang.percentage,
       lines: lang.lines || 0,
       color: generateColor(lang.name),
-    })
+    }),
   );
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export function LanguageDistributionChart({
         percentage: lang.percentage,
         lines: lang.lines || 0,
         color: generateColor(lang.name),
-      })
+      }),
     );
 
     if (languageData.length === 0) return;
@@ -111,14 +111,12 @@ export function LanguageDistributionChart({
       .attr("stroke", "rgba(0,0,0,0.5)")
       .attr("stroke-width", 2)
       .on("mouseenter", function (event, d) {
-         g.selectAll("path")
-         .interrupt()
-         .style("opacity", 0.25);
-       d3.select(this)
+        g.selectAll("path").interrupt().style("opacity", 0.25);
+        d3.select(this)
           .style("opacity", 1)
           .attr("d", (datum: any) => arcHover(datum) || "")
           .attr("stroke", "rgba(255,255,255,0.8)")
-          .attr("stroke-width", 3) 
+          .attr("stroke-width", 3)
           .style("filter", "brightness(1.1)");
         if (tooltipRef.current && svgRef.current) {
           const tooltip = d3.select(tooltipRef.current);
@@ -139,30 +137,28 @@ export function LanguageDistributionChart({
           d3.select(tooltipRef.current)
             .style("opacity", "1")
             .style("display", "block")
-             .style("left", `${x}px`)
-              .style("top", `${y}px`);
+            .style("left", `${x}px`)
+            .style("top", `${y}px`);
         }
       })
-      .on("mousemove", function (event, ) {
+      .on("mousemove", function (event) {
         if (tooltipRef.current && svgRef.current) {
           const offset = 16;
           const rect = svgRef.current.getBoundingClientRect();
           const x = event.clientX - rect.left + offset;
           const y = event.clientY - rect.top + offset;
-            d3.select(tooltipRef.current)
-              .style("left", `${x}px`)
-              .style("top", `${y}px`);
+          d3.select(tooltipRef.current)
+            .style("left", `${x}px`)
+            .style("top", `${y}px`);
         }
       })
       .on("mouseleave", function (_event, _d) {
-           g.selectAll("path")
-           .interrupt()
-           .style("opacity", 1);
-           d3.select(this)
+        g.selectAll("path").interrupt().style("opacity", 1);
+        d3.select(this)
           .attr("d", (datum: any) => arc(datum) || "")
           .attr("stroke", "rgba(0,0,0,0.5)")
           .attr("stroke-width", 2)
-          .style("filter", "none");  
+          .style("filter", "none");
         if (tooltipRef.current) {
           d3.select(tooltipRef.current)
             .style("opacity", "0")
@@ -211,16 +207,16 @@ export function LanguageDistributionChart({
         </p>
       </div>
       {languageData.length > 0 && (
-      <div className=" relative flex items-center justify-center overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-        <svg
-          ref={svgRef}
-          width="100%"
-          height="400"
-          viewBox="0 0 400 400"
-          preserveAspectRatio="xMidYMid meet"
-          className="text-foreground max-w-md"
-        />
-      </div>
+        <div className=" relative flex items-center justify-center overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <svg
+            ref={svgRef}
+            width="100%"
+            height="400"
+            viewBox="0 0 400 400"
+            preserveAspectRatio="xMidYMid meet"
+            className="text-foreground max-w-md"
+          />
+        </div>
       )}
       {/* Empty state when languageData is empty */}
       {languageData.length === 0 && (
@@ -259,21 +255,20 @@ export function LanguageDistributionChart({
         )}
       </div>
       <div
-             ref={tooltipRef}
-             className="absolute p-4 rounded-lg pointer-events-none shadow-xl border border-gray-700/50"
-             style={{
-             opacity: 0, // control later with state
-              display: "none",
-             backgroundColor: "rgba(0, 0, 0, 0.9)",
-             color: "white",
-             zIndex: 9999,
-             backdropFilter: "blur(8px)",
-             left: "0px",
-             top: "0px",
-             whiteSpace: "nowrap",
-       }}
-      >
-     </div>
+        ref={tooltipRef}
+        className="absolute p-4 rounded-lg pointer-events-none shadow-xl border border-gray-700/50"
+        style={{
+          opacity: 0, // control later with state
+          display: "none",
+          backgroundColor: "rgba(0, 0, 0, 0.9)",
+          color: "white",
+          zIndex: 9999,
+          backdropFilter: "blur(8px)",
+          left: "0px",
+          top: "0px",
+          whiteSpace: "nowrap",
+        }}
+      ></div>
     </Card>
   );
 }

@@ -33,7 +33,10 @@ export interface ComplianceViolation {
   timestamp: string;
 }
 
-export const REGION_CONFIGS: Record<DataResidencyRegion, RegionalStorageConfig> = {
+export const REGION_CONFIGS: Record<
+  DataResidencyRegion,
+  RegionalStorageConfig
+> = {
   US: {
     databaseUrlEnvKey: "DATABASE_URL_US",
     redisUrlEnvKey: "REDIS_URL_US",

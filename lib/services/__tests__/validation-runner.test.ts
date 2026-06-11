@@ -19,7 +19,9 @@ describe("ValidationRunnerService", () => {
       const result = await service.runValidation(repoPath, true);
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining(`[ValidationRunner] Simulating test execution in ${repoPath}...`)
+        expect.stringContaining(
+          `[ValidationRunner] Simulating test execution in ${repoPath}...`,
+        ),
       );
 
       expect(result).toBeDefined();

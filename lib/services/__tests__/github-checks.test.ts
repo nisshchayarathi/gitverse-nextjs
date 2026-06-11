@@ -5,9 +5,17 @@ describe("Synchronous Pre-Merge Policy Enforcement", () => {
   describe("PremergePolicyEngine", () => {
     it("Scenario 1: Clean PR -> Success", () => {
       const engine = new PremergePolicyEngine();
-      engine.addEvaluation({ category: "secret_scanning", status: "PASS", message: "Clean" });
-      engine.addEvaluation({ category: "ai_review", status: "PASS", message: "Clean" });
-      
+      engine.addEvaluation({
+        category: "secret_scanning",
+        status: "PASS",
+        message: "Clean",
+      });
+      engine.addEvaluation({
+        category: "ai_review",
+        status: "PASS",
+        message: "Clean",
+      });
+
       const result = engine.evaluate();
       expect(result.status).toBe("success");
       expect(result.reason).toBe("All policies passed successfully.");
@@ -15,9 +23,17 @@ describe("Synchronous Pre-Merge Policy Enforcement", () => {
 
     it("Scenario 2: Critical secret -> Failure", () => {
       const engine = new PremergePolicyEngine();
-      engine.addEvaluation({ category: "secret_scanning", status: "FAIL", message: "Critical secret found" });
-      engine.addEvaluation({ category: "ai_review", status: "PASS", message: "Clean" });
-      
+      engine.addEvaluation({
+        category: "secret_scanning",
+        status: "FAIL",
+        message: "Critical secret found",
+      });
+      engine.addEvaluation({
+        category: "ai_review",
+        status: "PASS",
+        message: "Clean",
+      });
+
       const result = engine.evaluate();
       expect(result.status).toBe("failure");
       expect(result.reason).toBe("Critical secret found");
@@ -25,9 +41,17 @@ describe("Synchronous Pre-Merge Policy Enforcement", () => {
 
     it("Scenario 3: Blackout window active -> Failure", () => {
       const engine = new PremergePolicyEngine();
-      engine.addEvaluation({ category: "secret_scanning", status: "PASS", message: "Clean" });
-      engine.addEvaluation({ category: "blackout_window", status: "FAIL", message: "Blackout window active" });
-      
+      engine.addEvaluation({
+        category: "secret_scanning",
+        status: "PASS",
+        message: "Clean",
+      });
+      engine.addEvaluation({
+        category: "blackout_window",
+        status: "FAIL",
+        message: "Blackout window active",
+      });
+
       const result = engine.evaluate();
       expect(result.status).toBe("failure");
       expect(result.reason).toBe("Blackout window active");
@@ -35,8 +59,12 @@ describe("Synchronous Pre-Merge Policy Enforcement", () => {
 
     it("Scenario 5: Policy violation -> Failure", () => {
       const engine = new PremergePolicyEngine();
-      engine.addEvaluation({ category: "organization_policies", status: "FAIL", message: "Org policy violation" });
-      
+      engine.addEvaluation({
+        category: "organization_policies",
+        status: "FAIL",
+        message: "Org policy violation",
+      });
+
       const result = engine.evaluate();
       expect(result.status).toBe("failure");
       expect(result.reason).toBe("Org policy violation");
@@ -46,8 +74,12 @@ describe("Synchronous Pre-Merge Policy Enforcement", () => {
   describe("CheckSummaryService", () => {
     it("should format correct markdown output for success", () => {
       const engine = new PremergePolicyEngine();
-      engine.addEvaluation({ category: "ai_review", status: "PASS", message: "Clean" });
-      
+      engine.addEvaluation({
+        category: "ai_review",
+        status: "PASS",
+        message: "Clean",
+      });
+
       const summary = CheckSummaryService.generateSummary(engine.evaluate());
       expect(summary.title).toBe("GitVerse Security & Compliance Passed");
       expect(summary.text).toContain("✅ Passed");
@@ -56,8 +88,12 @@ describe("Synchronous Pre-Merge Policy Enforcement", () => {
 
     it("should format correct markdown output for failure", () => {
       const engine = new PremergePolicyEngine();
-      engine.addEvaluation({ category: "secret_scanning", status: "FAIL", message: "Secret leaked" });
-      
+      engine.addEvaluation({
+        category: "secret_scanning",
+        status: "FAIL",
+        message: "Secret leaked",
+      });
+
       const summary = CheckSummaryService.generateSummary(engine.evaluate());
       expect(summary.title).toBe("GitVerse Security & Compliance Blocked");
       expect(summary.text).toContain("❌ Failed");

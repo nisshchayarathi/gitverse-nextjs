@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 export const repositoryKnowledgeService = {
   async getKnowledge(repositoryId: number) {
     return await prisma.repositoryKnowledge.findUnique({
-      where: { repositoryId }
+      where: { repositoryId },
     });
   },
 
@@ -16,18 +16,22 @@ export const repositoryKnowledgeService = {
     return true;
   },
 
-  async upsertKnowledge(repositoryId: number, knowledge: ParsedRepositoryKnowledge) {
+  async upsertKnowledge(
+    repositoryId: number,
+    knowledge: ParsedRepositoryKnowledge,
+  ) {
     // Determine if we have any actual data to save
-    const hasData = 
-      !!knowledge.projectDescription || 
-      (knowledge.glossary && Object.keys(knowledge.glossary).length > 0) || 
+    const hasData =
+      !!knowledge.projectDescription ||
+      (knowledge.glossary && Object.keys(knowledge.glossary).length > 0) ||
       (knowledge.onboardingNotes && knowledge.onboardingNotes.length > 0) ||
-      (knowledge.architecturePrinciples && knowledge.architecturePrinciples.length > 0);
+      (knowledge.architecturePrinciples &&
+        knowledge.architecturePrinciples.length > 0);
 
     if (!hasData) {
       // If no data, delete existing knowledge if any
       await prisma.repositoryKnowledge.deleteMany({
-        where: { repositoryId }
+        where: { repositoryId },
       });
       return null;
     }
@@ -38,15 +42,17 @@ export const repositoryKnowledgeService = {
         projectDescription: knowledge.projectDescription || null,
         glossary: knowledge.glossary || Prisma.DbNull,
         onboardingNotes: knowledge.onboardingNotes || Prisma.DbNull,
-        architecturePrinciples: knowledge.architecturePrinciples || Prisma.DbNull,
+        architecturePrinciples:
+          knowledge.architecturePrinciples || Prisma.DbNull,
       },
       create: {
         repositoryId,
         projectDescription: knowledge.projectDescription || null,
         glossary: knowledge.glossary || Prisma.DbNull,
         onboardingNotes: knowledge.onboardingNotes || Prisma.DbNull,
-        architecturePrinciples: knowledge.architecturePrinciples || Prisma.DbNull,
-      }
+        architecturePrinciples:
+          knowledge.architecturePrinciples || Prisma.DbNull,
+      },
     });
-  }
+  },
 };

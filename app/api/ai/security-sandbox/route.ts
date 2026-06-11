@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, sanitizeError, isHttpError } from "@/lib/middleware";
-import { runSecuritySandbox, getSandboxStatus, listSandboxesForRepository } from "@/lib/services/securitySandboxService";
+import {
+  runSecuritySandbox,
+  getSandboxStatus,
+  listSandboxesForRepository,
+} from "@/lib/services/securitySandboxService";
 import { isValidGitSha } from "@/lib/utils/validators";
 import prisma from "@/lib/prisma";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 const SANDBOX_RATE_LIMIT = 3;
 const SANDBOX_WINDOW_MS = 60_000;
@@ -12,10 +20,17 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    const globalRl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.AI_GLOBAL,
+    );
     if (!globalRl.allowed) return rateLimitResponse(globalRl);
 
-    const allowed = await checkRateLimit(String(user.userId), { namespace: "security-sandbox", maxRequests: SANDBOX_RATE_LIMIT, windowMs: SANDBOX_WINDOW_MS });
+    const allowed = await checkRateLimit(String(user.userId), {
+      namespace: "security-sandbox",
+      maxRequests: SANDBOX_RATE_LIMIT,
+      windowMs: SANDBOX_WINDOW_MS,
+    });
     if (!allowed.allowed) return rateLimitResponse(allowed);
     const body = await request.json();
     const { repositoryId, pullRequestId, headSha } = body;
@@ -23,14 +38,17 @@ export async function POST(request: NextRequest) {
     if (!repositoryId || !headSha) {
       return NextResponse.json(
         { error: "repositoryId and headSha are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!isValidGitSha(headSha)) {
       return NextResponse.json(
-        { error: "Invalid headSha format. Must be a valid 40-character SHA-1 or 64-character SHA-256 hash." },
-        { status: 400 }
+        {
+          error:
+            "Invalid headSha format. Must be a valid 40-character SHA-1 or 64-character SHA-256 hash.",
+        },
+        { status: 400 },
       );
     }
 
@@ -43,7 +61,7 @@ export async function POST(request: NextRequest) {
     if (!repository) {
       return NextResponse.json(
         { error: "Repository not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -61,13 +79,13 @@ export async function POST(request: NextRequest) {
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to run security sandbox" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -84,7 +102,7 @@ export async function GET(request: NextRequest) {
       if (!sandbox) {
         return NextResponse.json(
           { error: "Sandbox not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
       return NextResponse.json({ sandbox }, { status: 200 });
@@ -100,7 +118,7 @@ export async function GET(request: NextRequest) {
       if (!repository) {
         return NextResponse.json(
           { error: "Repository not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -110,7 +128,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { error: "sandboxId or repositoryId is required" },
-      { status: 400 }
+      { status: 400 },
     );
   } catch (error: any) {
     console.error("Security sandbox query error:", sanitizeError(error));
@@ -118,13 +136,13 @@ export async function GET(request: NextRequest) {
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status },
       );
     }
 
     return NextResponse.json(
       { error: error.message || "Failed to query security sandbox" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

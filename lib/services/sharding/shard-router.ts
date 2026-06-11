@@ -27,12 +27,15 @@ export class ShardRouter {
     const sortedShards = activeShards.sort((a, b) => a.id.localeCompare(b.id));
 
     // Create numeric hash from org ID
-    const hash = crypto.createHash("sha256").update(organizationId).digest("hex");
+    const hash = crypto
+      .createHash("sha256")
+      .update(organizationId)
+      .digest("hex");
     // Parse first 8 bytes as an integer to use for modulo arithmetic
     const numericHash = BigInt("0x" + hash.slice(0, 16));
-    
+
     const shardIndex = Number(numericHash % BigInt(sortedShards.length));
-    
+
     return sortedShards[shardIndex].id;
   }
 
@@ -40,7 +43,10 @@ export class ShardRouter {
    * Updates the routing override for an organization. Used by the migration worker
    * at the exact moment of cutover.
    */
-  public setMigrationOverride(organizationId: string, newShardId: ShardId): void {
+  public setMigrationOverride(
+    organizationId: string,
+    newShardId: ShardId,
+  ): void {
     this.migrationOverrides.set(organizationId, newShardId);
   }
 

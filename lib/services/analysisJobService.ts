@@ -53,29 +53,28 @@ export class AnalysisJobService {
     failed: number;
     stuck: number;
   }> {
-    const [total, processing, queued, done, failed, stuck] =
-      await Promise.all([
-        prisma.analysisJob.count({ where: { userId: params.userId } }),
-        prisma.analysisJob.count({
-          where: { userId: params.userId, status: "PROCESSING" },
-        }),
-        prisma.analysisJob.count({
-          where: { userId: params.userId, status: "QUEUED" },
-        }),
-        prisma.analysisJob.count({
-          where: { userId: params.userId, status: "DONE" },
-        }),
-        prisma.analysisJob.count({
-          where: { userId: params.userId, status: "FAILED" },
-        }),
-        prisma.analysisJob.count({
-          where: {
-            userId: params.userId,
-            status: "PROCESSING",
-            lockExpiresAt: { lt: new Date() },
-          },
-        }),
-      ]);
+    const [total, processing, queued, done, failed, stuck] = await Promise.all([
+      prisma.analysisJob.count({ where: { userId: params.userId } }),
+      prisma.analysisJob.count({
+        where: { userId: params.userId, status: "PROCESSING" },
+      }),
+      prisma.analysisJob.count({
+        where: { userId: params.userId, status: "QUEUED" },
+      }),
+      prisma.analysisJob.count({
+        where: { userId: params.userId, status: "DONE" },
+      }),
+      prisma.analysisJob.count({
+        where: { userId: params.userId, status: "FAILED" },
+      }),
+      prisma.analysisJob.count({
+        where: {
+          userId: params.userId,
+          status: "PROCESSING",
+          lockExpiresAt: { lt: new Date() },
+        },
+      }),
+    ]);
     return { total, processing, queued, done, failed, stuck };
   }
 
@@ -115,7 +114,10 @@ export class AnalysisJobService {
             maxAttempts: params.maxAttempts ?? 3,
           },
         });
-        await analysisQueue.add("repository_analysis", { jobId: job.id, userId: params.userId });
+        await analysisQueue.add("repository_analysis", {
+          jobId: job.id,
+          userId: params.userId,
+        });
         return job;
       } catch (error: any) {
         if (
@@ -170,7 +172,10 @@ export class AnalysisJobService {
             maxAttempts: params.maxAttempts ?? 3,
           },
         });
-        await analysisQueue.add("architecture_generation", { jobId: job.id, userId: params.userId });
+        await analysisQueue.add("architecture_generation", {
+          jobId: job.id,
+          userId: params.userId,
+        });
         return job;
       } catch (error: any) {
         if (
@@ -262,9 +267,10 @@ export class AnalysisJobService {
   }): Promise<void> {
     const lockExtension = params.extendLockMs ?? DEFAULT_LOCK_MS;
 
-    const pct = params.update.progressPercent !== undefined
-      ? Math.max(0, Math.min(100, Math.round(params.update.progressPercent)))
-      : undefined;
+    const pct =
+      params.update.progressPercent !== undefined
+        ? Math.max(0, Math.min(100, Math.round(params.update.progressPercent)))
+        : undefined;
 
     const where: any = { id: params.jobId };
     if (params.workerId) {
@@ -345,8 +351,7 @@ export class AnalysisJobService {
     }
 
     const shouldRetry =
-      params.attempts < params.maxAttempts &&
-      isRetryableError(params.error);
+      params.attempts < params.maxAttempts && isRetryableError(params.error);
     if (shouldRetry) {
       const delay = computeBackoffMs(params.attempts);
       await prisma.analysisJob.update({

@@ -14,12 +14,16 @@ export interface DNSValidationResult {
 
 export interface SecurityAuditEntry {
   timestamp: string;
-  event: 'ssrf_attempt' | 'allowlist_violation' | 'invalid_destination' | 'metadata_access_attempt';
+  event:
+    | "ssrf_attempt"
+    | "allowlist_violation"
+    | "invalid_destination"
+    | "metadata_access_attempt";
   url: string;
   hostname: string;
   resolvedIps?: string[];
   reason: string;
-  severity: 'high' | 'critical';
+  severity: "high" | "critical";
 }
 
 export interface SafeHttpClientOptions extends RequestInit {

@@ -8,7 +8,13 @@ import { repositoryKnowledgeService } from "./repositoryKnowledgeService";
 import { sanitizeTextContent } from "@/lib/utils/promptSanitization";
 
 export class PRImpactAnalysisService {
-  public static async analyzePullRequest(githubToken: string, repoFullName: string, prNumber: number, pullRequestId: number, repoId: number): Promise<void> {
+  public static async analyzePullRequest(
+    githubToken: string,
+    repoFullName: string,
+    prNumber: number,
+    pullRequestId: number,
+    repoId: number,
+  ): Promise<void> {
     try {
       const github = new GitHubService(githubToken);
       const [owner, repo] = repoFullName.split("/");
@@ -16,12 +22,17 @@ export class PRImpactAnalysisService {
       // 1. Fetch Diffs and Changed Files
       const files = await github.getPullRequestFiles(owner, repo, prNumber);
       if (!files || files.length === 0) return;
-      
+
       const changedFilePaths = files.map((f: any) => f.filename);
-      const diffBlocks = files.map((f: any) => `File: ${f.filename}\nPatch:\n${f.patch || 'N/A'}`).join("\n\n");
+      const diffBlocks = files
+        .map((f: any) => `File: ${f.filename}\nPatch:\n${f.patch || "N/A"}`)
+        .join("\n\n");
 
       // 2. Fetch Dependency Graph Impacts
-      const impact = await DependencyGraphAnalyzer.analyzeImpact(repoFullName, changedFilePaths);
+      const impact = await DependencyGraphAnalyzer.analyzeImpact(
+        repoFullName,
+        changedFilePaths,
+      );
 
       // 3. Fetch Architecture Knowledge (Issue #1571 Integration)
       let architecturePrinciples: string[] = [];
@@ -30,12 +41,16 @@ export class PRImpactAnalysisService {
         if (knowledge && knowledge.architecturePrinciples) {
           const ap = knowledge.architecturePrinciples;
           if (Array.isArray(ap)) {
-            architecturePrinciples = ap.filter((x): x is string => typeof x === "string");
+            architecturePrinciples = ap.filter(
+              (x): x is string => typeof x === "string",
+            );
           } else if (typeof ap === "string") {
             try {
               const parsed = JSON.parse(ap);
               if (Array.isArray(parsed)) {
-                architecturePrinciples = parsed.filter((x): x is string => typeof x === "string");
+                architecturePrinciples = parsed.filter(
+                  (x): x is string => typeof x === "string",
+                );
               }
             } catch {
               // ignore
@@ -43,18 +58,28 @@ export class PRImpactAnalysisService {
           }
         }
       } catch (e) {
-        console.warn("Failed to fetch repository knowledge for impact analysis:", e);
+        console.warn(
+          "Failed to fetch repository knowledge for impact analysis:",
+          e,
+        );
       }
 
       // 4. Construct AI Prompt
       const gemini = getGeminiService();
       const safeChangedFiles = sanitizeTextContent(changedFilePaths.join("\n"));
-      const safeDownstream = sanitizeTextContent(impact.affectedFiles.join("\n"));
-      const safePrinciples = architecturePrinciples.length > 0
-        ? sanitizeTextContent(architecturePrinciples.map(p => `- ${p}`).join("\n"))
-        : "None provided.";
+      const safeDownstream = sanitizeTextContent(
+        impact.affectedFiles.join("\n"),
+      );
+      const safePrinciples =
+        architecturePrinciples.length > 0
+          ? sanitizeTextContent(
+              architecturePrinciples.map((p) => `- ${p}`).join("\n"),
+            )
+          : "None provided.";
       const safeDiff = sanitizeTextContent(diffBlocks.substring(0, 20000));
-      const safeDependencyPaths = sanitizeTextContent(JSON.stringify(impact.dependencyPaths, null, 2));
+      const safeDependencyPaths = sanitizeTextContent(
+        JSON.stringify(impact.dependencyPaths, null, 2),
+      );
 
       const prompt = `You are a strict architectural and dependency analysis expert. Analyze the following Pull Request changes and identify the impact, structural drift, and risks.
 
@@ -99,7 +124,7 @@ Do not include any Markdown formatting like \`\`\`json. Return ONLY valid JSON.
         driftWarnings: [],
         dependencyRisks: [],
         recommendations: [],
-        mermaidGraph: ""
+        mermaidGraph: "",
       };
 
       try {
@@ -110,7 +135,11 @@ Do not include any Markdown formatting like \`\`\`json. Return ONLY valid JSON.
       }
 
       // 5. Calculate Risk Score
-      const riskResult = RiskScorer.calculateRisk(changedFilePaths, impact, parsedAI.driftWarnings);
+      const riskResult = RiskScorer.calculateRisk(
+        changedFilePaths,
+        impact,
+        parsedAI.driftWarnings,
+      );
 
       // 6. Store in Database
       // We must get the headSha to uniquely identify the PR state. We can fetch it via API or just use a placeholder if not passed.
@@ -123,7 +152,7 @@ Do not include any Markdown formatting like \`\`\`json. Return ONLY valid JSON.
           riskScore: riskResult.score,
           impactSummary: parsedAI.impactSummary,
           aiMetrics: parsedAI,
-          breakingChanges: parsedAI.driftWarnings.length > 0
+          breakingChanges: parsedAI.driftWarnings.length > 0,
         },
         create: {
           pullRequestId,
@@ -131,21 +160,25 @@ Do not include any Markdown formatting like \`\`\`json. Return ONLY valid JSON.
           riskScore: riskResult.score,
           impactSummary: parsedAI.impactSummary,
           aiMetrics: parsedAI,
-          breakingChanges: parsedAI.driftWarnings.length > 0
-        }
+          breakingChanges: parsedAI.driftWarnings.length > 0,
+        },
       });
 
       // 7. Post GitHub Comment
-      await GithubImpactReporter.postImpactReport(githubToken, repoFullName, prNumber, {
-        riskScore: riskResult.level,
-        impactSummary: parsedAI.impactSummary,
-        affectedModules: parsedAI.affectedModules,
-        driftWarnings: parsedAI.driftWarnings,
-        dependencyRisks: parsedAI.dependencyRisks,
-        recommendations: parsedAI.recommendations,
-        mermaidGraph: parsedAI.mermaidGraph
-      });
-
+      await GithubImpactReporter.postImpactReport(
+        githubToken,
+        repoFullName,
+        prNumber,
+        {
+          riskScore: riskResult.level,
+          impactSummary: parsedAI.impactSummary,
+          affectedModules: parsedAI.affectedModules,
+          driftWarnings: parsedAI.driftWarnings,
+          dependencyRisks: parsedAI.dependencyRisks,
+          recommendations: parsedAI.recommendations,
+          mermaidGraph: parsedAI.mermaidGraph,
+        },
+      );
     } catch (e) {
       console.error("PRImpactAnalysisService failed:", e);
     }

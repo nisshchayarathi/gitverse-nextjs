@@ -106,10 +106,7 @@ export async function recoverStuckEvents(): Promise<{
   const failedEvents = await prisma.webhookEvent.findMany({
     where: {
       status: "failed",
-      OR: [
-        { nextRetryAt: null },
-        { nextRetryAt: { lte: now } },
-      ],
+      OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }],
     },
     orderBy: { createdAt: "asc" },
     take: 10,
@@ -122,7 +119,7 @@ export async function recoverStuckEvents(): Promise<{
     if (currentRetryCount >= maxRetries) {
       await prisma.webhookEvent.update({
         where: { id: event.id },
-        data: { status: "dlq" }
+        data: { status: "dlq" },
       });
       skipped++;
       continue;

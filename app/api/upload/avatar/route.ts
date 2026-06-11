@@ -10,7 +10,11 @@ import {
   validateImageContent,
 } from "@/lib/services/imageService";
 import { storeAvatar, parseDataUrl } from "@/lib/services/storageService";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 /**
  * POST /api/upload/avatar
@@ -28,7 +32,10 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware
 export const POST = withErrorHandler(async (request: NextRequest) => {
   const user = await requireAuth(request);
 
-  const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.AVATAR_UPLOAD);
+  const rl = await checkRateLimit(
+    String(user.userId),
+    RATE_LIMITS.AVATAR_UPLOAD,
+  );
   if (!rl.allowed) return rateLimitResponse(rl);
 
   const contentType = request.headers.get("content-type") || "";
@@ -42,7 +49,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     if (!file) {
       return NextResponse.json(
         { error: true, message: "No file provided", code: 400 },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -50,7 +57,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     if (!validation.valid) {
       return NextResponse.json(
         { error: true, message: validation.error, code: 400 },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -60,7 +67,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
     logger.info(
       { userId: user.userId, mimeType: file.type, size: file.size },
-      "Avatar uploaded via file"
+      "Avatar uploaded via file",
     );
   } else if (contentType.includes("application/json")) {
     const body = await request.json();
@@ -71,7 +78,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       if (!validation.valid) {
         return NextResponse.json(
           { error: true, message: validation.error, code: 400 },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -79,7 +86,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       if (!parsed) {
         return NextResponse.json(
           { error: true, message: "Failed to parse data URL", code: 400 },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -100,7 +107,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       if (!validation.valid) {
         return NextResponse.json(
           { error: true, message: validation.error, code: 400 },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -126,24 +133,25 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           message: "Either 'dataUrl' or 'url' must be provided",
           code: 400,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
   } else {
     return NextResponse.json(
       {
         error: true,
-        message: "Unsupported content type. Use multipart/form-data or application/json",
+        message:
+          "Unsupported content type. Use multipart/form-data or application/json",
         code: 415,
       },
-      { status: 415 }
+      { status: 415 },
     );
   }
 
   if (!avatarUrl) {
     return NextResponse.json(
       { error: true, message: "Failed to process avatar", code: 500 },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -153,6 +161,6 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       avatarUrl,
       message: "Avatar uploaded successfully",
     },
-    { status: 200 }
+    { status: 200 },
   );
 });

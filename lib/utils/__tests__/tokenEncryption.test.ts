@@ -2,9 +2,11 @@
  * @jest-environment node
  */
 
-const VALID_HEX_KEY = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+const VALID_HEX_KEY =
+  "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 const SHORT_KEY = "0001020304050607";
-const INVALID_HEX_KEY = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
+const INVALID_HEX_KEY =
+  "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
 
 const ORIGINAL_KEY = process.env.TOKEN_ENCRYPTION_KEY;
 
@@ -163,7 +165,9 @@ describe("tokenEncryption", () => {
 
     it("throws when key is not set", () => {
       delete process.env.TOKEN_ENCRYPTION_KEY;
-      expect(() => mod.decryptToken("dGVzdA==")).toThrow("TOKEN_ENCRYPTION_KEY");
+      expect(() => mod.decryptToken("dGVzdA==")).toThrow(
+        "TOKEN_ENCRYPTION_KEY",
+      );
     });
 
     it("throws when ciphertext auth tag is corrupted", () => {
@@ -221,7 +225,8 @@ describe("tokenEncryption", () => {
       process.env.TOKEN_ENCRYPTION_KEY = VALID_HEX_KEY;
       const encrypted = mod.encryptToken("secret-token");
 
-      process.env.TOKEN_ENCRYPTION_KEY = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+      process.env.TOKEN_ENCRYPTION_KEY =
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
       expect(() => mod.decryptToken(encrypted)).toThrow();
     });
   });

@@ -68,13 +68,7 @@ async function runTests() {
   console.log("Running validation tests...\n");
 
   // Test 1: Suggest commit without any data
-  await runTest(
-    "/api/ai/suggest-commit",
-    "POST",
-    {},
-    400,
-    "test-token",
-  );
+  await runTest("/api/ai/suggest-commit", "POST", {}, 400, "test-token");
 
   // Test 2: Suggest commit with empty arrays
   await runTest(
@@ -152,13 +146,7 @@ async function runTests() {
   );
 
   // Test 11: Invalid repository ID
-  await runTest(
-    "/api/repositories/abc",
-    "GET",
-    null,
-    400,
-    "test-token",
-  );
+  await runTest("/api/repositories/abc", "GET", null, 400, "test-token");
 
   // Test 12: Chat without repositoryId
   await runTest(
@@ -170,13 +158,7 @@ async function runTests() {
   );
 
   // Test 13: Chat without question
-  await runTest(
-    "/api/ai/chat",
-    "POST",
-    { repositoryId: 1 },
-    400,
-    "test-token",
-  );
+  await runTest("/api/ai/chat", "POST", { repositoryId: 1 }, 400, "test-token");
 
   // Test 14: Analyze repository without repositoryId
   await runTest(

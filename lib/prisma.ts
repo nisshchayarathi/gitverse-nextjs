@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { Pool as PgPool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaNeonHttp, PrismaNeon } from "@prisma/adapter-neon";
-import { Pool as NeonPool, neonConfig } from "@neondatabase/serverless";
+import { Pool as NeonPool } from "@neondatabase/serverless";
 import ws from "ws";
 
 neonConfig.webSocketConstructor = ws;
@@ -25,6 +25,9 @@ function getAdapterChoice(connectionString: string): PrismaAdapterChoice {
   const isNeonHost =
     host.endsWith(".neon.tech") || connectionString.includes("neon.tech");
 
+  // Default to neon-ws for Neon hosts: WebSocket pooling supports transactions.
+  // Requires experimental.serverComponentsExternalPackages in next.config.js to
+  // prevent webpack from bundling ws/neon packages (which breaks the WS constructor).
   if (isNeonHost) return "neon-ws";
   return "pg";
 }
@@ -123,6 +126,7 @@ function withRetry(client: PrismaClient) {
 
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL;
+  console.log(connectionString);
 
   if (!connectionString) {
     throw new Error("DATABASE_URL is required");
@@ -199,7 +203,7 @@ export function getPrisma(): ExtendedPrismaClient {
   return globalThis.prismaGlobal;
 }
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   // Ensure the variable is declared so that the getter can use it
   if (!globalThis.prismaGlobal) {
     try {
@@ -254,9 +258,9 @@ let disconnectInProgress = false;
 
 const defaultDisconnectTimeoutMs = 10_000;
 
-export async function disconnectPrisma(
-  options?: { timeoutMs?: number }
-): Promise<void> {
+export async function disconnectPrisma(options?: {
+  timeoutMs?: number;
+}): Promise<void> {
   if (disconnectInProgress) return;
   disconnectInProgress = true;
 
@@ -266,18 +270,22 @@ export async function disconnectPrisma(
     try {
       const timeoutMs = options?.timeoutMs ?? defaultDisconnectTimeoutMs;
       const disconnect = client.$disconnect();
-      const timer = timeoutMs > 0
-        ? new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("disconnect timed out")), timeoutMs)
-          )
-        : null;
+      const timer =
+        timeoutMs > 0
+          ? new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error("disconnect timed out")),
+                timeoutMs,
+              ),
+            )
+          : null;
       await (timer ? Promise.race([disconnect, timer]) : disconnect);
     } catch (err: any) {
       const isTimeout = err?.message === "disconnect timed out";
       console.warn(
         isTimeout
           ? "[Prisma] disconnect timed out — forcing cleanup"
-          : `[Prisma] disconnect error: ${err?.message ?? err}`
+          : `[Prisma] disconnect error: ${err?.message ?? err}`,
       );
     }
   }

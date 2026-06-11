@@ -11,7 +11,9 @@ interface InsightCardProps {
 
 export function InsightCard({ insight, className = "" }: InsightCardProps) {
   return (
-    <Card className={`glass border border-border/70 transition-all duration-300 hover:shadow-md ${className}`}>
+    <Card
+      className={`glass border border-border/70 transition-all duration-300 hover:shadow-md ${className}`}
+    >
       <CardContent className="pt-6">
         <div className="space-y-3">
           {/* Header with icon and badge */}

@@ -42,7 +42,7 @@ describe("DeploymentAnalysisService", () => {
         123,
         "owner",
         "repo",
-        "2024-01-16T00:00:00Z"
+        "2024-01-16T00:00:00Z",
       );
 
       expect(result).toContain("PR #123");
@@ -61,7 +61,7 @@ describe("DeploymentAnalysisService", () => {
         123,
         "owner",
         "repo",
-        "2024-01-16T00:00:00Z"
+        "2024-01-16T00:00:00Z",
       );
 
       expect(result).toBe("No recently merged PRs found before the incident.");
@@ -70,18 +70,18 @@ describe("DeploymentAnalysisService", () => {
     it("should handle errors gracefully", async () => {
       const { githubService } = require("../githubService");
       (githubService.client.get as jest.Mock).mockRejectedValueOnce(
-        new Error("API Error")
+        new Error("API Error"),
       );
 
       const result = await service.getRecentDeploymentContext(
         123,
         "owner",
         "repo",
-        "2024-01-16T00:00:00Z"
+        "2024-01-16T00:00:00Z",
       );
 
       expect(result).toBe(
-        "Unable to retrieve recent deployment context due to an error."
+        "Unable to retrieve recent deployment context due to an error.",
       );
     });
 
@@ -110,7 +110,7 @@ describe("DeploymentAnalysisService", () => {
         123,
         "owner",
         "repo",
-        "2024-01-16T00:00:00Z"
+        "2024-01-16T00:00:00Z",
       );
 
       expect(result).toContain("PR #123");
@@ -136,7 +136,7 @@ describe("DeploymentAnalysisService", () => {
         123,
         "owner",
         "repo",
-        new Date(Date.now() + 86400000).toISOString()
+        new Date(Date.now() + 86400000).toISOString(),
       );
 
       const prCount = (result.match(/PR #/g) || []).length;

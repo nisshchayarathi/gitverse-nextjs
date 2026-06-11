@@ -36,12 +36,17 @@ const acquiredJobIds: string[] = [];
 
 const releaseAllLocks = async () => {
   if (acquiredJobIds.length === 0) return;
-  console.log(`[CronWorker] Releasing ${acquiredJobIds.length} lock(s) before exit`);
+  console.log(
+    `[CronWorker] Releasing ${acquiredJobIds.length} lock(s) before exit`,
+  );
   for (const jobId of acquiredJobIds) {
     try {
       await analysisJobService.releaseLock({ jobId, workerId: WORKER_ID });
     } catch (err) {
-      console.error(`[CronWorker] Failed to release lock for job ${jobId}:`, err);
+      console.error(
+        `[CronWorker] Failed to release lock for job ${jobId}:`,
+        err,
+      );
     }
   }
   acquiredJobIds.length = 0;
@@ -78,8 +83,13 @@ const processJob = async (jobId: string): Promise<boolean> => {
       return false;
     }
 
-    if (dbJob.type !== "repository_analysis" && dbJob.type !== "architecture_generation") {
-      console.warn(`[CronWorker] Unsupported job type for ${jobId}: ${dbJob.type}`);
+    if (
+      dbJob.type !== "repository_analysis" &&
+      dbJob.type !== "architecture_generation"
+    ) {
+      console.warn(
+        `[CronWorker] Unsupported job type for ${jobId}: ${dbJob.type}`,
+      );
       await analysisJobService.markFailed({
         jobId,
         workerId: WORKER_ID,
@@ -94,9 +104,13 @@ const processJob = async (jobId: string): Promise<boolean> => {
 
     if (dbJob.type === "repository_analysis") {
       const details = dbJob.progressDetails as any;
-      await repositoryService.analyzeRepository(dbJob.repositoryId, dbJob.userId, {
-        scope: details?.scope,
-      });
+      await repositoryService.analyzeRepository(
+        dbJob.repositoryId,
+        dbJob.userId,
+        {
+          scope: details?.scope,
+        },
+      );
     }
 
     await analysisJobService.markDone({ jobId, workerId: WORKER_ID });
@@ -111,11 +125,16 @@ const processJob = async (jobId: string): Promise<boolean> => {
         jobId,
         workerId: WORKER_ID,
         error: message,
-        attempts: (await analysisJobService.getJob({ jobId, userId: 0 }))?.attempts ?? 0,
+        attempts:
+          (await analysisJobService.getJob({ jobId, userId: 0 }))?.attempts ??
+          0,
         maxAttempts: 3,
       });
     } catch (markErr) {
-      console.error(`[CronWorker] Failed to mark job ${jobId} as failed:`, markErr);
+      console.error(
+        `[CronWorker] Failed to mark job ${jobId} as failed:`,
+        markErr,
+      );
     }
     return false;
   }
@@ -124,7 +143,9 @@ const processJob = async (jobId: string): Promise<boolean> => {
 const runOnce = async (): Promise<number> => {
   const healthy = await checkDatabaseConnectivity();
   if (!healthy) {
-    throw new Error("Database connectivity check failed — aborting cron worker run");
+    throw new Error(
+      "Database connectivity check failed — aborting cron worker run",
+    );
   }
 
   const reclaimed = await analysisJobService.reclaimOrphanedJobs();
@@ -137,7 +158,9 @@ const runOnce = async (): Promise<number> => {
 
   for (let i = 0; i < BATCH_LIMIT; i++) {
     if (Date.now() >= deadline) {
-      console.log(`[CronWorker] Timeout approaching, stopping after ${processed} job(s)`);
+      console.log(
+        `[CronWorker] Timeout approaching, stopping after ${processed} job(s)`,
+      );
       break;
     }
 

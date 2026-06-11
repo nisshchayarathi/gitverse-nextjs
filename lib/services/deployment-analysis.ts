@@ -9,7 +9,7 @@ export class DeploymentAnalysisService {
     installationId: number,
     owner: string,
     repo: string,
-    incidentTimestamp: string
+    incidentTimestamp: string,
   ): Promise<string> {
     try {
       // Ideally, we'd fetch PRs merged just before the incidentTimestamp
@@ -18,13 +18,21 @@ export class DeploymentAnalysisService {
       const client = (githubService as any).client;
 
       const incidentDate = new Date(incidentTimestamp);
-      
-      const { data: pullRequests } = await client.get(`/repos/${owner}/${repo}/pulls`, {
-        params: { state: "closed", sort: "updated", direction: "desc", per_page: 20 }
-      });
+
+      const { data: pullRequests } = await client.get(
+        `/repos/${owner}/${repo}/pulls`,
+        {
+          params: {
+            state: "closed",
+            sort: "updated",
+            direction: "desc",
+            per_page: 20,
+          },
+        },
+      );
 
       const mergedPrs = pullRequests.filter(
-        (pr: any) => pr.merged_at && new Date(pr.merged_at) <= incidentDate
+        (pr: any) => pr.merged_at && new Date(pr.merged_at) <= incidentDate,
       );
 
       const contextLines = mergedPrs.slice(0, 5).map((pr: any) => {
@@ -37,7 +45,10 @@ export class DeploymentAnalysisService {
 
       return contextLines.join("\n");
     } catch (error) {
-      console.error("[DeploymentAnalysis] Error fetching deployment context:", error);
+      console.error(
+        "[DeploymentAnalysis] Error fetching deployment context:",
+        error,
+      );
       return "Unable to retrieve recent deployment context due to an error.";
     }
   }

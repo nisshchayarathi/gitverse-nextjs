@@ -275,7 +275,9 @@ describe("internalAuth utilities", () => {
 
       const result = validateRequiredAnalysisSecrets();
       expect(result.errors.length).toBe(0);
-      expect(result.warnings.filter((w) => w.includes("differ")).length).toBe(0);
+      expect(result.warnings.filter((w) => w.includes("differ")).length).toBe(
+        0,
+      );
     });
   });
 
@@ -297,8 +299,10 @@ describe("internalAuth utilities", () => {
       const warnings = validateSecretIsolation();
       expect(warnings).toEqual(
         expect.arrayContaining([
-          expect.stringContaining("INTERNAL_WORKER_SECRET should differ from GITHUB_WEBHOOK_SECRET"),
-        ])
+          expect.stringContaining(
+            "INTERNAL_WORKER_SECRET should differ from GITHUB_WEBHOOK_SECRET",
+          ),
+        ]),
       );
     });
 
@@ -309,8 +313,10 @@ describe("internalAuth utilities", () => {
       const warnings = validateSecretIsolation();
       expect(warnings).toEqual(
         expect.arrayContaining([
-          expect.stringContaining("INTERNAL_WORKER_SECRET should differ from JWT_SECRET"),
-        ])
+          expect.stringContaining(
+            "INTERNAL_WORKER_SECRET should differ from JWT_SECRET",
+          ),
+        ]),
       );
     });
 
@@ -321,8 +327,10 @@ describe("internalAuth utilities", () => {
       const warnings = validateSecretIsolation();
       expect(warnings).toEqual(
         expect.arrayContaining([
-          expect.stringContaining("ANALYSIS_RUNNER_SECRET should differ from INTERNAL_WORKER_SECRET"),
-        ])
+          expect.stringContaining(
+            "ANALYSIS_RUNNER_SECRET should differ from INTERNAL_WORKER_SECRET",
+          ),
+        ]),
       );
     });
 
@@ -333,8 +341,10 @@ describe("internalAuth utilities", () => {
       const warnings = validateSecretIsolation();
       expect(warnings).toEqual(
         expect.arrayContaining([
-          expect.stringContaining("ANALYSIS_RUNNER_SECRET should differ from CRON_SECRET"),
-        ])
+          expect.stringContaining(
+            "ANALYSIS_RUNNER_SECRET should differ from CRON_SECRET",
+          ),
+        ]),
       );
     });
 
@@ -345,8 +355,10 @@ describe("internalAuth utilities", () => {
       const warnings = validateSecretIsolation();
       expect(warnings).toEqual(
         expect.arrayContaining([
-          expect.stringContaining("ANALYSIS_RUNNER_SECRET should differ from JWT_SECRET"),
-        ])
+          expect.stringContaining(
+            "ANALYSIS_RUNNER_SECRET should differ from JWT_SECRET",
+          ),
+        ]),
       );
     });
   });

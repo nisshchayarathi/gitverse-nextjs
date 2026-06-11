@@ -4,7 +4,14 @@ import { PRReviewResponse } from "../prReviewService";
 
 describe("Chunked Review Engine", () => {
   it("processes a small PR normally", async () => {
-    const files = Array(10).fill({ filename: "test.ts", changes: 10, additions: 10, deletions: 0, patch: "...", status: "modified" });
+    const files = Array(10).fill({
+      filename: "test.ts",
+      changes: 10,
+      additions: 10,
+      deletions: 0,
+      patch: "...",
+      status: "modified",
+    });
     const estimator = new TimeoutEstimatorService();
 
     let chunksProcessed = 0;
@@ -13,8 +20,18 @@ describe("Chunked Review Engine", () => {
       return {
         summary: `Chunk ${index}`,
         overallScore: 80,
-        issues: [{ title: "Issue 1", severity: "low", category: "style", file: "test.ts", line: 1, explanation: "Exp", suggestion: "Sug" }],
-        praise: ["Good code"]
+        issues: [
+          {
+            title: "Issue 1",
+            severity: "low",
+            category: "style",
+            file: "test.ts",
+            line: 1,
+            explanation: "Exp",
+            suggestion: "Sug",
+          },
+        ],
+        praise: ["Good code"],
       } as PRReviewResponse;
     };
 
@@ -23,10 +40,10 @@ describe("Chunked Review Engine", () => {
       timeoutEstimator: estimator,
       chunkSize: 50,
       processChunk,
-      mode: 'Standard'
+      mode: "Standard",
     });
 
-    expect(result.status).toBe('Completed');
+    expect(result.status).toBe("Completed");
     expect(result.reviewedFileCount).toBe(10);
     expect(chunksProcessed).toBe(1);
     expect(review?.overallScore).toBe(80);
@@ -34,7 +51,14 @@ describe("Chunked Review Engine", () => {
   });
 
   it("chunks a large PR correctly", async () => {
-    const files = Array(200).fill({ filename: "test.ts", changes: 10, additions: 10, deletions: 0, patch: "...", status: "modified" });
+    const files = Array(200).fill({
+      filename: "test.ts",
+      changes: 10,
+      additions: 10,
+      deletions: 0,
+      patch: "...",
+      status: "modified",
+    });
     const estimator = new TimeoutEstimatorService();
 
     let chunksProcessed = 0;
@@ -44,7 +68,7 @@ describe("Chunked Review Engine", () => {
         summary: `Chunk ${index}`,
         overallScore: 90,
         issues: [],
-        praise: []
+        praise: [],
       } as PRReviewResponse;
     };
 
@@ -53,10 +77,10 @@ describe("Chunked Review Engine", () => {
       timeoutEstimator: estimator,
       chunkSize: 50,
       processChunk,
-      mode: 'Chunked'
+      mode: "Chunked",
     });
 
-    expect(result.status).toBe('Completed');
+    expect(result.status).toBe("Completed");
     expect(result.reviewedFileCount).toBe(200);
     expect(chunksProcessed).toBe(4);
     expect(review?.overallScore).toBe(90);
@@ -65,9 +89,16 @@ describe("Chunked Review Engine", () => {
   });
 
   it("bails early when time limit is reached", async () => {
-    const files = Array(300).fill({ filename: "test.ts", changes: 10, additions: 10, deletions: 0, patch: "...", status: "modified" });
+    const files = Array(300).fill({
+      filename: "test.ts",
+      changes: 10,
+      additions: 10,
+      deletions: 0,
+      patch: "...",
+      status: "modified",
+    });
     const estimator = new TimeoutEstimatorService();
-    
+
     let checks = 0;
     estimator.isTimeExhausted = jest.fn().mockImplementation(() => {
       checks++;
@@ -81,7 +112,7 @@ describe("Chunked Review Engine", () => {
         summary: `Finished chunk ${index}`,
         overallScore: 70,
         issues: [],
-        praise: []
+        praise: [],
       } as PRReviewResponse;
     };
 
@@ -90,11 +121,11 @@ describe("Chunked Review Engine", () => {
       timeoutEstimator: estimator,
       chunkSize: 100,
       processChunk,
-      mode: 'Degraded'
+      mode: "Degraded",
     });
 
     expect(chunksProcessed).toBe(1);
-    expect(result.status).toBe('Partial');
+    expect(result.status).toBe("Partial");
     expect(result.reviewedFileCount).toBe(100);
     expect(review?.summary).toContain("[PARTIAL REVIEW]");
   });

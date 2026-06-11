@@ -20,10 +20,7 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
-function stableStringify(
-  value: unknown,
-  seen?: Set<unknown>,
-): string {
+function stableStringify(value: unknown, seen?: Set<unknown>): string {
   if (seen === undefined) {
     seen = new Set<unknown>();
   }
@@ -90,7 +87,8 @@ function stableStringify(
     seen.add(value);
     const keys = Object.keys(value).sort();
     const entries = keys.map(
-      (key) => `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key], seen)}`,
+      (key) =>
+        `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key], seen)}`,
     );
     return `{${entries.join(",")}}`;
   }

@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 
-export function apiError(
-  status: number,
-  message: string,
-  code?: string
-) {
+export function apiError(status: number, message: string, code?: string) {
   return NextResponse.json(
     {
       error: {
@@ -12,6 +8,6 @@ export function apiError(
         ...(code && { code }),
       },
     },
-    { status }
+    { status },
   );
 }

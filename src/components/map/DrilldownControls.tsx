@@ -1,4 +1,4 @@
-import { ArrowLeft, Target, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Target, RefreshCw } from "lucide-react";
 
 interface DrilldownControlsProps {
   canGoBack: boolean;
@@ -8,7 +8,13 @@ interface DrilldownControlsProps {
   onResetGraph: () => void;
 }
 
-export function DrilldownControls({ canGoBack, onGoBack, onClearFocus, focusNode, onResetGraph }: DrilldownControlsProps) {
+export function DrilldownControls({
+  canGoBack,
+  onGoBack,
+  onClearFocus,
+  focusNode,
+  onResetGraph,
+}: DrilldownControlsProps) {
   return (
     <div className="absolute top-4 left-4 z-10 flex gap-2">
       {canGoBack && (
@@ -19,12 +25,18 @@ export function DrilldownControls({ canGoBack, onGoBack, onClearFocus, focusNode
           <ArrowLeft size={16} /> Back
         </button>
       )}
-      
+
       {focusNode && (
         <div className="bg-indigo-900/40 border border-indigo-500/50 text-indigo-200 px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm backdrop-blur-sm">
           <Target size={16} className="text-indigo-400" />
-          Focus: <span className="font-mono text-xs">{focusNode.replace(/^(folder|file)-/, '')}</span>
-          <button onClick={onClearFocus} className="ml-2 text-indigo-400 hover:text-indigo-200">
+          Focus:{" "}
+          <span className="font-mono text-xs">
+            {focusNode.replace(/^(folder|file)-/, "")}
+          </span>
+          <button
+            onClick={onClearFocus}
+            className="ml-2 text-indigo-400 hover:text-indigo-200"
+          >
             &times;
           </button>
         </div>

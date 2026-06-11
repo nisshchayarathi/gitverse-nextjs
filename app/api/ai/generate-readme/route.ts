@@ -11,7 +11,11 @@ import {
 import { checkAiRateLimit, logAiRequest } from "@/lib/utils/ipRateLimit";
 import { getClientIp } from "@/lib/services/rateLimitService";
 import { sanitizeTextContent } from "@/lib/utils/promptSanitization";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "@/lib/middleware/rateLimit";
 
 const GENERATE_README_RATE_LIMIT = 5;
 const GENERATE_README_WINDOW_MS = 60_000;
@@ -22,7 +26,10 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
 
-    const globalRl = await checkRateLimit(String(user.userId), RATE_LIMITS.AI_GLOBAL);
+    const globalRl = await checkRateLimit(
+      String(user.userId),
+      RATE_LIMITS.AI_GLOBAL,
+    );
     if (!globalRl.allowed) return rateLimitResponse(globalRl);
 
     const contentTypeError = validateContentType(request);
@@ -137,11 +144,17 @@ export async function POST(request: NextRequest) {
       .join(", ");
 
     const safeName = sanitizeTextContent(repository.name);
-    const safeDescription = sanitizeTextContent(repository.description || "No description provided.");
+    const safeDescription = sanitizeTextContent(
+      repository.description || "No description provided.",
+    );
     const safeLanguages = sanitizeTextContent(languagesStr || "Unknown");
     const safeBranch = sanitizeTextContent(repository.defaultBranch || "main");
-    const safeManifestFile = manifestFile ? sanitizeTextContent(manifestFile) : "";
-    const safeManifestContent = manifestContent ? sanitizeTextContent(manifestContent) : "";
+    const safeManifestFile = manifestFile
+      ? sanitizeTextContent(manifestFile)
+      : "";
+    const safeManifestContent = manifestContent
+      ? sanitizeTextContent(manifestContent)
+      : "";
     const safeFileTree = sanitizeTextContent(fileTree);
 
     const prompt = `

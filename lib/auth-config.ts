@@ -409,11 +409,38 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
         });
 
+<<<<<<< HEAD
+        if (!user) {
+          throw new Error("Invalid email or password");
+        }
+
+        // Security: never allow password login for OAuth-only accounts.
+        // An OAuth-only account has no local passwordHash, but does have a linked provider account.
+        if (!user.passwordHash) {
+          const hasOAuthAccount =
+            (await prisma.account.count({
+              where: { userId: user.id },
+            })) > 0;
+
+          if (hasOAuthAccount) {
+            throw new Error(
+              "Email already exists. Please sign in with your linked social account.",
+            );
+          }
+
+          throw new Error("Invalid email or password");
+        }
+
+        const isValidPassword = await bcrypt.compare(
+          credentials.password,
+          user.passwordHash,
+=======
         // To prevent timing attacks, always run bcrypt.compare with a dummy hash if user/hash is missing.
         const passwordHashToCompare = user?.passwordHash || DUMMY_BCRYPT_HASH;
         const isValidPassword = await bcrypt.compare(
           credentials.password,
           passwordHashToCompare,
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
         );
 
         if (!user || !user.passwordHash || !isValidPassword) {

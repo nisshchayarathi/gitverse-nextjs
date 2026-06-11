@@ -264,7 +264,9 @@ export default function Login() {
                 Email
               </label>
               <div className="relative">
-                <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${emailError ? "text-red-500" : "text-muted-foreground"}`} />
+                <Mail
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${emailError ? "text-red-500" : "text-muted-foreground"}`}
+                />
                 <Input
                   id="email"
                   type="email"
@@ -279,7 +281,9 @@ export default function Login() {
                   aria-invalid={!!emailError}
                 />
               </div>
-              {emailError && <p className="text-sm text-red-500 mt-1">{emailError}</p>}
+              {emailError && (
+                <p className="text-sm text-red-500 mt-1">{emailError}</p>
+              )}
             </div>
 
             <div
@@ -290,7 +294,9 @@ export default function Login() {
                 Password
               </label>
               <div className="relative">
-                <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${passwordError ? "text-red-500" : "text-muted-foreground"}`} />
+                <Lock
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${passwordError ? "text-red-500" : "text-muted-foreground"}`}
+                />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -317,7 +323,9 @@ export default function Login() {
                   )}
                 </button>
               </div>
-              {passwordError && <p className="text-sm text-red-500 mt-1">{passwordError}</p>}
+              {passwordError && (
+                <p className="text-sm text-red-500 mt-1">{passwordError}</p>
+              )}
             </div>
 
             <div

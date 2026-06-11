@@ -17,10 +17,10 @@ if (!global.AbortSignal.timeout) {
  * ====================================================================================
  * SECURITY INTEGRATION & ROBUSTNESS TEST SUITE: FILE CONTENT PREVIEW SECURITY BOUNDS
  * ====================================================================================
- * 
+ *
  * This test suite guarantees the robustness and operational safety of the repository
  * file content preview API endpoint (`app/api/repositories/[id]/files/content/route.ts`).
- * 
+ *
  * Secure Software Development Lifecycle (SSDLC) Objectives:
  * 1. Path Traversal Mitigation: Ensure that double dot sequences (`..`), absolute paths (`/`),
  *    and other traversal payloads are strictly blocked before resolution to prevent arbitrary
@@ -76,7 +76,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
 
   describe("Standard Operational Scenarios", () => {
     it("Scenario 1.1: successfully retrieves text file content under normal parameters", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -86,7 +88,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
     });
 
     it("Scenario 1.2: successfully retrieves files with complex multi-level folder paths", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/components/layout/Navbar/Navbar.tsx");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/components/layout/Navbar/Navbar.tsx",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -95,7 +99,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
     });
 
     it("Scenario 1.3: rejects requests lacking a repository ID parameter", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/NaN/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/NaN/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "NaN" } });
       const data = await response.json();
 
@@ -104,7 +110,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
     });
 
     it("Scenario 1.4: rejects requests missing the file path parameter", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -129,7 +137,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
 
     for (const payload of traversalAttackPayloads) {
       it(`Scenario 2.X: blocks path traversal attempt containing sequence "${payload}"`, async () => {
-        const request = new NextRequest(`http://localhost/api/repositories/1/files/content?path=${payload}`);
+        const request = new NextRequest(
+          `http://localhost/api/repositories/1/files/content?path=${payload}`,
+        );
         const response = await GET(request, { params: { id: "1" } });
         const data = await response.json();
 
@@ -139,7 +149,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
     }
 
     it("Scenario 2.Y: blocks absolute paths starting with '/' to prevent local file reads", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=/etc/passwd");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=/etc/passwd",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -148,7 +160,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
     });
 
     it("Scenario 2.Z: blocks paths containing null byte injection attempts", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js%00.png");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js%00.png",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -170,7 +184,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
 
     for (const sensitiveFile of sensitiveFiles) {
       it(`Scenario 3.X: denies access attempt to sensitive file format: "${sensitiveFile}"`, async () => {
-        const request = new NextRequest(`http://localhost/api/repositories/1/files/content?path=${sensitiveFile}`);
+        const request = new NextRequest(
+          `http://localhost/api/repositories/1/files/content?path=${sensitiveFile}`,
+        );
         const response = await GET(request, { params: { id: "1" } });
         const data = await response.json();
 
@@ -182,7 +198,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
 
   describe("File Format Integrity & Binary Prevention", () => {
     const testExtensionBlock = async (ext: string) => {
-      const request = new NextRequest(`http://localhost/api/repositories/1/files/content?path=assets/file.${ext}`);
+      const request = new NextRequest(
+        `http://localhost/api/repositories/1/files/content?path=assets/file.${ext}`,
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -335,7 +353,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
         text: jest.fn().mockResolvedValue("mocked content"),
       } as any);
 
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -352,7 +372,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
         text: jest.fn().mockResolvedValue("a".repeat(1024 * 1024 + 50)), // Exceeds 1MB
       } as any);
 
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -374,7 +396,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
         text: jest.fn().mockResolvedValue("a".repeat(1024 * 1024)),
       } as any);
 
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       expect(response.status).toBe(200);
     });
@@ -388,7 +412,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
         statusText: "Not Found",
       } as any);
 
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/missing.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/missing.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -403,7 +429,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
         statusText: "Service Unavailable",
       } as any);
 
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -413,10 +441,12 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
 
     it("Scenario 6.3: fails gracefully with a 500 when repository lookup logic crashes", async () => {
       (repositoryService.getRepository as jest.Mock).mockRejectedValue(
-        new Error("Repository lookup connection database deadlock")
+        new Error("Repository lookup connection database deadlock"),
       );
 
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -431,7 +461,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
         statusText: "Forbidden",
       } as any);
 
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -446,7 +478,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
         statusText: "Bad Gateway",
       } as any);
 
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -460,7 +494,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
       // User is authenticated but repository doesn't exist or doesn't belong to them
       (repositoryService.getRepository as jest.Mock).mockResolvedValue(null);
 
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -475,7 +511,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
         defaultBranch: "main",
       });
 
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -487,15 +525,17 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
   describe("Encoding Integrity & Path Segments Injection Safeguard", () => {
     it("Scenario 8.1: verifies path segments are individually url-encoded correctly", async () => {
       const fetchSpy = jest.spyOn(global, "fetch");
-      
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/folder name with spaces/index.js");
+
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/folder name with spaces/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       expect(response.status).toBe(200);
 
       // Verify that individual path segments are encoded correctly
       expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringContaining("src/folder%20name%20with%20spaces/index.js"),
-        expect.any(Object)
+        expect.any(Object),
       );
 
       fetchSpy.mockRestore();
@@ -503,7 +543,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
 
     it("Scenario 8.2: double encoding bypass verification", async () => {
       // Injected path segment with URL-encoded traversal characters (testing if we escape the escapes)
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/%2e%2e%2f%2e%2e%2f.env");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/%2e%2e%2f%2e%2e%2f.env",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -517,20 +559,26 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
 
   describe("Scenario 9: Edge Cases and Complex File Names Verification", () => {
     it("Scenario 9.1: blocks files with double dots in the middle of their name (e.g. file..name.txt)", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/file..name.txt");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/file..name.txt",
+      );
       const response = await GET(request, { params: { id: "1" } });
       expect(response.status).toBe(400);
     });
 
     it("Scenario 9.2: permits files with single dot paths that are valid (e.g. src/./index.js)", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/./index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/./index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
       expect(response.status).toBe(200);
     });
 
     it("Scenario 9.3: blocks long path names exceeding bounds safely", async () => {
       const longPathName = "a/".repeat(200) + "index.js";
-      const request = new NextRequest(`http://localhost/api/repositories/1/files/content?path=${longPathName}`);
+      const request = new NextRequest(
+        `http://localhost/api/repositories/1/files/content?path=${longPathName}`,
+      );
       const response = await GET(request, { params: { id: "1" } });
       expect(response.status).toBe(200);
     });
@@ -538,7 +586,9 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
 
   describe("Scenario 10: Whitelist Integrity & Allowed File Formats Verification", () => {
     const testAllowedExtension = async (ext: string) => {
-      const request = new NextRequest(`http://localhost/api/repositories/1/files/content?path=src/file.${ext}`);
+      const request = new NextRequest(
+        `http://localhost/api/repositories/1/files/content?path=src/file.${ext}`,
+      );
       const response = await GET(request, { params: { id: "1" } });
       expect(response.status).toBe(200);
     };
@@ -595,19 +645,25 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
 
   describe("Scenario 11: Extreme Path Sanitization Boundaries", () => {
     it("Scenario 11.1: processes paths with trailing special characters gracefully", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js?v=1");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js?v=1",
+      );
       const response = await GET(request, { params: { id: "1" } });
       expect(response.status).toBe(200);
     });
 
     it("Scenario 11.2: processes paths containing hash tags gracefully", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js#L20");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js#L20",
+      );
       const response = await GET(request, { params: { id: "1" } });
       expect(response.status).toBe(200);
     });
 
     it("Scenario 11.3: blocks path strings consisting only of spaces", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=   ");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=   ",
+      );
       const response = await GET(request, { params: { id: "1" } });
       expect(response.status).toBe(400);
     });
@@ -615,17 +671,23 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
 
   describe("Scenario 12: Detailed API Header & Payload Validation Checks", () => {
     it("Scenario 12.1: returns a validated JSON response with correct headers", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
-      
-      expect(response.headers.get("content-type")).toContain("application/json");
+
+      expect(response.headers.get("content-type")).toContain(
+        "application/json",
+      );
       const data = await response.json();
       expect(data).toHaveProperty("content");
       expect(data).toHaveProperty("path");
     });
 
     it("Scenario 12.2: returns 400 when empty path is supplied", async () => {
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=",
+      );
       const response = await GET(request, { params: { id: "1" } });
       const data = await response.json();
 
@@ -634,11 +696,15 @@ describe("GET /api/repositories/[id]/files/content - Security Bounds and Robustn
     });
 
     it("Scenario 12.3: fails with 500 when requireAuth rejects", async () => {
-      (requireAuth as jest.Mock).mockRejectedValue(new Error("Unauthorized access"));
+      (requireAuth as jest.Mock).mockRejectedValue(
+        new Error("Unauthorized access"),
+      );
 
-      const request = new NextRequest("http://localhost/api/repositories/1/files/content?path=src/index.js");
+      const request = new NextRequest(
+        "http://localhost/api/repositories/1/files/content?path=src/index.js",
+      );
       const response = await GET(request, { params: { id: "1" } });
-      
+
       expect(response.status).toBe(500);
       const data = await response.json();
       expect(data.error).toBe("Failed to fetch file content");

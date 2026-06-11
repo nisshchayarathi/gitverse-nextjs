@@ -9,7 +9,9 @@ describe("verifyIncidentWebhookSignature", () => {
   const rawBody = JSON.stringify({ id: "evt_123", status: "triggered" });
 
   function sign(body: string, key = secret) {
-    return "sha256=" + crypto.createHmac("sha256", key).update(body).digest("hex");
+    return (
+      "sha256=" + crypto.createHmac("sha256", key).update(body).digest("hex")
+    );
   }
 
   it("accepts a valid sha256 HMAC signature", () => {
@@ -18,7 +20,7 @@ describe("verifyIncidentWebhookSignature", () => {
         rawBody,
         signatureHeader: sign(rawBody),
         webhookSecret: secret,
-      })
+      }),
     ).toBe(true);
   });
 
@@ -28,7 +30,7 @@ describe("verifyIncidentWebhookSignature", () => {
         rawBody,
         signatureHeader: sign(rawBody),
         webhookSecret: undefined,
-      })
+      }),
     ).toBe(false);
 
     expect(
@@ -36,7 +38,7 @@ describe("verifyIncidentWebhookSignature", () => {
         rawBody,
         signatureHeader: null,
         webhookSecret: secret,
-      })
+      }),
     ).toBe(false);
 
     expect(
@@ -44,7 +46,7 @@ describe("verifyIncidentWebhookSignature", () => {
         rawBody: `${rawBody}\n`,
         signatureHeader: sign(rawBody),
         webhookSecret: secret,
-      })
+      }),
     ).toBe(false);
   });
 });
@@ -72,8 +74,8 @@ describe("parseIncidentTarget", () => {
           installationId: "1",
           owner: "../owner",
           repo: "repo",
-        })
-      )
+        }),
+      ),
     ).toBeNull();
   });
 });

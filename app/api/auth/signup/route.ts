@@ -93,6 +93,17 @@ export async function POST(request: NextRequest) {
         success: false,
       });
 
+<<<<<<< HEAD
+      if (txResult.error === "GOOGLE_ONLY") {
+        return NextResponse.json(
+          { error: "Email already exists. Please sign in with Google." },
+          { status: 409 },
+        );
+      }
+
+      return NextResponse.json(
+        { error: "User with this email already exists" },
+=======
       logger.info(
         { email: normalizedEmail, conflictType: txResult.error },
         "Signup attempt failed: Email already exists",
@@ -105,6 +116,7 @@ export async function POST(request: NextRequest) {
           message:
             "Unable to complete registration. Please verify your information and try again.",
         },
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
         { status: 409 },
       );
     }
@@ -142,12 +154,16 @@ export async function POST(request: NextRequest) {
         "Signup attempt failed: Database unique constraint violation (email already exists)",
       );
       return NextResponse.json(
+<<<<<<< HEAD
+        { error: "User with this email already exists" },
+=======
         {
           error:
             "Unable to complete registration. Please verify your information and try again.",
           message:
             "Unable to complete registration. Please verify your information and try again.",
         },
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
         { status: 409 },
       );
     }

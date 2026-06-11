@@ -1,24 +1,24 @@
-'use client'
+"use client";
 
-import React, { useEffect } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
-import { Loader2 } from 'lucide-react'
+import React, { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth()
-  const router = useRouter()
-  const pathname = usePathname()
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push(`/login?from=${encodeURIComponent(pathname || '/')}`)
+      router.push(`/login?from=${encodeURIComponent(pathname || "/")}`);
     }
-  }, [isLoading, isAuthenticated, router, pathname])
+  }, [isLoading, isAuthenticated, router, pathname]);
 
   if (isLoading) {
     return (
@@ -28,7 +28,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (!isAuthenticated) {
@@ -39,8 +39,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
           <p className="text-muted-foreground">Redirecting to login...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  return <>{children}</>
-}
+  return <>{children}</>;
+};

@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui";
 import { ChecklistItem } from "./ChecklistItem";
 
 const STORAGE_KEY = "gitverse-quickstart-checklist";
@@ -34,9 +40,8 @@ const CHECKLIST_ITEMS: Array<{
 ];
 
 export function QuickStartChecklist() {
-  const [checklistState, setChecklistState] = useState<QuickStartChecklistState>(
-    DEFAULT_CHECKLIST_STATE,
-  );
+  const [checklistState, setChecklistState] =
+    useState<QuickStartChecklistState>(DEFAULT_CHECKLIST_STATE);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -44,7 +49,9 @@ export function QuickStartChecklist() {
     try {
       const savedValue = window.localStorage.getItem(STORAGE_KEY);
       if (savedValue) {
-        const parsed = JSON.parse(savedValue) as Partial<QuickStartChecklistState>;
+        const parsed = JSON.parse(
+          savedValue,
+        ) as Partial<QuickStartChecklistState>;
         setChecklistState({ ...DEFAULT_CHECKLIST_STATE, ...parsed });
       }
     } catch {
@@ -58,7 +65,9 @@ export function QuickStartChecklist() {
   }, [checklistState]);
 
   const completedCount = Object.values(checklistState).filter(Boolean).length;
-  const progressPercent = Math.round((completedCount / CHECKLIST_ITEMS.length) * 100);
+  const progressPercent = Math.round(
+    (completedCount / CHECKLIST_ITEMS.length) * 100,
+  );
   const isComplete = completedCount === CHECKLIST_ITEMS.length;
 
   const handleToggle = (id: keyof QuickStartChecklistState) => {
@@ -73,9 +82,12 @@ export function QuickStartChecklist() {
       <CardHeader className="p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-base">🚀 Quick Start Checklist</CardTitle>
+            <CardTitle className="text-base">
+              🚀 Quick Start Checklist
+            </CardTitle>
             <CardDescription>
-              Track your progress while learning and contributing to this repository.
+              Track your progress while learning and contributing to this
+              repository.
             </CardDescription>
           </div>
           <div className="text-right">

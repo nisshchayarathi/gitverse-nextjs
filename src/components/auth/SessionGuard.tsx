@@ -11,10 +11,14 @@ const PROTECTED_ROUTES = [
   "/repo",
   "/analysis",
   "/analyze",
-  "/contribute"
+  "/contribute",
 ];
 
-export default function SessionGuard({ children }: { children: React.ReactNode }) {
+export default function SessionGuard({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
@@ -25,13 +29,13 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
     if (status === "loading") return;
 
     const isProtected = PROTECTED_ROUTES.some((route) =>
-      pathname?.startsWith(route)
+      pathname?.startsWith(route),
     );
 
     if (status === "unauthenticated" && isProtected) {
       if (!hasAlerted.current) {
         hasAlerted.current = true;
-        
+
         toast({
           title: "Session Expired",
           description: "Session expired. Please log in again.",
@@ -40,9 +44,11 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
 
         // Clear local JWT token if any exists
         localStorage.removeItem("gitverse_token");
-        
+
         // Redirect to login
-        router.push(`/login?from=${encodeURIComponent(pathname || "/dashboard")}`);
+        router.push(
+          `/login?from=${encodeURIComponent(pathname || "/dashboard")}`,
+        );
       }
     } else if (status === "authenticated") {
       hasAlerted.current = false;

@@ -255,6 +255,11 @@ describe("imageService", () => {
   });
 
   describe("validateHttpAvatarUrl", () => {
+<<<<<<< HEAD
+    it("accepts valid HTTPS URLs", () => {
+      const result = validateHttpAvatarUrl(
+        "https://example.com/avatars/user123.jpg",
+=======
     beforeEach(() => {
       (validateSafeUrl as jest.Mock).mockReset();
       (validateSafeUrl as jest.Mock).mockResolvedValue(true);
@@ -263,13 +268,20 @@ describe("imageService", () => {
     it("accepts valid HTTPS URLs", async () => {
       const result = await validateHttpAvatarUrl(
         "https://example.com/avatars/user123.jpg"
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
       );
       expect(result.valid).toBe(true);
     });
 
+<<<<<<< HEAD
+    it("accepts valid HTTP URLs", () => {
+      const result = validateHttpAvatarUrl(
+        "http://example.com/avatars/user123.jpg",
+=======
     it("accepts valid HTTP URLs", async () => {
       const result = await validateHttpAvatarUrl(
         "http://example.com/avatars/user123.jpg"
+>>>>>>> ede0d665ec4d448aa73484ccb136b2157752c0da
       );
       expect(result.valid).toBe(true);
     });

@@ -15,12 +15,16 @@ interface JobData {
   error: string | null;
 }
 
-export default function AnalysisJobPage({ params }: { params: { jobId: string } }) {
+export default function AnalysisJobPage({
+  params,
+}: {
+  params: { jobId: string };
+}) {
   const router = useRouter();
   const [job, setJob] = useState<JobData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const jobId = params.jobId;
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -80,20 +84,43 @@ export default function AnalysisJobPage({ params }: { params: { jobId: string } 
 
   if (loading && !job) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] p-4 text-center" role="status" aria-live="polite" aria-label="Loading Job Details">
-        <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" aria-hidden="true" />
-        <h2 className="text-xl font-semibold text-foreground">Loading Job Details...</h2>
+      <div
+        className="flex flex-col items-center justify-center min-h-[70vh] p-4 text-center"
+        role="status"
+        aria-live="polite"
+        aria-label="Loading Job Details"
+      >
+        <Loader2
+          className="h-10 w-10 text-primary animate-spin mb-4"
+          aria-hidden="true"
+        />
+        <h2 className="text-xl font-semibold text-foreground">
+          Loading Job Details...
+        </h2>
       </div>
     );
   }
 
   if (error || !job) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] p-4 text-center" role="alert" aria-live="assertive">
-        <AlertCircle className="h-12 w-12 text-destructive mb-4" aria-hidden="true" />
+      <div
+        className="flex flex-col items-center justify-center min-h-[70vh] p-4 text-center"
+        role="alert"
+        aria-live="assertive"
+      >
+        <AlertCircle
+          className="h-12 w-12 text-destructive mb-4"
+          aria-hidden="true"
+        />
         <h2 className="text-2xl font-bold text-foreground mb-2">Job Error</h2>
-        <p className="text-muted-foreground mb-6 max-w-md">{error || "Job not found"}</p>
-        <Button onClick={() => router.push("/dashboard")} variant="default" aria-label="Back to Dashboard">
+        <p className="text-muted-foreground mb-6 max-w-md">
+          {error || "Job not found"}
+        </p>
+        <Button
+          onClick={() => router.push("/dashboard")}
+          variant="default"
+          aria-label="Back to Dashboard"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
           Back to Dashboard
         </Button>
@@ -102,24 +129,48 @@ export default function AnalysisJobPage({ params }: { params: { jobId: string } 
   }
 
   return (
-    <div className="container mx-auto px-4 py-12 flex flex-col items-center justify-center min-h-[80vh]" aria-live="polite" aria-atomic="true">
+    <div
+      className="container mx-auto px-4 py-12 flex flex-col items-center justify-center min-h-[80vh]"
+      aria-live="polite"
+      aria-atomic="true"
+    >
       {job.status === "QUEUED" && (
-        <div className="flex flex-col items-center text-center space-y-4" role="status">
-          <Loader2 className="h-12 w-12 text-primary animate-spin" aria-hidden="true" />
-          <h2 className="text-3xl font-bold font-heading text-foreground">Analysis Queued</h2>
+        <div
+          className="flex flex-col items-center text-center space-y-4"
+          role="status"
+        >
+          <Loader2
+            className="h-12 w-12 text-primary animate-spin"
+            aria-hidden="true"
+          />
+          <h2 className="text-3xl font-bold font-heading text-foreground">
+            Analysis Queued
+          </h2>
           <p className="text-muted-foreground max-w-lg">
-            Your repository analysis job is in the queue and will start processing shortly. Please wait...
+            Your repository analysis job is in the queue and will start
+            processing shortly. Please wait...
           </p>
         </div>
       )}
 
       {job.status === "PROCESSING" && (
-        <div className="w-full max-w-3xl" role="status" aria-label="Analysis is processing">
-          <RepositoryAnalysisProgress 
-            currentStep={job.progressPercent ? Math.floor((job.progressPercent / 100) * 5) : 0} 
+        <div
+          className="w-full max-w-3xl"
+          role="status"
+          aria-label="Analysis is processing"
+        >
+          <RepositoryAnalysisProgress
+            currentStep={
+              job.progressPercent
+                ? Math.floor((job.progressPercent / 100) * 5)
+                : 0
+            }
           />
           {job.progressMessage && (
-            <p className="text-center text-muted-foreground mt-6 text-sm" aria-live="polite">
+            <p
+              className="text-center text-muted-foreground mt-6 text-sm"
+              aria-live="polite"
+            >
               Status: {job.progressMessage}
             </p>
           )}
@@ -127,22 +178,42 @@ export default function AnalysisJobPage({ params }: { params: { jobId: string } 
       )}
 
       {job.status === "DONE" && (
-        <div className="flex flex-col items-center text-center space-y-6" role="status" aria-label="Analysis complete">
-          <div className="h-20 w-20 rounded-full bg-success/20 flex items-center justify-center" aria-hidden="true">
+        <div
+          className="flex flex-col items-center text-center space-y-6"
+          role="status"
+          aria-label="Analysis complete"
+        >
+          <div
+            className="h-20 w-20 rounded-full bg-success/20 flex items-center justify-center"
+            aria-hidden="true"
+          >
             <svg
               className="h-10 w-10 text-success"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           </div>
           <div>
-            <h2 className="text-3xl font-bold font-heading text-foreground mb-2">Analysis Complete!</h2>
-            <p className="text-muted-foreground">Redirecting you to the repository dashboard...</p>
+            <h2 className="text-3xl font-bold font-heading text-foreground mb-2">
+              Analysis Complete!
+            </h2>
+            <p className="text-muted-foreground">
+              Redirecting you to the repository dashboard...
+            </p>
           </div>
-          <Button onClick={() => router.push(`/repo/${job.repositoryId}`)} className="mt-4" aria-label="View Repository Now">
+          <Button
+            onClick={() => router.push(`/repo/${job.repositoryId}`)}
+            className="mt-4"
+            aria-label="View Repository Now"
+          >
             View Repository Now
             <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
           </Button>
@@ -150,20 +221,38 @@ export default function AnalysisJobPage({ params }: { params: { jobId: string } 
       )}
 
       {job.status === "FAILED" && (
-        <div className="flex flex-col items-center text-center space-y-6" role="alert" aria-live="assertive">
-          <AlertCircle className="h-16 w-16 text-destructive" aria-hidden="true" />
+        <div
+          className="flex flex-col items-center text-center space-y-6"
+          role="alert"
+          aria-live="assertive"
+        >
+          <AlertCircle
+            className="h-16 w-16 text-destructive"
+            aria-hidden="true"
+          />
           <div>
-            <h2 className="text-3xl font-bold font-heading text-foreground mb-2">Analysis Failed</h2>
+            <h2 className="text-3xl font-bold font-heading text-foreground mb-2">
+              Analysis Failed
+            </h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              {job.error || "An error occurred while analyzing the repository. Please try again."}
+              {job.error ||
+                "An error occurred while analyzing the repository. Please try again."}
             </p>
           </div>
           <div className="flex gap-4">
-            <Button onClick={() => router.push("/contribute")} variant="outline" aria-label="Analyze Another Repository">
+            <Button
+              onClick={() => router.push("/contribute")}
+              variant="outline"
+              aria-label="Analyze Another Repository"
+            >
               <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
               Analyze Another
             </Button>
-            <Button onClick={() => window.location.reload()} variant="default" aria-label="Retry Job">
+            <Button
+              onClick={() => window.location.reload()}
+              variant="default"
+              aria-label="Retry Job"
+            >
               Retry Job
             </Button>
           </div>
