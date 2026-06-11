@@ -21,7 +21,11 @@ export async function GET(
   return apiError(404, "Job not found");
 }
 
-return NextResponse.json({ job });
+return NextResponse.json({
+  schemaVersion: "1.0",
+  exportedAt: new Date().toISOString(),
+  job,
+});
 } catch (error: any) {
   console.error("GET /analysis/:jobId error:", error);
   return apiError(500, "Failed to fetch job");

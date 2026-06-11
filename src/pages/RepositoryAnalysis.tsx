@@ -33,6 +33,7 @@ import {
   XCircle,
   FileX2,
   MessageSquare,
+  Download,
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
@@ -134,6 +135,52 @@ export default function RepositoryAnalysis() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const exportAnalysis = async () => {
+  try {
+    const token = localStorage.getItem("gitverse_token");
+
+    const response = await axios.get(
+      buildApiUrl(`/api/analysis/${job?.id}`),
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const blob = new Blob(
+      [JSON.stringify(response.data, null, 2)],
+      {
+        type: "application/json",
+      }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `analysis-${job?.id}.json`;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export successful",
+      description: "Analysis JSON downloaded successfully.",
+    });
+  } catch (error: any) {
+    toast({
+      title: "Export failed",
+      description:
+        error.response?.data?.error ||
+        "Failed to export analysis.",
+      variant: "destructive",
+    });
+  }
+};
   const pollingStartedAt = useRef<number | null>(null);
   const pollingJobRef = useRef<string | null>(null);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -536,6 +583,16 @@ export default function RepositoryAnalysis() {
                   )}
               </div>
               </div>
+              {repository && job && (
+  <button
+    onClick={exportAnalysis}
+    className="glass p-2 rounded-lg hover:bg-primary/20 transition-all duration-300 text-primary flex-shrink-0"
+    title="Export Analysis JSON"
+  >
+    <Download className="h-4 w-4 sm:h-5 sm:w-5" />
+  </button>
+)}
+
               {/* Delete button only if repository exists */}
               {repository && (
                 <button
