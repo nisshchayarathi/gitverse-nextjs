@@ -104,6 +104,28 @@ export class GraphAnalyzer {
     // We build links directly between files. UI filtering will aggregate them later.
     const linkSet = new Set<string>();
 
+    // Build adjacency list for cycle detection
+    const adjList = new Map<string, string[]>();
+    files.forEach(file => {
+      if (file.path) {
+        adjList.set(file.path, file.dependencies || []);
+      }
+    });
+
+    const hasPath = (start: string, end: string, visited: Set<string>): boolean => {
+      if (start === end) return true;
+      visited.add(start);
+      const neighbors = adjList.get(start) || [];
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor)) {
+          if (hasPath(neighbor, end, visited)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
     files.forEach(file => {
       const sourceId = `file-${file.path}`;
 
@@ -115,11 +137,15 @@ export class GraphAnalyzer {
             const linkId = `${sourceId}->${targetId}`;
             if (!linkSet.has(linkId)) {
               linkSet.add(linkId);
+              
+              // If there's a path back from the dependency (target) to the file (source), it's a cycle
+              const isCyclic = hasPath(dep, file.path, new Set<string>());
+              
               links.push({
                 source: sourceId,
                 target: targetId,
                 strength: 1,
-                isCyclic: false
+                isCyclic
               });
             }
           }

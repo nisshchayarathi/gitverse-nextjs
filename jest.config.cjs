@@ -6,6 +6,7 @@ const createJestConfig = nextJest({
 
 /** @type {import('jest').Config} */
 const customJestConfig = {
+  rootDir: __dirname.replace(/\\/g, '/'),
   testEnvironment: 'jsdom',
   testMatch: [
     '<rootDir>/lib/**/__tests__/**/*.test.ts',
@@ -29,4 +30,22 @@ const customJestConfig = {
   ],
 };
 
-module.exports = createJestConfig(customJestConfig);
+const jestConfig = createJestConfig(customJestConfig);
+
+module.exports = async () => {
+  const config = await jestConfig();
+  const normalize = (obj) => {
+    if (!obj) return;
+    if (obj.rootDir && typeof obj.rootDir === 'string') {
+      obj.rootDir = obj.rootDir.replace(/\\/g, '/');
+    }
+    if (obj.testMatch && Array.isArray(obj.testMatch)) {
+      obj.testMatch = obj.testMatch.map(p => typeof p === 'string' ? p.replace(/\\/g, '/') : p);
+    }
+  };
+  normalize(config);
+  if (config.config) {
+    normalize(config.config);
+  }
+  return config;
+};
