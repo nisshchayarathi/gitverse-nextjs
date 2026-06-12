@@ -32,8 +32,22 @@ function getAdapterChoice(connectionString: string): PrismaAdapterChoice {
 function getPoolConfig() {
   const rawMax = process.env.PG_POOL_MAX;
   const isProd = process.env.NODE_ENV === "production";
+
+  let connectionLimit: number | null = null;
+  if (process.env.DATABASE_URL) {
+    try {
+      const url = new URL(process.env.DATABASE_URL);
+      const limit = url.searchParams.get("connection_limit");
+      if (limit) {
+        connectionLimit = Number(limit);
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
   const defaultMax = isProd ? 2 : 5;
-  const max = rawMax ? Number(rawMax) : defaultMax;
+  const max = rawMax ? Number(rawMax) : (connectionLimit ?? defaultMax);
 
   const rawMin = process.env.PG_POOL_MIN;
   const defaultMin = 0;
