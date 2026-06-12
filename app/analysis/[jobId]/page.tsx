@@ -15,14 +15,31 @@ interface JobData {
   error: string | null;
 }
 
+function getWebSocketUrl(jobId: string): string {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return `ws://localhost:8080?jobId=${jobId}`;
+  }
+  
+  const customWsUrl = process.env.NEXT_PUBLIC_WORKER_WS_URL;
+  if (customWsUrl) {
+    return `${customWsUrl}?jobId=${jobId}`;
+  }
+  
+  return `${protocol}//${window.location.host}/api/analysis/ws?jobId=${jobId}`;
+}
+
 export default function AnalysisJobPage({ params }: { params: { jobId: string } }) {
   const router = useRouter();
   const [job, setJob] = useState<JobData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [usePolling, setUsePolling] = useState(false);
   
   const jobId = params.jobId;
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
 
   const fetchJobStatus = useCallback(async () => {
     try {
@@ -48,26 +65,94 @@ export default function AnalysisJobPage({ params }: { params: { jobId: string } 
   }, [fetchJobStatus]);
 
   useEffect(() => {
-    if (!job) return;
+    if (!jobId) return;
+    
+    // Only connect or poll if the job is queued or processing (or if we haven't loaded it yet)
+    if (job && job.status !== "QUEUED" && job.status !== "PROCESSING") {
+      return;
+    }
 
-    if (job.status === "QUEUED" || job.status === "PROCESSING") {
+    if (usePolling) {
       pollIntervalRef.current = setInterval(() => {
         fetchJobStatus();
       }, 3000);
+      return () => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+        }
+      };
     }
 
-    if (job.status === "DONE" || job.status === "FAILED") {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
+    let fallbackTimeout: NodeJS.Timeout | null = null;
+    let ws: WebSocket | null = null;
+
+    try {
+      const wsUrl = getWebSocketUrl(jobId);
+      console.log(`Connecting to WebSocket: ${wsUrl}`);
+      ws = new WebSocket(wsUrl);
+      socketRef.current = ws;
+
+      fallbackTimeout = setTimeout(() => {
+        console.warn("WebSocket connection timed out, falling back to polling");
+        setUsePolling(true);
+      }, 3000);
+
+      ws.onopen = () => {
+        console.log("WebSocket connection established");
+        if (fallbackTimeout) {
+          clearTimeout(fallbackTimeout);
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.jobId === jobId) {
+            setJob((prev) => {
+              if (!prev) return data as JobData;
+              return {
+                ...prev,
+                status: data.status,
+                progressPercent: data.progressPercent !== undefined ? data.progressPercent : prev.progressPercent,
+                progressMessage: data.progressMessage !== undefined ? data.progressMessage : prev.progressMessage,
+                error: data.error !== undefined ? data.error : prev.error,
+              };
+            });
+            setLoading(false);
+          }
+        } catch (e) {
+          console.error("Failed to parse WebSocket message", e);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        setUsePolling(true);
+      };
+
+      ws.onclose = (event) => {
+        console.log(`WebSocket closed (code: ${event.code})`);
+        setJob((currentJob) => {
+          if (currentJob && currentJob.status !== "DONE" && currentJob.status !== "FAILED") {
+            setUsePolling(true);
+          }
+          return currentJob;
+        });
+      };
+    } catch (e) {
+      console.error("Failed to initialize WebSocket", e);
+      setUsePolling(true);
     }
 
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
+      if (fallbackTimeout) {
+        clearTimeout(fallbackTimeout);
+      }
+      if (ws) {
+        ws.close();
       }
     };
-  }, [job, fetchJobStatus]);
+  }, [jobId, usePolling, job === null, job?.status, fetchJobStatus]);
 
   useEffect(() => {
     if (job?.status === "DONE" && job.repositoryId) {
@@ -116,13 +201,9 @@ export default function AnalysisJobPage({ params }: { params: { jobId: string } 
       {job.status === "PROCESSING" && (
         <div className="w-full max-w-3xl" role="status" aria-label="Analysis is processing">
           <RepositoryAnalysisProgress 
-            currentStep={job.progressPercent ? Math.floor((job.progressPercent / 100) * 5) : 0} 
+            progressPercent={job.progressPercent ?? 0}
+            progressMessage={job.progressMessage ?? undefined}
           />
-          {job.progressMessage && (
-            <p className="text-center text-muted-foreground mt-6 text-sm" aria-live="polite">
-              Status: {job.progressMessage}
-            </p>
-          )}
         </div>
       )}
 

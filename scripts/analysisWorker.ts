@@ -69,9 +69,11 @@ export async function startAnalysisWorkerLoop(opts?: {
         });
 
         // Also update BullMQ progress
-        if (update.progressPercent != null) {
-          await job.updateProgress(update.progressPercent);
-        }
+        await job.updateProgress({
+          progressPercent: update.progressPercent ?? lastProgressPercent,
+          progressMessage: update.progressMessage ?? lastProgressMessage,
+          progressDetails: update.progressDetails,
+        });
 
         lastProgressWriteAt = now;
         if (update.progressPercent != null)

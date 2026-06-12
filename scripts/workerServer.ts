@@ -1,10 +1,15 @@
 import "dotenv/config";
 import os from "os";
 import http from "http";
+import url from "url";
+import { WebSocketServer, WebSocket } from "ws";
+import { QueueEvents } from "bullmq";
 
 import { startAnalysisWorkerLoop } from "./analysisWorker";
 import { startWebhookWorkerLoop } from "../lib/workers/webhookWorker";
 import { disconnectPrisma, getPoolHealth, getPoolMetrics } from "../lib/prisma";
+import connection from "../lib/redis";
+import { ANALYSIS_QUEUE_NAME } from "../lib/queue/analysisQueue";
 
 const port = Number(process.env.PORT || "8080");
 const GRACE_PERIOD_MS = 35_000;
@@ -13,6 +18,10 @@ let healthServer: http.Server | null = null;
 let stopping = false;
 let workerDone: (() => void) | null = null;
 let workerFinished: Promise<void> | null = null;
+
+const clients = new Map<string, Set<WebSocket>>();
+let queueEvents: QueueEvents | null = null;
+let wss: WebSocketServer | null = null;
 
 function startHealthServer(): http.Server {
   const server = http.createServer((req, res) => {
@@ -90,6 +99,15 @@ const drain = async (source: string) => {
   stopping = true;
   console.log(`drain initiated via ${source}`);
 
+  if (wss) {
+    wss.close(() => {
+      console.log("WebSocket server closed");
+    });
+  }
+  if (queueEvents) {
+    await queueEvents.close();
+  }
+
   if (workerDone) {
     workerDone();
   }
@@ -128,6 +146,98 @@ process.on("SIGHUP", () => void shutdown("SIGHUP"));
 
 async function main() {
   healthServer = startHealthServer();
+
+  // Initialize WebSocket server
+  wss = new WebSocketServer({ noServer: true });
+
+  healthServer.on("upgrade", (request, socket, head) => {
+    wss!.handleUpgrade(request, socket, head, (ws) => {
+      wss!.emit("connection", ws, request);
+    });
+  });
+
+  wss.on("connection", (ws, req) => {
+    const parsedUrl = url.parse(req.url || "", true);
+    const jobId = parsedUrl.query.jobId as string | undefined;
+    if (!jobId) {
+      ws.close(4000, "Missing jobId");
+      return;
+    }
+
+    if (!clients.has(jobId)) {
+      clients.set(jobId, new Set());
+    }
+    clients.get(jobId)!.add(ws);
+
+    ws.on("close", () => {
+      const jobClients = clients.get(jobId);
+      if (jobClients) {
+        jobClients.delete(ws);
+        if (jobClients.size === 0) {
+          clients.delete(jobId);
+        }
+      }
+    });
+  });
+
+  // Initialize BullMQ QueueEvents listener
+  queueEvents = new QueueEvents(ANALYSIS_QUEUE_NAME, {
+    connection: connection as any,
+  });
+
+  queueEvents.on("progress", ({ jobId, data }) => {
+    const jobClients = clients.get(jobId);
+    if (jobClients) {
+      const isObj = data && typeof data === "object";
+      const progressPercent = isObj ? (data as any).progressPercent : data;
+      const progressMessage = isObj ? (data as any).progressMessage : undefined;
+
+      const payload = JSON.stringify({
+        jobId,
+        status: "PROCESSING",
+        progressPercent,
+        progressMessage,
+      });
+      for (const client of jobClients) {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(payload);
+        }
+      }
+    }
+  });
+
+  queueEvents.on("completed", ({ jobId }) => {
+    const jobClients = clients.get(jobId);
+    if (jobClients) {
+      const payload = JSON.stringify({
+        jobId,
+        status: "DONE",
+        progressPercent: 100,
+        progressMessage: "Completed",
+      });
+      for (const client of jobClients) {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(payload);
+        }
+      }
+    }
+  });
+
+  queueEvents.on("failed", ({ jobId, failedReason }) => {
+    const jobClients = clients.get(jobId);
+    if (jobClients) {
+      const payload = JSON.stringify({
+        jobId,
+        status: "FAILED",
+        error: failedReason || "Analysis failed",
+      });
+      for (const client of jobClients) {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(payload);
+        }
+      }
+    }
+  });
 
   workerFinished = new Promise<void>((resolve) => {
     workerDone = resolve;
