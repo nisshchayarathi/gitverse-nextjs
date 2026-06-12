@@ -111,6 +111,22 @@
     color: inherit;
   }
 
+  body::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  body::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  body::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.5);
+    border-radius: 5px;
+    border: 2px solid hsl(var(--background));
+  }
+  body::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.8);
+  }
+
   h1,
   h2,
   h3,
@@ -251,6 +267,21 @@
     border: 1px solid hsl(var(--border) / 0.12);
     cursor: pointer;
     z-index: 5;
+    transition: all 0.2s ease;
+  }
+
+  .feature-carousel__nav:hover {
+    background: hsl(var(--card));
+    box-shadow: 0 8px 24px hsl(var(--primary) / 0.15);
+    transform: translateY(-50%) scale(1.05);
+  }
+
+  .feature-carousel__nav:focus-visible {
+    background: hsl(var(--card));
+    box-shadow: 0 8px 24px hsl(var(--primary) / 0.15);
+    transform: translateY(-50%) scale(1.05);
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
   }
 
   .feature-carousel__nav--left {

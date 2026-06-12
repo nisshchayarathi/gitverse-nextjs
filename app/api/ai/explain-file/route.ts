@@ -14,8 +14,8 @@ import { getClientIp } from "@/lib/services/rateLimitService";
 import { sanitizeTextContent } from "@/lib/utils/promptSanitization";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
-const EXPLAIN_FILE_RATE_LIMIT = 15;
-const EXPLAIN_FILE_WINDOW_MS = 60_000;
+const EXPLAIN_FILE_RATE_LIMIT = process.env.AI_EXPLAIN_RATE_LIMIT ? parseInt(process.env.AI_EXPLAIN_RATE_LIMIT, 10) : 15;
+const EXPLAIN_FILE_WINDOW_MS = process.env.AI_EXPLAIN_WINDOW_MS ? parseInt(process.env.AI_EXPLAIN_WINDOW_MS, 10) : 60_000;
 const MAX_FILE_CONTENT_LENGTH = 120_000;
 const MAX_FILE_PATH_LENGTH = 500;
 

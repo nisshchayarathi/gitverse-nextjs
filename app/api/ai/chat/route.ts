@@ -24,6 +24,12 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware
 // Allowed roles in the conversation history
 const ALLOWED_MESSAGE_ROLES = new Set(["user", "model", "assistant"]);
 
+const ALLOWED_SHORT_TERMS = new Set([
+  "api", "sql", "css", "aws", "jsx", "dom", "bug", "env", "git", "ci", "cd", "ui", "ux"
+]);
+const AI_CHAT_RATE_LIMIT = process.env.AI_CHAT_RATE_LIMIT ? parseInt(process.env.AI_CHAT_RATE_LIMIT, 10) : 30;
+const AI_CHAT_WINDOW_MS = process.env.AI_CHAT_WINDOW_MS ? parseInt(process.env.AI_CHAT_WINDOW_MS, 10) : 60_000;
+
 function parseKnowledgeArray(value: any): string[] {
   if (Array.isArray(value)) {
     return value;
@@ -66,8 +72,8 @@ export async function POST(request: NextRequest) {
       String(user.userId),
       "userId",
       "chat",
-      30,
-      60_000,
+      AI_CHAT_RATE_LIMIT,
+      AI_CHAT_WINDOW_MS,
     );
     if (!allowed) {
       return NextResponse.json(
@@ -146,7 +152,7 @@ export async function POST(request: NextRequest) {
         .split(/\s+/)
         .filter(
           (w: string) =>
-            w.length > 3 &&
+            (w.length > 3 || ALLOWED_SHORT_TERMS.has(w)) &&
             ![
               "what",
               "how",

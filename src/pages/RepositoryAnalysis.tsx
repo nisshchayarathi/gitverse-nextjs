@@ -38,6 +38,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { buildApiUrl } from "@/services/apiConfig";
 import { Modal } from "@/components/ui/Modal";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 type TabType =
   | "overview"
@@ -459,15 +460,28 @@ export default function RepositoryAnalysis() {
         )}
 
         {loading ? (
-          <div className="glass rounded-lg p-12 text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Loading Repository</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Fetching repository data and analysis results...
-              </p>
+          <div className="glass rounded-lg p-8 sm:p-12">
+            <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-6 text-center">
+              <div className="rounded-full border border-primary/20 bg-primary/5 p-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+
+              <div className="space-y-3 w-full">
+                <div className="space-y-2">
+                  <Skeleton className="mx-auto h-6 w-44" />
+                  <Skeleton className="mx-auto h-4 w-72 max-w-full" />
+                </div>
+
+                <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-5/6" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+
+                <p className="text-sm text-muted-foreground">
+                  Fetching repository data and analysis results...
+                </p>
+              </div>
             </div>
           </div>
         ) : !job && !error ? (

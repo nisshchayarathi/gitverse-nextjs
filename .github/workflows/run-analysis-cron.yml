@@ -12,6 +12,10 @@ concurrency:
 jobs:
   run-worker:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       ANALYSIS_RUNNER_SECRET: ${{ secrets.ANALYSIS_RUNNER_SECRET }}
@@ -31,7 +35,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Verify Prisma schema
         run: test -f "$GITHUB_WORKSPACE/prisma/schema.prisma"

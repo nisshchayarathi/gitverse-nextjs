@@ -354,14 +354,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             .style("top", `${event.clientY}px`);
         }
       })
-      .on("mouseleave", function () {
-        if (tooltipRef.current) {
-          d3.select(tooltipRef.current)
-            .style("opacity", "0")
-            .style("display", "none");
-        }
-      })
-      .on("mouseleave", function (_event: any, d: any) {
+     .on("mouseleave", function (_event: any, d: any) {
+        // Shrink node back to original size and restore stroke
         d3.select(this)
           .transition()
           .duration(200)
@@ -369,6 +363,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           .attr("stroke", "rgba(255,255,255,0.3)")
           .attr("stroke-width", 2);
 
+        // Restore link colours
         link
           .transition()
           .duration(200)
@@ -377,8 +372,11 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           )
           .attr("stroke-opacity", 0.6);
 
+        // Hide tooltip completely (opacity AND display)
         if (tooltipRef.current) {
-          d3.select(tooltipRef.current).style("opacity", 0);
+          d3.select(tooltipRef.current)
+            .style("opacity", "0")
+            .style("display", "none");
         }
       });
 

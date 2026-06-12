@@ -175,7 +175,7 @@ describe("checkRateLimit", () => {
 
     const result = await checkRateLimit({
       endpoint: "mfa:verify",
-      userId: 2,
+      userId: 999,
       tier: "free",
     });
 

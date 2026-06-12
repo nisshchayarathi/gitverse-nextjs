@@ -11,7 +11,10 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['avatars.githubusercontent.com', 'gitlab.com', 'bitbucket.org'],
+    domains: ['avatars.githubusercontent.com', 'gitlab.com', 'bitbucket.org', 'api.dicebear.com'],
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   webpack: (config) => {
     config.resolve.alias.canvas = false

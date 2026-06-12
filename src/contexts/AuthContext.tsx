@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { useSession } from "next-auth/react";
 import { buildApiUrl } from "../services/apiConfig";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/sessionConstants";
 
 interface User {
   id: string;
@@ -88,8 +89,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 data.user.avatarUrl ||
                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.email}`,
             });
+          } else if (response.status === 401) {
+            localStorage.removeItem("gitverse_token");
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("session-expired", {
+                detail: { message: SESSION_EXPIRED_MESSAGE },
+              }));
+              window.location.href = "/login";
+            }
           } else {
-            // Token invalid, clear storage
             localStorage.removeItem("gitverse_token");
           }
         } catch (error) {

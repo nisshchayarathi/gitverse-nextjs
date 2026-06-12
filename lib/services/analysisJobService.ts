@@ -269,7 +269,9 @@ export class AnalysisJobService {
     const where: any = { id: params.jobId };
     if (params.workerId) {
       where.lockedBy = params.workerId;
-      if (params.lockToken) where.lockToken = params.lockToken;
+    }
+    if (params.lockToken) {
+      where.lockToken = params.lockToken;
     }
 
     await prisma.analysisJob.update({
@@ -297,7 +299,9 @@ export class AnalysisJobService {
     const where: any = { id: params.jobId };
     if (params.workerId) {
       where.lockedBy = params.workerId;
-      if (params.lockToken) where.lockToken = params.lockToken;
+    }
+    if (params.lockToken) {
+      where.lockToken = params.lockToken;
     }
 
     await prisma.analysisJob.update({
@@ -335,7 +339,9 @@ export class AnalysisJobService {
     const where: any = { id: params.jobId };
     if (params.workerId) {
       where.lockedBy = params.workerId;
-      if (params.lockToken) where.lockToken = params.lockToken;
+    }
+    if (params.lockToken) {
+      where.lockToken = params.lockToken;
     }
 
     const shouldRetry =
@@ -474,7 +480,9 @@ export class AnalysisJobService {
     const where: any = { id: params.jobId };
     if (params.workerId) {
       where.lockedBy = params.workerId;
-      if (params.lockToken) where.lockToken = params.lockToken;
+    }
+    if (params.lockToken) {
+      where.lockToken = params.lockToken;
     }
     await prisma.analysisJob.update({
       where,
@@ -548,7 +556,9 @@ export class AnalysisJobService {
     const where: any = { id: params.jobId };
     if (params.workerId) {
       where.lockedBy = params.workerId;
-      if (params.lockToken) where.lockToken = params.lockToken;
+    }
+    if (params.lockToken) {
+      where.lockToken = params.lockToken;
     }
     await prisma.analysisJob.update({
       where,

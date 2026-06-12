@@ -6,9 +6,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
 import { Toaster } from "@/components/ui/toaster";
-import { ScrollToTop } from "@/components/ui/ScrollToTop";
-import { FocusRingManager } from "@/components/ui/FocusRingManager";
-import ProgressBarProvider from "@/components/providers/ProgressBarProvider";
+import { SessionExpiryHandler } from "@/components/auth/SessionExpiryHandler";
 import "./globals.css";
 
 
@@ -86,16 +84,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ThemeProvider>
           <NextAuthProvider>
             <AuthProvider>
-              <FocusRingManager />
-              <ProgressBarProvider>
-                <main id="main-content">
-                  {children}
-                </main>
-              </ProgressBarProvider>
-
-                <Toaster />
-                <ScrollToTop />
-              </AuthProvider>
+              <SessionExpiryHandler />
+              {children}
+              <Toaster />
+            </AuthProvider>
           </NextAuthProvider>
         </ThemeProvider>
       </body>

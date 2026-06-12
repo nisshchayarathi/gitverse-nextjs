@@ -24,6 +24,33 @@ Whether you're a new contributor facing an unfamiliar codebase, or a maintainer 
 
 </div>
 
+
+## 📚 Table of Contents
+
+- [GitVerse](#gitverse-%EF%B8%8F)
+- [Pitch](#pitch)
+- [“Repo-to-Map in 10 seconds” (MVP flow)](#repo-to-map-in-10-seconds-mvp-flow)
+- [What you can do today](#what-you-can-do-today)
+- [Supported Node Version](#supported-node-version)
+- [Quickstart (local dev)](#️quickstart-local-dev)
+- [Contribution-first onboarding ](#contribution-first-onboarding-the-hackathon-angle)
+- [Tech stack](#tech-stack)
+- [Project Architecture](#%EF%B8%8F-project-architecture)
+- [Project Structure](#️%EF%B8%8F-project-structure)
+- [Design System](#-design-system)
+- [API Routes](#-api-routes)
+- [API Pagination](#-api-pagination)
+- [Development](-deployment)
+- [Security](-security)
+- [Environment Variables](-environment-variables)
+- [Contributing](-contributing)
+- [Contributors & Thanks](#-contributors--thanks)
+- [Project Support](#-project-support)
+- [License](#-license)
+- [Acknowledgments](-acknowledgments)
+- [ FAQ – Common Questions & Edge Cases](#--faq--common-questions--edge-cases)
+
+
 ## Pitch
 
 ### Problem

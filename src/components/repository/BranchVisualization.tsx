@@ -1,5 +1,11 @@
-import { GitBranch, Clock, User, CheckCircle, GitCommit } from "lucide-react";
+import { GitBranch, Clock, User, CheckCircle, GitCommit, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useState } from "react";
 
 interface Branch {
@@ -67,9 +73,16 @@ const toSafeIso = (value?: string | Date) => {
   return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 };
 
+const getBranchAgeInDays = (timestamp: string | Date) => {
+  return Math.floor(
+    (new Date().getTime() - new Date(timestamp).getTime()) /
+      (1000 * 60 * 60 * 24)
+  );
+};
+
 export function BranchVisualization({ repository }: BranchVisualizationProps) {
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
-  const [filter, setFilter] = useState<FilterType>("active");
+  const [filter, setFilter] = useState<FilterType>("all");
 
   // Use real branches from repository or empty array
   const branches: Branch[] =
@@ -115,16 +128,12 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
 
   const filteredBranches = branches.filter((branch) => {
     switch (filter) {
-      case "active":
-        // Show all branches (active means all branches, not filtered)
-        return true;
-      case "stale":
-        const diffInDays = Math.floor(
-          (new Date().getTime() -
-            new Date(branch.lastCommit.timestamp).getTime()) /
-            (1000 * 60 * 60 * 24)
-        );
-        return diffInDays > 30;
+      case "active": {
+        return getBranchAgeInDays(branch.lastCommit.timestamp) <= 30;
+      }
+      case "stale": {
+        return getBranchAgeInDays(branch.lastCommit.timestamp) > 30;
+      }
       case "merged":
         return branch.ahead === 0 && branch.behind > 0;
       default:
@@ -156,16 +165,18 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as FilterType)}
-            className="glass px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-300 cursor-pointer"
-          >
-            <option value="all">All branches</option>
-            <option value="active">Active</option>
-            <option value="stale">Stale</option>
-            <option value="merged">Merged</option>
-          </select>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="glass px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-300 cursor-pointer flex items-center gap-2 outline-none">
+              {filter === "all" ? "All branches" : filter.charAt(0).toUpperCase() + filter.slice(1)}
+              <ChevronDown className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="glass">
+              <DropdownMenuItem onClick={() => setFilter("all")} className="cursor-pointer">All branches</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("active")} className="cursor-pointer">Active</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("stale")} className="cursor-pointer">Stale</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilter("merged")} className="cursor-pointer">Merged</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -216,14 +227,9 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
             <div>
               <p className="text-2xl font-bold">
                 {
-                  branches.filter((b) => {
-                    const days = Math.floor(
-                      (new Date().getTime() -
-                        new Date(b.lastCommit.timestamp).getTime()) /
-                        (1000 * 60 * 60 * 24)
-                    );
-                    return days > 30;
-                  }).length
+                  branches.filter(
+                    (b) => getBranchAgeInDays(b.lastCommit.timestamp) > 30
+                  ).length
                 }
               </p>
               <p className="text-xs text-muted-foreground">Stale Branches</p>

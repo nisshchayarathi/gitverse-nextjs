@@ -30,9 +30,9 @@ describe("Navbar", () => {
 
   it("renders navigation links", () => {
     render(<Navbar />);
-    expect(screen.getByText((content) => content.includes("Features"))).toBeDefined();
-    expect(screen.getByText((content) => content.includes("How it Works"))).toBeDefined();
-    expect(screen.getByText((content) => content.includes("Pricing"))).toBeDefined();
+    expect(screen.getByText((content: string) => content.includes("Features"))).toBeDefined();
+    expect(screen.getByText((content: string) => content.includes("How it Works"))).toBeDefined();
+    expect(screen.getByText((content: string) => content.includes("Pricing"))).toBeDefined();
   });
 
   it("renders sign in and get started buttons", () => {

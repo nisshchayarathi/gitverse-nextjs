@@ -42,7 +42,7 @@ export async function GET(
 
     const repository = await prisma.repository.findUnique({
       where: { id: repositoryId },
-      select: { url: true },
+      select: { url: true, userId: true },
     });
 
     if (!repository) {
@@ -52,49 +52,49 @@ export async function GET(
       );
     }
 
+    let repoFullName = "";
     const match = repository.url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
-    if (!match) {
+    if (match) {
+      repoFullName = `${match[1]}/${match[2]}`.replace(/\.git$/, "");
+    }
+
+    if (!repoFullName) {
       return NextResponse.json(
-        { error: "Invalid repository URL format" },
+        { error: "Invalid GitHub repository URL" },
         { status: 400, headers: securityHeaders }
       );
     }
 
-    const owner = match[1];
-    const repoName = match[2].replace(/\.git$/, "");
-    const repoFullName = `${owner}/${repoName}`;
-
-    const githubRepo = await prisma.gitHubRepo.findFirst({
-      where: { repoFullName },
+    let quotaInfo = null;
+    const githubRepo = await prisma.gitHubRepo.findUnique({
+      where: {
+        userId_repoFullName: {
+          userId: repository.userId,
+          repoFullName,
+        },
+      },
       select: { installationId: true },
     });
 
-    if (!githubRepo || !githubRepo.installationId) {
-      return NextResponse.json(
-        { error: "No GitHub installation found for this repository" },
-        { status: 404, headers: securityHeaders }
-      );
-    }
+    if (githubRepo && githubRepo.installationId !== null) {
+      const quota = await prisma.aiQuota.findUnique({
+        where: { installationId: githubRepo.installationId },
+        select: {
+          requestsUsed: true,
+          tokensConsumed: true,
+          quotaWindowStart: true,
+          warningPosted: true,
+        },
+      });
 
-    const installationId = githubRepo.installationId;
-    let quotaInfo = null;
-
-    const quota = await prisma.aiQuota.findUnique({
-      where: { installationId },
-      select: {
-        tokensConsumed: true,
-        quotaWindowStart: true,
-        warningPosted: true,
-      },
-    });
-
-    if (quota) {
-      quotaInfo = {
-        tokensUsed: quota.tokensConsumed,
-        tokenLimit: QuotaService.getQuotaMax(),
-        windowStart: quota.quotaWindowStart,
-        warningPosted: quota.warningPosted,
-      };
+      if (quota) {
+        quotaInfo = {
+          tokensUsed: quota.requestsUsed,
+          tokenLimit: QuotaService.getQuotaMax(),
+          windowStart: quota.quotaWindowStart,
+          warningPosted: quota.warningPosted,
+        };
+      }
     }
 
     return NextResponse.json(
@@ -149,14 +149,6 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { tokenLimit } = body;
-
-    if (tokenLimit === undefined || typeof tokenLimit !== "number" || tokenLimit < 0) {
-      return NextResponse.json(
-        { error: "tokenLimit is required and must be a non-negative number" },
-        { status: 400, headers: securityHeaders }
-      );
-    }
 
     const assignment = await prisma.repositoryPolicyAssignment.findUnique({
       where: { repositoryId },
@@ -172,7 +164,7 @@ export async function PUT(
 
     const repository = await prisma.repository.findUnique({
       where: { id: repositoryId },
-      select: { url: true },
+      select: { url: true, userId: true },
     });
 
     if (!repository) {
@@ -182,30 +174,35 @@ export async function PUT(
       );
     }
 
+    let repoFullName = "";
     const match = repository.url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
-    if (!match) {
+    if (match) {
+      repoFullName = `${match[1]}/${match[2]}`.replace(/\.git$/, "");
+    }
+
+    if (!repoFullName) {
       return NextResponse.json(
-        { error: "Invalid repository URL format" },
+        { error: "Invalid GitHub repository URL" },
         { status: 400, headers: securityHeaders }
       );
     }
 
-    const owner = match[1];
-    const repoName = match[2].replace(/\.git$/, "");
-    const repoFullName = `${owner}/${repoName}`;
-
-    const githubRepo = await prisma.gitHubRepo.findFirst({
-      where: { repoFullName },
+    const githubRepo = await prisma.gitHubRepo.findUnique({
+      where: {
+        userId_repoFullName: {
+          userId: repository.userId,
+          repoFullName,
+        },
+      },
       select: { installationId: true },
     });
 
-    if (!githubRepo || !githubRepo.installationId) {
+    if (!githubRepo || githubRepo.installationId === null) {
       return NextResponse.json(
         { error: "No GitHub installation found for this repository" },
         { status: 404, headers: securityHeaders }
       );
     }
-
     const installationId = githubRepo.installationId;
 
     // Fetch current quota for audit trail
@@ -213,20 +210,28 @@ export async function PUT(
       where: { installationId },
     });
 
-    const previousLimit = QuotaService.getQuotaMax();
+    const previousUsage = currentQuota ? currentQuota.requestsUsed : null;
 
-    // Update or create quota record (saving tokenLimit is not supported in schema, so we keep warningPosted reset)
+    // Reset quota record using schema fields
+    const now = new Date();
+    const windowMs = 24 * 60 * 60 * 1000; // 24 hours
+    const quotaWindowEnd = new Date(now.getTime() + windowMs);
+
     await prisma.aiQuota.upsert({
       where: { installationId },
       update: {
+        requestsUsed: 0,
+        tokensConsumed: 0,
+        quotaWindowStart: now,
+        quotaWindowEnd,
         warningPosted: false,
       },
       create: {
         installationId,
         requestsUsed: 0,
         tokensConsumed: 0,
-        quotaWindowStart: new Date(),
-        quotaWindowEnd: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        quotaWindowStart: now,
+        quotaWindowEnd,
         warningPosted: false,
       },
     });
@@ -236,14 +241,14 @@ export async function PUT(
       userId: permission.userId,
       repositoryId,
       organizationId: assignment.organizationId,
-      action: "billing_quota_update",
-      previousValue: String(previousLimit),
-      newValue: String(tokenLimit),
+      action: "billing_quota_reset",
+      previousValue: previousUsage !== null ? String(previousUsage) : "unset",
+      newValue: "0",
       ipAddress: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || undefined,
     });
 
     return NextResponse.json(
-      { message: "Billing quota updated successfully", tokenLimit },
+      { message: "Billing quota reset successfully" },
       { status: 200, headers: securityHeaders }
     );
   } catch (error: any) {

@@ -471,4 +471,4 @@ describe("Workflow concurrency guarantees", () => {
   });
 });
 
-export { };
+export {};

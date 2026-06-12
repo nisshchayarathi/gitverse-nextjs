@@ -219,9 +219,7 @@ describe("GitService abort signal handling", () => {
 
       (proc.stderr as Readable).push(null);
       (proc.stdout as Readable).push(null);
-      for (let i = 0; i < 5; i++) {
-        await new Promise(r => setImmediate(r));
-      }
+      await new Promise(r => setImmediate(r));
       proc.emit("close", 0);
 
       const result = await promise;
