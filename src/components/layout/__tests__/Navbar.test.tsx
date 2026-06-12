@@ -25,7 +25,7 @@ describe("Navbar", () => {
   it("renders without crashing", () => {
     const { container } = render(<Navbar />);
     expect(container.querySelector("nav")).toBeTruthy();
-    expect(screen.getAllByText((content, node) => node?.textContent === "GitVerse").length).toBeGreaterThan(0);
+    expect(screen.getAllByText((content: string, node: any) => node?.textContent === "GitVerse").length).toBeGreaterThan(0);
   });
 
   it("renders navigation links", () => {
