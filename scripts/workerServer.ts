@@ -1,7 +1,9 @@
 import "dotenv/config";
+import os from "os";
 import http from "http";
 
 import { startAnalysisWorkerLoop } from "./analysisWorker";
+import { startWebhookWorkerLoop } from "../lib/workers/webhookWorker";
 import { disconnectPrisma, getPoolHealth, getPoolMetrics } from "../lib/prisma";
 
 const port = Number(process.env.PORT || "8080");
@@ -131,10 +133,8 @@ async function main() {
     workerDone = resolve;
   });
 
-  // Pass signalHandlers: false to analysisWorker since workerServer
-  // handles the signal coordination and the worker should not register
-  // its own handlers that would race with the server's shutdown.
-  await startAnalysisWorkerLoop({ signalHandlers: false, once: false });
+  await startAnalysisWorkerLoop();
+  await startWebhookWorkerLoop({ workerId: `${os.hostname()}-webhook` });
 
   if (!stopping) {
     workerDone?.();

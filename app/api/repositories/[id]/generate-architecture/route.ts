@@ -63,7 +63,17 @@ export async function GET(
 ) {
     try {
         const user = await requireAuth(request);
+
+        if (!/^\d+$/.test(params.id)) {
+            return NextResponse.json({ error: "Invalid repository ID format" }, { status: 400 });
+        }
+
         const id = parseInt(params.id);
+
+        const repository = await repositoryService.getRepository(id, user.userId);
+        if (!repository) {
+            return NextResponse.json({ error: "Repository not found" }, { status: 404 });
+        }
 
         const knowledge = await prisma.repositoryKnowledge.findUnique({
             where: { repositoryId: id }

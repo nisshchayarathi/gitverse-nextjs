@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
@@ -62,15 +62,7 @@ export default function CompareRepositories() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [hasCompared, setHasCompared] = useState(false);
 
-  useEffect(() => {
-    if (!isAuthLoading && !isAuthenticated) {
-      router.push("/login");
-      return;
-    }
-    fetchRepositories();
-  }, [isAuthLoading, isAuthenticated]);
-
-  const fetchRepositories = async () => {
+  const fetchRepositories = useCallback(async () => {
     try {
       setIsListLoading(true);
       const token = localStorage.getItem("gitverse_token");
@@ -82,15 +74,16 @@ export default function CompareRepositories() {
       setRepoList(Array.isArray(repos) ? repos : []);
     } catch (error) {
       console.error("Failed to fetch repositories:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load repositories list",
-        variant: "destructive",
-      });
-    } finally {
-      setIsListLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push("/login");
+      return;
+    }
+    fetchRepositories();
+  }, [isAuthLoading, isAuthenticated, router, fetchRepositories]);
 
   const handleToggleSelect = (id: number) => {
     setSelectedIds((prev) => {

@@ -4,14 +4,15 @@ import { getNextAuthSecret } from "./config/env";
 import type { JWTPayload } from "./auth";
 import prisma from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
+import { hashApiKey } from "@/lib/utils/api-key";
 
 export interface AuthenticatedRequest {
   user: JWTPayload;
 }
 
 /**
- * Resolves the authenticated user from either a JWT bearer token
- * or a NextAuth session cookie.
+ * Resolves the authenticated user from either a JWT bearer token,
+ * an API key, or a NextAuth session cookie.
  * Rejects tokens issued before the user's latest password change.
  * Uses secure token validation with tokenVersion verification.
  */
@@ -20,46 +21,6 @@ export async function getAuthUser(
 ): Promise<JWTPayload | null> {
   const authHeader = request.headers.get("authorization");
   let userPayload: JWTPayload | null = null;
-
-  // 1) Secure JWT auth (Authorization: Bearer ...)
-  // Uses verifyTokenWithUserValidation for proper tokenVersion checking
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.substring(7);
-    
-    try {
-      const payload = await verifyTokenWithUserValidation(token);
-      
-      if (payload) {
-        // Additional security check: verify user still exists
-        const dbUser = await prisma.user.findUnique({
-          where: { id: payload.userId },
-          select: {
-            id: true,
-            tokenVersion: true,
-            lockedUntil: true,
-          },
-        });
-
-        if (!dbUser) {
-          return null;
-        }
-
-        if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
-          return null;
-        }
-
-        // Double-check tokenVersion matches (extra security)
-        if (payload.tokenVersion !== dbUser.tokenVersion) {
-          return null;
-        }
-
-        userPayload = payload;
-      }
-    } catch (error) {
-      console.warn("[Auth] JWT validation error:", error);
-      return null;
-    }
-  }
 
   // 2) NextAuth session cookie (Google OAuth)
   if (!userPayload) {
@@ -116,6 +77,13 @@ export async function getAuthUser(
           jwtTokenVersion != null &&
           jwtTokenVersion !== dbUser.tokenVersion
         ) {
+          try {
+            request.cookies.delete("next-auth.session-token");
+            request.cookies.delete("next-auth.csrf-token");
+            request.cookies.delete("next-auth.callback-url");
+          } catch {
+            // Best-effort cookie clearing
+          }
           return null;
         }
 
@@ -171,6 +139,29 @@ export async function requireAuth(
 
   if (!user) {
     throw new HttpError(401, "Unauthorized");
+  }
+
+  return user;
+}
+
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim()) : [];
+
+/**
+ * Checks if the given user is an administrator.
+ */
+export function isAdmin(user: JWTPayload): boolean {
+  return ADMIN_EMAILS.includes(user.email);
+}
+
+/**
+ * Ensures the incoming request is authenticated AND the user is an admin.
+ * Throws an HttpError if authentication or authorization fails.
+ */
+export async function requireAdmin(request: NextRequest): Promise<JWTPayload> {
+  const user = await requireAuth(request);
+
+  if (!isAdmin(user)) {
+    throw new HttpError(403, "Forbidden: Admin access required");
   }
 
   return user;

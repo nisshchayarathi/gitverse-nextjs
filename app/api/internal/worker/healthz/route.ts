@@ -4,7 +4,7 @@ import {
   validateRequiredSecrets,
   validateSecretIsolation,
 } from "@/lib/utils/internalAuth";
-import { checkEncryptionHealth } from "@/lib/utils/tokenEncryption";
+import { checkEncryptionHealth } from "@/lib/utils/envelopeEncryption";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 export const runtime = "nodejs";
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     };
   }
 
-  const encryptionHealth = checkEncryptionHealth();
+  const encryptionHealth = await checkEncryptionHealth();
   if (encryptionHealth.healthy) {
     checks.tokenEncryption = { status: "ok" };
   } else {

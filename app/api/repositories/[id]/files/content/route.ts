@@ -31,10 +31,23 @@ function validateFilePath(filePath: string): string | null {
     return "Absolute path not allowed";
   }
 
+  if (filePath.includes("//")) {
+    return "path must not contain empty segments";
+  }
+
+  if (filePath.endsWith("/")) {
+    return "path must not end with slash";
+  }
+
   if (filePath.includes("\0") || filePath.toLowerCase().includes("%00")) {
     return "Null bytes not allowed";
   }
-  
+
+  // Check for special characters that could be injection vectors
+  if (/[<>@!$%^&*(){}[\]|]/.test(filePath)) {
+    return "path contains invalid characters";
+  }
+
   let decodedPath = filePath;
   try {
     decodedPath = decodeURIComponent(filePath);
@@ -42,26 +55,44 @@ function validateFilePath(filePath: string): string | null {
   } catch (e) {
     // Ignore decoding errors
   }
-  
+
+  if (decodedPath.includes("\\")) {
+    return "Path traversal detected";
+  }
+
+  if (decodedPath.includes("\0")) {
+    return "Null bytes not allowed";
+  }
+
   const segments = decodedPath.split("/");
+  // Check for path traversal (..) first before other checks
   for (const segment of segments) {
     if (segment.includes("..")) {
-      return "Path traversal detected"; 
+      return "Path traversal detected";
     }
+  }
+  // Check for leading . segment (e.g., ./src)
+  if (segments.length > 0 && segments[0] === ".") {
+    return "path must not contain . segment";
   }
 
   const lowerPath = filePath.toLowerCase();
+  const fileName = lowerPath.split("/").pop() || "";
   for (const sensitive of SENSITIVE_FILES) {
-    if (lowerPath === sensitive || lowerPath.endsWith(`/${sensitive}`)) {
+    if (lowerPath === sensitive || fileName === sensitive) {
       return "Access to sensitive files is restricted";
     }
   }
 
-  const extMatch = filePath.match(/\.([a-zA-Z0-9]+)(?:[#?].*)?$/);
-  if (extMatch) {
-    const ext = extMatch[1].toLowerCase();
-    if (!ALLOWED_TEXT_EXTENSIONS.includes(ext)) {
-      return "Binary files and media are not supported";
+  // Allow dotfiles (e.g., .env.example) unless in sensitive list
+  // For regular files, check extension against whitelist
+  if (!fileName.startsWith(".")) {
+    const extMatch = filePath.match(/\.([a-zA-Z0-9]+)(?:[#?].*)?$/);
+    if (extMatch) {
+      const ext = extMatch[1].toLowerCase();
+      if (!ALLOWED_TEXT_EXTENSIONS.includes(ext)) {
+        return "Binary files and media are not supported";
+      }
     }
   }
 
@@ -173,13 +204,13 @@ export async function GET(
     if (contentLengthHeader) {
       const size = parseInt(contentLengthHeader, 10);
       if (size > MAX_FILE_SIZE) {
-        return NextResponse.json({ error: "File size exceeds 1MB limit" }, { status: 400 });
+        return NextResponse.json({ error: "File size is too large" }, { status: 413 });
       }
     }
 
     const content = await response.text();
     if (content.length > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: "File size exceeds 1MB limit" }, { status: 400 });
+      return NextResponse.json({ error: "File size is too large" }, { status: 413 });
     }
 
     return NextResponse.json({ content, path: filePath });

@@ -95,6 +95,15 @@ function prismaIntIdAdapter(): Adapter {
         ...account,
         userId: intUserId(account.userId),
       } as any;
+
+      if (data.access_token || data.refresh_token || data.id_token) {
+        const { encryptToken } = await import("@/lib/utils/envelopeEncryption");
+        if (data.access_token) data.access_token = await encryptToken(data.access_token);
+        if (data.refresh_token) data.refresh_token = await encryptToken(data.refresh_token);
+        if (data.id_token) data.id_token = await encryptToken(data.id_token);
+        data.tokenEncrypted = true;
+      }
+
       await prisma.account.create({ data });
       return account;
     },
@@ -264,13 +273,13 @@ async function verifyGoogleIdToken(idToken: string) {
 if ((googleClientId || googleClientSecret) && !isGoogleConfigured) {
   // Intentionally do not log secrets.
   console.warn(
-    "[auth] Google OAuth is not fully configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to real values (not placeholders), then restart the dev server."
+    "[auth] Google OAuth is not fully configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to real values (not placeholders), then restart the dev server.",
   );
 }
 
 if ((githubClientId || githubClientSecret) && !isGithubConfigured) {
   console.warn(
-    "[auth] GitHub OAuth is not fully configured. Set GITHUB_ID and GITHUB_SECRET to real values (not placeholders), then restart the dev server."
+    "[auth] GitHub OAuth is not fully configured. Set GITHUB_ID and GITHUB_SECRET to real values (not placeholders), then restart the dev server.",
   );
 }
 
@@ -279,10 +288,52 @@ if ((githubClientId || githubClientSecret) && !isGithubConfigured) {
 if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
   console.warn(
     "[auth][warning] NEXTAUTH_URL environment variable is not set in production. " +
-    "This will likely cause Google OAuth 'redirect_uri_mismatch' errors because the " +
-    "callback URL cannot be reliably inferred. Please set NEXTAUTH_URL to your exact production domain (e.g., https://yourdomain.com)."
+      "This will likely cause Google OAuth 'redirect_uri_mismatch' errors because the " +
+      "callback URL cannot be reliably inferred. Please set NEXTAUTH_URL to your exact production domain (e.g., https://yourdomain.com).",
   );
 }
+
+const tokenVersionCache = new Map<
+  string,
+  { version: number; fetchedAt: number }
+>();
+const CACHE_TTL_MS = 60_000;
+
+async function getFreshTokenVersion(
+  sub: string | undefined,
+  fallback: number | undefined,
+): Promise<number | undefined> {
+  if (!sub) return fallback;
+  const userId = Number(sub);
+  if (!Number.isFinite(userId)) return fallback;
+
+  const cached = tokenVersionCache.get(sub);
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+    return cached.version;
+  }
+
+  try {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { tokenVersion: true },
+    });
+    if (dbUser) {
+      tokenVersionCache.set(sub, {
+        version: dbUser.tokenVersion,
+        fetchedAt: Date.now(),
+      });
+      return dbUser.tokenVersion;
+    }
+  } catch {
+    // DB unavailable — use the existing token version from the JWT cookie
+  }
+  return fallback;
+}
+
+// Pre-computed dummy hash for timing-safe comparison.
+// Generated via bcrypt.hashSync("dummy", 10) - must be exactly 60 characters.
+const DUMMY_BCRYPT_HASH =
+  "$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqZR2r0Y2ILi7z1tPzC6mXi7TE7.K";
 
 export const authOptions: NextAuthOptions = {
   debug: process.env.NEXTAUTH_DEBUG === "true",
@@ -358,33 +409,27 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
         });
 
-        if (!user) {
-          throw new Error("Invalid email or password");
-        }
-
-        // Security: never allow password login for OAuth-only accounts.
-        // An OAuth-only account has no local passwordHash, but does have a linked provider account.
-        if (!user.passwordHash) {
-          const hasOAuthAccount =
-            (await prisma.account.count({
-              where: { userId: user.id },
-            })) > 0;
-
-          if (hasOAuthAccount) {
-            throw new Error(
-              "Email already exists. Please sign in with your linked social account."
-            );
-          }
-
-          throw new Error("Invalid email or password");
-        }
-
+        // To prevent timing attacks, always run bcrypt.compare with a dummy hash if user/hash is missing.
+        const passwordHashToCompare = user?.passwordHash || DUMMY_BCRYPT_HASH;
         const isValidPassword = await bcrypt.compare(
           credentials.password,
-          user.passwordHash
+          passwordHashToCompare,
         );
 
-        if (!isValidPassword) {
+        if (!user || !user.passwordHash || !isValidPassword) {
+          if (!user) {
+            console.info(
+              `[auth-config] Credentials login failed: User not found for email ${credentials.email}`,
+            );
+          } else if (!user.passwordHash) {
+            console.info(
+              `[auth-config] Credentials login failed: User ${user.id} has no password hash`,
+            );
+          } else {
+            console.info(
+              `[auth-config] Credentials login failed: Incorrect password for user ${user.id}`,
+            );
+          }
           throw new Error("Invalid email or password");
         }
 
@@ -413,7 +458,12 @@ export const authOptions: NextAuthOptions = {
         try {
           const fresh = await prisma.user.findUnique({
             where: { id },
-            select: { name: true, email: true, image: true, tokenVersion: true },
+            select: {
+              name: true,
+              email: true,
+              image: true,
+              tokenVersion: true,
+            },
           });
 
           if (fresh) {
@@ -423,12 +473,13 @@ export const authOptions: NextAuthOptions = {
 
             // Validate tokenVersion: if the JWT tokenVersion doesn't match
             // the DB, the session has been invalidated (password change/logout).
-            const jwtTokenVersion = (token as any).tokenVersion as number | undefined;
+            const jwtTokenVersion = (token as any).tokenVersion as
+              | number
+              | undefined;
             if (
               jwtTokenVersion != null &&
               fresh.tokenVersion !== jwtTokenVersion
             ) {
-              // Return minimal session to signal invalidation
               return {
                 ...session,
                 user: { id: (session.user as any).id },
@@ -465,29 +516,13 @@ export const authOptions: NextAuthOptions = {
         ((user as any)?.image as string | undefined);
 
       // Attach tokenVersion for session invalidation on password change/logout.
-      // On initial sign-in (user object present), fetch from DB.
-      // On subsequent requests, keep the existing tokenVersion from the cookie.
-      let tokenVersion: number | undefined =
-        typeof (token as any).tokenVersion === "number"
-          ? (token as any).tokenVersion
-          : undefined;
-
-      if (user) {
-        const userId = Number((user as any).id);
-        if (Number.isFinite(userId)) {
-          try {
-            const dbUser = await prisma.user.findUnique({
-              where: { id: userId },
-              select: { tokenVersion: true },
-            });
-            if (dbUser) {
-              tokenVersion = dbUser.tokenVersion;
-            }
-          } catch {
-            // If DB is unavailable, keep existing tokenVersion
-          }
-        }
-      }
+      // Always fetch from DB on every JWT callback invocation so that logout
+      // or password change is reflected within one token refresh cycle (~5 min).
+      // Cache the DB lookup for 60 seconds to avoid excessive queries.
+      const tokenVersion = await getFreshTokenVersion(
+        user ? String((user as any).id) : token.sub,
+        (token as any).tokenVersion as number | undefined,
+      );
 
       const safeToken: Record<string, unknown> = {
         sub,
@@ -499,7 +534,7 @@ export const authOptions: NextAuthOptions = {
 
       if (process.env.NEXTAUTH_DEBUG === "true") {
         const keys = Object.keys(safeToken).filter(
-          (k) => safeToken[k] !== undefined
+          (k) => safeToken[k] !== undefined,
         );
         const size = JSON.stringify(safeToken).length;
         console.debug("[auth] jwt payload bytes", { size, keys });

@@ -86,7 +86,7 @@ describe("Prisma connection lifecycle", () => {
 
   beforeAll(() => {
     process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
-    process.env.NODE_ENV = "test";
+    (process.env as any).NODE_ENV = "test";
     process.env.PRISMA_ADAPTER = "pg";
 
     jest.isolateModules(() => {
@@ -96,7 +96,7 @@ describe("Prisma connection lifecycle", () => {
 
   afterAll(() => {
     process.env.DATABASE_URL = ORIGINAL_DB_URL;
-    process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    (process.env as any).NODE_ENV = ORIGINAL_NODE_ENV;
     process.removeAllListeners("beforeExit");
   });
 

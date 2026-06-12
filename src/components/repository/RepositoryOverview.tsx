@@ -47,6 +47,7 @@ import { QuickStartChecklist } from "@/components/repository/QuickStartChecklist
 import { FolderImportanceGuide } from "@/components/repository/FolderImportanceGuide";
 import { SavedModulesPanel } from "@/components/repository/SavedModulesPanel";
 import { ModuleComparisonTool } from "@/components/repository/ModuleComparisonTool";
+import { GoodFirstIssueGenerator } from "@/components/repository/GoodFirstIssueGenerator";
 import { RepositoryInsightsDashboard } from "@/components/repository/RepositoryInsightsDashboard";
 import { useModuleBookmarks } from "@/hooks/useModuleBookmarks";
 import { IssueData } from "@/types/firstPRSimulator";
@@ -55,12 +56,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import { ContributorJourneyPanel } from "@/components/repository/ContributorJourneyPanel";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/hooks/use-toast";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { FavoriteButton } from "./FavoriteButton";
-
 
 interface RepositoryData {
   id: string;
@@ -289,14 +290,14 @@ export const RepositoryOverview = ({
     setSelectedIssue(null);
   };
 
-  const MODULE_GUIDANCE: Record<
+  const MODULE_GUIDANCE = useMemo<Record<
     string,
     {
       description: string;
       recommendation: string;
       difficulty: "beginner" | "intermediate" | "advanced";
     }
-  > = {
+  >>(() => ({
     components: {
       description:
         "Contains reusable UI building blocks used throughout the application.",
@@ -328,7 +329,7 @@ export const RepositoryOverview = ({
       recommendation: "Requires understanding of security flows.",
       difficulty: "advanced",
     },
-  };
+  }), []);
 
   const ARCHITECTURE_GUIDANCE: Record<string, string> = {
     services:
@@ -355,7 +356,7 @@ export const RepositoryOverview = ({
     return Array.from(segments).filter((segment) =>
       Object.prototype.hasOwnProperty.call(MODULE_GUIDANCE, segment),
     );
-  }, [repositoryData?.files]);
+  }, [repositoryData?.files, MODULE_GUIDANCE]);
 
   const hotspotGuidance = useMemo(() => {
     const filePaths = (repositoryData?.files || []).map((file: any) =>
@@ -775,6 +776,8 @@ export const RepositoryOverview = ({
 
         <RepositoryInsightsDashboard repositoryData={repositoryData} />
 
+        <GoodFirstIssueGenerator repository={repositoryMetadata} />
+
         <ModuleComparisonTool />
 
         <FolderImportanceGuide />
@@ -914,6 +917,9 @@ export const RepositoryOverview = ({
           </CardContent>
         </Card>
       </div>
+
+      {/* Contributor Journey Simulator */}
+      <ContributorJourneyPanel repository={repositoryData} />
 
       {/* README */}
       <div className="grid grid-cols-1 gap-4 sm:gap-6">

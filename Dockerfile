@@ -16,26 +16,21 @@ RUN apt-get update \
 
 FROM base AS deps
 
-# Install devDependencies too (Tailwind/PostCSS live there), regardless of NODE_ENV.
-ENV NPM_CONFIG_INCLUDE=dev
-
 # Install dependencies (incl. dev deps for build)
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --include=dev
 
 
 FROM base AS builder
 
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Build Next.js and generate Prisma client
 RUN npm run build
-
-# Compile background worker to plain JS for production runtime
-RUN npm run build:worker
 
 # Keep only production deps (keeps generated Prisma client artifacts too)
 RUN npm prune --omit=dev
@@ -63,6 +58,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/dist-worker ./dist-worker
+
+# Compile background worker in the runner stage so it always runs
+# even when the builder layer is served from cache and dist-worker/
+# is no longer committed in the repository.
+RUN npm run build:worker
 
 CMD ["npm", "start"]

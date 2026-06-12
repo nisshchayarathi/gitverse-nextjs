@@ -198,17 +198,18 @@ finally {
 </DropdownMenu>
 </div>
 </div>
-</div>
           </CardContent>
         </Card>
         {/* Results Count */}
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {sortedRepositories.length}{" "}
-            {sortedRepositories.length === 1 ? "repository" : "repositories"}{" "}
-            found
-          </p>
-        </div>
+        {!loading && !error && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {sortedRepositories.length}{" "}
+              {sortedRepositories.length === 1 ? "repository" : "repositories"}{" "}
+              found
+            </p>
+          </div>
+        )}
 
         {/* Repository Grid/List */}
         {loading ? (

@@ -653,10 +653,10 @@ export default function LandingPage() {
             onTouchCancel={() => setIsCarouselPaused(false)}
           >
             <button
-              className="feature-carousel__nav feature-carousel__nav--left"
-              aria-label="Previous feature"
-              onClick={goPrev}
-            >
+  className="feature-carousel__nav feature-carousel__nav--left transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-2xl cursor-pointer"
+  aria-label="Previous feature"
+  onClick={goPrev}
+>
               <ChevronLeft className="h-5 w-5" />
             </button>
             <div className="feature-carousel__viewport">
@@ -710,10 +710,10 @@ export default function LandingPage() {
               </div>
             </div>
             <button
-              className="feature-carousel__nav feature-carousel__nav--right"
-              aria-label="Next feature"
-              onClick={goNext}
-            >
+  className="feature-carousel__nav feature-carousel__nav--right transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-2xl cursor-pointer"
+  aria-label="Next feature"
+  onClick={goNext}
+>
               <ChevronRight className="h-5 w-5" />
             </button>
 

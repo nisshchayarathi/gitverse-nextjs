@@ -99,7 +99,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Section */}
         <div className="mt-12 pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-sm">&copy; 2026 GitVerse. All rights reserved.</p>
+          <p className="text-sm">&copy; {new Date().getFullYear()} GitVerse. All rights reserved.</p>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <a
               href="https://x.com/nisshchayarathi"

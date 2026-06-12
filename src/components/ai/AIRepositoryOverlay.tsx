@@ -86,7 +86,7 @@ export function AIRepositoryOverlay({ repository }: AIRepositoryOverlayProps) {
       };
       setMessages([greeting]);
     }
-  }, [isOpen, repository.name]);
+  }, [isOpen, repository.name, messages.length]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

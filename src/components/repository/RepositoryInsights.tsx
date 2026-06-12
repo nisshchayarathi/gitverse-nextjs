@@ -7,9 +7,8 @@ import { useState } from 'react'
 import { toast } from '@/hooks/use-toast'
 import axios from 'axios'
 
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 import { Loader2 } from "lucide-react";
+import { exportElement } from '@/lib/exportUtils'
 
 interface LanguageStat {
   name: string;
@@ -51,39 +50,37 @@ export function RepositoryInsights({
   const [progressPercent, setProgressPercent] = useState(0);
 
   const downloadPNG = async () => {
-    const element = document.getElementById("repo-analysis");
-
-    if (!element) return;
-
-    const canvas = await html2canvas(element);
-
-    const link = document.createElement("a");
-
-    link.download = "repository-analysis.png";
-
-    link.href = canvas.toDataURL("image/png");
-
-    link.click();
+    try {
+      await exportElement("repo-analysis", "png", "repository-analysis");
+      toast({
+        title: "Success",
+        description: "Repository analysis exported as PNG.",
+      });
+    } catch (error: any) {
+      console.error("Failed to export PNG:", error);
+      toast({
+        title: "Export failed",
+        description: error.message || "Failed to export repository analysis as PNG.",
+        variant: "destructive",
+      });
+    }
   };
 
   const downloadPDF = async () => {
-    const element = document.getElementById("repo-analysis");
-
-    if (!element) return;
-
-    const canvas = await html2canvas(element);
-
-    const imgData = canvas.toDataURL("image/png");
-
-    const pdf = new jsPDF("p", "mm", "a4");
-
-    const pdfWidth = 210;
-
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-
-    pdf.save("repository-analysis.pdf");
+    try {
+      await exportElement("repo-analysis", "pdf", "repository-analysis");
+      toast({
+        title: "Success",
+        description: "Repository analysis exported as PDF.",
+      });
+    } catch (error: any) {
+      console.error("Failed to export PDF:", error);
+      toast({
+        title: "Export failed",
+        description: error.message || "Failed to export repository analysis as PDF.",
+        variant: "destructive",
+      });
+    }
   };
 
   const generateArchitectureMarkdown = async () => {
