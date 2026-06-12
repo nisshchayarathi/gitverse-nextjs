@@ -152,7 +152,7 @@ export default function Dashboard() {
   const fetchRepositories = async () => {
     try {
       const token = localStorage.getItem("gitverse_token");
-      const response = await axios.get(buildApiUrl("/api/repositories?limit=1000"), {
+      const response = await axios.get(buildApiUrl("/api/repositories?limit=50"), {
         headers: { Authorization: `Bearer ${token}` },
       });
       // API returns { data: { repositories: [...] } } via apiSuccess wrapper

@@ -2,9 +2,17 @@
 
 export const dynamic = "force-dynamic";
 import { toast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, Grid, List, GitBranch, Clock, Activity } from "lucide-react";
+import {
+  Search,
+  Grid,
+  List,
+  GitBranch,
+  Clock,
+  Activity,
+  Loader2,
+} from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   Card,
@@ -17,16 +25,13 @@ import {
   EmptyState,
   Skeleton,
 } from "@/components/ui";
-import { buildApiUrl } from "@/services/apiConfig";
-import axios from "axios";
-
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from '@/components/ui/dropdown-menu'
-
+} from "@/components/ui/dropdown-menu";
+import { useRepositories } from "@/hooks/useRepositories";
 
 interface Repository {
   id: string;
@@ -51,62 +56,21 @@ export default function SearchPage() {
   const [searchQuery, setSearchQuery] = useState(initialUrl);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"recent" | "stars" | "name">("recent");
-  const [repositories, setRepositories] = useState<Repository[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetchRepositories();
-  }, []);
+  const {
+    repos: repositories,
+    isLoading: loading,
+    isLoadingMore,
+    hasMore,
+    totalCount,
+    error,
+    loadMore,
+  } = useRepositories({ search: searchQuery, limit: 15 });
 
-  const fetchRepositories = async () => {
-     setError("");
-    try {
-      const token = localStorage.getItem("gitverse_token");
-      const response = await axios.get(buildApiUrl("/api/repositories"), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // API returns { data: { repositories: [...] } } via apiSuccess wrapper
-      const repos = response.data.data?.repositories || [];
-      setRepositories(Array.isArray(repos) ? repos : []);
-    }  
-    catch (error: any) {
-  console.error("Error fetching repositories:", error);
-
-  setRepositories([]);
-
-  const message =
-    error?.response?.data?.message ||
-    "Failed to load repositories. Please check your connection and try again.";
-
-  setError(message);
-
-  toast({
-    title: "Error",
-    description: message,
-    variant: "destructive",
-  });
-}
-
-finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredRepositories = Array.isArray(repositories)
-    ? repositories.filter(
-        (repo) =>
-          repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (repo.description || "")
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase())
-      )
-    : [];
-
-  const sortedRepositories = [...filteredRepositories].sort((a, b) => {
+  const sortedRepositories = [...repositories].sort((a: any, b: any) => {
     if (sortBy === "stars") return (b.stars || 0) - (a.stars || 0);
     if (sortBy === "name") return a.name.localeCompare(b.name);
-    return 0; // 'recent' is already sorted
+    return 0; // 'recent' is default from API (ordered by id desc)
   });
 
   return (
@@ -130,7 +94,7 @@ finally {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search repositories..."
+                  placeholder="Search repositories by name or URL..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 bg-background/50"
@@ -204,9 +168,9 @@ finally {
         {!loading && !error && (
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              {sortedRepositories.length}{" "}
-              {sortedRepositories.length === 1 ? "repository" : "repositories"}{" "}
-              found
+              {searchQuery
+                ? `${totalCount} ${totalCount === 1 ? "repository" : "repositories"} found`
+                : `${totalCount} ${totalCount === 1 ? "repository" : "repositories"} total`}
             </p>
           </div>
         )}
@@ -289,78 +253,6 @@ finally {
                 onAction={() => setSearchQuery("")}
               />
               
-              {repositories.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between px-2 sm:px-0">
-                    <h2 className="text-xl font-heading font-semibold flex items-center gap-2">
-                      <GitBranch className="h-5 w-5 text-primary" />
-                      Explore Available Repositories
-                    </h2>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                    {repositories.slice(0, 3).map((repo, index) => (
-                      <Card
-                        key={repo.id}
-                        className="glass glass-hover cursor-pointer transition-transform hover:scale-[1.02] focus-within:scale-[1.02]"
-                        onClick={() => router.push(`/repo/${repo.id}`)}
-                        style={{ animationDelay: `${index * 0.05}s` }}
-                      >
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-lg bg-primary/10">
-                                <GitBranch className="h-5 w-5 text-primary" />
-                              </div>
-                              <div>
-                                <CardTitle className="font-heading text-base sm:text-lg break-all">
-                                  {repo.name}
-                                </CardTitle>
-                                <CardDescription className="text-xs font-mono break-all max-w-[180px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[400px]">
-                                  {repo.url}
-                                </CardDescription>
-                              </div>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-xs sm:text-sm text-muted-foreground mb-4 line-clamp-2 min-h-[32px]">
-                            {repo.description || "No description available"}
-                          </p>
-                          <div className="flex flex-wrap items-center justify-between text-xs sm:text-sm">
-                            <div className="flex items-center gap-4 text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Activity className="h-4 w-4" />
-                                {(repo as any)._count?.commits || 0}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <GitBranch className="h-4 w-4" />
-                                {(repo as any)._count?.branches || 0}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              {new Date(
-                                (repo as any).lastAnalyzedAt || (repo as any).createdAt
-                              ).toLocaleDateString()}
-                            </div>
-                          </div>
-                          <div className="mt-3 pt-3 border-t border-border/50">
-                            {(repo as any).languages?.[0]?.name ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-accent/10 text-accent">
-                                {(repo as any).languages[0].name}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-muted/50 text-muted-foreground">
-                                No language
-                              </span>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
             <EmptyState
@@ -372,6 +264,7 @@ finally {
             />
           )
         ) : viewMode === "grid" ? (
+          <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {sortedRepositories.map((repo, index) => (
               <Card
@@ -434,7 +327,30 @@ finally {
               </Card>
             ))}
           </div>
+
+          {/* Load More Button */}
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={loadMore}
+                disabled={isLoadingMore}
+                className="min-w-[160px]"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Load More"
+                )}
+              </Button>
+            </div>
+          )}
+          </>
         ) : (
+          <>
           <div className="flex flex-col gap-3">
             {sortedRepositories.map((repo, index) => (
               <Card
@@ -485,6 +401,28 @@ finally {
               </Card>
             ))}
           </div>
+
+          {/* Load More Button */}
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={loadMore}
+                disabled={isLoadingMore}
+                className="min-w-[160px]"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Load More"
+                )}
+              </Button>
+            </div>
+          )}
+          </>
         )}
       </div>
     </DashboardLayout>

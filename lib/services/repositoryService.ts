@@ -892,29 +892,42 @@ export class RepositoryService {
     return repository;
   }
 
-  async listRepositories(userId: number, limit: number = 10, cursor?: number) {
-    const repositories = await prisma.repository.findMany({
-      where: { userId },
-      take: limit + 1, // Fetch one extra to determine if hasMore
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      include: {
-        _count: {
-          select: {
-            commits: true,
-            contributors: true,
-            files: true,
-            branches: true,
-            subPackages: true,
+  async listRepositories(userId: number, limit: number = 10, cursor?: number, search?: string) {
+    const whereClause: any = { userId };
+
+    if (search && search.trim().length > 0) {
+      const term = search.trim();
+      whereClause.OR = [
+        { name: { contains: term, mode: "insensitive" } },
+        { url: { contains: term, mode: "insensitive" } },
+      ];
+    }
+
+    const [repositories, totalCount] = await Promise.all([
+      prisma.repository.findMany({
+        where: whereClause,
+        take: limit + 1, // Fetch one extra to determine if hasMore
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        include: {
+          _count: {
+            select: {
+              commits: true,
+              contributors: true,
+              files: true,
+              branches: true,
+              subPackages: true,
+            },
           },
+          languages: {
+            orderBy: { percentage: "desc" },
+            take: 3,
+          },
+          parent: true,
         },
-        languages: {
-          orderBy: { percentage: "desc" },
-          take: 3,
-        },
-        parent: true,
-      },
-      orderBy: { id: "desc" },
-    });
+        orderBy: { id: "desc" },
+      }),
+      prisma.repository.count({ where: whereClause }),
+    ]);
 
     let nextCursor: number | undefined = undefined;
     if (repositories.length > limit) {
@@ -926,6 +939,7 @@ export class RepositoryService {
       data: repositories,
       nextCursor,
       hasMore: nextCursor !== undefined,
+      totalCount,
     };
   }
 
