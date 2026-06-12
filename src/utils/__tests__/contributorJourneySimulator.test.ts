@@ -1,8 +1,9 @@
 import { simulateContributorJourney } from "../contributorJourneySimulator";
+import { RepositoryAnalysisData } from "@/types/contributionPath";
 
 describe("contributor journey simulator", () => {
   it("infers authentication category and ranks auth files highly", () => {
-    const repository = {
+    const repository: RepositoryAnalysisData = {
       files: [
         { path: "src/auth.ts", size: 18_000 },
         { path: "src/middleware.ts", size: 9_000 },
@@ -12,8 +13,20 @@ describe("contributor journey simulator", () => {
         { path: "src/utils/helpers.ts", size: 6_000 },
       ],
       commits: [
-        { message: "Fix auth provider flow" },
-        { message: "Improve login session handling" },
+        {
+          hash: "abc1234",
+          message: "Fix auth provider flow",
+          author: "Author A",
+          date: new Date(),
+          filesChanged: 1,
+        },
+        {
+          hash: "def5678",
+          message: "Improve login session handling",
+          author: "Author B",
+          date: new Date(),
+          filesChanged: 1,
+        },
       ],
     };
 

@@ -22,6 +22,46 @@ export async function getAuthUser(
   const authHeader = request.headers.get("authorization");
   let userPayload: JWTPayload | null = null;
 
+  // 1) Secure JWT auth (Authorization: Bearer ...)
+  // Uses verifyTokenWithUserValidation for proper tokenVersion checking
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    
+    try {
+      const payload = await verifyTokenWithUserValidation(token);
+      
+      if (payload) {
+        // Additional security check: verify user still exists
+        const dbUser = await prisma.user.findUnique({
+          where: { id: payload.userId },
+          select: {
+            id: true,
+            tokenVersion: true,
+            lockedUntil: true,
+          },
+        });
+
+        if (!dbUser) {
+          return null;
+        }
+
+        if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
+          return null;
+        }
+
+        // Double-check tokenVersion matches (extra security)
+        if (payload.tokenVersion !== dbUser.tokenVersion) {
+          return null;
+        }
+
+        userPayload = payload;
+      }
+    } catch (error) {
+      console.warn("[Auth] JWT validation error:", error);
+      return null;
+    }
+  }
+
   // 2) NextAuth session cookie (Google OAuth)
   if (!userPayload) {
     try {
