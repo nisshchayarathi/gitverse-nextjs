@@ -12,8 +12,8 @@ describe("contributor journey simulator", () => {
         { path: "src/utils/helpers.ts", size: 6_000 },
       ],
       commits: [
-        { message: "Fix auth provider flow" },
-        { message: "Improve login session handling" },
+        { hash: "sha1", message: "Fix auth provider flow", author: "Author 1", date: new Date(), filesChanged: 1 },
+        { hash: "sha2", message: "Improve login session handling", author: "Author 2", date: new Date(), filesChanged: 2 },
       ],
     };
 

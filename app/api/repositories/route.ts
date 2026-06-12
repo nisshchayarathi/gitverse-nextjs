@@ -227,17 +227,20 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limitParam = searchParams.get("limit");
     const cursorParam = searchParams.get("cursor");
+    const searchParam = searchParams.get("search");
 
     const result = await repositoryService.listRepositories(
       user.userId,
       limitParam ? parseInt(limitParam) : 10,
       cursorParam ? parseInt(cursorParam) : undefined,
+      searchParam || undefined,
     );
 
     return apiSuccess({
       repositories: result.data,
       nextCursor: result.nextCursor,
       hasMore: result.hasMore,
+      totalCount: result.totalCount,
     });
   } catch (error: any) {
     console.error("List repositories error:", error);
