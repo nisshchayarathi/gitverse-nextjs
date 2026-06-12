@@ -143,8 +143,17 @@ export class DependencyGraphService {
    * Finds all direct and indirect dependents of the given changed files.
    * Limits traversal depth to avoid overly broad blast radius.
    */
-  getDownstreamDependents(graph: DependencyGraph, changedFiles: string[], maxDepth: number = 3): string[] {
+  getDownstreamDependents(
+    graph: DependencyGraph,
+    changedFiles: string[],
+    maxDepth: number = 3,
+    visited: Set<string> = new Set()
+  ): string[] {
     const affected = new Set<string>();
+    
+    // Initialize visited with original changed files to prevent processing them again
+    changedFiles.forEach(f => visited.add(f));
+    
     const queue: Array<{file: string, depth: number}> = changedFiles.map(f => ({file: f, depth: 0}));
 
     while (queue.length > 0) {
@@ -154,7 +163,8 @@ export class DependencyGraphService {
       const dependents = graph.get(file);
       if (dependents) {
         for (const dep of dependents) {
-          if (!affected.has(dep)) {
+          if (!visited.has(dep)) {
+            visited.add(dep);
             affected.add(dep);
             queue.push({file: dep, depth: depth + 1});
           }
