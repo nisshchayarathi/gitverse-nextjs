@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rotateDek } from "@/lib/utils/envelopeEncryption";
+import { rotateAndReEncryptAll } from "@/lib/utils/envelopeEncryption";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -13,18 +13,22 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await rotateDek();
-    console.log("[RotateDEK] Key rotated successfully");
+    const result = await rotateAndReEncryptAll();
+    console.log("[RotateDEK] Key rotated and credentials re-encrypted successfully");
 
     return NextResponse.json({
       success: true,
-      message: "DEK rotated successfully. Update WRAPPED_DEK in all environments.",
-      wrappedDekPrefix: result.newWrapped.substring(0, 16) + "...",
+      message: "DEK rotated and credentials re-encrypted successfully.",
+      githubAccountsCount: result.githubAccountsCount,
+      accountsCount: result.accountsCount,
+      mfaConfigsCount: result.mfaConfigsCount,
+      durationMs: result.durationMs,
+      newWrappedPrefix: result.newWrapped.substring(0, 16) + "...",
     });
   } catch (e: any) {
-    console.error("[RotateDEK] Rotation failed:", e.message);
+    console.error("[RotateDEK] Rotation and re-encryption failed:", e.message);
     return NextResponse.json(
-      { error: `DEK rotation failed: ${e.message}` },
+      { error: `DEK rotation and re-encryption failed: ${e.message}` },
       { status: 500 },
     );
   }

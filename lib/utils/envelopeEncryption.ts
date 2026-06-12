@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import { getKmsProvider, KmsProvider } from "@/lib/utils/kmsProvider";
+import prisma from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16;
@@ -32,23 +34,45 @@ async function initializeDek(): Promise<void> {
   if (dekPromise) return dekPromise;
 
   dekPromise = (async () => {
-    const wrapped = process.env.WRAPPED_DEK || null;
-
     if (isKmsConfigured()) {
       const kms = await ensureKms();
       const keyId = getKmsKeyId();
 
-      if (wrapped) {
-        const wrappedBuf = Buffer.from(wrapped, "base64");
-        const plaintext = await kms.decrypt(keyId, wrappedBuf);
-        dekCache = { plaintext, wrapped };
-      } else {
-        const result = await kms.generateDataKey(keyId, "AES_256");
-        dekCache = {
-          plaintext: result.plaintext,
-          wrapped: result.ciphertext.toString("base64"),
-        };
+      // Check database for active key first
+      let activeKeyRecord = await prisma.dataEncryptionKey.findFirst({
+        where: { isActive: true },
+      });
+
+      let activeWrapped = activeKeyRecord?.wrappedKey || null;
+
+      if (!activeWrapped) {
+        // Fallback to process.env.WRAPPED_DEK
+        activeWrapped = process.env.WRAPPED_DEK || null;
+
+        if (activeWrapped) {
+          // Save the env key to the database
+          await prisma.dataEncryptionKey.create({
+            data: {
+              wrappedKey: activeWrapped,
+              isActive: true,
+            },
+          });
+        } else {
+          // Generate new key and save to database
+          const result = await kms.generateDataKey(keyId, "AES_256");
+          activeWrapped = result.ciphertext.toString("base64");
+          await prisma.dataEncryptionKey.create({
+            data: {
+              wrappedKey: activeWrapped,
+              isActive: true,
+            },
+          });
+        }
       }
+
+      const wrappedBuf = Buffer.from(activeWrapped, "base64");
+      const plaintext = await kms.decrypt(keyId, wrappedBuf);
+      dekCache = { plaintext, wrapped: activeWrapped };
     } else {
       const keyHex = process.env.TOKEN_ENCRYPTION_KEY;
       if (!keyHex) throw new Error("TOKEN_ENCRYPTION_KEY is required when KMS is not configured");
@@ -138,6 +162,175 @@ export async function rotateDek(): Promise<{ oldWrapped: string | null; newWrapp
   dekCache = { plaintext: newPlaintext, wrapped: newWrapped };
 
   return { oldWrapped, newWrapped };
+}
+
+export async function rotateAndReEncryptAll(): Promise<{
+  oldWrapped: string | null;
+  newWrapped: string;
+  githubAccountsCount: number;
+  accountsCount: number;
+  mfaConfigsCount: number;
+  durationMs: number;
+}> {
+  const startTime = Date.now();
+
+  if (!isKmsConfigured()) {
+    throw new Error("KMS must be configured to rotate DEK. Set KMS_KEY_ID and KMS_PROVIDER=aws.");
+  }
+
+  // Ensure current DEK is loaded in memory
+  await initializeDek();
+  if (!dekCache || !dekCache.plaintext) {
+    throw new Error("Failed to initialize current DEK");
+  }
+  const oldPlaintext = dekCache.plaintext;
+
+  const kms = await ensureKms();
+  const keyId = getKmsKeyId();
+
+  // Find the active wrapped key in database (to track oldWrapped)
+  const activeKeyRecord = await prisma.dataEncryptionKey.findFirst({
+    where: { isActive: true },
+  });
+  const oldWrapped = activeKeyRecord?.wrappedKey ?? dekCache.wrapped;
+
+  logger.info(
+    { oldWrapped: oldWrapped ? `${oldWrapped.substring(0, 20)}...` : null },
+    "Generating new DEK from AWS KMS..."
+  );
+
+  const result = await kms.generateDataKey(keyId, "AES_256");
+  const newPlaintext = result.plaintext;
+  const newWrapped = result.ciphertext.toString("base64");
+
+  logger.info("Fetching credentials for re-encryption...");
+
+  // Retrieve all records to be re-encrypted
+  const githubAccounts = await prisma.gitHubAccount.findMany({
+    select: { id: true, accessToken: true, tokenEncrypted: true },
+  });
+
+  const accounts = await prisma.account.findMany({
+    where: { access_token: { not: null } },
+    select: { id: true, access_token: true, tokenEncrypted: true },
+  });
+
+  const mfaConfigs = await prisma.mfaConfig.findMany({
+    select: { id: true, totpSecret: true, tokenEncrypted: true },
+  });
+
+  logger.info(
+    {
+      githubAccountsCount: githubAccounts.length,
+      accountsCount: accounts.length,
+      mfaConfigsCount: mfaConfigs.length,
+    },
+    "Decrypting and re-encrypting credentials in memory..."
+  );
+
+  const decryptedLegacyHex = process.env.TOKEN_ENCRYPTION_KEY;
+  const legacyKey = decryptedLegacyHex ? Buffer.from(decryptedLegacyHex.trim(), "hex") : null;
+
+  const decryptValue = (val: string): string => {
+    try {
+      return aesDecrypt(val, oldPlaintext);
+    } catch (err) {
+      if (legacyKey && legacyKey.length === DEK_BYTE_LENGTH) {
+        try {
+          return aesDecrypt(val, legacyKey);
+        } catch {}
+      }
+      throw new Error(`Failed to decrypt credential with current DEK and legacy key: ${err}`);
+    }
+  };
+
+  const reEncryptedGithubAccounts = githubAccounts.map((item: { id: number; accessToken: string; tokenEncrypted: boolean }) => {
+    const plain = item.tokenEncrypted ? decryptValue(item.accessToken) : item.accessToken;
+    return {
+      id: item.id,
+      encrypted: aesEncrypt(plain, newPlaintext),
+    };
+  });
+
+  const reEncryptedAccounts = accounts.map((item: { id: string; access_token: string | null; tokenEncrypted: boolean }) => {
+    const plain = item.tokenEncrypted ? decryptValue(item.access_token!) : item.access_token!;
+    return {
+      id: item.id,
+      encrypted: aesEncrypt(plain, newPlaintext),
+    };
+  });
+
+  const reEncryptedMfaConfigs = mfaConfigs.map((item: { id: number; totpSecret: string; tokenEncrypted: boolean }) => {
+    const plain = item.tokenEncrypted ? decryptValue(item.totpSecret) : item.totpSecret;
+    return {
+      id: item.id,
+      encrypted: aesEncrypt(plain, newPlaintext),
+    };
+  });
+
+  logger.info("Executing database transaction for DEK rotation...");
+
+  await prisma.$transaction(async (tx) => {
+    // 1. Mark existing active DEKs as inactive
+    await tx.dataEncryptionKey.updateMany({
+      where: { isActive: true },
+      data: { isActive: false },
+    });
+
+    // 2. Create the new active DEK
+    await tx.dataEncryptionKey.create({
+      data: {
+        wrappedKey: newWrapped,
+        isActive: true,
+      },
+    });
+
+    // 3. Update all database records
+    for (const update of reEncryptedGithubAccounts) {
+      await tx.gitHubAccount.update({
+        where: { id: update.id },
+        data: { accessToken: update.encrypted, tokenEncrypted: true },
+      });
+    }
+
+    for (const update of reEncryptedAccounts) {
+      await tx.account.update({
+        where: { id: update.id },
+        data: { access_token: update.encrypted, tokenEncrypted: true },
+      });
+    }
+
+    for (const update of reEncryptedMfaConfigs) {
+      await tx.mfaConfig.update({
+        where: { id: update.id },
+        data: { totpSecret: update.encrypted, tokenEncrypted: true },
+      });
+    }
+  });
+
+  // Update in-memory cache
+  dekCache = { plaintext: newPlaintext, wrapped: newWrapped };
+  const durationMs = Date.now() - startTime;
+
+  logger.info(
+    {
+      newWrapped: `${newWrapped.substring(0, 20)}...`,
+      githubAccountsCount: reEncryptedGithubAccounts.length,
+      accountsCount: reEncryptedAccounts.length,
+      mfaConfigsCount: reEncryptedMfaConfigs.length,
+      durationMs,
+    },
+    "DEK rotation and database re-encryption completed successfully."
+  );
+
+  return {
+    oldWrapped,
+    newWrapped,
+    githubAccountsCount: reEncryptedGithubAccounts.length,
+    accountsCount: reEncryptedAccounts.length,
+    mfaConfigsCount: reEncryptedMfaConfigs.length,
+    durationMs,
+  };
 }
 
 export async function reEncryptWithNewDek<T extends { id: any; encryptedFields: string[] }>(

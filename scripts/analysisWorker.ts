@@ -32,6 +32,14 @@ export async function startAnalysisWorkerLoop(opts?: {
   const worker = new Worker(
     ANALYSIS_QUEUE_NAME,
     async (job: Job) => {
+      if (job.name === "dek-rotation") {
+        console.log("Processing automated DEK rotation job...");
+        const { rotateAndReEncryptAll } = require("../lib/utils/envelopeEncryption");
+        const stats = await rotateAndReEncryptAll();
+        console.log("DEK rotation completed successfully:", stats);
+        return stats;
+      }
+
       const { jobId, userId } = job.data;
       console.log(`Processing job ${jobId} (attempt ${job.attemptsMade + 1})`);
 

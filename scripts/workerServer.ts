@@ -5,6 +5,7 @@ import http from "http";
 import { startAnalysisWorkerLoop } from "./analysisWorker";
 import { startWebhookWorkerLoop } from "../lib/workers/webhookWorker";
 import { disconnectPrisma, getPoolHealth, getPoolMetrics } from "../lib/prisma";
+import { analysisQueue } from "../lib/queue/analysisQueue";
 
 const port = Number(process.env.PORT || "8080");
 const GRACE_PERIOD_MS = 35_000;
@@ -132,6 +133,26 @@ async function main() {
   workerFinished = new Promise<void>((resolve) => {
     workerDone = resolve;
   });
+
+  // Register repeatable DEK rotation job (every 90 days)
+  if (process.env.KMS_KEY_ID || process.env.KMS_PROVIDER === "aws") {
+    console.log("Registering repeatable DEK rotation job (every 90 days)...");
+    try {
+      await analysisQueue.add(
+        "dek-rotation",
+        {},
+        {
+          repeat: {
+            pattern: "0 0 */90 * *", // every 90 days
+          },
+          jobId: "dek-rotation-job",
+        }
+      );
+      console.log("Repeatable DEK rotation job registered successfully.");
+    } catch (err) {
+      console.error("Failed to register repeatable DEK rotation job:", err);
+    }
+  }
 
   await startAnalysisWorkerLoop();
   await startWebhookWorkerLoop({ workerId: `${os.hostname()}-webhook` });
