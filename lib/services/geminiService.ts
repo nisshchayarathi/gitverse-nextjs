@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import CircuitBreaker from "opossum";
 import { getGeminiAnalysisCache, setGeminiAnalysisCache } from "./geminiAnalysisCacheService";
 import { buildCacheKey } from "../utils/cacheKey";
 
@@ -90,6 +91,7 @@ export interface AIRepositoryChatRequest {
 export class GeminiService {
   private client: GoogleGenerativeAI;
   private model: GenerativeModel;
+  private breaker: CircuitBreaker<[any], any>;
 
   constructor(apiKey?: string) {
     const key = apiKey || process.env.GEMINI_API_KEY || "dummy-key-for-build";
@@ -99,6 +101,24 @@ export class GeminiService {
     
     this.client = new GoogleGenerativeAI(key);
     this.model = this.client.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    this.breaker = new CircuitBreaker(
+      (contents: any) => this.model.generateContent(contents),
+      {
+        timeout: 15000, // 15 seconds
+        errorThresholdPercentage: 50, // 50%
+        resetTimeout: 30000, // 30 seconds
+      }
+    );
+
+    this.breaker.fallback(() => {
+      return {
+        response: Promise.resolve({
+          text: () => "AI service temporarily unavailable due to safety limits.",
+          usageMetadata: { totalTokenCount: 0 }
+        })
+      };
+    });
   }
 
   /**
@@ -111,7 +131,7 @@ export class GeminiService {
     prompt = scanAndRedactPayload(prompt);
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const result = await this.breaker.fire(prompt);
       const response = await result.response;
       return response.text();
     } catch (error: any) {
@@ -172,7 +192,7 @@ export class GeminiService {
     }
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const result = await this.breaker.fire(prompt);
       const response = await result.response;
       const text = response.text();
 
@@ -222,7 +242,7 @@ export class GeminiService {
     prompt = scanAndRedactPayload(prompt);
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const result = await this.breaker.fire(prompt);
       const response = await result.response;
       return response.text();
     } catch (error: any) {
@@ -277,13 +297,13 @@ export class GeminiService {
           { role: "user", parts: [{ text: scanAndRedactPayload(prompt) }] },
         ];
 
-        const result = await this.model.generateContent({ contents });
+        const result = await this.breaker.fire({ contents });
         const response = await result.response;
         const text = response.text();
         const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
         return { text, tokensConsumed };
       } else {
-        const result = await this.model.generateContent(scanAndRedactPayload(prompt));
+        const result = await this.breaker.fire(scanAndRedactPayload(prompt));
         const response = await result.response;
         const text = response.text();
         const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
@@ -348,12 +368,12 @@ Provide only the commit messages, one per line.
     prompt = scanAndRedactPayload(prompt);
 
     try {
-      const result = await this.model.generateContent(prompt);
+      const result = await this.breaker.fire(prompt);
       const response = await result.response;
       const text = response.text();
       return text
         .split("\n")
-        .filter((line) => line.trim())
+        .filter((line: string) => line.trim())
         .slice(0, 3);
     } catch (error: any) {
       console.error("Commit message suggestion error:", error);
