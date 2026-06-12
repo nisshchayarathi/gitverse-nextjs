@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import * as htmlToImage from "html-to-image";
 import * as d3 from "d3";
-import { Card } from "@/components/ui";
+import { Card, Input } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
 import { GraphFilteringService } from "@/services/graphFilteringService";
 import { MapControls } from "./MapControls";
@@ -51,6 +51,19 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const [selectedCommitHash, setSelectedCommitHash] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
 
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [showFolders, setShowFolders] = useState(true);
+  const [showFiles, setShowFiles] = useState(true);
+  const [minConnections, setMinConnections] = useState(0);
+  const [selectedExtension, setSelectedExtension] = useState<string>("all");
+
+  // Additional refs for tracking D3 selections for transition centering
+  const d3SvgRef = useRef<d3.Selection<SVGSVGElement, unknown, null, undefined> | null>(null);
+  const d3GRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
+  const renderedNodesRef = useRef<any[]>([]);
+
   const selectedCommit = useMemo(() => {
     if (!selectedCommitHash || !repository?.commits) return null;
     return repository.commits.find((c: any) => c.hash === selectedCommitHash || c.shortHash === selectedCommitHash) || null;
@@ -85,6 +98,69 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       visibleDomains: filters.visibleDomains
     });
   }, [completeGraph, expandedNodes, filters]);
+
+  // Compute connections (degree) for each node based on the drilldown-filtered graphData
+  const connectionsMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    graphData.links.forEach((link: any) => {
+      const sourceId = typeof link.source === "string" ? link.source : (link.source as any).id;
+      const targetId = typeof link.target === "string" ? link.target : (link.target as any).id;
+      map[sourceId] = (map[sourceId] || 0) + 1;
+      map[targetId] = (map[targetId] || 0) + 1;
+    });
+    return map;
+  }, [graphData.links]);
+
+  // Add degree to nodes
+  const nodesWithDegree = useMemo(() => {
+    return graphData.nodes.map((node) => ({
+      ...node,
+      degree: connectionsMap[node.id] || 0,
+    }));
+  }, [graphData.nodes, connectionsMap]);
+
+  // Extract unique file extensions for filters from the current node set
+  const uniqueExtensions = useMemo(() => {
+    return Array.from(
+      new Set(
+        nodesWithDegree
+          .filter((n) => n.type === "file")
+          .map((n) => {
+            const parts = n.name.split(".");
+            return parts.length > 1 ? "." + parts.pop() : "other";
+          })
+      )
+    );
+  }, [nodesWithDegree]);
+
+  // Filter nodes dynamically
+  const filteredNodes = useMemo(() => {
+    return nodesWithDegree.filter((node) => {
+      // Filter by type
+      if (node.type === "folder" && !showFolders) return false;
+      if (node.type === "file" && !showFiles) return false;
+
+      // Filter by min connections
+      if (node.degree < minConnections) return false;
+
+      // Filter by file extension
+      if (node.type === "file" && selectedExtension !== "all") {
+        const ext = node.name.includes(".") ? "." + node.name.split(".").pop() : "other";
+        if (ext !== selectedExtension) return false;
+      }
+
+      return true;
+    });
+  }, [nodesWithDegree, showFolders, showFiles, minConnections, selectedExtension]);
+
+  const filteredLinks = useMemo(() => {
+    const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
+    return graphData.links.filter((link) => {
+      const sourceId = typeof link.source === "string" ? link.source : (link.source as any).id;
+      const targetId = typeof link.target === "string" ? link.target : (link.target as any).id;
+      return filteredNodeIds.has(sourceId) && filteredNodeIds.has(targetId);
+    });
+  }, [graphData.links, filteredNodes]);
 
   const exportGraph = async (format: "png" | "svg") => {
     if (!exportRef.current) return;
@@ -155,7 +231,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     if (!svgRef.current) return;
 
     // If no data, show empty state
-    if (graphData.nodes.length === 0) {
+    if (filteredNodes.length === 0) {
       const svg = d3.select(svgRef.current);
       svg.selectAll("*").remove();
       svg
@@ -165,7 +241,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         .attr("text-anchor", "middle")
         .attr("dominant-baseline", "middle")
         .attr("fill", "rgba(255,255,255,0.4)")
-        .text("No files found in repository");
+        .text("No nodes match the filters");
       return;
     }
 
@@ -191,10 +267,15 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     };
 
     // Prepare data
-    const nodes = graphData.nodes.map((d) => ({ ...d }));
-    const links = graphData.links.map((d) => ({ ...d }));
+    const nodes = filteredNodes.map((d) => ({ ...d }));
+    const links = filteredLinks.map((d) => ({ ...d }));
     nodesRef.current = nodes;
     linksRef.current = links;
+
+    // Store in refs for search/centering
+    d3SvgRef.current = svg;
+    d3GRef.current = g;
+    renderedNodesRef.current = nodes;
 
     // Create force simulation
     const simulation = d3
@@ -220,6 +301,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .selectAll("line")
       .data(links)
       .join("line")
+      .attr("class", "link-element")
       .attr("stroke", (d: any) =>
         d.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)",
       )
@@ -243,6 +325,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .selectAll("g")
       .data(nodes)
       .join("g")
+      .attr("class", "node-element")
       .style("cursor", "pointer")
       .attr("tabindex", "0")
       .attr("role", "button")
@@ -302,6 +385,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           toggleExpand(d.id);
         }
         setFocus(d.id);
+        setSelectedNodeId(null);
+        setSearchQuery("");
       });
 
     // Node circles
@@ -414,6 +499,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         setTransform({ x: event.transform.x, y: event.transform.y, k: event.transform.k });
       });
 
+    zoomRef.current = zoom;
     svg.call(zoom as any);
 
     // Animate nodes on load
@@ -430,12 +516,14 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     return () => {
       simulation.stop();
     };
-  }, [graphData, setFocus, toggleExpand]);
+  }, [filteredNodes, filteredLinks, setFocus, toggleExpand]);
 
   // Effect to handle focus mode fading
   useEffect(() => {
     if (!svgSelectionRef.current) return;
     const { node, link } = svgSelectionRef.current;
+
+    if (selectedNodeId) return; // Let selectedNodeId effect handle transitions
 
     if (!focusNode) {
       // Restore opacity
@@ -460,15 +548,15 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .attr("stroke-opacity", (d: any) => 
         (d.source.id === focusNode || d.target.id === focusNode) ? 1 : 0.1
       );
-  }, [focusNode]);
+  }, [focusNode, selectedNodeId]);
 
   // Effect to handle time-travel highlighting
   useEffect(() => {
     if (!svgSelectionRef.current) return;
     const { node, link } = svgSelectionRef.current;
 
-    // If there is a focusNode, it overrides time-travel highlighting to prevent conflicting transitions
-    if (focusNode) return;
+    // If there is a focusNode or selectedNodeId, it overrides time-travel highlighting to prevent conflicting transitions
+    if (focusNode || selectedNodeId) return;
 
     if (!changedFiles) {
       // Restore normal opacity/colors
@@ -510,7 +598,73 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       
     // Dim links
     link.transition().duration(300).attr("stroke-opacity", 0.1);
-  }, [changedFiles, focusNode]);
+  }, [changedFiles, focusNode, selectedNodeId]);
+
+  // Effect to handle focusing/zooming on the selected node and pulsing it
+  useEffect(() => {
+    if (!d3SvgRef.current || !d3GRef.current || !svgRef.current) return;
+
+    const svg = d3SvgRef.current;
+    const g = d3GRef.current;
+
+    // Reset styles if no search selection is active
+    if (!selectedNodeId) {
+      g.selectAll(".node-element").style("opacity", 1);
+      g.selectAll(".link-element").style("opacity", 0.6);
+      g.selectAll("circle")
+        .attr("stroke", "rgba(255,255,255,0.3)")
+        .attr("stroke-width", 2);
+      return;
+    }
+
+    // Find target node coordinates
+    const targetNode = renderedNodesRef.current.find((n: any) => n.id === selectedNodeId);
+    if (!targetNode) return;
+
+    const containerWidth = svgRef.current.parentElement?.clientWidth || 800;
+    const width = Math.min(containerWidth - 40, 800);
+    const height = Math.min(width * 0.75, 600);
+
+    const x = (targetNode as any).x;
+    const y = (targetNode as any).y;
+
+    if (x !== undefined && y !== undefined && zoomRef.current) {
+      const scale = 1.8;
+      const transformIdentity = d3.zoomIdentity
+        .translate(width / 2 - scale * x, height / 2 - scale * y)
+        .scale(scale);
+
+      svg.transition()
+        .duration(750)
+        .call(zoomRef.current.transform as any, transformIdentity);
+
+      // Dim non-matching nodes and links
+      g.selectAll(".node-element").style("opacity", (d: any) => 
+        d && d.id === selectedNodeId ? 1 : 0.2
+      );
+      g.selectAll(".link-element").style("opacity", (d: any) => 
+        d && (d.source.id === selectedNodeId || d.target.id === selectedNodeId) ? 0.8 : 0.05
+      );
+
+      // Pulse the selected node's circle
+      const circle = g.selectAll("circle").filter((d: any) => d && d.id === selectedNodeId);
+      circle
+        .transition()
+        .duration(300)
+        .attr("r", (d: any) => (d.size / 3) * 1.6)
+        .attr("stroke", "#ffffff")
+        .attr("stroke-width", 4)
+        .transition()
+        .duration(300)
+        .attr("r", (d: any) => d.size / 3)
+        .attr("stroke-width", 2)
+        .transition()
+        .duration(300)
+        .attr("r", (d: any) => (d.size / 3) * 1.3)
+        .attr("stroke", "#ffffff")
+        .attr("stroke-width", 3);
+    }
+  }, [selectedNodeId]);
 
   const handleZoomIn = () => {
     if (svgRef.current) {
@@ -597,6 +751,135 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         </div>
 
         <div className="relative">
+          {/* Search and Filters Controls */}
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-lg bg-black/25 border border-white/5 backdrop-blur-md">
+            {/* Search Panel */}
+            <div className="flex flex-col gap-1.5 relative">
+              <label className="text-xs font-medium text-muted-foreground">Search Nodes</label>
+              <div className="flex gap-2">
+                <div className="relative flex-grow">
+                  <Input
+                    placeholder="Search file or folder..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      if (selectedNodeId) setSelectedNodeId(null);
+                    }}
+                    className="w-full bg-black/40 border-white/10 text-xs h-9 text-white placeholder-white/40"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSelectedNodeId(null);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white text-xs"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {/* Autocomplete Dropdown */}
+              {searchQuery && !selectedNodeId && (
+                <div className="absolute top-[100%] left-0 right-0 z-50 mt-1 max-h-40 overflow-y-auto rounded-md border border-white/10 bg-zinc-950/95 p-1 shadow-lg backdrop-blur-md">
+                  {filteredNodes
+                    .filter((n) => n.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .slice(0, 5)
+                    .map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => {
+                          setSelectedNodeId(n.id);
+                          setSearchQuery(n.name);
+                        }}
+                        className="w-full text-left px-3 py-1.5 text-xs rounded hover:bg-white/10 transition-colors flex items-center justify-between text-white"
+                      >
+                        <span className="truncate">{n.name}</span>
+                        <span className="text-[10px] text-muted-foreground capitalize px-1.5 py-0.5 bg-white/5 rounded">
+                          {n.type}
+                        </span>
+                      </button>
+                    ))}
+                  {filteredNodes.filter((n) => n.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                    <div className="px-3 py-1.5 text-xs text-muted-foreground">No matches found</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Type & Extension Filters */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Filters</label>
+              <div className="flex flex-wrap items-center gap-4 h-9 px-3 rounded-md bg-black/30 border border-white/5">
+                <label className="flex items-center gap-2 text-xs cursor-pointer select-none text-white">
+                  <input
+                    type="checkbox"
+                    checked={showFolders}
+                    onChange={(e) => {
+                      setShowFolders(e.target.checked);
+                      setSelectedNodeId(null);
+                    }}
+                    className="rounded border-white/10 bg-black/40 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                  />
+                  <span>Folders</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs cursor-pointer select-none text-white">
+                  <input
+                    type="checkbox"
+                    checked={showFiles}
+                    onChange={(e) => {
+                      setShowFiles(e.target.checked);
+                      setSelectedNodeId(null);
+                    }}
+                    className="rounded border-white/10 bg-black/40 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                  />
+                  <span>Files</span>
+                </label>
+
+                {uniqueExtensions.length > 0 && showFiles && (
+                  <select
+                    value={selectedExtension}
+                    onChange={(e) => {
+                      setSelectedExtension(e.target.value);
+                      setSelectedNodeId(null);
+                    }}
+                    className="ml-auto bg-transparent border-0 text-xs text-muted-foreground focus:ring-0 focus:outline-none cursor-pointer outline-none max-w-28 truncate text-white"
+                  >
+                    <option value="all" className="bg-zinc-950 text-white">All Exts</option>
+                    {uniqueExtensions.map((ext) => (
+                      <option key={ext} value={ext} className="bg-zinc-950 text-white">
+                        {ext}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            {/* Centrality / Connections Slider */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between items-center text-xs font-medium text-muted-foreground">
+                <span>Min Connections</span>
+                <span className="text-white bg-white/10 px-1.5 py-0.5 rounded text-[10px]">{minConnections}+</span>
+              </div>
+              <div className="flex items-center h-9 px-3 rounded-md bg-black/30 border border-white/5">
+                <input
+                  type="range"
+                  min="0"
+                  max={nodesWithDegree.length > 0 ? Math.max(...nodesWithDegree.map((n) => n.degree || 0), 5) : 5}
+                  value={minConnections}
+                  onChange={(e) => {
+                    setMinConnections(Number(e.target.value));
+                    setSelectedNodeId(null);
+                  }}
+                  className="w-full accent-purple-500 bg-zinc-800 h-1 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+
           <div
             ref={exportRef}
             className="glass rounded-lg p-4 sm:p-6 relative overflow-visible"
