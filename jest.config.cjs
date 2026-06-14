@@ -14,6 +14,8 @@ const customJestConfig = {
     '<rootDir>/app/**/__tests__/**/*.test.tsx',
     '<rootDir>/src/**/__tests__/**/*.test.ts',
     '<rootDir>/src/**/__tests__/**/*.test.tsx',
+    '<rootDir>/src/**/tests/**/*.test.ts',
+    '<rootDir>/src/**/tests/**/*.test.tsx',
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
