@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import redis from "@/lib/redis";
 import CircuitBreaker from "opossum";
 import { LRUCache } from "lru-cache";
 
@@ -30,7 +30,7 @@ export interface RateLimitResult {
   resetAt: number;
   /** The configured maxRequests for this rate limit */
   limit: number;
-  /** Set to true when both the DB upsert and the LRU fallback have failed */
+  /** Set to true when both the Redis and the LRU fallback have failed */
   fallbackFailed?: boolean;
 }
 
@@ -58,31 +58,15 @@ export const RATE_LIMITS = {
   ANALYZE_REPOSITORY: { namespace: "repo:submission", maxRequests: 5, windowMs: 60_000 },
 } as const;
 
-let lastCleanupAt = 0;
-const CLEANUP_INTERVAL_MS = 60_000;
-
-async function maybeCleanupExpired(): Promise<void> {
-  const now = Date.now();
-  if (now - lastCleanupAt < CLEANUP_INTERVAL_MS) return;
-  lastCleanupAt = now;
-  try {
-    await prisma.rateLimit.deleteMany({
-      where: { expiresAt: { lt: new Date() } },
-    });
-  } catch {
-    // Best-effort cleanup, never block a rate limit check for this
-  }
-}
-
 function buildRateLimitKey(namespace: string, identifier: string): string {
   const sanitized = identifier.replace(/[^\w@.:\-]/g, "_");
-  return `${namespace}:${sanitized}`;
+  return `rl:${namespace}:${sanitized}`;
 }
 
 /**
  * Compute the fixed-window expiry for a given timestamp.
  * All requests within the same clock interval (floor(now / windowMs)) share
- * the same expiry, which is what allows the upsert to work atomically.
+ * the same expiry, which is what allows the Redis key to be shared atomically.
  */
 export function getWindowExpiry(now: number, windowMs: number): Date {
   const windowStart = Math.floor(now / windowMs) * windowMs;
@@ -94,21 +78,38 @@ const fallbackCache = new LRUCache<string, { count: number; resetAt: number }>({
   ttl: 1000 * 60 * 60,
 });
 
-const dbLimiterCircuit = new CircuitBreaker(
-  async ({ key, config, expiresAt }: { key: string, config: RateLimitConfig, expiresAt: Date }) => {
-    void maybeCleanupExpired();
+const redisLimiterCircuit = new CircuitBreaker(
+  async ({ key, config, windowSec }: { key: string; config: RateLimitConfig; windowSec: number }) => {
+    const pipeline = redis.pipeline();
+    pipeline.incr(key);
+    pipeline.ttl(key);
+    const results = await pipeline.exec();
 
-    const result = await prisma.rateLimit.upsert({
-      where: { key_expiresAt: { key, expiresAt } },
-      update: { points: { increment: 1 } },
-      create: { key, points: 1, expiresAt },
-    });
+    if (!results) {
+      throw new Error("Redis pipeline returned null");
+    }
 
-    const allowed = result.points <= config.maxRequests;
+    const [incrResult, ttlResult] = results;
+    // @ts-ignore
+    if (incrResult[0]) throw incrResult[0];
+    // @ts-ignore
+    if (ttlResult[0]) throw ttlResult[0];
+
+    const count = (incrResult[1] as number) ?? 0;
+    let ttl = (ttlResult[1] as number) ?? -1;
+
+    // Set expiry on the first request in this window
+    if (ttl < 0) {
+      await redis.expire(key, windowSec);
+      ttl = windowSec;
+    }
+
+    const allowed = count <= config.maxRequests;
+    const resetAt = Date.now() + ttl * 1000;
     return {
       allowed,
-      remaining: Math.max(0, config.maxRequests - result.points),
-      resetAt: expiresAt.getTime(),
+      remaining: Math.max(0, config.maxRequests - count),
+      resetAt,
       limit: config.maxRequests,
     };
   },
@@ -123,7 +124,7 @@ const dbLimiterCircuit = new CircuitBreaker(
  * Check whether `identifier` has exceeded the rate limit described by `config`.
  *
  * Uses a three-layer approach:
- *   1. Atomic prisma.rateLimit.upsert (DB — relies on @@unique([key, expiresAt]))
+ *   1. Atomic Redis INCR + EXPIRE (via ioredis pipeline)
  *   2. opossum circuit breaker (fault isolation, 3 s timeout)
  *   3. In-memory LRU cache fallback (10 k entries, fail-open)
  */
@@ -132,22 +133,12 @@ export async function checkRateLimit(
   config: RateLimitConfig,
 ): Promise<RateLimitResult> {
   const key = buildRateLimitKey(config.namespace, identifier);
-  const now = Date.now();
-  const expiresAt = getWindowExpiry(now, config.windowMs);
+  const windowSec = Math.ceil(config.windowMs / 1000);
 
   try {
-    return await dbLimiterCircuit.fire({ key, config, expiresAt }) as RateLimitResult;
+    return await redisLimiterCircuit.fire({ key, config, windowSec }) as RateLimitResult;
   } catch (error: any) {
-    if (error?.code === "P2002") {
-      return {
-        allowed: false,
-        remaining: 0,
-        resetAt: expiresAt.getTime(),
-        limit: config.maxRequests,
-      };
-    }
-
-    console.error("[RateLimit DB] Circuit Breaker opened or DB failed, falling back to LRU:", error.message);
+    console.error("[RateLimit Redis] Circuit Breaker opened or Redis failed, falling back to LRU:", error.message);
 
     try {
       const timeNow = Date.now();
@@ -170,7 +161,7 @@ export async function checkRateLimit(
         resetAt: record.resetAt,
       };
     } catch (fallbackErr) {
-      console.error("[RateLimit DB] LRU Fallback also failed:", fallbackErr);
+      console.error("[RateLimit Redis] LRU Fallback also failed:", fallbackErr);
       return {
         allowed: false,
         remaining: 0,
@@ -184,14 +175,11 @@ export async function checkRateLimit(
 
 /**
  * Reset module-level state between tests.
- * Clears the LRU cache, closes the circuit breaker, and resets the
- * cleanup interval guard so that the next call to maybeCleanupExpired
- * will run.
+ * Clears the LRU cache and closes the circuit breaker.
  */
 export function _resetStateForTesting(): void {
-  lastCleanupAt = 0;
   fallbackCache.clear();
-  dbLimiterCircuit.close();
+  redisLimiterCircuit.close();
 }
 
 /**

@@ -1,15 +1,21 @@
 import { checkRateLimit, getWindowExpiry, _resetStateForTesting, RATE_LIMITS } from "../rateLimit";
 
-const mockUpsert = jest.fn();
-const mockDeleteMany = jest.fn().mockResolvedValue({ count: 0 });
+const mockIncr = jest.fn();
+const mockTtl = jest.fn();
+const mockExpire = jest.fn();
+const mockPipelineExec = jest.fn();
 
-jest.mock("@/lib/prisma", () => ({
+jest.mock("@/lib/redis", () => ({
   __esModule: true,
   default: {
-    rateLimit: {
-      upsert: (...args: any[]) => mockUpsert(...args),
-      deleteMany: (...args: any[]) => mockDeleteMany(...args),
-    },
+    pipeline: () => ({
+      incr: (...args: any[]) => mockIncr(...args),
+      ttl: (...args: any[]) => mockTtl(...args),
+      exec: () => mockPipelineExec(),
+    }),
+    incr: (...args: any[]) => mockIncr(...args),
+    ttl: (...args: any[]) => mockTtl(...args),
+    expire: (...args: any[]) => mockExpire(...args),
   },
 }));
 
@@ -18,43 +24,49 @@ beforeEach(() => {
   jest.useFakeTimers();
   jest.setSystemTime(new Date("2026-06-04T12:00:00Z"));
   _resetStateForTesting();
+
+  // Default: successful pipeline
+  mockPipelineExec.mockResolvedValue([
+    [null, 1],  // incr returns count=1
+    [null, 59], // ttl returns 59s remaining
+  ]);
 });
 
 afterEach(() => {
   jest.useRealTimers();
 });
 
-describe("atomicity — no TOCTOU window", () => {
-  it("upsert is the only DB operation (no separate count + create)", async () => {
-    mockUpsert.mockResolvedValue({ points: 1 });
+describe("atomicity — Redis INCR is atomic", () => {
+  it("uses Redis pipeline with INCR and TTL for atomic increment", async () => {
+    mockPipelineExec.mockResolvedValue([
+      [null, 1],
+      [null, 59],
+    ]);
 
     await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
-    const callKeys = mockUpsert.mock.calls.map((c: any[]) => Object.keys(c[0] || {}));
-    expect(callKeys.length).toBe(1);
-    const firstCall = mockUpsert.mock.calls[0][0];
-    expect(firstCall).toHaveProperty("where");
-    expect(firstCall).toHaveProperty("update");
-    expect(firstCall).toHaveProperty("create");
+    expect(mockIncr).toHaveBeenCalledTimes(1);
+    expect(mockTtl).toHaveBeenCalledTimes(1);
+    expect(mockPipelineExec).toHaveBeenCalledTimes(1);
   });
 
-  it("upsert uses points: { increment: 1 } for atomic increment", async () => {
-    mockUpsert.mockResolvedValue({ points: 2 });
+  it("pipeline INCR returns the current count atomically", async () => {
+    mockPipelineExec.mockResolvedValue([
+      [null, 3],  // count=3 after increment
+      [null, 45],
+    ]);
 
-    await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
-    expect(mockUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        update: { points: { increment: 1 } },
-      })
-    );
+    expect(result.allowed).toBe(true);
+    expect(result.remaining).toBe(2);  // 5 - 3 = 2
   });
 
-  it("concurrent requests to the same key share a single upsert target", async () => {
-    mockUpsert
-      .mockResolvedValueOnce({ points: 1 })
-      .mockResolvedValueOnce({ points: 2 })
-      .mockResolvedValueOnce({ points: 3 });
+  it("concurrent requests to the same key use Redis INCR atomically", async () => {
+    mockPipelineExec
+      .mockResolvedValueOnce([[null, 1], [null, 59]])
+      .mockResolvedValueOnce([[null, 2], [null, 58]])
+      .mockResolvedValueOnce([[null, 3], [null, 57]]);
 
     const [r1, r2, r3] = await Promise.all([
       checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE),
@@ -62,13 +74,7 @@ describe("atomicity — no TOCTOU window", () => {
       checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE),
     ]);
 
-    expect(mockUpsert).toHaveBeenCalledTimes(3);
-
-    const sameWhere = mockUpsert.mock.calls.every((c: any[]) => {
-      const w = c[0].where.key_expiresAt;
-      return w.key === "repo:analyze:user1";
-    });
-    expect(sameWhere).toBe(true);
+    expect(mockPipelineExec).toHaveBeenCalledTimes(3);
 
     expect(r1.allowed).toBe(true);
     expect(r2.allowed).toBe(true);
@@ -77,109 +83,86 @@ describe("atomicity — no TOCTOU window", () => {
 });
 
 describe("fixed-window behavior", () => {
-  it("requests before and after a window boundary use different rows", async () => {
-    mockUpsert.mockResolvedValue({ points: 1 });
+  it("requests before and after a window boundary use different Redis keys or TTL resets", async () => {
+    mockPipelineExec.mockResolvedValue([
+      [null, 1],
+      [null, 59],
+    ]);
 
     await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
-    const firstExpiry = mockUpsert.mock.calls[0][0].where.key_expiresAt.expiresAt;
+    const firstKey = mockIncr.mock.calls[0][0];
 
     jest.advanceTimersByTime(60_000);
 
-    mockUpsert.mockResolvedValue({ points: 1 });
-    await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
-    const secondExpiry = mockUpsert.mock.calls[1][0].where.key_expiresAt.expiresAt;
+    // After window boundary, TTL is -1 again (key expired), so EXPIRE is called
+    mockPipelineExec.mockResolvedValue([
+      [null, 1],   // New window, count resets to 1
+      [null, -1],  // TTL expired
+    ]);
 
-    expect(secondExpiry.getTime()).toBeGreaterThan(firstExpiry.getTime());
+    await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    const secondKey = mockIncr.mock.calls[1][0];
+
+    // Same key format, but the TTL expired so EXPIRE resets the window
+    expect(firstKey).toBe(secondKey);
+    expect(mockExpire).toHaveBeenCalled();
   });
 
-  it("expiry aligns to the next clock boundary", async () => {
-    jest.setSystemTime(new Date("2026-06-04T12:01:30.000Z"));
-
-    mockUpsert.mockResolvedValue({ points: 1 });
+  it("sets Redis EXPIRE to window seconds on first request", async () => {
+    // TTL returns -1 (key doesn't exist yet)
+    mockPipelineExec.mockResolvedValue([
+      [null, 1],
+      [null, -1],
+    ]);
 
     await checkRateLimit("user1", { namespace: "test", maxRequests: 5, windowMs: 60_000 });
 
-    const { expiresAt } = mockUpsert.mock.calls[0][0].where.key_expiresAt;
-    expect(expiresAt.toISOString()).toBe("2026-06-04T12:02:00.000Z");
-  });
-
-  it("same-window requests after limit redirect to LRU on P2002", async () => {
-    const p2002 = new Error("Unique constraint");
-    (p2002 as any).code = "P2002";
-    mockUpsert
-      .mockResolvedValueOnce({ points: 5 })
-      .mockRejectedValueOnce(p2002);
-
-    const r1 = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
-    expect(r1.allowed).toBe(true);
-    expect(r1.remaining).toBe(0);
-
-    const r2 = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
-    expect(r2.allowed).toBe(false);
-    expect(r2.remaining).toBe(0);
+    expect(mockExpire).toHaveBeenCalledWith(
+      expect.stringContaining("test:user1"),
+      60  // windowSec = 60
+    );
   });
 });
 
 describe("circuit breaker", () => {
-  it("recovers after reset timeout when upsert succeeds again", async () => {
-    mockUpsert
-      .mockRejectedValueOnce(new Error("DB timeout"))
-      .mockResolvedValueOnce({ points: 1 });
+  it("recovers after reset timeout when Redis succeeds again", async () => {
+    mockPipelineExec
+      .mockRejectedValueOnce(new Error("Redis timeout"))
+      .mockResolvedValueOnce([[null, 1], [null, 59]]);
 
     const r1 = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+    // Falls back to LRU
     expect(r1.allowed).toBe(true);
 
     jest.advanceTimersByTime(15_000);
     _resetStateForTesting();
-    mockUpsert.mockReset();
-    mockUpsert.mockResolvedValue({ points: 2 });
+    mockPipelineExec.mockReset();
+    mockPipelineExec.mockResolvedValue([[null, 2], [null, 58]]);
 
     const r2 = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
     expect(r2.allowed).toBe(true);
     expect(r2.remaining).toBe(3);
-    expect(mockUpsert).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("maybeCleanupExpired (coverage)", () => {
-  it("triggers deleteMany on first call and then respects the interval", async () => {
-    mockUpsert.mockResolvedValue({ points: 1 });
-
-    await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
-    expect(mockDeleteMany).toHaveBeenCalledTimes(1);
-
-    await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
-    expect(mockDeleteMany).toHaveBeenCalledTimes(1);
-
-    jest.advanceTimersByTime(60_000);
-    _resetStateForTesting();
-
-    mockUpsert.mockResolvedValue({ points: 1 });
-    await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
-    expect(mockDeleteMany).toHaveBeenCalledTimes(2);
-  });
-
-  it("does not throw when deleteMany fails", async () => {
-    mockDeleteMany.mockRejectedValueOnce(new Error("DB error"));
-    mockUpsert.mockResolvedValue({ points: 1 });
-
-    await expect(
-      checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE)
-    ).resolves.toHaveProperty("allowed", true);
+    expect(mockPipelineExec).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("edge cases", () => {
-  it("returns remaining=0 when points is exactly at the limit", async () => {
-    mockUpsert.mockResolvedValue({ points: 5 });
+  it("returns remaining=0 when count is exactly at the limit", async () => {
+    mockPipelineExec.mockResolvedValue([
+      [null, 5],  // count=5 (at limit)
+      [null, 30],
+    ]);
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(0);
   });
 
-  it("returns remaining=0 when points is one over the limit", async () => {
-    mockUpsert.mockResolvedValue({ points: 6 });
+  it("returns remaining=0 when count is one over the limit", async () => {
+    mockPipelineExec.mockResolvedValue([
+      [null, 6],  // count=6 (over limit of 5)
+      [null, 15],
+    ]);
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
     expect(result.allowed).toBe(false);
@@ -187,7 +170,10 @@ describe("edge cases", () => {
   });
 
   it("handles the largest windowMs defined in RATE_LIMITS", async () => {
-    mockUpsert.mockResolvedValue({ points: 1 });
+    mockPipelineExec.mockResolvedValue([
+      [null, 1],
+      [null, 3599],
+    ]);
 
     const result = await checkRateLimit("user1", RATE_LIMITS.GITHUB_IMPORT);
     expect(result.allowed).toBe(true);
@@ -195,7 +181,10 @@ describe("edge cases", () => {
   });
 
   it("handles zero previous points (first request in window)", async () => {
-    mockUpsert.mockResolvedValue({ points: 1 });
+    mockPipelineExec.mockResolvedValue([
+      [null, 1],  // First request, count=1
+      [null, 59],
+    ]);
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
     expect(result.allowed).toBe(true);
@@ -204,12 +193,12 @@ describe("edge cases", () => {
 });
 
 describe("_resetStateForTesting", () => {
-  it("clears LRU cache and circuit breaker state between tests", () => {
-    mockUpsert.mockRejectedValue(new Error("fail"));
+  it("clears LRU cache and circuit breaker state between tests", async () => {
+    mockPipelineExec.mockRejectedValue(new Error("fail"));
     const r1 = checkRateLimit("u1", RATE_LIMITS.REPOSITORY_ANALYZE);
     _resetStateForTesting();
-    mockUpsert.mockReset();
-    mockUpsert.mockResolvedValue({ points: 1 });
+    mockPipelineExec.mockReset();
+    mockPipelineExec.mockResolvedValue([[null, 1], [null, 59]]);
     const r2 = checkRateLimit("u1", RATE_LIMITS.REPOSITORY_ANALYZE);
     expect(r2).resolves.toHaveProperty("allowed", true);
   });

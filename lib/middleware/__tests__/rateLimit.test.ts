@@ -1,16 +1,22 @@
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS, addRateLimitHeaders, getWindowExpiry, _resetStateForTesting } from "../rateLimit";
 import { NextResponse } from "next/server";
 
-const mockUpsert = jest.fn();
-const mockDeleteMany = jest.fn().mockResolvedValue({ count: 0 });
+const mockIncr = jest.fn();
+const mockTtl = jest.fn();
+const mockExpire = jest.fn();
+const mockPipelineExec = jest.fn();
 
-jest.mock("@/lib/prisma", () => ({
+jest.mock("@/lib/redis", () => ({
   __esModule: true,
   default: {
-    rateLimit: {
-      upsert: (...args: any[]) => mockUpsert(...args),
-      deleteMany: (...args: any[]) => mockDeleteMany(...args),
-    },
+    pipeline: () => ({
+      incr: (...args: any[]) => mockIncr(...args),
+      ttl: (...args: any[]) => mockTtl(...args),
+      exec: () => mockPipelineExec(),
+    }),
+    incr: (...args: any[]) => mockIncr(...args),
+    ttl: (...args: any[]) => mockTtl(...args),
+    expire: (...args: any[]) => mockExpire(...args),
   },
 }));
 
@@ -19,15 +25,17 @@ beforeEach(() => {
   jest.useFakeTimers();
   jest.setSystemTime(new Date("2026-06-04T12:00:00Z"));
   _resetStateForTesting();
+
+  // Default: successful pipeline returning [incrResult, ttlResult]
+  mockPipelineExec.mockResolvedValue([
+    [null, 1],  // incr returns count=1
+    [null, 59], // ttl returns 59 seconds remaining
+  ]);
 });
 
 afterEach(() => {
   jest.useRealTimers();
 });
-
-function windowExpiry(windowMs: number): Date {
-  return getWindowExpiry(Date.parse("2026-06-04T12:00:00Z"), windowMs);
-}
 
 describe("getWindowExpiry", () => {
   it("rounds to the next window boundary for 60s windows", () => {
@@ -66,18 +74,23 @@ describe("getWindowExpiry", () => {
 
 describe("checkRateLimit", () => {
   it("allows request when under limit", async () => {
-    mockUpsert.mockResolvedValue({ points: 1, key: "repo:analyze:user1" });
+    mockPipelineExec.mockResolvedValue([
+      [null, 1],  // incr returns count=1
+      [null, 59], // ttl returns 59s remaining
+    ]);
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(4);
     expect(result.limit).toBe(5);
-    expect(result.resetAt).toBe(windowExpiry(60_000).getTime());
   });
 
   it("allows request at boundary of limit", async () => {
-    mockUpsert.mockResolvedValue({ points: 5, key: "repo:analyze:user1" });
+    mockPipelineExec.mockResolvedValue([
+      [null, 5],  // incr returns count=5
+      [null, 30], // ttl returns 30s remaining
+    ]);
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
@@ -86,8 +99,11 @@ describe("checkRateLimit", () => {
     expect(result.limit).toBe(5);
   });
 
-  it("rejects request when points exceed limit", async () => {
-    mockUpsert.mockResolvedValue({ points: 6, key: "repo:analyze:user1" });
+  it("rejects request when count exceeds limit", async () => {
+    mockPipelineExec.mockResolvedValue([
+      [null, 6],  // incr returns count=6 (over limit)
+      [null, 15], // ttl returns 15s remaining
+    ]);
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
@@ -96,8 +112,11 @@ describe("checkRateLimit", () => {
     expect(result.limit).toBe(5);
   });
 
-  it("rejects request when points far exceed limit", async () => {
-    mockUpsert.mockResolvedValue({ points: 20, key: "repo:analyze:user1" });
+  it("rejects request when count far exceeds limit", async () => {
+    mockPipelineExec.mockResolvedValue([
+      [null, 20], // incr returns count=20
+      [null, 5],  // ttl returns 5s remaining
+    ]);
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
@@ -105,20 +124,44 @@ describe("checkRateLimit", () => {
     expect(result.remaining).toBe(0);
   });
 
-  it("handles P2002 unique constraint violation as rate limited", async () => {
-    const p2002Error = new Error("Unique constraint");
-    (p2002Error as any).code = "P2002";
-    mockUpsert.mockRejectedValue(p2002Error);
+  it("sets expiry on the first request in a window", async () => {
+    // TTL returns -1 (key doesn't exist yet)
+    mockPipelineExec.mockResolvedValue([
+      [null, 1],   // incr returns count=1
+      [null, -1],  // ttl returns -1 (no expiry set)
+    ]);
+
+    await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+
+    expect(mockExpire).toHaveBeenCalledWith(
+      expect.stringContaining("repo:analyze:"),
+      60  // windowSec
+    );
+  });
+
+  it("does not set expiry when TTL is already set", async () => {
+    mockPipelineExec.mockResolvedValue([
+      [null, 2],   // incr returns count=2
+      [null, 45],  // ttl returns 45s remaining
+    ]);
+
+    await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
+
+    expect(mockExpire).not.toHaveBeenCalled();
+  });
+
+  it("falls back to LRU on Redis errors", async () => {
+    mockPipelineExec.mockRejectedValue(new Error("Redis connection failed"));
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
-    expect(result.allowed).toBe(false);
-    expect(result.remaining).toBe(0);
-    expect(result.resetAt).toBe(windowExpiry(60_000).getTime());
+    expect(result.allowed).toBe(true);
+    expect(result.remaining).toBe(4);
+    expect(result.limit).toBe(5);
   });
 
-  it("falls back to LRU on database errors", async () => {
-    mockUpsert.mockRejectedValue(new Error("DB connection failed"));
+  it("falls back to LRU when pipeline returns null", async () => {
+    mockPipelineExec.mockResolvedValue(null);
 
     const result = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
 
@@ -128,7 +171,7 @@ describe("checkRateLimit", () => {
   });
 
   it("LRU tracks count across successive fallback requests", async () => {
-    mockUpsert.mockRejectedValue(new Error("DB timeout"));
+    mockPipelineExec.mockRejectedValue(new Error("Redis timeout"));
 
     const r1 = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
     expect(r1.allowed).toBe(true);
@@ -143,8 +186,8 @@ describe("checkRateLimit", () => {
     expect(r3.remaining).toBe(2);
   });
 
-  it("LRU enforces limit during prolonged DB failure", async () => {
-    mockUpsert.mockRejectedValue(new Error("DB timeout"));
+  it("LRU enforces limit during prolonged Redis failure", async () => {
+    mockPipelineExec.mockRejectedValue(new Error("Redis timeout"));
 
     for (let i = 0; i < 5; i++) {
       const r = await checkRateLimit("user1", RATE_LIMITS.REPOSITORY_ANALYZE);
@@ -157,12 +200,9 @@ describe("checkRateLimit", () => {
   });
 
   it("handles distinct users independently", async () => {
-    mockUpsert.mockImplementation(({ where: { key_expiresAt } }: any) => {
-      const k = key_expiresAt.key;
-      if (k === "file:content:user-a") return Promise.resolve({ points: 1, key: k });
-      if (k === "file:content:user-b") return Promise.resolve({ points: 101, key: k });
-      return Promise.resolve({ points: 0, key: k });
-    });
+    mockPipelineExec
+      .mockResolvedValueOnce([[null, 1], [null, 59]])   // user-a: count=1
+      .mockResolvedValueOnce([[null, 101], [null, 10]]); // user-b: count=101
 
     const resultA = await checkRateLimit("user-a", RATE_LIMITS.FILE_CONTENT);
     expect(resultA.allowed).toBe(true);
@@ -173,70 +213,42 @@ describe("checkRateLimit", () => {
     expect(resultB.remaining).toBe(0);
   });
 
-  it("calls upsert with the correct composite key", async () => {
-    mockUpsert.mockResolvedValue({ points: 1 });
+  it("uses Redis INCR+TTL pipeline for atomic increment", async () => {
+    mockPipelineExec.mockResolvedValue([
+      [null, 1],
+      [null, 59],
+    ]);
 
-    const expiry = windowExpiry(60_000);
     await checkRateLimit("alice", { namespace: "repo:analyze", maxRequests: 5, windowMs: 60_000 });
 
-    expect(mockUpsert).toHaveBeenCalledWith({
-      where: { key_expiresAt: { key: "repo:analyze:alice", expiresAt: expiry } },
-      update: { points: { increment: 1 } },
-      create: { key: "repo:analyze:alice", points: 1, expiresAt: expiry },
-    });
-  });
-
-  it("uses fixed-window expiry rather than per-request expiry", async () => {
-    mockUpsert.mockResolvedValue({ points: 1 });
-
-    const windowMs = 120_000;
-    await checkRateLimit("user1", { namespace: "test", maxRequests: 3, windowMs });
-
-    const expectedExpiry = windowExpiry(windowMs);
-    expect(mockUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { key_expiresAt: { key: "test:user1", expiresAt: expectedExpiry } },
-        update: { points: { increment: 1 } },
-        create: expect.objectContaining({ expiresAt: expectedExpiry }),
-      })
+    expect(mockIncr).toHaveBeenCalledWith(
+      expect.stringContaining("repo:analyze:")
     );
+    expect(mockTtl).toHaveBeenCalled();
   });
 
   it("sanitizes special characters in the identifier", async () => {
-    mockUpsert.mockResolvedValue({ points: 1 });
+    mockPipelineExec.mockResolvedValue([
+      [null, 1],
+      [null, 59],
+    ]);
 
     await checkRateLimit("user@x.y", { namespace: "test", maxRequests: 3, windowMs: 60_000 });
 
-    expect(mockUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { key_expiresAt: { key: "test:user@x.y", expiresAt: expect.any(Date) } },
-      })
-    );
+    const incrKey = mockIncr.mock.calls[0][0];
+    expect(incrKey).toContain("test:user@x.y");
   });
 
   it("sanitizes SQL metacharacters in the identifier", async () => {
-    mockUpsert.mockResolvedValue({ points: 1 });
+    mockPipelineExec.mockResolvedValue([
+      [null, 1],
+      [null, 59],
+    ]);
 
     await checkRateLimit("a;b", { namespace: "test", maxRequests: 3, windowMs: 60_000 });
 
-    expect(mockUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { key_expiresAt: { key: "test:a_b", expiresAt: expect.any(Date) } },
-      })
-    );
-  });
-
-  it("truncates excessively long identifiers", async () => {
-    mockUpsert.mockResolvedValue({ points: 1 });
-
-    const longId = "a".repeat(1000);
-    await checkRateLimit(longId, { namespace: "test", maxRequests: 3, windowMs: 60_000 });
-
-    expect(mockUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { key_expiresAt: { key: expect.stringContaining("test:"), expiresAt: expect.any(Date) } },
-      })
-    );
+    const incrKey = mockIncr.mock.calls[0][0];
+    expect(incrKey).toContain("test:a_b");
   });
 
   it("validates all RATE_LIMITS configs have sensible values", () => {
