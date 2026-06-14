@@ -10,6 +10,12 @@ import React, {
 import { useSession } from "next-auth/react";
 import { buildApiUrl } from "../services/apiConfig";
 import { SESSION_EXPIRED_MESSAGE } from "@/lib/sessionConstants";
+import {
+  getAuthToken,
+  initializeAuthSession,
+  removeAuthToken,
+  setAuthToken,
+} from "@/lib/authTokenStorage";
 
 interface User {
   id: string;
@@ -22,7 +28,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: (retries?: number) => Promise<void>;
   updateUser: (data: Partial<User>) => void;
@@ -50,6 +56,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Check for existing auth on mount (NextAuth or JWT)
   useEffect(() => {
     const checkAuth = async () => {
+      initializeAuthSession();
+
       // If NextAuth session exists, use it
       if (status === "loading") {
         return; // Still loading session
@@ -69,7 +77,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Otherwise, check for JWT token
-      const token = localStorage.getItem("gitverse_token");
+      const token = getAuthToken();
 
       if (token) {
         try {
@@ -90,7 +98,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.email}`,
             });
           } else if (response.status === 401) {
-            localStorage.removeItem("gitverse_token");
+            removeAuthToken();
             if (typeof window !== "undefined") {
               window.dispatchEvent(new CustomEvent("session-expired", {
                 detail: { message: SESSION_EXPIRED_MESSAGE },
@@ -98,11 +106,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               window.location.href = "/login";
             }
           } else {
-            localStorage.removeItem("gitverse_token");
+            removeAuthToken();
           }
         } catch (error) {
           console.error("Failed to verify auth:", error);
-          localStorage.removeItem("gitverse_token");
+          removeAuthToken();
         }
       }
       setIsLoading(false);
@@ -111,7 +119,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, [session, status]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (
+    email: string,
+    password: string,
+    rememberMe = false,
+  ) => {
     setIsLoading(true);
 
     try {
@@ -120,7 +132,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       });
 
       const data = await response.json();
@@ -138,7 +150,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.email}`,
       };
 
-      localStorage.setItem("gitverse_token", data.token);
+      setAuthToken(data.token, rememberMe);
       setUser(newUser);
     } catch (error) {
       setIsLoading(false);
@@ -175,7 +187,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.email}`,
       };
 
-      localStorage.setItem("gitverse_token", data.token);
+      setAuthToken(data.token, true);
       setUser(newUser);
     } catch (error) {
       setIsLoading(false);
@@ -186,7 +198,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = async (retries = 2) => {
-    const token = localStorage.getItem("gitverse_token");
+    const token = getAuthToken();
 
     // Handle JWT logout
     if (token) {
@@ -200,7 +212,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             },
           });
           if (response.ok) {
-            localStorage.removeItem("gitverse_token");
+            removeAuthToken();
             break;
           }
         } catch (error) {

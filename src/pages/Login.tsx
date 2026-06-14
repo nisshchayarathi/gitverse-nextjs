@@ -16,6 +16,10 @@ import {
 } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { signIn } from "next-auth/react";
+import {
+  getRememberMePreference,
+  setRememberMePreference,
+} from "@/lib/authTokenStorage";
 
 export default function Login() {
   const router = useRouter();
@@ -28,6 +32,7 @@ export default function Login() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
 
   const RepoGraph = ({
     className,
@@ -106,6 +111,10 @@ export default function Login() {
   );
 
   const from = searchParams?.get("from") || "/dashboard";
+
+  useEffect(() => {
+    setRememberMe(getRememberMePreference());
+  }, []);
 
   useEffect(() => {
     const error = searchParams?.get("error");
@@ -201,7 +210,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       toast({
         title: "Success!",
         description: "Welcome back to GitVerse",
@@ -325,7 +334,17 @@ export default function Login() {
               style={{ animationDelay: "170ms" }}
             >
               <label className="flex items-center cursor-pointer">
-                <input type="checkbox" className="mr-2 rounded border-input" />
+                <input
+                  id="remember-me"
+                  type="checkbox"
+                  className="mr-2 rounded border-input"
+                  checked={rememberMe}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setRememberMe(checked);
+                    setRememberMePreference(checked);
+                  }}
+                />
                 <span className="text-muted-foreground">Remember me</span>
               </label>
               <span

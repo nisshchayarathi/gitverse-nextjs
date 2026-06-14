@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
+import { removeAuthToken } from "@/lib/authTokenStorage";
 
 const PROTECTED_ROUTES = [
   "/dashboard",
@@ -39,7 +39,7 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
         });
 
         // Clear local JWT token if any exists
-        localStorage.removeItem("gitverse_token");
+        removeAuthToken();
         
         // Redirect to login
         router.push(`/login?from=${encodeURIComponent(pathname || "/dashboard")}`);
