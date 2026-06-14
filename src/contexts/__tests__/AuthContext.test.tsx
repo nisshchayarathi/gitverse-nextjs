@@ -171,11 +171,34 @@ describe("useAuth", () => {
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
       await act(async () => {
-        await result.current.login("test@test.com", "password");
+        await result.current.login("test@test.com", "password", true);
       });
 
       expect(localStorage.getItem("gitverse_token")).toBe("new-jwt-token");
+      expect(localStorage.getItem("gitverse_remember_me")).toBe("true");
       expect(result.current.user?.email).toBe("test@test.com");
+    });
+
+    it("stores session-only token when remember me is disabled", async () => {
+      useSession.mockReturnValue({ data: null, status: "unauthenticated" });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          token: "session-jwt-token",
+          user: { id: 1, name: "Test", email: "test@test.com" },
+        }),
+      });
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      await act(async () => {
+        await result.current.login("test@test.com", "password", false);
+      });
+
+      expect(localStorage.getItem("gitverse_token")).toBe("session-jwt-token");
+      expect(localStorage.getItem("gitverse_remember_me")).toBe("false");
     });
 
     it("throws error on failed login", async () => {

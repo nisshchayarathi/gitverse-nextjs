@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { generateToken } from "@/lib/auth";
+import {
+  TOKEN_EXPIRY_REMEMBER,
+  TOKEN_EXPIRY_SESSION,
+} from "@/lib/authTokenStorage";
 import { apiError } from "@/lib/api-error";
 import { logger } from "@/lib/logger";
 import {
@@ -24,7 +28,7 @@ export async function POST(request: NextRequest) {
     const ip = getClientIp(request);
 
     const body = await request.json();
-    const { email, password } = body;
+    const { email, password, rememberMe } = body;
 
     if (!email || !password) {
       return apiError(400, "Email and password are required");
@@ -168,11 +172,14 @@ export async function POST(request: NextRequest) {
     });
     await clearFailedAttempts(normalizedEmail, "LOGIN");
 
-    const token = generateToken({
-      userId: user.id,
-      email: user.email,
-      tokenVersion: user.tokenVersion,
-    });
+    const token = generateToken(
+      {
+        userId: user.id,
+        email: user.email,
+        tokenVersion: user.tokenVersion,
+      },
+      rememberMe ? TOKEN_EXPIRY_REMEMBER : TOKEN_EXPIRY_SESSION,
+    );
 
     return NextResponse.json({
       user: {

@@ -1,4 +1,5 @@
 import { signOut } from "next-auth/react";
+import { removeAuthToken } from "@/lib/authTokenStorage";
 
 /**
  * A wrapper around fetch that automatically handles 401 Unauthorized responses
@@ -13,7 +14,7 @@ export async function apiFetch(
   if (response.status === 401) {
     if (typeof window !== "undefined") {
       // Clear local JWT storage
-      localStorage.removeItem("gitverse_token");
+      removeAuthToken();
 
       // Redirect to login using next-auth signOut or directly via location
       const currentPath = window.location.pathname;
