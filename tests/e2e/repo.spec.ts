@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Repository Page Tests', () => {
   test.describe('Unauthenticated Access', () => {
     test('should redirect to login when accessing repo page without auth', async ({ page }) => {
-      await page.goto('/repo/test-repo-123')
+      await page.goto('/repo/test-repo-123?playwright_no_bypass=true')
       await expect(page).toHaveURL(/\/login/)
     })
   })

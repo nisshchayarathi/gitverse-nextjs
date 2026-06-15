@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { requireAuth, sanitizeError } from "@/lib/middleware";
+import { requireAuth, sanitizeError, isHttpError } from "@/lib/middleware";
 import { logger } from "@/lib/logger";
 import bcrypt from "bcryptjs";
 import {
@@ -422,6 +422,13 @@ export async function PUT(request: NextRequest) {
       { err: sanitizeError(error), route: "app/api/users/profile/route.ts" },
       "Error updating profile"
     );
+
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
+    }
 
     if (error?.code === "P2025") {
       return NextResponse.json(

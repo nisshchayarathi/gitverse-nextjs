@@ -17,7 +17,7 @@ describe("contributor journey simulator", () => {
       ],
     };
 
-    const result = simulateContributorJourney(repository, {
+    const result = simulateContributorJourney(repository as any, {
       goal: "Add OAuth Provider",
       experienceLevel: "Intermediate",
       maxSteps: 5,

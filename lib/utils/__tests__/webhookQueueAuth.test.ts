@@ -131,6 +131,11 @@ describe("Webhook Queue Authorization", () => {
       const validToken = deriveBearerToken("timing-test-secret");
       const invalidToken = deriveBearerToken("timing-test-secret").slice(0, -2) + "ff";
 
+      // Warm up to allow JIT compilation and caching
+      for (let i = 0; i < 50; i++) {
+        isInternalWorkerAuthorized(validToken);
+      }
+
       // Measure validation times
       const times: number[] = [];
 
@@ -141,15 +146,17 @@ describe("Webhook Queue Authorization", () => {
         times.push(Number(end - start));
       }
 
-      // All validations should take similar time
-      const avg = times.reduce((a, b) => a + b, 0) / times.length;
-      const deviations = times.map((t) => Math.abs(t - avg)).sort((a, b) => a - b);
-      // Take 90th percentile deviation to exclude OS context-switching outliers
-      const stableDeviation = deviations[Math.floor(deviations.length * 0.9)];
-      const avgDeviation = stableDeviation / avg;
+      // Sort and strip outliers (top 10% and bottom 10%) to prevent VM/CI scheduling noise
+      times.sort((a, b) => a - b);
+      const stableTimes = times.slice(10, 90);
 
-      // Should have low timing variance
-      expect(avgDeviation).toBeLessThan(50);
+      // All validations should take similar time
+      const avg = stableTimes.reduce((a, b) => a + b, 0) / stableTimes.length;
+      const maxDeviation = Math.max(...stableTimes.map((t) => Math.abs(t - avg)));
+      const avgDeviation = maxDeviation / avg;
+
+      // Tight threshold (under 10) can now be enforced because VM outliers are removed
+      expect(avgDeviation).toBeLessThan(10);
     });
 
     it("uses constant-time comparison", () => {

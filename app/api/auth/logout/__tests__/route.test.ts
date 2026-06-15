@@ -30,10 +30,16 @@ jest.mock("@/lib/utils/authCookie", () => ({
   appendClearCookieHeaders: jest.fn(),
 }));
 
+jest.mock("@/lib/csrf", () => ({
+  validateCsrfOrigin: jest.fn(() => true),
+  csrfError: jest.fn(() => NextResponse.json({ error: "CSRF validation failed: request origin not allowed" }, { status: 403 })),
+}));
+
 const prisma = require("@/lib/prisma").default;
 const { getAuthUser } = require("@/lib/middleware");
 const { getToken } = require("next-auth/jwt");
 const { appendClearCookieHeaders } = require("@/lib/utils/authCookie");
+const { validateCsrfOrigin } = require("@/lib/csrf");
 
 function mockRequest(authHeader?: string): NextRequest {
   return {
@@ -110,5 +116,14 @@ describe("POST /api/auth/logout", () => {
 
     const response = await POST(mockRequest("Bearer token"));
     expect(response.status).toBe(500);
+  });
+
+  it("returns 403 when CSRF validation fails", async () => {
+    validateCsrfOrigin.mockReturnValueOnce(false);
+
+    const response = await POST(mockRequest());
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toContain("CSRF validation failed");
   });
 });

@@ -31,6 +31,14 @@ jest.mock("@/lib/middleware", () => ({
   sanitizeError: jest.fn((err) => err?.message || "Unknown error"),
 }));
 
+jest.mock("@/lib/middleware/rateLimit", () => ({
+  checkRateLimit: jest.fn().mockResolvedValue({ allowed: true, remaining: 5, limit: 5, windowSec: 60, resetInSec: 60 }),
+  rateLimitResponse: jest.fn(),
+  RATE_LIMITS: {
+    GITHUB_CONNECT: { namespace: "github:connect", maxRequests: 5, windowMs: 60_000 },
+  },
+}));
+
 jest.mock("@/lib/prisma", () => ({
   __esModule: true,
   default: {
@@ -104,7 +112,7 @@ describe("POST /api/integrations/github/connect", () => {
       updatedAt: new Date(),
     });
     mockEncryptToken.mockImplementation(async (token: string) => `encrypted:${token}`);
-    (GitHubService as any).mockImplementation(() => ({
+    (GitHubService as unknown as jest.Mock).mockImplementation(() => ({
       getAuthenticatedUser: jest.fn().mockResolvedValue({ id: 12345, login: "testuser" }),
     }));
   });

@@ -22,6 +22,13 @@ jest.mock("@/lib/middleware/rateLimit", () => ({
 jest.mock("@/lib/middleware", () => ({
   requireAuth: jest.fn(),
   sanitizeError: jest.fn((err) => err?.message || "Unknown error"),
+  isHttpError: jest.fn(
+    (err) =>
+      err &&
+      typeof err === "object" &&
+      "status" in err &&
+      typeof err.status === "number",
+  ),
 }));
 
 jest.mock("@/lib/logger", () => ({

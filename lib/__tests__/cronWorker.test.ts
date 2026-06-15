@@ -550,4 +550,3 @@ describe("cronWorker — process exit behavior", () => {
 });
 
 export {};
-

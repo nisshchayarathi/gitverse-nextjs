@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { sanitizeError, isHttpError } from "@/lib/middleware";
 import { enforceRepositoryPermission } from "@/middleware/repository-permissions";
 import { SettingsAuditService } from "@/services/security/settings-audit";
-import prisma from "@/lib/prisma";
 import { QuotaService } from "@/lib/services/quotaService";
+import prisma from "@/lib/prisma";
 
 const securityHeaders = {
   "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
@@ -203,7 +203,6 @@ export async function PUT(
         { status: 404, headers: securityHeaders }
       );
     }
-
     const installationId = githubRepo.installationId;
 
     // Fetch current quota for audit trail

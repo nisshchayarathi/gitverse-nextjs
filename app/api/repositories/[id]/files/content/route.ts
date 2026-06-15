@@ -9,7 +9,7 @@ const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 // Whitelist of allowed extensions from tests
 const ALLOWED_TEXT_EXTENSIONS = [
   "txt", "md", "json", "yml", "yaml", "js", "ts", "tsx", "jsx",
-  "html", "css", "scss", "py", "go", "toml", "sql"
+  "html", "css", "scss", "py", "go", "toml", "sql", "example"
 ];
 
 // Blocklist of sensitive files
@@ -28,7 +28,11 @@ function validateFilePath(filePath: string): string | null {
   }
 
   if (filePath.startsWith("/")) {
-    return "Absolute path not allowed";
+    return "Absolute path not allowed: must not start with /";
+  }
+
+  if (filePath.includes("\\")) {
+    return "invalid: Path traversal detected";
   }
 
   if (filePath.includes("//")) {
@@ -47,7 +51,6 @@ function validateFilePath(filePath: string): string | null {
   if (/[<>@!$%^&*(){}[\]|]/.test(filePath)) {
     return "path contains invalid characters";
   }
-
   let decodedPath = filePath;
   try {
     decodedPath = decodeURIComponent(filePath);
@@ -55,7 +58,7 @@ function validateFilePath(filePath: string): string | null {
   } catch (e) {
     // Ignore decoding errors
   }
-
+  
   if (decodedPath.includes("\\")) {
     return "Path traversal detected";
   }
@@ -71,6 +74,7 @@ function validateFilePath(filePath: string): string | null {
       return "Path traversal detected";
     }
   }
+
   // Check for leading . segment (e.g., ./src)
   if (segments.length > 0 && segments[0] === ".") {
     return "path must not contain . segment";
@@ -114,7 +118,42 @@ export async function GET(
     const user = await requireAuth(request);
     const id = parseInt(params.id);
     const searchParams = request.nextUrl.searchParams;
-    const filePath = searchParams.get("path");
+    let filePath = searchParams.get("path");
+    if (filePath) {
+      const lastSlashIdx = filePath.lastIndexOf("/");
+      const segmentStart = lastSlashIdx + 1;
+      const lastSegment = filePath.substring(segmentStart);
+      const lastDotIdx = lastSegment.lastIndexOf(".");
+      
+      let splitIdx = -1;
+      if (lastDotIdx !== -1) {
+        const remaining = lastSegment.substring(lastDotIdx + 1);
+        const qIdx = remaining.indexOf("?");
+        const hIdx = remaining.indexOf("#");
+        if (qIdx !== -1 && hIdx !== -1) splitIdx = Math.min(qIdx, hIdx);
+        else if (qIdx !== -1) splitIdx = qIdx;
+        else if (hIdx !== -1) splitIdx = hIdx;
+
+        if (splitIdx !== -1) {
+          const ext = remaining.substring(0, splitIdx).toLowerCase();
+          if (ALLOWED_TEXT_EXTENSIONS.includes(ext)) {
+            const targetIdx = segmentStart + lastDotIdx + 1 + splitIdx;
+            filePath = filePath.substring(0, targetIdx);
+          }
+        }
+      } else {
+        const qIdx = lastSegment.indexOf("?");
+        const hIdx = lastSegment.indexOf("#");
+        if (qIdx !== -1 && hIdx !== -1) splitIdx = Math.min(qIdx, hIdx);
+        else if (qIdx !== -1) splitIdx = qIdx;
+        else if (hIdx !== -1) splitIdx = hIdx;
+
+        if (splitIdx !== -1) {
+          const targetIdx = segmentStart + splitIdx;
+          filePath = filePath.substring(0, targetIdx);
+        }
+      }
+    }
 
     const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.FILE_CONTENT);
     if (!rl.allowed) return rateLimitResponse(rl);

@@ -58,6 +58,7 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
       - name: Verify no committed build artifacts in dist-worker
+        shell: bash
         run: |
           if git ls-files --error-unmatch dist-worker/ 2>/dev/null; then
             echo "Error: dist-worker/ is tracked in git."

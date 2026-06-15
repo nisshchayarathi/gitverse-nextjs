@@ -17,6 +17,7 @@ const customJestConfig = {
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
+    '^msgpackr$': '<rootDir>/node_modules/msgpackr/dist/node.cjs',
     '^@/lib/(.*)$': '<rootDir>/lib/$1',
     '^@/app/(.*)$': '<rootDir>/app/$1',
     '^@/services/(.*)$': '<rootDir>/services/$1',

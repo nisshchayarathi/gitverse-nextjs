@@ -4,6 +4,7 @@ import { getNextAuthSecret } from "./config/env";
 import type { JWTPayload } from "./auth";
 import prisma from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
+import { validateCsrfOrigin } from "./csrf";
 import { hashApiKey } from "@/lib/utils/api-key";
 
 export interface AuthenticatedRequest {
@@ -21,6 +22,70 @@ export async function getAuthUser(
 ): Promise<JWTPayload | null> {
   const authHeader = request.headers.get("authorization");
   let userPayload: JWTPayload | null = null;
+
+  // 1) Secure JWT auth (Authorization: Bearer ...)
+  // Uses verifyTokenWithUserValidation for proper tokenVersion checking
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+
+    // Try API key lookup first (fast, no crypto overhead)
+    if (token.startsWith("gv_")) {
+      const hashed = hashApiKey(token);
+      try {
+        const apiKey = await prisma.apiKey.findUnique({ where: { hashedKey: hashed } });
+        if (apiKey && apiKey.expiresAt > new Date()) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: apiKey.userId },
+            select: { id: true, email: true, name: true, tokenVersion: true, lockedUntil: true },
+          });
+          if (dbUser && (!dbUser.lockedUntil || dbUser.lockedUntil <= new Date())) {
+            await prisma.apiKey.update({
+              where: { id: apiKey.id },
+              data: { lastUsedAt: new Date() },
+            });
+            userPayload = { userId: dbUser.id, email: dbUser.email, tokenVersion: dbUser.tokenVersion };
+          }
+        }
+      } catch {
+        // DB error — fall through to other auth methods
+      }
+    }
+
+    // Try JWT token (existing behavior)
+    if (!userPayload) {
+      try {
+        const payload = await verifyTokenWithUserValidation(token);
+
+        if (payload) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: payload.userId },
+            select: {
+              id: true,
+              tokenVersion: true,
+              lockedUntil: true,
+            },
+          });
+
+          if (!dbUser) {
+            return null;
+          }
+
+          if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
+            return null;
+          }
+
+          if (payload.tokenVersion !== dbUser.tokenVersion) {
+            return null;
+          }
+
+          userPayload = payload;
+        }
+      } catch (error) {
+        console.warn("[Auth] JWT validation error:", error);
+        return null;
+      }
+    }
+  }
 
   // 2) NextAuth session cookie (Google OAuth)
   if (!userPayload) {
@@ -135,6 +200,10 @@ export async function getAuthUser(
 export async function requireAuth(
   request: NextRequest
 ): Promise<JWTPayload> {
+  if (!validateCsrfOrigin(request)) {
+    throw new HttpError(403, "CSRF validation failed");
+  }
+
   const user = await getAuthUser(request);
 
   if (!user) {

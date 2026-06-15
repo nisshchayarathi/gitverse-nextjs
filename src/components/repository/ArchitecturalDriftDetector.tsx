@@ -67,7 +67,7 @@ export function ArchitecturalDriftDetector({ repository, loading = false }: Arch
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={Building2}
+            icon={<Building2 className="h-8 w-8" />}
             title="No repository data available"
             description="Load a repository with file metadata to analyze architectural drift and complexity metrics."
           />

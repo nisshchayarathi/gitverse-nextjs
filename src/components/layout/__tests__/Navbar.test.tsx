@@ -1,11 +1,11 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 
-jest.mock("next/link", () => {
-  const MockLink = ({ children, href, ...props }: any) =>
-    React.createElement("a", { href, ...props }, children);
-  return MockLink;
-});
+jest.mock("next/link", () => ({
+  __esModule: true,
+  default: ({ children, href, ...props }: any) =>
+    React.createElement("a", { href, ...props }, children),
+}));
 
 jest.mock("lucide-react", () => ({
   GitBranch: () => <svg data-testid="git-branch" />,
@@ -14,6 +14,7 @@ jest.mock("lucide-react", () => ({
 }));
 
 jest.mock("@/components/ui", () => ({
+  __esModule: true,
   Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
   ThemeToggle: () => <button data-testid="theme-toggle">Toggle</button>,
 }));
@@ -24,6 +25,7 @@ describe("Navbar", () => {
   it("renders without crashing", () => {
     const { container } = render(<Navbar />);
     expect(container.querySelector("nav")).toBeTruthy();
+    expect(screen.getAllByText((content: string, node: any) => node?.textContent === "GitVerse").length).toBeGreaterThan(0);
   });
 
   it("renders navigation links", () => {

@@ -44,7 +44,7 @@ jest.mock("@aws-sdk/client-s3", () => ({
   }),
 }));
 
-const BACKUP_DIR = "/tmp/test-backups";
+const BACKUP_DIR = path.normalize("/tmp/test-backups");
 const TEST_DB_URL = "postgresql://user:pass@localhost:5432/testdb";
 
 const ORIGINAL_ENV = { ...process.env };

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/middleware";
+import { requireAuth, isHttpError } from "@/lib/middleware";
 import { prisma } from "@/lib/prisma";
 import { broadcastAnnotationEvent } from "@/lib/services/annotationSync";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
@@ -60,6 +60,9 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (error: any) {
+    if (isHttpError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return NextResponse.json({ error: "Failed to update annotation" }, { status: 500 });
   }
 }
@@ -107,6 +110,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
+    if (isHttpError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return NextResponse.json({ error: "Failed to delete annotation" }, { status: 500 });
   }
 }

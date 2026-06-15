@@ -26,7 +26,7 @@ export class SettingsAuditService {
           repositoryId: entry.repositoryId ?? null,
           organizationId: entry.organizationId ?? null,
           action: entry.action,
-          resource: "Settings",
+          resource: entry.action.split("_")[0] || "settings",
           details: {
             previousValue: entry.previousValue,
             newValue: entry.newValue,

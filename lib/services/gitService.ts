@@ -300,6 +300,11 @@ export class GitService {
     ];
 
     return new Promise((resolve, reject) => {
+      if (opts?.signal?.aborted) {
+        reject(new Error("Repository clone aborted"));
+        return;
+      }
+
       const child = spawn("git", args, {
         stdio: ["ignore", "pipe", "pipe"],
         env: {

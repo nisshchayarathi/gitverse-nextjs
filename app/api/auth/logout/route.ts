@@ -4,8 +4,11 @@ import prisma from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
 import { getNextAuthSecret } from "@/lib/config/env";
 import { appendClearCookieHeaders } from "@/lib/utils/authCookie";
+import { validateCsrfOrigin, csrfError } from "@/lib/csrf";
 
 export async function POST(request: NextRequest) {
+  if (!validateCsrfOrigin(request)) return csrfError();
+
   try {
     const user = await getAuthUser(request);
 

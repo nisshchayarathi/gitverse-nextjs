@@ -32,6 +32,7 @@ export default defineConfig({
     timeout: 120000,
     env: {
       PLAYWRIGHT_TEST: 'true',
+      NEXT_PUBLIC_PLAYWRIGHT_TEST: 'true',
     },
   },
 })

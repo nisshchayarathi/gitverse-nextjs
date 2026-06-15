@@ -55,7 +55,7 @@ export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetect
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={Archive}
+            icon={<Archive className="h-8 w-8" />}
             title="No repository files available"
             description="Load a repository with file metadata so the dead code detector can scan dependencies and usage patterns."
           />
@@ -80,7 +80,7 @@ export function DeadCodeDetector({ repository, loading = false }: DeadCodeDetect
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={ShieldOff}
+            icon={<ShieldOff className="h-8 w-8" />}
             title="No likely dead code detected"
             description="The repository dependency graph looks well-connected, with no obvious orphaned files."
           />
