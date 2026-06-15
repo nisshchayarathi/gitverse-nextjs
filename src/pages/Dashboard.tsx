@@ -32,6 +32,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
+import { useTags } from "@/hooks/useTags";
+import { TagBadge } from "@/components/tags/TagBadge";
+import { TagSelector } from "@/components/tags/TagSelector";
 
 interface Repository {
   id: string;
@@ -46,6 +49,7 @@ interface Repository {
   status?: "completed" | "processing" | "failed";
   createdAt?: string;
   updatedAt?: string;
+  tags?: Array<{ tag: any }>;
 }
 
 export default function Dashboard() {
@@ -54,6 +58,7 @@ export default function Dashboard() {
   const searchRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
   const analyzeUrl = searchParams ? searchParams.get("analyzeUrl") : null;
+  const activeTags = searchParams ? searchParams.get("tags")?.split(",").filter(Boolean) || [] : [];
   const [repoUrl, setRepoUrl] = useState("");
   const [repoScope, setRepoScope] = useState("");
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -61,6 +66,22 @@ export default function Dashboard() {
   const [analyzing, setAnalyzing] = useState(false);
 
   const { addRepo } = useRecentRepos();
+  const { tags: allTags } = useTags();
+  const [activeTagSelectorId, setActiveTagSelectorId] = useState<string | null>(null);
+
+  const handleUpdateRepoTags = async (repoId: string, tagIds: string[]) => {
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      await axios.put(
+        buildApiUrl(`/api/repositories/${repoId}/tags`),
+        { tagIds },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await fetchRepositories();
+    } catch (e: any) {
+      toast({ title: "Failed to update tags", description: e.message, variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
     fetchRepositories();
@@ -541,6 +562,12 @@ export default function Dashboard() {
               ) : (
                 <div className="space-y-3">
                   {[...repositories]
+                    .filter((repo: any) => {
+                      if (activeTags.length === 0) return true;
+                      if (!repo.tags) return false;
+                      const repoTagIds = repo.tags.map((t: any) => t.tag.id);
+                      return activeTags.some(tagId => repoTagIds.includes(tagId));
+                    })
                     .sort((a: any, b: any) => {
                       const aTime = new Date(a.lastAnalyzedAt || a.createdAt).getTime();
                       const bTime = new Date(b.lastAnalyzedAt || b.createdAt).getTime();
@@ -561,6 +588,33 @@ export default function Dashboard() {
                           <h3 className="font-medium text-sm sm:text-base truncate">
                             {repo.name}
                           </h3>
+                          <div className="flex flex-wrap gap-1 mt-1 mb-1 items-center" onClick={e => e.stopPropagation()}>
+                            {repo.tags?.slice(0, 3).map((t: any) => (
+                              <TagBadge key={t.tag.id} tag={t.tag} />
+                            ))}
+                            {repo.tags && repo.tags.length > 3 && (
+                              <span className="text-[10px] text-muted-foreground ml-1">+{repo.tags.length - 3}</span>
+                            )}
+                            <div className="relative inline-block ml-2">
+                              <button
+                                onClick={() => setActiveTagSelectorId(activeTagSelectorId === repo.id ? null : repo.id)}
+                                className="text-xs text-muted-foreground hover:text-foreground flex items-center justify-center w-5 h-5 rounded-full border border-dashed border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-400"
+                                title="Add tags"
+                              >
+                                +
+                              </button>
+                              {activeTagSelectorId === repo.id && (
+                                <div className="absolute left-0 top-6 mt-1">
+                                  <TagSelector
+                                    allTags={allTags}
+                                    selectedTagIds={repo.tags?.map((t: any) => t.tag.id) || []}
+                                    onChange={(tagIds) => handleUpdateRepoTags(repo.id, tagIds)}
+                                    onClose={() => setActiveTagSelectorId(null)}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
                           <p className="text-xs sm:text-sm text-muted-foreground truncate">
                             {repo.url}
                           </p>

@@ -29,6 +29,8 @@ import {
 import { Button, ThemeToggle } from "@/components/ui";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { toast } from "@/hooks/use-toast";
+import { useTags } from "@/hooks/useTags";
+import { TagManager } from "@/components/tags/TagManager";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -43,6 +45,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const { tags, createTag, deleteTag } = useTags();
+
+  const handleFilterChange = (activeTags: string[]) => {
+    const params = new URLSearchParams(window.location.search);
+    if (activeTags.length > 0) {
+      params.set("tags", activeTags.join(","));
+    } else {
+      params.delete("tags");
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  };
 
   const handleLogout = () => {
     logout();
@@ -113,6 +126,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               );
             })}
           </nav>
+
+          {/* Tags Section */}
+          <div className="p-4 border-t border-border/50 overflow-y-auto max-h-64">
+            {sidebarOpen && (
+              <TagManager 
+                tags={tags} 
+                onCreateTag={createTag} 
+                onDeleteTag={deleteTag}
+                activeFilter={typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get("tags")?.split(",") || [] : []}
+                onFilterChange={handleFilterChange}
+              />
+            )}
+          </div>
 
           {/* Toggle Sidebar Button */}
           <div className="p-4 border-t border-border/50">

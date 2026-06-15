@@ -62,6 +62,7 @@ model User {
   mfaConfig               MfaConfig?
   auditLogs               AuditLog[]
   apiKeys                 ApiKey[]
+  tags                    UserTag[]
 
   @@map("users")
 }
@@ -253,6 +254,7 @@ model Repository {
   lastSynchronizedAt           DateTime?                     @map("last_synchronized_at")
   configWarning                String?                       @map("config_warning") @db.Text
   repositoryArchitectureChunks RepositoryArchitectureChunk[]
+  tags                         RepositoryTag[]
 
   @@index([url])
   // Index for fast listing of all repos belonging to a user
@@ -860,4 +862,32 @@ model MfaConfig {
 
   @@index([userId])
   @@map("mfa_configs")
+}
+
+model UserTag {
+  id        String   @id @default(cuid())
+  userId    Int      @map("user_id")
+  name      String
+  color     String   @default("#6366f1")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repos RepositoryTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("user_tags")
+}
+
+model RepositoryTag {
+  repositoryId Int    @map("repository_id")
+  tagId        String @map("tag_id")
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  tag        UserTag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([repositoryId, tagId])
+  @@index([tagId])
+  @@map("repository_tags")
 }

@@ -50,8 +50,6 @@ async function getFileSize(filePath: string): Promise<number> {
 
 async function runPgDump(databaseUrl: string, outputPath: string): Promise<void> {
   const dumpCmd = `pg_dump --no-owner --no-acl --quote-all-identifiers "${databaseUrl}"`;
-  const gzip = createGzip({ level: 6 });
-  const outStream = createWriteStream(outputPath);
 
   try {
     await execAsync(`${dumpCmd} | gzip -c > ${outputPath}`, {
@@ -63,6 +61,10 @@ async function runPgDump(databaseUrl: string, outputPath: string): Promise<void>
       timeout: 5 * 60 * 1000,
       maxBuffer: 1024 * 1024 * 1024,
     }).then(async (result) => {
+      const gzip = createGzip({ level: 6 });
+      const outStream = createWriteStream(outputPath);
+      // Ensure we don't crash on unhandled stream errors if the dir is deleted
+      outStream.on("error", () => {});
       const source = Buffer.from(result.stdout, "utf-8");
       await pipeline(
         require("stream").Readable.from(source),
