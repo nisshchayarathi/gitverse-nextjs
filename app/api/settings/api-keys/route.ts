@@ -5,7 +5,7 @@ import { generateApiKey, generateKeyExpiry } from "@/lib/utils/api-key";
 
 export async function GET(req: NextRequest) {
   const auth = await authenticateRequest(req);
-  if (!auth.user) return auth.error;
+  if (!auth.user) return auth.error as NextResponse;
 
   const keys = await prisma.apiKey.findMany({
     where: { userId: auth.user.id },
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const auth = await authenticateRequest(req);
-  if (!auth.user) return auth.error;
+  if (!auth.user) return auth.error as NextResponse;
 
   let body: { name?: string; scopes?: string[] };
   try {
