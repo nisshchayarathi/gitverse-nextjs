@@ -22,6 +22,23 @@ export async function getAuthUser(
   const authHeader = request.headers.get("authorization");
   let userPayload: JWTPayload | null = null;
 
+  // 1) JWT Bearer token
+  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+    try {
+      const token = authHeader.substring(7);
+      const decoded = await verifyTokenWithUserValidation(token);
+      if (decoded) {
+        userPayload = {
+          userId: decoded.userId,
+          email: decoded.email,
+          tokenVersion: decoded.tokenVersion,
+        };
+      }
+    } catch {
+      // Ignore token validation errors
+    }
+  }
+
   // 2) NextAuth session cookie (Google OAuth)
   if (!userPayload) {
     try {
@@ -70,8 +87,6 @@ export async function getAuthUser(
         }
 
         // Validate tokenVersion for NextAuth session cookies.
-        // The JWT callback attaches tokenVersion at sign-in; if it no longer
-        // matches the DB value (after password change or logout), reject.
         const jwtTokenVersion = (token as any).tokenVersion as number | undefined;
         if (
           jwtTokenVersion != null &&
@@ -90,6 +105,7 @@ export async function getAuthUser(
         userPayload = {
           userId,
           email: token.email,
+          tokenVersion: jwtTokenVersion,
         };
       }
     } catch {
@@ -115,6 +131,13 @@ export async function getAuthUser(
     }
 
     if (finalUser.lockedUntil && finalUser.lockedUntil > new Date()) {
+      return null;
+    }
+
+    if (
+      userPayload.tokenVersion != null &&
+      userPayload.tokenVersion !== finalUser.tokenVersion
+    ) {
       return null;
     }
   } catch (error) {
