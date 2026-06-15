@@ -3,6 +3,9 @@ import { getAuthUser , sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
 import { SAFE_SESSION_SELECT } from "@/lib/utils/sessionResponse";
+import { getToken } from "next-auth/jwt";
+import { getNextAuthSecret } from "@/lib/config/env";
+import { appendClearCookieHeaders } from "@/lib/utils/authCookie";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +17,15 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    // Invalidate JWT bearer tokens by incrementing tokenVersion
     await prisma.user.update({
       where: { id: user.userId },
       data: { tokenVersion: { increment: 1 }, passwordChangedAt: new Date() },
+    });
+
+    // Delete all DB sessions for the user to prevent orphaned rows
+    await prisma.session.deleteMany({
+      where: { userId: user.userId },
     });
 
     const response = NextResponse.json({
@@ -24,6 +33,19 @@ export async function DELETE(request: NextRequest) {
     });
 
     response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+
+    // Clear NextAuth session cookies if the request came from a browser session
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      const nextAuthToken = await getToken({
+        req: request,
+        secret: getNextAuthSecret(),
+      });
+
+      if (nextAuthToken) {
+        appendClearCookieHeaders(response);
+      }
+    }
 
     return response;
   } catch (error: any) {
