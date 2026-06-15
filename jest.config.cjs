@@ -29,4 +29,13 @@ const customJestConfig = {
   ],
 };
 
-module.exports = createJestConfig(customJestConfig);
+module.exports = async () => {
+  const nextJestConfig = await createJestConfig(customJestConfig)();
+  
+  nextJestConfig.transformIgnorePatterns = [
+    '/node_modules/(?!(jose|@panva|oauth4webapi|uuid)/)',
+    ...nextJestConfig.transformIgnorePatterns.filter(pattern => pattern !== '/node_modules/'),
+  ];
+  
+  return nextJestConfig;
+};

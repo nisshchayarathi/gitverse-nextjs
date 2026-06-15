@@ -39,6 +39,9 @@ import { useToast } from "@/hooks/use-toast";
 import { buildApiUrl } from "@/services/apiConfig";
 import { Modal } from "@/components/ui/Modal";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useTags } from "@/hooks/useTags";
+import { TagBadge } from "@/components/tags/TagBadge";
+import { TagSelector } from "@/components/tags/TagSelector";
 
 type TabType =
   | "overview"
@@ -137,6 +140,23 @@ export default function RepositoryAnalysis() {
   const pollingStartedAt = useRef<number | null>(null);
   const pollingJobRef = useRef<string | null>(null);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { tags: allTags } = useTags();
+  const [activeTagSelector, setActiveTagSelector] = useState(false);
+
+  const handleUpdateRepoTags = async (tagIds: string[]) => {
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      await axios.put(
+        buildApiUrl(`/api/repositories/${id}/tags`),
+        { tagIds },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await fetchRepository();
+    } catch (e: any) {
+      toast({ title: "Failed to update tags", description: e.message, variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
     fetchRepository();
@@ -534,6 +554,11 @@ export default function RepositoryAnalysis() {
                       {error}
                     </p>
                   )}
+                  <div className="flex flex-wrap gap-1 mt-2 items-center">
+                    {repository?.tags?.map((t: any) => (
+                      <TagBadge key={t.tag.id} tag={t.tag} />
+                    ))}
+                  </div>
               </div>
               </div>
               {/* Delete button only if repository exists */}
@@ -657,7 +682,39 @@ export default function RepositoryAnalysis() {
                   <div className="lg:col-span-3 space-y-6">
                     {renderContent()}
                   </div>
-                  <div className="lg:col-span-1">
+                  <div className="lg:col-span-1 space-y-6">
+                    <div className="glass rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold">Repository Tags</h3>
+                        <button
+                          onClick={() => setActiveTagSelector(!activeTagSelector)}
+                          className="text-xs text-indigo-500 hover:text-indigo-400 font-medium"
+                        >
+                          + Add Tag
+                        </button>
+                      </div>
+                      <div className="relative">
+                        {activeTagSelector && (
+                          <div className="absolute right-0 top-0 mt-1 mb-4 z-50">
+                            <TagSelector
+                              allTags={allTags}
+                              selectedTagIds={repository?.tags?.map((t: any) => t.tag.id) || []}
+                              onChange={handleUpdateRepoTags}
+                              onClose={() => setActiveTagSelector(false)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {repository?.tags?.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">No tags assigned.</p>
+                        ) : (
+                          repository?.tags?.map((t: any) => (
+                            <TagBadge key={t.tag.id} tag={t.tag} />
+                          ))
+                        )}
+                      </div>
+                    </div>
                     <SyncStatusCard 
                       repositoryId={repository.id.toString()} 
                       lastSynchronizedAt={repository.lastSynchronizedAt}

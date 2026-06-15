@@ -886,6 +886,9 @@ export class RepositoryService {
         knowledge: true,
         subPackages: true,
         parent: true,
+        tags: {
+          include: { tag: true },
+        },
       },
     });
 
@@ -912,6 +915,9 @@ export class RepositoryService {
           take: 3,
         },
         parent: true,
+        tags: {
+          include: { tag: true },
+        },
       },
       orderBy: { id: "desc" },
     });

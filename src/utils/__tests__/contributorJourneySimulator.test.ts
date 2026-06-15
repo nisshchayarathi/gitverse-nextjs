@@ -12,10 +12,10 @@ describe("contributor journey simulator", () => {
         { path: "src/utils/helpers.ts", size: 6_000 },
       ],
       commits: [
-        { message: "Fix auth provider flow" },
-        { message: "Improve login session handling" },
+        { message: "Fix auth provider flow", hash: "a1", author: "Dev", date: new Date(), filesChanged: 1 },
+        { message: "Improve login session handling", hash: "b2", author: "Dev", date: new Date(), filesChanged: 1 },
       ],
-    };
+    } as any;
 
     const result = simulateContributorJourney(repository, {
       goal: "Add OAuth Provider",

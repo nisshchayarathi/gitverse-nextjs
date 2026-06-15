@@ -22,6 +22,16 @@ export async function getAuthUser(
   const authHeader = request.headers.get("authorization");
   let userPayload: JWTPayload | null = null;
 
+  // 1) JWT Bearer token
+  if (authHeader?.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.substring(7);
+      userPayload = await verifyTokenWithUserValidation(token);
+    } catch {
+      // Ignore token validation errors, try NextAuth
+    }
+  }
+
   // 2) NextAuth session cookie (Google OAuth)
   if (!userPayload) {
     try {
@@ -115,6 +125,10 @@ export async function getAuthUser(
     }
 
     if (finalUser.lockedUntil && finalUser.lockedUntil > new Date()) {
+      return null;
+    }
+
+    if (userPayload.tokenVersion != null && userPayload.tokenVersion !== finalUser.tokenVersion) {
       return null;
     }
   } catch (error) {
