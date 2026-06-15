@@ -4,7 +4,7 @@ import { authenticateRequest } from "@/lib/middleware/api-auth";
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await authenticateRequest(req);
-  if (!auth.user) return auth.error;
+  if (!auth.user) return auth.error as NextResponse;
 
   const keyId = Number(params.id);
   if (!Number.isFinite(keyId)) {
