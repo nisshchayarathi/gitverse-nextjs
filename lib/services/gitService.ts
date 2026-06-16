@@ -331,6 +331,11 @@ export class GitService {
         stderr += chunk.toString();
       });
 
+      if (opts?.signal?.aborted) {
+        reject(new Error("Repository clone aborted"));
+        return;
+      }
+
       if (opts?.signal) {
         opts.signal.addEventListener("abort", () => {
           killProcess(child);

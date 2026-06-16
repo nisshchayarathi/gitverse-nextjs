@@ -7,17 +7,17 @@ jest.mock("next/link", () => ({
   ),
 }));
 
-vi.mock("lucide-react", () => ({
+jest.mock("lucide-react", () => ({
   GitBranch: () => <svg data-testid="git-branch" />,
   Menu: () => <svg data-testid="menu" />,
   X: () => <svg data-testid="x" />,
 }));
 
-vi.mock("@/components/ui", () => ({
+jest.mock("@/components/ui", () => ({
   Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
 }));
 
-vi.mock("@/components/ThemeToggle", () => ({
+jest.mock("@/components/ui/ThemeToggle", () => ({
   ThemeToggle: () => <button data-testid="theme-toggle">Toggle</button>,
 }));
 
