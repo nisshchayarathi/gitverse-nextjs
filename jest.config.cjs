@@ -17,6 +17,9 @@ const customJestConfig = {
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
+    '^jose$': require.resolve('jose'),
+    '^@panva/hkdf$': require.resolve('@panva/hkdf'),
+    '^uuid$': require.resolve('uuid'),
     '^@/lib/(.*)$': '<rootDir>/lib/$1',
     '^@/app/(.*)$': '<rootDir>/app/$1',
     '^@/services/(.*)$': '<rootDir>/services/$1',

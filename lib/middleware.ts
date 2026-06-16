@@ -22,6 +22,19 @@ export async function getAuthUser(
   const authHeader = request.headers.get("authorization");
   let userPayload: JWTPayload | null = null;
 
+  // 1) JWT bearer token in Authorization header
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.substring(7);
+      const validatedUser = await verifyTokenWithUserValidation(token);
+      if (validatedUser) {
+        userPayload = validatedUser;
+      }
+    } catch (error) {
+      console.warn("Bearer token validation failed:", error);
+    }
+  }
+
   // 2) NextAuth session cookie (Google OAuth)
   if (!userPayload) {
     try {
@@ -115,6 +128,13 @@ export async function getAuthUser(
     }
 
     if (finalUser.lockedUntil && finalUser.lockedUntil > new Date()) {
+      return null;
+    }
+
+    if (
+      userPayload.tokenVersion != null &&
+      finalUser.tokenVersion !== userPayload.tokenVersion
+    ) {
       return null;
     }
   } catch (error) {

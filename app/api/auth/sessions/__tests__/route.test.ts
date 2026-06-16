@@ -4,6 +4,7 @@ import { DELETE, GET } from "../route";
 const mockFindUnique = jest.fn();
 const mockFindMany = jest.fn();
 const mockUpdate = jest.fn();
+const mockDeleteMany = jest.fn();
 
 jest.mock("@/lib/prisma", () => ({
   __esModule: true,
@@ -14,6 +15,7 @@ jest.mock("@/lib/prisma", () => ({
     },
     session: {
       findMany: (...args: any[]) => mockFindMany(...args),
+      deleteMany: (...args: any[]) => mockDeleteMany(...args),
     },
   },
 }));
