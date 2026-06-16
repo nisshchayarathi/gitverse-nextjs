@@ -15,6 +15,7 @@ const FORCE_KILL_DELAY_MS = 5_000;
 const MAX_COMMITS_DEFAULT = 1000;
 const MAX_CONTRIBUTOR_COMMITS = 3000;
 const MAX_FILE_BYTES_TO_READ_FOR_LINECOUNT = 256 * 1024; // 256KB
+const MAX_BRANCHES_TO_PROCESS = 100;
 
 function countLinesReadStream(filePath: string): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -429,17 +430,25 @@ export class GitService {
       );
       const defaultBranchName = defaultBranch.trim().replace(/^refs\/remotes\/origin\//, "");
 
-      // Get both local and remote branches
+      // Get both local and remote branches, sorted by most recent commit
       const { stdout } = await this.spawnGit(
-        ["for-each-ref", "--format=%(refname:short)|%(committerdate:iso)|%(objectname)", "refs/heads/", "refs/remotes/origin/"],
+        [
+          "for-each-ref",
+          "--sort=-committerdate",
+          "--format=%(refname:short)|%(committerdate:iso)|%(objectname)",
+          "refs/heads/",
+          "refs/remotes/origin/",
+        ],
         { timeout: DEFAULT_GIT_TIMEOUT_MS, signal },
       );
 
       const lines = stdout.trim().split("\n").filter(Boolean);
       const seenBranches = new Set<string>();
-      const refEntries: { name: string; fullName: string; date: string }[] = [];
+      let refEntries: { name: string; fullName: string; date: string }[] = [];
 
       for (const line of lines) {
+        if (refEntries.length >= MAX_BRANCHES_TO_PROCESS) break;
+
         const [fullName, date] = line.split("|");
 
         // Skip origin/HEAD
@@ -456,6 +465,7 @@ export class GitService {
       }
 
       // 🔥 FIX: Process in chunks to prevent process bombs on repositories with many branches
+      // Additionally, refEntries is now bounded to MAX_BRANCHES_TO_PROCESS to prevent DoS
       const countResults: PromiseSettledResult<number>[] = [];
       const concurrencyLimit = 50;
       for (let i = 0; i < refEntries.length; i += concurrencyLimit) {
