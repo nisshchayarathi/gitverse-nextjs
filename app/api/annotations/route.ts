@@ -14,6 +14,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "repositoryId is required" }, { status: 400 });
     }
 
+    // Verify user has access to the repository to prevent IDOR
+    const repo = await prisma.repository.findFirst({
+      where: {
+        id: parseInt(repositoryId),
+        userId: user.userId,
+      }
+    });
+
+    if (!repo) {
+      return NextResponse.json({ error: "Repository not found or access denied" }, { status: 403 });
+    }
+
     const annotations = await prisma.mapAnnotation.findMany({
       where: {
         repositoryId: parseInt(repositoryId),
