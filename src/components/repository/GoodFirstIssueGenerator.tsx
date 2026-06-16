@@ -231,7 +231,7 @@ export function GoodFirstIssueGenerator({
   repository,
   loading = false,
 }: GoodFirstIssueGeneratorProps) {
-  const files = (repository?.files || []) as RepositoryFile[];
+  const files = useMemo(() => (repository?.files || []) as RepositoryFile[], [repository?.files]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyCategory | "all">("all");
   const [showTips, setShowTips] = useState(true);
 

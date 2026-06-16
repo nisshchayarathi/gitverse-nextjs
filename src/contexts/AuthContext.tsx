@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { useSession } from "next-auth/react";
 import { buildApiUrl } from "../services/apiConfig";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/sessionConstants";
 
 interface User {
   id: string;
@@ -21,9 +22,9 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (retries?: number) => Promise<void>;
   updateUser: (data: Partial<User>) => void;
 }
 
@@ -88,8 +89,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 data.user.avatarUrl ||
                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.email}`,
             });
+          } else if (response.status === 401) {
+            localStorage.removeItem("gitverse_token");
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("session-expired", {
+                detail: { message: SESSION_EXPIRED_MESSAGE },
+              }));
+              window.location.href = "/login";
+            }
           } else {
-            // Token invalid, clear storage
             localStorage.removeItem("gitverse_token");
           }
         } catch (error) {
@@ -103,7 +111,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, [session, status]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, rememberMe: boolean = false) => {
     setIsLoading(true);
 
     try {
@@ -112,7 +120,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       });
 
       const data = await response.json();

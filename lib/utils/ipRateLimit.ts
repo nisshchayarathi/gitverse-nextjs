@@ -37,8 +37,8 @@ async function checkAiRateLimit(
     const count = await prisma.aiRequestLog.count({ where });
     return count < maxRequests;
   } catch (error) {
-    console.error("AI rate limit check failed, allowing request:", error);
-    return true;
+    console.error(`AI rate limit check failed endpoint=${endpoint} field=${field}:`, error);
+    return false;
   }
 }
 
@@ -56,8 +56,12 @@ async function logAiRequest(params: {
       },
     });
   } catch (error) {
-    console.error("Failed to log AI request:", error);
+    console.error(`Failed to log AI request endpoint=${params.endpoint} ip=${params.ip}:`, error);
   }
 }
 
 export { checkAiRateLimit, logAiRequest, cleanupStaleLogs };
+
+export function _resetCleanupIntervalForTesting(): void {
+  lastCleanupAt = 0;
+}

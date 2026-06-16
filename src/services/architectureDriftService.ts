@@ -73,7 +73,7 @@ export const getSummaryMetrics = (snapshot: ArchitectureSnapshot) => {
 export const getRecommendedActions = (
   report: DriftReport,
 ): Array<{ action: string; priority: "High" | "Medium" | "Low" }> => {
-  const actions = [];
+  const actions: Array<{ action: string; priority: "High" | "Medium" | "Low" }> = [];
 
   if (report.riskLevel === "High") {
     actions.push({
@@ -117,7 +117,7 @@ export const buildHealthTimeline = (
   snapshots: ArchitectureSnapshot[],
 ): Array<{ label: string; score: number; trend: string }> => {
   return snapshots.map((snapshot) => ({
-    label: snapshot.label,
+    label: snapshot.label || "Snapshot",
     score: calculateComplexityScore(snapshot),
     trend: snapshot.commitHash ? `Commit: ${snapshot.commitHash.slice(0, 7)}` : "Snapshot",
   }));

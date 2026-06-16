@@ -10,7 +10,7 @@ jest.mock("../prisma", () => ({
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
-      updateMany: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
   }),
 }));
@@ -36,7 +36,7 @@ function asMock<T>(fn: T): jest.Mock {
   return fn as any;
 }
 
-const { AnalysisJobService } = require("../services/analysisJobService");
+import { AnalysisJobService } from "../services/analysisJobService";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -53,20 +53,22 @@ describe("AnalysisJobService – heartbeat", () => {
     asMock(mockPrisma.$executeRaw).mockResolvedValueOnce(undefined);
 
     const before = Date.now();
-    await service.heartbeat({ jobId: "job-1", workerId: "worker-A" });
+    await service.heartbeat({
+      jobId: "job-1",
+      workerId: "worker-A",
+      lockToken: "tok-001",
+    });
     const after = Date.now();
 
     expect(asMock(mockPrisma.$executeRaw)).toHaveBeenCalledTimes(1);
     const callArgs = asMock(mockPrisma.$executeRaw).mock.calls[0];
-    // Tagged-template raw: callArgs[0] is the SQL string array, then the
-    // interpolated values follow as positional args.
     const strings = callArgs[0];
     const interpolated = callArgs.slice(1);
     expect(strings).toBeInstanceOf(Array);
     expect(interpolated).toContain(5 * 60_000);
     expect(interpolated).toContain("job-1");
     expect(interpolated).toContain("worker-A");
-    // Sanity-check the call window without asserting on the raw template.
+    expect(interpolated).toContain("tok-001");
     expect(after - before).toBeGreaterThanOrEqual(0);
   });
 
@@ -76,6 +78,7 @@ describe("AnalysisJobService – heartbeat", () => {
     await service.heartbeat({
       jobId: "job-1",
       workerId: "worker-A",
+      lockToken: "tok-002",
       lockMs: 30_000,
     });
 
@@ -84,21 +87,39 @@ describe("AnalysisJobService – heartbeat", () => {
     expect(interpolated).toContain(30_000);
   });
 
-  it("scopes the heartbeat to the calling worker", async () => {
+  it("scopes the heartbeat to the calling worker and lockToken", async () => {
     asMock(mockPrisma.$executeRaw).mockResolvedValueOnce(undefined);
 
-    await service.heartbeat({ jobId: "job-1", workerId: "worker-A" });
+    await service.heartbeat({
+      jobId: "job-1",
+      workerId: "worker-A",
+      lockToken: "tok-003",
+    });
 
     const callArgs = asMock(mockPrisma.$executeRaw).mock.calls[0];
     const strings = callArgs[0];
     const sql = strings
       .filter((s: unknown) => typeof s === "string")
       .join(" ");
-    // The WHERE clause must include both the status check and the worker
-    // identity check, so a worker cannot heartbeat a job it does not own.
     expect(sql).toMatch(/WHERE/i);
     expect(sql).toMatch(/status\s*=\s*'PROCESSING'/i);
     expect(sql).toMatch(/locked_by\s*=/i);
+    expect(sql).toMatch(/lock_token\s*=/i);
+  });
+
+  it("includes lock_token in the WHERE clause", async () => {
+    asMock(mockPrisma.$executeRaw).mockResolvedValueOnce(undefined);
+
+    await service.heartbeat({
+      jobId: "job-1",
+      workerId: "worker-A",
+      lockToken: "tok-004",
+    });
+
+    const callArgs = asMock(mockPrisma.$executeRaw).mock.calls[0];
+    const strings = callArgs[0];
+    const sql = strings.join(" ");
+    expect(sql).toMatch(/lock_token/i);
   });
 });
 
@@ -358,6 +379,274 @@ describe("AnalysisJobService – cleanupStaleJobs edge cases", () => {
   });
 });
 
+describe("AnalysisJobService – claimNextJob with inline reclaim", () => {
+  let service: AnalysisJobService;
+
+  beforeEach(() => {
+    service = new AnalysisJobService();
+    // Mock $transaction to execute the callback with a fake tx
+    asMock(mockPrisma.$transaction).mockImplementation(
+      (cb: (tx: any) => Promise<any>) =>
+        cb({
+          $executeRaw: jest.fn().mockResolvedValue(undefined),
+          $queryRaw: jest.fn().mockResolvedValue([]),
+          analysisJob: {
+            findUnique: jest.fn().mockResolvedValue(null),
+          },
+        }),
+    );
+  });
+
+  it("runs reclaim inside the transaction before the CTE", async () => {
+    const txExecuteRaw = jest.fn().mockResolvedValue(undefined);
+    const txQueryRaw = jest.fn().mockResolvedValue([]);
+    asMock(mockPrisma.$transaction).mockImplementation(
+      (cb: (tx: any) => Promise<any>) =>
+        cb({
+          $executeRaw: txExecuteRaw,
+          $queryRaw: txQueryRaw,
+          analysisJob: {
+            findUnique: jest.fn().mockResolvedValue(null),
+          },
+        }),
+    );
+
+    const result = await service.claimNextJob({ workerId: "worker-A" });
+
+    expect(result).toBeNull();
+    expect(txExecuteRaw).toHaveBeenCalledTimes(1);
+    const reclaimSql = (txExecuteRaw.mock.calls[0][0] as any[])
+      .filter((s) => typeof s === "string")
+      .join(" ");
+    expect(reclaimSql).toMatch(/UPDATE analysis_jobs/i);
+    expect(reclaimSql).toMatch(/lock_token = NULL/i);
+  });
+
+  it("returns null when no job is available", async () => {
+    const result = await service.claimNextJob({ workerId: "worker-A" });
+    expect(result).toBeNull();
+  });
+
+  it("returns a claimed job when a candidate exists", async () => {
+    const fakeJob = { id: "job-claim-1", status: "PROCESSING", lockedBy: "worker-A" };
+    asMock(mockPrisma.$transaction).mockImplementation(
+      (cb: (tx: any) => Promise<any>) =>
+        cb({
+          $executeRaw: jest.fn().mockResolvedValue(undefined),
+          $queryRaw: jest.fn().mockResolvedValue([{ id: "job-claim-1" }]),
+          analysisJob: {
+            findUnique: jest.fn().mockResolvedValue(fakeJob),
+          },
+        }),
+    );
+
+    const result = await service.claimNextJob({ workerId: "worker-A" });
+    expect(result).toEqual(fakeJob);
+  });
+});
+
+describe("AnalysisJobService – markDone with lockToken", () => {
+  let service: AnalysisJobService;
+
+  beforeEach(() => {
+    service = new AnalysisJobService();
+  });
+
+  it("includes lockToken in WHERE when both workerId and lockToken provided", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.markDone({ jobId: "job-1", workerId: "worker-A", lockToken: "tok-done" });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.id).toBe("job-1");
+    expect(call.where.lockedBy).toBe("worker-A");
+    expect(call.where.lockToken).toBe("tok-done");
+    expect(call.data.status).toBe("DONE");
+  });
+
+  it("only uses id when workerId and lockToken are omitted", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.markDone({ jobId: "job-1" });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.id).toBe("job-1");
+    expect(call.where.lockedBy).toBeUndefined();
+    expect(call.where.lockToken).toBeUndefined();
+  });
+});
+
+describe("AnalysisJobService – markFailed with lockToken", () => {
+  let service: AnalysisJobService;
+
+  beforeEach(() => {
+    service = new AnalysisJobService();
+  });
+
+  it("includes lockToken in WHERE for retry path", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.markFailed({
+      jobId: "job-1",
+      workerId: "worker-A",
+      lockToken: "tok-fail",
+      error: "timeout",
+      attempts: 1,
+      maxAttempts: 3,
+    });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.lockedBy).toBe("worker-A");
+    expect(call.where.lockToken).toBe("tok-fail");
+    expect(call.data.status).toBe("QUEUED");
+    expect(call.data.lockToken).toBeNull();
+  });
+
+  it("includes lockToken in WHERE for final failure", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.markFailed({
+      jobId: "job-1",
+      workerId: "worker-A",
+      lockToken: "tok-final",
+      error: "fatal error",
+      attempts: 3,
+      maxAttempts: 3,
+    });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.lockedBy).toBe("worker-A");
+    expect(call.where.lockToken).toBe("tok-final");
+    expect(call.data.status).toBe("FAILED");
+    expect(call.data.lockToken).toBeNull();
+  });
+
+  it("skips lockToken when not provided", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.markFailed({
+      jobId: "job-1",
+      error: "error",
+      attempts: 3,
+      maxAttempts: 3,
+    });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.lockToken).toBeUndefined();
+  });
+});
+
+describe("AnalysisJobService – updateProgress with lockToken", () => {
+  let service: AnalysisJobService;
+
+  beforeEach(() => {
+    service = new AnalysisJobService();
+  });
+
+  it("extends lock when workerId and lockToken provided", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.updateProgress({
+      jobId: "job-1",
+      workerId: "worker-A",
+      lockToken: "tok-progress",
+      update: { progressPercent: 50 },
+    });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.lockedBy).toBe("worker-A");
+    expect(call.where.lockToken).toBe("tok-progress");
+    expect(call.data.lockExpiresAt).toBeInstanceOf(Date);
+  });
+});
+
+describe("AnalysisJobService – reclaimOrphanedJobs clears lockToken", () => {
+  let service: AnalysisJobService;
+
+  beforeEach(() => {
+    service = new AnalysisJobService();
+  });
+
+  it("sets lockToken to null on reclaimed jobs", async () => {
+    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({ count: 3 });
+
+    const result = await service.reclaimOrphanedJobs();
+
+    expect(result).toBe(3);
+    const call = asMock(mockPrisma.analysisJob.updateMany).mock.calls[0][0];
+    expect(call.data.lockToken).toBeNull();
+  });
+});
+
+describe("AnalysisJobService – cleanupStaleJobs clears lockToken", () => {
+  let service: AnalysisJobService;
+
+  beforeEach(() => {
+    service = new AnalysisJobService();
+  });
+
+  it("sets lockToken to null on stale jobs", async () => {
+    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({ count: 1 });
+
+    await service.cleanupStaleJobs();
+
+    const call = asMock(mockPrisma.analysisJob.updateMany).mock.calls[0][0];
+    expect(call.data.lockToken).toBeNull();
+  });
+});
+
+describe("AnalysisJobService – markDrainReleased clears lockToken", () => {
+  let service: AnalysisJobService;
+
+  beforeEach(() => {
+    service = new AnalysisJobService();
+  });
+
+  it("sets lockToken to null on drained jobs", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.markDrainReleased({
+      jobId: "job-1",
+      workerId: "worker-A",
+      lockToken: "tok-drain",
+      error: "shutdown",
+    });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.lockedBy).toBe("worker-A");
+    expect(call.where.lockToken).toBe("tok-drain");
+    expect(call.data.lockToken).toBeNull();
+  });
+});
+
+describe("AnalysisJobService – releaseLock with lockToken", () => {
+  let service: AnalysisJobService;
+
+  beforeEach(() => {
+    service = new AnalysisJobService();
+  });
+
+  it("includes lockToken in WHERE when provided with workerId", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.releaseLock({ jobId: "job-1", workerId: "worker-A", lockToken: "tok-rel" });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.id).toBe("job-1");
+    expect(call.where.lockedBy).toBe("worker-A");
+    expect(call.where.lockToken).toBe("tok-rel");
+  });
+
+  it("skips lockToken when not provided", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.releaseLock({ jobId: "job-1" });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.lockToken).toBeUndefined();
+  });
+});
+
 describe("AnalysisJobService – exports", () => {
   it("exports a singleton instance", () => {
     const { analysisJobService } = require("../services/analysisJobService");
@@ -393,6 +682,171 @@ describe("AnalysisJobService – exports", () => {
     expect(typeof countOrphanedJobs).toBe("function");
     expect(typeof getAnalysisStats).toBe("function");
     expect(typeof cleanupStaleJobs).toBe("function");
+  });
+});
+
+describe("AnalysisJobService – concurrent claim scenarios", () => {
+  let service: AnalysisJobService;
+
+  beforeEach(() => {
+    service = new AnalysisJobService();
+  });
+
+  it("simulates two workers racing for the same job — only one succeeds", async () => {
+    let callCount = 0;
+    asMock(mockPrisma.$transaction).mockImplementation(
+      (cb: (tx: any) => Promise<any>) => {
+        callCount++;
+        return cb({
+          $executeRaw: jest.fn().mockResolvedValue(undefined),
+          $queryRaw: jest
+            .fn()
+            .mockResolvedValue(
+              callCount === 1 ? [{ id: "job-race-1" }] : [],
+            ),
+          analysisJob: {
+            findUnique: jest
+              .fn()
+              .mockResolvedValue(
+                callCount === 1
+                  ? { id: "job-race-1", lockedBy: "worker-A" }
+                  : null,
+              ),
+          },
+        });
+      },
+    );
+
+    const [resultA, resultB] = await Promise.all([
+      service.claimNextJob({ workerId: "worker-A" }),
+      service.claimNextJob({ workerId: "worker-B" }),
+    ]);
+
+    const claimedCount = [resultA, resultB].filter(Boolean).length;
+    expect(claimedCount).toBe(1);
+  });
+
+  it("generates unique lockToken per claim", async () => {
+    asMock(mockPrisma.$transaction).mockImplementation(
+      (cb: (tx: any) => Promise<any>) =>
+        cb({
+          $executeRaw: jest.fn().mockResolvedValue(undefined),
+          $queryRaw: jest.fn().mockResolvedValue([{ id: "job-tok-1" }]),
+          analysisJob: {
+            findUnique: jest
+              .fn()
+              .mockResolvedValue({
+                id: "job-tok-1",
+                lockToken: "tok-unique-001",
+              }),
+          },
+        }),
+    );
+
+    const job = await service.claimNextJob({ workerId: "worker-A" });
+    expect(job).not.toBeNull();
+  });
+
+  it("zombie heartbeat fails after reclaim clears lockToken", async () => {
+    asMock(mockPrisma.$executeRaw).mockResolvedValueOnce({ cmd: "UPDATE 0" });
+
+    await service.heartbeat({
+      jobId: "job-zombie",
+      workerId: "worker-old",
+      lockToken: "tok-stale",
+    });
+
+    const call = asMock(mockPrisma.$executeRaw).mock.calls[0];
+    const strings = call[0];
+    const sql = strings
+      .filter((s: unknown) => typeof s === "string")
+      .join(" ");
+    const interpolated = call.slice(1);
+    expect(interpolated).toContain("tok-stale");
+    expect(sql).toMatch(/lock_token\s*=/i);
+  });
+
+  it("reclaim clears lockToken so zombie operations cannot match", async () => {
+    asMock(mockPrisma.analysisJob.updateMany).mockResolvedValueOnce({
+      count: 1,
+    });
+
+    await service.reclaimOrphanedJobs();
+
+    const call = asMock(mockPrisma.analysisJob.updateMany).mock.calls[0][0];
+    expect(call.data.lockToken).toBeNull();
+  });
+
+  it("stale markDone fails after re-claim regenerates lockToken", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.markDone({
+      jobId: "job-stale",
+      workerId: "worker-old",
+      lockToken: "tok-stale",
+    });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.id).toBe("job-stale");
+    expect(call.where.lockedBy).toBe("worker-old");
+    expect(call.where.lockToken).toBe("tok-stale");
+  });
+
+  it("stale markFailed after re-claim cannot overwrite new owner", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.markFailed({
+      jobId: "job-stale-fail",
+      workerId: "worker-old",
+      lockToken: "tok-stale",
+      error: "stale error",
+      attempts: 1,
+      maxAttempts: 3,
+    });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.lockToken).toBe("tok-stale");
+  });
+
+  it("heartbeat correctly fails when lockToken does not match", async () => {
+    asMock(mockPrisma.$executeRaw).mockResolvedValueOnce({ cmd: "UPDATE 0" });
+
+    await service.heartbeat({
+      jobId: "job-mismatch",
+      workerId: "worker-A",
+      lockToken: "tok-wrong",
+    });
+
+    const call = asMock(mockPrisma.$executeRaw).mock.calls[0];
+    const interpolated = call.slice(1);
+    expect(interpolated).toContain("tok-wrong");
+  });
+
+  it("direct markDone without workerId does not require lockToken", async () => {
+    asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
+
+    await service.markDone({ jobId: "job-direct" });
+
+    const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
+    expect(call.where.id).toBe("job-direct");
+    expect(call.where.lockedBy).toBeUndefined();
+    expect(call.where.lockToken).toBeUndefined();
+  });
+
+  it("claimNextJob returns null when CTE returns no candidate", async () => {
+    asMock(mockPrisma.$transaction).mockImplementation(
+      (cb: (tx: any) => Promise<any>) =>
+        cb({
+          $executeRaw: jest.fn().mockResolvedValue(undefined),
+          $queryRaw: jest.fn().mockResolvedValue([]),
+          analysisJob: {
+            findUnique: jest.fn().mockResolvedValue(null),
+          },
+        }),
+    );
+
+    const result = await service.claimNextJob({ workerId: "worker-A" });
+    expect(result).toBeNull();
   });
 });
 

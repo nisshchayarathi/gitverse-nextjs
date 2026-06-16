@@ -178,6 +178,37 @@ describe("useAuth", () => {
       expect(result.current.user?.email).toBe("test@test.com");
     });
 
+    it("passes rememberMe parameter to login endpoint", async () => {
+      useSession.mockReturnValue({ data: null, status: "unauthenticated" });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          token: "new-jwt-token",
+          user: { id: 1, name: "Test", email: "test@test.com" },
+        }),
+      });
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      await act(async () => {
+        await result.current.login("test@test.com", "password", true);
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/auth/login"),
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            email: "test@test.com",
+            password: "password",
+            rememberMe: true,
+          }),
+        })
+      );
+    });
+
     it("throws error on failed login", async () => {
       useSession.mockReturnValue({ data: null, status: "unauthenticated" });
       mockFetch.mockResolvedValueOnce({

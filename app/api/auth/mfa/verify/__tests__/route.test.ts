@@ -6,6 +6,7 @@ const mockVerifyTOTP = jest.fn();
 const mockEnableMfa = jest.fn();
 const mockGenerateBackupCodes = jest.fn();
 const mockVerifyAndConsumeBackupCode = jest.fn();
+const mockGetDecryptedTotpSecret = jest.fn();
 const mockLogAuditEvent = jest.fn();
 const mockCheckRateLimit = jest.fn();
 const mockRateLimitResponse = jest.fn();
@@ -25,6 +26,8 @@ jest.mock("@/lib/mfa", () => ({
   generateBackupCodes: (...args: any[]) => mockGenerateBackupCodes(...args),
   verifyAndConsumeBackupCode: (...args: any[]) =>
     mockVerifyAndConsumeBackupCode(...args),
+  getDecryptedTotpSecret: (...args: any[]) =>
+    mockGetDecryptedTotpSecret(...args),
 }));
 
 jest.mock("@/lib/auditLogger", () => ({
@@ -63,6 +66,8 @@ describe("POST /api/auth/mfa/verify", () => {
     mockGetClientIp.mockReturnValue("127.0.0.1");
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 4, windowSec: 60, limit: 5, resetInSec: 60 });
     mockRequireAuth.mockResolvedValue({ userId: 1, email: "test@test.com" });
+    mockGetDecryptedTotpSecret.mockResolvedValue("JBSWY3DPEHPK3PXP");
+    mockPrismaFindUnique.mockResolvedValue({ isEnabled: false });
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -96,7 +101,7 @@ describe("POST /api/auth/mfa/verify", () => {
   });
 
   it("returns 409 when MFA not initialized", async () => {
-    mockPrismaFindUnique.mockResolvedValue(null);
+    mockGetDecryptedTotpSecret.mockResolvedValue(null);
 
     const response = await POST(mockRequest({ token: "123456" }));
     expect(response.status).toBe(409);
@@ -105,14 +110,14 @@ describe("POST /api/auth/mfa/verify", () => {
   });
 
   it("returns 409 when backup code used but MFA not enabled", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: false });
+    mockPrismaFindUnique.mockResolvedValue({ isEnabled: false });
 
     const response = await POST(mockRequest({ backupCode: "ABCD-EFGH" }));
     expect(response.status).toBe(409);
   });
 
   it("returns 401 for invalid backup code", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
+    mockPrismaFindUnique.mockResolvedValue({ isEnabled: true });
     mockVerifyAndConsumeBackupCode.mockResolvedValue(false);
 
     const response = await POST(mockRequest({ backupCode: "INVALID-CODE" }));
@@ -122,7 +127,7 @@ describe("POST /api/auth/mfa/verify", () => {
   });
 
   it("accepts valid backup code", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
+    mockPrismaFindUnique.mockResolvedValue({ isEnabled: true });
     mockVerifyAndConsumeBackupCode.mockResolvedValue(true);
 
     const response = await POST(mockRequest({ backupCode: "VALID-CODE" }));
@@ -133,8 +138,6 @@ describe("POST /api/auth/mfa/verify", () => {
   });
 
   it("returns 400 for invalid token format", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: false });
-
     const response = await POST(mockRequest({ token: "abc" }));
     expect(response.status).toBe(400);
     const body = await response.json();
@@ -142,7 +145,6 @@ describe("POST /api/auth/mfa/verify", () => {
   });
 
   it("returns 401 for invalid TOTP token", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: false });
     mockVerifyTOTP.mockReturnValue(false);
 
     const response = await POST(mockRequest({ token: "123456" }));
@@ -152,7 +154,6 @@ describe("POST /api/auth/mfa/verify", () => {
   });
 
   it("enrolls MFA with valid token in enroll mode", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: false });
     mockVerifyTOTP.mockReturnValue(true);
     mockGenerateBackupCodes.mockReturnValue({
       plaintext: ["CODE1", "CODE2"],
@@ -170,7 +171,7 @@ describe("POST /api/auth/mfa/verify", () => {
   });
 
   it("returns 409 when enrolling but MFA already enabled", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
+    mockPrismaFindUnique.mockResolvedValue({ isEnabled: true });
     mockVerifyTOTP.mockReturnValue(true);
 
     const response = await POST(mockRequest({ token: "123456", mode: "enroll" }));
@@ -180,7 +181,7 @@ describe("POST /api/auth/mfa/verify", () => {
   });
 
   it("verifies TOTP for authentication mode", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: true });
+    mockPrismaFindUnique.mockResolvedValue({ isEnabled: true });
     mockVerifyTOTP.mockReturnValue(true);
 
     const response = await POST(mockRequest({ token: "123456", mode: "authenticate" }));
@@ -196,7 +197,7 @@ describe("POST /api/auth/mfa/verify", () => {
   });
 
   it("returns 409 when MFA not enabled during authentication", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: false });
+    mockPrismaFindUnique.mockResolvedValue({ isEnabled: false });
     mockVerifyTOTP.mockReturnValue(true);
 
     const response = await POST(mockRequest({ token: "123456", mode: "authenticate" }));
@@ -221,7 +222,6 @@ describe("POST /api/auth/mfa/verify", () => {
   });
 
   it("logs audit event on MFA failure", async () => {
-    mockPrismaFindUnique.mockResolvedValue({ totpSecret: "secret", isEnabled: false });
     mockVerifyTOTP.mockReturnValue(false);
 
     await POST(mockRequest({ token: "123456" }));

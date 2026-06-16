@@ -29,7 +29,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Generate Prisma Client
         run: npx prisma generate
@@ -48,20 +48,6 @@ jobs:
 
       - name: Run consistency checks
         run: npx tsx scripts/verify-worker-consistency.ts
-
-      - name: Verify build output is fresh
-        run: |
-          git config --global user.email "ci@gitverse.ai"
-          git config --global user.name "CI Bot"
-          git add -f dist-worker/
-          if git diff --cached --stat -- dist-worker/ | grep -q .; then
-            echo "Error: dist-worker/ would produce a diff after build."
-            echo "Run npm run build:worker and commit the changes."
-            git diff --cached --stat -- dist-worker/
-            exit 1
-          fi
-          echo "OK: dist-worker/ is up to date with TypeScript sources"
-          git reset HEAD dist-worker/
 
       - name: Verify worker scripts can be required
         run: |

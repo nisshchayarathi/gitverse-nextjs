@@ -111,8 +111,8 @@ export async function verifyTokenWithUserValidation(token: string): Promise<JWTP
   }
 }
 
-export function generateToken(payload: JWTPayload): string {
-  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d' })
+export function generateToken(payload: JWTPayload, options?: jwt.SignOptions): string {
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: '7d', ...options })
 }
 
 /**
