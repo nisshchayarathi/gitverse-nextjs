@@ -4,6 +4,14 @@ import { getRegionAiRouterService } from "../region-ai-router";
 import { DataResidencyRegion } from "@prisma/client";
 import { getComplianceAuditService } from "../compliance-audit";
 
+jest.mock("@prisma/client", () => ({
+  DataResidencyRegion: {
+    US: "US",
+    EU: "EU",
+    APAC: "APAC",
+  },
+}));
+
 // Mock Prisma
 jest.mock("../../prisma", () => ({
   __esModule: true,

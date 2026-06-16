@@ -21,6 +21,9 @@ const customJestConfig = {
     '^@/app/(.*)$': '<rootDir>/app/$1',
     '^@/services/(.*)$': '<rootDir>/services/$1',
     '^@/(?!lib/|app/|services/)(.*)$': '<rootDir>/src/$1',
+    '^jose$': '<rootDir>/node_modules/jose/dist/node/cjs/index.js',
+    '^@panva/hkdf$': '<rootDir>/node_modules/@panva/hkdf/dist/node/cjs/index.js',
+    '^uuid$': require.resolve('uuid'),
   },
   testPathIgnorePatterns: [
     '<rootDir>/.next/',
