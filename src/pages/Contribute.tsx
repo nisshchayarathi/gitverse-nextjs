@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
+import { ChevronDown } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { buildApiUrl } from "@/services/apiConfig";
 import {
@@ -18,6 +19,7 @@ import {
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
+  DropdownMenuItem,
 } from "@/components/ui";
 
 type GitHubRepoApiItem = {
@@ -527,25 +529,48 @@ export default function Contribute() {
           <CardContent className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
               <div className="flex-1 space-y-2">
-                <label className="text-sm text-muted-foreground">
+                <label className="text-sm text-muted-foreground block">
                   Repository
                 </label>
-                <select
-                  className="w-full h-10 rounded-md border border-border bg-background/50 px-3 text-sm"
-                  value={historyRepoFullName}
-                  onChange={(e) => setHistoryRepoFullName(e.target.value)}
-                >
-                  {connectedRepos.filter((r) => r.enabled).length === 0 && (
-                    <option value="">No enabled repos</option>
-                  )}
-                  {connectedRepos
-                    .filter((r) => r.enabled)
-                    .map((r) => (
-                      <option key={r.id} value={r.repoFullName}>
-                        {r.repoFullName}
-                      </option>
-                    ))}
-                </select>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full h-10 justify-between text-left font-normal bg-background/50 border-border hover:bg-background/80"
+                      disabled={connectedRepos.filter((r) => r.enabled).length === 0}
+                    >
+                      <span className="truncate">
+                        {historyRepoFullName ||
+                          (connectedRepos.filter((r) => r.enabled).length === 0
+                            ? "No enabled repos"
+                            : "Select repository")}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-[360px] max-h-[300px] overflow-auto glass"
+                  >
+                    {connectedRepos.filter((r) => r.enabled).length === 0 ? (
+                      <DropdownMenuItem disabled>
+                        No enabled repos
+                      </DropdownMenuItem>
+                    ) : (
+                      connectedRepos
+                        .filter((r) => r.enabled)
+                        .map((r) => (
+                          <DropdownMenuItem
+                            key={r.id}
+                            onClick={() => setHistoryRepoFullName(r.repoFullName)}
+                            className={r.repoFullName === historyRepoFullName ? "bg-accent text-accent-foreground" : ""}
+                          >
+                            <span className="truncate">{r.repoFullName}</span>
+                          </DropdownMenuItem>
+                        ))
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <div className="flex gap-3">
                 <Button

@@ -1,5 +1,11 @@
 import { RepositoryFile } from "@/types/firstPRSimulator";
-import { ArchitectureModule, ArchitectureSnapshot } from "@/types/architectureDrift";
+import {
+  ArchitectureModule,
+  ArchitectureSnapshot,
+  ArchitectureLayer,
+  DependencyPath,
+  ArchitectureMetrics,
+} from "@/types/architectureDrift";
 import { buildDependencyGraph } from "@/lib/changeImpact";
 
 const normalizePath = (value: string): string =>
@@ -33,6 +39,14 @@ const determineModuleType = (filePath: string): ArchitectureModule["type"] => {
   }
   return "Unknown";
 };
+
+function determineLayerFromType(type: string): ArchitectureLayer {
+  if (type === "API Route") return "API";
+  if (type === "Service") return "Services";
+  if (type === "Utility") return "Utils";
+  if (type === "Page" || type === "Component" || type === "Hook") return "UI";
+  return "Other";
+}
 
 const calculateModuleComplexity = (
   file: RepositoryFile,
@@ -99,27 +113,64 @@ export const generateArchitectureSnapshot = (
   );
 
   const circularDependencies = detectCircularDependencies(graph.dependentsMap, graph.importMap);
+  const layerDistribution: Record<ArchitectureLayer, number> = {
+    UI: 0,
+    Services: 0,
+    Database: 0,
+    Auth: 0,
+    API: 0,
+    Utils: 0,
+    Config: 0,
+    Other: 0,
+  };
+
   modules.forEach((mod) => {
     if (circularDependencies.has(mod.path)) {
       mod.isCircular = true;
     }
+
+    const layer = determineLayerFromType(mod.type);
+    layerDistribution[layer] += 1;
   });
 
-  const metrics = {
+  const metrics: ArchitectureMetrics = {
     moduleCount: modules.length,
+    totalDependencies: dependencies.length,
     dependencyCount: dependencies.length,
     averageCoupling: modules.length > 0 ? dependencies.length / modules.length : 0,
     circularDependencyCount: circularDependencies.size,
-    complexityScore: modules.length > 0 ? Math.round(modules.reduce((sum, m) => sum + m.complexity, 0) / modules.length) : 0,
+    complexityScore:
+      modules.length > 0
+        ? Math.round(modules.reduce((sum, m) => sum + m.complexity, 0) / modules.length)
+        : 0,
+    criticalViolations: 0,
+    highViolations: 0,
+    mediumViolations: 0,
+    lowViolations: 0,
+    circularity: 0,
+    coupling: Math.min(100, (dependencies.length / Math.max(modules.length, 1)) * 10),
+    cohesion: modules.length > 0 ? Math.max(0, 100 - (dependencies.length / modules.length) * 2) : 100,
+    healthScore: Math.max(0, 100 - (dependencies.length / Math.max(modules.length, 1)) * 5),
   };
 
   return {
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(),
+    snapshotDate: new Date().toISOString().split("T")[0],
     label,
     commitHash,
     releaseTag,
     modules,
     dependencies,
+    dependencyGraph: dependencies.map((dep) => ({
+      source: dep.source,
+      target: dep.target,
+      layer: "Other",
+      isViolation: false,
+    })),
+    totalDependencies: dependencies.length,
+    violationCount: 0,
+    moduleCount: modules.length,
+    layerDistribution,
     metrics,
   };
 };

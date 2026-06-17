@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const ip = getClientIp(request);
 
     const body = await request.json();
-    const { email, password } = body;
+    const { email, password, rememberMe } = body;
 
     if (!email || !password) {
       return apiError(400, "Email and password are required");
@@ -168,11 +168,16 @@ export async function POST(request: NextRequest) {
     });
     await clearFailedAttempts(normalizedEmail, "LOGIN");
 
-    const token = generateToken({
-      userId: user.id,
-      email: user.email,
-      tokenVersion: user.tokenVersion,
-    });
+    const token = generateToken(
+      {
+        userId: user.id,
+        email: user.email,
+        tokenVersion: user.tokenVersion,
+      },
+      {
+        expiresIn: rememberMe ? "30d" : "1d",
+      }
+    );
 
     return NextResponse.json({
       user: {

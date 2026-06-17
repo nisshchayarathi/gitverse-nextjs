@@ -42,14 +42,22 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   
   const [annotations, setAnnotations] = useState<MapAnnotation[]>([]);
+  // Keep a ref always in sync with the latest annotations so the D3 tick
+  // callback can read them without causing React re-renders.
+  const annotationsRef = useRef<MapAnnotation[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [popover, setPopover] = useState<{ isOpen: boolean, x: number, y: number, initialData?: Partial<MapAnnotation>, targetId?: string, targetType?: 'node'|'edge' } | null>(null);
   const nodesRef = useRef<any[]>([]);
   const linksRef = useRef<any[]>([]);
-  const [, setTick] = useState(0);
   
   const [selectedCommitHash, setSelectedCommitHash] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
+
+  // Keep annotationsRef in sync with the annotations state so the D3 tick
+  // callback always has access to the latest list without a closure over stale state.
+  useEffect(() => {
+    annotationsRef.current = annotations;
+  }, [annotations]);
 
   const selectedCommit = useMemo(() => {
     if (!selectedCommitHash || !repository?.commits) return null;
@@ -393,7 +401,10 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .attr("fill", "currentColor")
       .attr("pointer-events", "none");
 
-    // Update positions on simulation tick
+    // Update positions on simulation tick.
+    // PERF FIX (#1994): Annotation DOM positions are updated directly via
+    // data-annotation-id attributes instead of calling setTick(), which
+    // previously caused the entire component to re-render ~60 times/second.
     simulation.on("tick", () => {
       link
         .attr("x1", (d: any) => d.source.x)
@@ -402,7 +413,29 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         .attr("y2", (d: any) => d.target.y);
 
       node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
-      setTick(t => t + 1); // trigger react render for annotations
+
+      // Directly update annotation overlay positions without triggering React re-renders.
+      annotationsRef.current.forEach((a) => {
+        const el = document.querySelector<HTMLElement>(`[data-annotation-id="${a.id}"]`);
+        if (!el) return;
+        let x = 0;
+        let y = 0;
+        if (a.targetType === 'node') {
+          const n = nodesRef.current.find((nd) => nd.id === a.targetId);
+          if (n) { x = n.x; y = n.y; }
+        } else if (a.targetType === 'edge') {
+          const parts = a.targetId.split('->');
+          const l = linksRef.current.find(
+            (lk) => lk.source.id === parts[0] && lk.target.id === parts[1]
+          );
+          if (l) {
+            x = (l.source.x + l.target.x) / 2;
+            y = (l.source.y + l.target.y) / 2;
+          }
+        }
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+      });
     });
 
     // Zoom behavior
@@ -614,6 +647,10 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
                 viewBox="0 0 900 600"
                 preserveAspectRatio="xMidYMid meet"
               />
+              {/* Annotation overlay: positions are updated via direct DOM manipulation
+                 inside the D3 tick callback (see PERF FIX #1994) to avoid triggering
+                 React re-renders at 60 FPS. The transform wrapper still uses React state
+                 because zoom changes are infrequent and intentional re-renders. */}
               <div 
                 className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible"
                 style={{
@@ -621,41 +658,26 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
                   transformOrigin: '0 0'
                 }}
               >
-                {annotations.map(a => {
-                  let x = 0;
-                  let y = 0;
-                  if (a.targetType === 'node') {
-                    const node = nodesRef.current.find(n => n.id === a.targetId);
-                    if (node) {
-                      x = node.x;
-                      y = node.y;
-                    }
-                  } else if (a.targetType === 'edge') {
-                    const parts = a.targetId.split('->');
-                    const link = linksRef.current.find(l => l.source.id === parts[0] && l.target.id === parts[1]);
-                    if (link) {
-                      x = (link.source.x + link.target.x) / 2;
-                      y = (link.source.y + link.target.y) / 2;
-                    }
-                  }
-                  if (x === 0 && y === 0) return null; // Wait for nodes to be initialized
-                  
-                  return (
-                    <div key={a.id} className="absolute pointer-events-auto" style={{ left: x, top: y }}>
-                      <AnnotationMarker 
-                        annotation={a} 
-                        x={0} 
-                        y={0} 
-                        onClick={() => setPopover({
-                          isOpen: true,
-                          x: 0, // In this case we might want to center the popover or use mouse coordinates
-                          y: 0,
-                          initialData: a
-                        })} 
-                      />
-                    </div>
-                  );
-                })}
+                {annotations.map(a => (
+                  <div
+                    key={a.id}
+                    data-annotation-id={a.id}
+                    className="absolute pointer-events-auto"
+                    style={{ left: 0, top: 0 }}
+                  >
+                    <AnnotationMarker 
+                      annotation={a} 
+                      x={0} 
+                      y={0} 
+                      onClick={() => setPopover({
+                        isOpen: true,
+                        x: 0,
+                        y: 0,
+                        initialData: a
+                      })} 
+                    />
+                  </div>
+                ))}
               </div>
             </div>
             <div className="absolute bottom-2 right-3 text-[10px] text-white/70 pointer-events-none">
