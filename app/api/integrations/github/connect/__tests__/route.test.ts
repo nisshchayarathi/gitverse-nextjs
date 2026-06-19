@@ -50,6 +50,16 @@ jest.mock("@/lib/services/githubService", () => ({
   GitHubService: jest.fn().mockImplementation(() => ({
     getAuthenticatedUser: jest.fn(),
   })),
+  GitHubRateLimitError: class GitHubRateLimitError extends Error {
+    retryAfterSeconds: number;
+    constructor(retryAfterSeconds: number) {
+      super(
+        `GitHub API rate limit reached. Please retry after ${retryAfterSeconds} seconds.`,
+      );
+      this.name = "GitHubRateLimitError";
+      this.retryAfterSeconds = retryAfterSeconds;
+    }
+  },
 }));
 
 jest.mock("@/services/security/redact-sensitive-fields", () => ({
@@ -78,9 +88,9 @@ jest.mock("@/lib/utils/jsonSafe", () => ({
 }));
 
 import { POST } from "../route";
-import { requireAuth } from "@/lib/middleware";
+import { requireAuth, sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
-import { GitHubService } from "@/lib/services/githubService";
+import { GitHubService, GitHubRateLimitError } from "@/lib/services/githubService";
 import { NextRequest } from "next/server";
 
 function mockRequest(body: any): NextRequest {
@@ -202,6 +212,74 @@ describe("POST /api/integrations/github/connect", () => {
           }),
         })
       );
+    });
+  });
+
+  describe("rate limit handling", () => {
+    it("returns 429 with retryAfter when rate limit error occurs", async () => {
+      const retryAfterSeconds = 60;
+      (GitHubService as jest.Mock).mockImplementation(() => ({
+        getAuthenticatedUser: jest.fn().mockRejectedValue(
+          new GitHubRateLimitError(retryAfterSeconds)
+        ),
+      }));
+
+      const res = await POST(mockRequest({ token: "ghp_test" }));
+      const body = await res.json();
+
+      expect(res.status).toBe(429);
+      expect(body.error).toBe("GITHUB_RATE_LIMIT");
+      expect(body.retryAfter).toBe(retryAfterSeconds);
+      expect(res.headers.get("Retry-After")).toBe(String(retryAfterSeconds));
+    });
+
+    it("includes retry-after header in rate limit response", async () => {
+      const retryAfterSeconds = 120;
+      (GitHubService as jest.Mock).mockImplementation(() => ({
+        getAuthenticatedUser: jest.fn().mockRejectedValue(
+          new GitHubRateLimitError(retryAfterSeconds)
+        ),
+      }));
+
+      const res = await POST(mockRequest({ token: "ghp_test" }));
+
+      expect(res.headers.get("Retry-After")).toBe("120");
+    });
+
+    it("handles different retry after durations", async () => {
+      for (const seconds of [30, 60, 300, 3600]) {
+        (GitHubService as jest.Mock).mockImplementation(() => ({
+          getAuthenticatedUser: jest.fn().mockRejectedValue(
+            new GitHubRateLimitError(seconds)
+          ),
+        }));
+
+        const res = await POST(mockRequest({ token: "ghp_test" }));
+        const body = await res.json();
+
+        expect(body.retryAfter).toBe(seconds);
+      }
+    });
+  });
+
+  describe("token sanitization in logs", () => {
+    it("sanitizes errors before logging", async () => {
+      const testError = new Error("Test error");
+      (GitHubService as jest.Mock).mockImplementation(() => ({
+        getAuthenticatedUser: jest.fn().mockRejectedValue(testError),
+      }));
+
+      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+
+      await POST(mockRequest({ token: "ghp_test" }));
+
+      expect(sanitizeError).toHaveBeenCalledWith(testError);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "GitHub connect error:",
+        expect.any(String)
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 });

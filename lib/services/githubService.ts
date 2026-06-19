@@ -424,9 +424,9 @@ export class GitHubService {
   /**
    * Get collaborators for a repository
    */
-  async getCollaborators(owner: string, repo: string): Promise<Array<{ login: string; permissions: { admin: boolean; push: boolean; pull: boolean } }>> {
+async getCollaborators(owner: string, repo: string): Promise<Array<{ login: string; permissions: { admin: boolean; push: boolean; pull: boolean } }>> {
     const response = await this.client.get(
-      `/repos/${owner}/${repo}/collaborators`
+      `/repos/${owner}/${repo}/collaborators`,
     );
     return response.data;
   }
