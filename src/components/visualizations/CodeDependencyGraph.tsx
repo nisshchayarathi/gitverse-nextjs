@@ -17,6 +17,7 @@ import { FilterPanel } from "../map/FilterPanel";
 import { DrilldownControls } from "../map/DrilldownControls";
 import { MiniMap } from "../map/MiniMap";
 import { TimeTravelTimeline } from "../repository/TimeTravelTimeline";
+import { exportGraphAsSVG } from "@/lib/svgExporter";
 
 interface RepositoryFile {
   path: string;
@@ -94,40 +95,47 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     });
   }, [completeGraph, expandedNodes, filters]);
 
-  const exportGraph = async (format: "png" | "svg") => {
-    if (!exportRef.current) return;
-
+  const exportGraph = async (format: "png" | "svg", svgMode?: "current" | "full") => {
     setIsExporting(true);
     const toastId = toast.loading(`Exporting graph as ${format.toUpperCase()}...`);
     
     try {
-      // Create options for higher resolution output, especially for PNG
-      const options = {
-        backgroundColor: "#0f172a", // Dark background to match the theme
-        pixelRatio: 3, // High DPI for crisp text
-        cacheBust: true,
-        style: {
-          margin: "0",
-          borderRadius: "0",
-          boxShadow: "none"
-        }
-      };
-
-      // We wait a tiny bit to ensure React state has flushed (e.g. MapControls is hidden if we chose to hide them, though we exclude them by not wrapping them in exportRef)
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const dataUrl =
-        format === "png"
-          ? await htmlToImage.toPng(exportRef.current, options)
-          : await htmlToImage.toSvg(exportRef.current, options);
-
-      const link = document.createElement("a");
       const repoName = repository?.name ? `-${repository.name}` : "";
-      link.download = `gitverse${repoName}-map.${format}`;
-      link.href = dataUrl;
-      link.click();
       
-      toast.success(`Graph exported successfully!`, { id: toastId });
+      if (format === "svg") {
+        if (!svgRef.current) {
+          throw new Error("SVG element ref is empty");
+        }
+        exportGraphAsSVG(svgRef.current, svgMode || "current", `gitverse${repoName}-map.svg`);
+        toast.success("SVG graph exported successfully!", { id: toastId });
+      } else {
+        if (!exportRef.current) {
+          throw new Error("Export container ref is empty");
+        }
+        // Create options for higher resolution output, especially for PNG
+        const options = {
+          backgroundColor: "#0f172a", // Dark background to match the theme
+          pixelRatio: 3, // High DPI for crisp text
+          cacheBust: true,
+          style: {
+            margin: "0",
+            borderRadius: "0",
+            boxShadow: "none"
+          }
+        };
+
+        // We wait a tiny bit to ensure React state has flushed
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        const dataUrl = await htmlToImage.toPng(exportRef.current, options);
+
+        const link = document.createElement("a");
+        link.download = `gitverse${repoName}-map.png`;
+        link.href = dataUrl;
+        link.click();
+        
+        toast.success("PNG graph exported successfully!", { id: toastId });
+      }
     } catch (error) {
       console.error("Export failed:", error);
       toast.error("Failed to export the graph. Please try again.", { id: toastId });
@@ -720,7 +728,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             onZoomOut={handleZoomOut} 
             onReset={handleReset} 
             onExportPng={() => exportGraph("png")}
-            onExportSvg={() => exportGraph("svg")}
+            onExportSvg={(mode) => exportGraph("svg", mode)}
             isExporting={isExporting}
           />
         </div>
