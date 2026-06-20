@@ -10,9 +10,9 @@ export async function POST(request: NextRequest) {
     const { email, password } = body;
 
     // Validation
-    if (!email || !password) {
+    if (!email || typeof email !== "string" || !password || typeof password !== "string") {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: "Email and password must be valid strings" },
         { status: 400 }
       );
     }
