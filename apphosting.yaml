@@ -2,25 +2,6 @@
 # See https://firebase.google.com/docs/app-hosting/configure#cloud-run
 runConfig:
   minInstances: 0
-  # maxInstances: 100
-  # concurrency: 80
-  # cpu: 1
-  # memoryMiB: 512
-
-  # Environment variables and secrets.
-  # env:
-  # Configure environment variables.
-  # See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
-  # - variable: MESSAGE
-  #   value: Hello world!
-  #   availability:
-  #     - BUILD
-  #     - RUNTIME
-
-  # Grant access to secrets in Cloud Secret Manager.
-  # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
-  # - variable: MY_SECRET
-  #   secret: mySecretRef
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     secret: webapp-firebase-api-key
@@ -41,6 +22,14 @@ env:
     secret: google-client-id
   - variable: GOOGLE_CLIENT_SECRET
     secret: google-client-secret
+
+  # Worker auth secrets
+  - variable: INTERNAL_WORKER_SECRET
+    secret: internal-worker-secret
+  - variable: ANALYSIS_RUNNER_SECRET
+    secret: analysis-runner-secret
+  - variable: TOKEN_ENCRYPTION_KEY
+    secret: token-encryption-key
 
   # Prisma / Postgres tuning (safe defaults for Cloud Run)
   - variable: PRISMA_ADAPTER

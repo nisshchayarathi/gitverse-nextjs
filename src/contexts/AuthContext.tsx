@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { useSession } from "next-auth/react";
 import { buildApiUrl } from "../services/apiConfig";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/sessionConstants";
 
 interface User {
   id: string;
@@ -21,9 +22,9 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (retries?: number) => Promise<void>;
   updateUser: (data: Partial<User>) => void;
 }
 
@@ -54,7 +55,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return; // Still loading session
       }
 
-      if (session?.user) {
+      if (session?.user && session.expires && new Date(session.expires).getTime() > Date.now()) {
         setUser({
           id: session.user.id || "",
           name: session.user.name || "",
@@ -88,8 +89,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 data.user.avatarUrl ||
                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.email}`,
             });
+          } else if (response.status === 401) {
+            localStorage.removeItem("gitverse_token");
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("session-expired", {
+                detail: { message: SESSION_EXPIRED_MESSAGE },
+              }));
+              window.location.href = "/login";
+            }
           } else {
-            // Token invalid, clear storage
             localStorage.removeItem("gitverse_token");
           }
         } catch (error) {
@@ -103,7 +111,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, [session, status]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, rememberMe: boolean = false) => {
     setIsLoading(true);
 
     try {
@@ -112,7 +120,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       });
 
       const data = await response.json();
@@ -177,22 +185,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = async () => {
+  const logout = async (retries = 2) => {
     const token = localStorage.getItem("gitverse_token");
 
     // Handle JWT logout
     if (token) {
-      try {
-        await fetch(buildApiUrl("/api/auth/logout"), {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      } catch (error) {
-        console.error("Logout error:", error);
+      let lastError: Error | null = null;
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const response = await fetch(buildApiUrl("/api/auth/logout"), {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (response.ok) {
+            localStorage.removeItem("gitverse_token");
+            break;
+          }
+        } catch (error) {
+          lastError = error as Error;
+          if (attempt < retries) {
+            await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+          }
+        }
       }
-      localStorage.removeItem("gitverse_token");
+      if (lastError) {
+        console.error("Logout error after retries:", lastError);
+      }
     }
 
     // Handle NextAuth logout

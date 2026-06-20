@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import Image from "next/image";
 import {
   GitBranch,
   LayoutDashboard,
@@ -13,6 +14,8 @@ import {
   User,
   ChevronLeft,
   Menu,
+  FileDiff,
+  GitCompare,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -23,7 +26,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui";
+import { Button, ThemeToggle } from "@/components/ui";
+import { CommandPalette } from "@/components/ui/CommandPalette";
 import { toast } from "@/hooks/use-toast";
 
 interface DashboardLayoutProps {
@@ -38,6 +42,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -50,6 +55,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   const navItems = [
     { icon: LayoutDashboard, label: "Visualise", path: "/dashboard" },
+    { icon: FileDiff, label: "Simulate PR", path: "/simulate-pr" },
+    { icon: GitCompare, label: "Compare", path: "/compare" },
     { icon: Search, label: "Search", path: "/search" },
     { icon: GitPullRequest, label: "Contribute", path: "/contribute" },
     { icon: Settings, label: "Settings", path: "/settings" },
@@ -81,34 +88,45 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             </Link>
           </div>
 
-          {/* Navigation */}
+          {/* Navigation - Desktop */}
           <nav className="flex-1 p-4 space-y-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                href={item.path}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-                  isActive(item.path)
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                }`}
-              >
-                <item.icon className="h-5 w-5 shrink-0" />
-                {sidebarOpen && <span>{item.label}</span>}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const active = isActive(item.path);
+              return (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all relative ${
+                    active
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
+                >
+                  <item.icon className="h-5 w-5 shrink-0" />
+                  {sidebarOpen && <span>{item.label}</span>}
+                  
+                  {/* Visual Indicator Line on the left edge of the active button */}
+                  {active && (
+                    <span className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-r" />
+                  )}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Toggle Sidebar Button */}
           <div className="p-4 border-t border-border/50">
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-accent transition-colors"
+              aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             >
               <ChevronLeft
                 className={`h-5 w-5 transition-transform ${!sidebarOpen ? "rotate-180" : ""}`}
               />
-            </button>
+            </Button>
           </div>
         </div>
       </aside>
@@ -132,23 +150,31 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 </Link>
               </div>
 
-              {/* Navigation */}
+              {/* Navigation - Mobile */}
               <nav className="flex-1 p-4 space-y-2">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.path}
-                    href={item.path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-                      isActive(item.path)
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    }`}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </Link>
-                ))}
+                {navItems.map((item) => {
+                  const active = isActive(item.path);
+                  return (
+                    <Link
+                      key={item.path}
+                      href={item.path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all relative ${
+                        active
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      }`}
+                    >
+                      <item.icon className="h-5 w-5 shrink-0" />
+                      <span>{item.label}</span>
+
+                      {/* Mobile Indicator Line */}
+                      {active && (
+                        <span className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-r" />
+                      )}
+                    </Link>
+                  );
+                })}
               </nav>
             </div>
           </aside>
@@ -163,68 +189,96 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         <header className="sticky top-0 z-30 glass border-b border-border/50">
           <div className="px-4 py-3 flex items-center justify-between">
             {/* Mobile Menu Button */}
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setMobileMenuOpen(true)}
               className="p-2 rounded-lg hover:bg-accent transition-colors md:hidden"
+              aria-label="Open mobile menu"
             >
               <Menu className="h-5 w-5" />
-            </button>
+            </Button>
 
-            <div className="flex-1" />
+            <div className="flex-1 flex items-center justify-end px-4 sm:px-6 gap-3">
+              <Button
+                variant="outline"
+                className="hidden sm:flex relative h-9 w-full justify-start rounded-[0.5rem] bg-background/50 text-sm text-muted-foreground sm:pr-12 md:w-56 lg:w-64 border-border/50 hover:bg-accent/50"
+                onClick={() => setCommandPaletteOpen(true)}
+              >
+                <span className="hidden lg:inline-flex">Search or jump to...</span>
+                <span className="inline-flex lg:hidden">Search...</span>
+                <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex text-foreground">
+                  <span className="text-xs">⌘</span>K / Ctrl K
+                </kbd>
+              </Button>
+            </div>
 
-            {/* User Profile Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="gap-2">
-                  <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center">
-                    {user?.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.name}
-                        className="rounded-full"
-                      />
-                    ) : (
-                      <User className="h-4 w-4 text-primary-foreground" />
-                    )}
-                  </div>
-                  <div className="hidden md:block text-left">
-                    <div className="text-sm font-medium">{user?.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {user?.email}
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+
+              {/* User Profile Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="gap-2"
+                    aria-label={user?.name ? `${user.name} account menu` : "Open account menu"}
+                  >
+                    <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center">
+                      {user?.avatar ? (
+                        <Image
+                          src={user.avatar}
+                          alt={user.name}
+                          width={32}
+                          height={32}
+                          className="rounded-full h-full w-full object-cover"
+                        />
+                      ) : (
+                        <User className="h-4 w-4 text-primary-foreground" />
+                      )}
                     </div>
-                  </div>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 glass">
-                <DropdownMenuLabel>
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">{user?.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {user?.email}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push("/settings")}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="text-destructive"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    <div className="hidden md:block text-left">
+                      <div className="text-sm font-medium">{user?.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {user?.email}
+                      </div>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 glass">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">{user?.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {user?.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push("/settings")}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="text-destructive"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </header>
 
         {/* Page Content */}
         <main className="p-6">{children}</main>
       </div>
+
+      {/* Global Command Palette */}
+      <CommandPalette open={commandPaletteOpen} setOpen={setCommandPaletteOpen} />
     </div>
   );
 };

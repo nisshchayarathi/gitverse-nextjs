@@ -3,10 +3,27 @@ import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { GitHubService } from "@/lib/services/githubService";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
+import { validateEncryptionConfig } from "@/lib/utils/tokenEncryption";
+import { encryptToken } from "@/lib/utils/envelopeEncryption";
+import { RedactSensitiveFields } from "@/services/security/redact-sensitive-fields";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 export async function POST(request: NextRequest) {
   try {
+    const encryptionCheck = validateEncryptionConfig();
+    if (!encryptionCheck.valid) {
+      return NextResponse.json(
+        {
+          error: "ENCRYPTION_UNAVAILABLE",
+          message: "Token encryption is not configured. Contact the administrator.",
+        },
+        { status: 503 },
+      );
+    }
+
     const user = await requireAuth(request);
+    const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.GITHUB_CONNECT);
+    if (!rl.allowed) return rateLimitResponse(rl);
     const body = await request.json();
     const token = (body?.token as string | undefined)?.trim();
 
@@ -20,18 +37,22 @@ export async function POST(request: NextRequest) {
     const github = new GitHubService(token);
     const me = await github.getAuthenticatedUser();
 
+    const encryptedToken = await encryptToken(token);
+
     const account = await prisma.gitHubAccount.upsert({
       where: { userId: user.userId },
       create: {
         userId: user.userId,
         githubUserId: BigInt(me.id),
         username: me.login,
-        accessToken: token,
+        accessToken: encryptedToken,
+        tokenEncrypted: true,
       },
       update: {
         githubUserId: BigInt(me.id),
         username: me.login,
-        accessToken: token,
+        accessToken: encryptedToken,
+        tokenEncrypted: true,
       },
       select: {
         id: true,
@@ -43,7 +64,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ account: toJsonSafe(account) }, { status: 200 });
+    return NextResponse.json(
+      RedactSensitiveFields.redact({ account: toJsonSafe(account) }),
+      { status: 200 },
+    );
   } catch (error: any) {
     console.error("GitHub connect error:", sanitizeError(error));
     if (isHttpError(error)) {

@@ -5,29 +5,91 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
-    name: test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node: [22.x]
-
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22.x
           cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Run ESLint
+        run: npm run lint
 
-      - name: Install
-        run: npm ci
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      - name: Run TypeScript type checking
+        run: npm run typecheck
 
-      - name: Unit tests
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      - name: Verify no committed build artifacts in dist-worker
+        run: |
+          if git ls-files --error-unmatch dist-worker/ 2>/dev/null; then
+            echo "Error: dist-worker/ is tracked in git."
+            echo "Remove it with: git rm -r --cached dist-worker/"
+            exit 1
+          fi
+          echo "OK: dist-worker/ is not tracked in git"
+      - name: Build worker
+        run: npm run build:worker
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      - name: Run unit tests
         run: npm test
-
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+          JWT_SECRET: "dummy-secret"
+          NEXTAUTH_SECRET: "dummy-secret"
+          NEXTAUTH_URL: "http://localhost:3000"
+          GEMINI_API_KEY: "dummy-key"
+          INTERNAL_WORKER_SECRET: "dummy-secret"
+          TOKEN_ENCRYPTION_KEY: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"

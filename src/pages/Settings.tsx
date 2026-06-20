@@ -2,10 +2,12 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState, useRef } from "react";
-import { User, Lock, Shield, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState, useRef } from "react";
+import Image from "next/image";
+import { User, Lock, Shield, Trash2, AlertCircle, Sun, Moon, Cpu } from "lucide-react";
 import { Save } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Card,
   CardHeader,
@@ -15,14 +17,18 @@ import {
   Button,
   Input,
   toast,
+  EmptyState,
   Modal,
 } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
+import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
+import { useAISettings, AIProviderType } from "@/hooks/useAISettings";
 
 export default function Settings() {
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, isLoading: authLoading } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -51,25 +57,39 @@ export default function Settings() {
     didInitProfileForm.current = true;
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
+  const [userFetchStatus, setUserFetchStatus] = useState<
+    "loading" | "success" | "error" | "empty"
+  >("loading");
 
-    const fetchLinkStatus = async () => {
-      try {
-        const token = localStorage.getItem("gitverse_token");
-        const res = await axios.get(buildApiUrl("/api/users/me"), {
-          withCredentials: true,
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        setIsGoogleLinked(!!res.data?.isGoogleLinked);
-      } catch {
-        // Non-fatal; hide the indicator if we can't fetch.
+  const fetchUserInfo = useCallback(async () => {
+    setUserFetchStatus("loading");
+    try {
+      const token = localStorage.getItem("gitverse_token");
+      const res = await axios.get(buildApiUrl("/api/users/me"), {
+        withCredentials: true,
+        timeout: 5000,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      if (!res.data) {
+        setUserFetchStatus("empty");
         setIsGoogleLinked(null);
+        return;
       }
-    };
 
-    fetchLinkStatus();
-  }, [user]);
+      setIsGoogleLinked(!!res.data?.isGoogleLinked);
+      setUserFetchStatus("success");
+    } catch (err) {
+      console.error("Error fetching user info:", err);
+      setIsGoogleLinked(null);
+      setUserFetchStatus("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    fetchUserInfo();
+  }, [authLoading, fetchUserInfo]);
 
   useEffect(() => {
   return () => {
@@ -78,6 +98,33 @@ export default function Settings() {
     }
   };
 }, [avatar]);
+
+  // AI Settings State
+  const { settings, updateSettings, isLoaded: isAISettingsLoaded } = useAISettings();
+  const [aiProvider, setAiProvider] = useState<AIProviderType>("gemini");
+  const [aiGeminiKey, setAiGeminiKey] = useState("");
+  const [aiOpenaiKey, setAiOpenaiKey] = useState("");
+
+  useEffect(() => {
+    if (isAISettingsLoaded) {
+      setAiProvider(settings.provider);
+      setAiGeminiKey(settings.geminiKey);
+      setAiOpenaiKey(settings.openaiKey);
+    }
+  }, [settings, isAISettingsLoaded]);
+
+  const handleSaveAISettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSettings({
+      provider: aiProvider,
+      geminiKey: aiGeminiKey,
+      openaiKey: aiOpenaiKey,
+    });
+    toast({
+      title: "AI Settings Saved",
+      description: "Your local AI provider and API keys have been updated.",
+    });
+  };
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -167,7 +214,8 @@ export default function Settings() {
       if (response.status === 200) {
         initialEmailRef.current = trimmedEmail;
         setEmailChangeNewPassword("");
-        updateUser({ name: trimmedName, email: trimmedEmail, avatar: avatar || user?.avatar });
+        setName(trimmedName);
+        setEmail(trimmedEmail);
         toast({
           title: "Profile Updated",
           description: "Your profile has been successfully updated",
@@ -284,10 +332,6 @@ export default function Settings() {
 });
   };
 
-  const handleDeleteAccount = () => {
-    setShowDeleteModal(true);
-  };
-
   const confirmDeleteAccount = async () => {
     if (isDeletingAccount) return;
 
@@ -306,7 +350,7 @@ export default function Settings() {
         description: "Your account has been deleted successfully.",
       });
 
-      window.location.href = "/signup";
+      window.location.href = "/account-deleted";
     } catch (error: any) {
       console.error("Error deleting account:", error);
       toast({
@@ -322,9 +366,66 @@ export default function Settings() {
 
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
+    { id: "preferences", label: "Appearance", icon: Sun },
     { id: "security", label: "Security", icon: Shield },
+    { id: "ai", label: "AI Settings", icon: Cpu },
     { id: "danger", label: "Danger Zone", icon: Trash2 },
   ];
+
+  // Early returns for loading / error / empty states to prevent layout shift
+  if (userFetchStatus === "loading" || authLoading) {
+    return (
+      <DashboardLayout>
+        <SettingsSkeleton />
+      </DashboardLayout>
+    );
+  }
+
+  if (userFetchStatus === "error") {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-heading font-bold mb-2">Settings</h1>
+            <p className="text-muted-foreground">
+              Manage your account settings and preferences
+            </p>
+          </div>
+
+          <EmptyState
+            icon={AlertCircle}
+            title="Unable to load account"
+            description="There was an error loading your account information. Check your connection and try again."
+            actionLabel="Retry"
+            onAction={fetchUserInfo}
+          />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (userFetchStatus === "empty") {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-heading font-bold mb-2">Settings</h1>
+            <p className="text-muted-foreground">
+              Manage your account settings and preferences
+            </p>
+          </div>
+
+          <EmptyState
+            icon={User}
+            title="No account found"
+            description="We couldn't find user data for this account. Try signing in again or contact support."
+            actionLabel="Reload"
+            onAction={fetchUserInfo}
+          />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -347,11 +448,10 @@ export default function Settings() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left ${
-                        activeTab === tab.id
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left ${activeTab === tab.id
                           ? "bg-primary/10 text-primary font-medium"
                           : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                      }`}
+                        }`}
                     >
                       <tab.icon className="h-5 w-5" />
                       <span>{tab.label}</span>
@@ -415,7 +515,7 @@ export default function Settings() {
                     {isGoogleLinked &&
                       !!initialEmailRef.current &&
                       email.trim().toLowerCase() !==
-                        initialEmailRef.current.toLowerCase() && (
+                      initialEmailRef.current.toLowerCase() && (
                         <div className="space-y-2">
                           <label
                             htmlFor="email-change-password"
@@ -445,15 +545,19 @@ export default function Settings() {
                       <div className="flex items-center gap-4">
                         <div className="h-16 w-16 rounded-full bg-gradient-primary flex items-center justify-center overflow-hidden">
                           {avatar ? (
-                            <img
+                            <Image
                               src={avatar}
                               alt={name}
+                              width={64}
+                              height={64}
                               className="w-full h-full object-cover"
                             />
                           ) : user?.avatar ? (
-                            <img
+                            <Image
                               src={user.avatar}
                               alt={user.name}
+                              width={64}
+                              height={64}
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -494,6 +598,58 @@ export default function Settings() {
                       </Button>
                     </div>
                   </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Appearance Tab */}
+            {activeTab === "preferences" && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle className="font-heading flex items-center gap-2">
+                    <Sun className="h-5 w-5" />
+                    Appearance Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Customize the theme of the application
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Theme Mode</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setTheme('light')}
+                        aria-pressed={theme === 'light'}
+                        aria-label="Use light mode"
+                        className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${
+                          theme === 'light'
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Sun className="h-8 w-8 mb-2" />
+                        <span className="font-semibold text-sm">Light Mode</span>
+                        <span className="text-xs text-muted-foreground mt-1">Sleek light workspace</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTheme('dark')}
+                        aria-pressed={theme === 'dark'}
+                        aria-label="Use dark mode"
+                        className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${
+                          theme === 'dark'
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Moon className="h-8 w-8 mb-2" />
+                        <span className="font-semibold text-sm">Dark Mode</span>
+                        <span className="text-xs text-muted-foreground mt-1">Reduce eye strain at night</span>
+                      </button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -591,6 +747,85 @@ export default function Settings() {
               </Card>
             )}
 
+            {/* AI Settings Tab */}
+            {activeTab === "ai" && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle className="font-heading flex items-center gap-2">
+                    <Cpu className="h-5 w-5" />
+                    AI Summary Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Configure your AI provider to generate module and file summaries. Keys are stored securely in your browser&apos;s localStorage.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSaveAISettings} className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="ai-provider" className="text-sm font-medium">
+                        AI Provider
+                      </label>
+                      <select
+                        id="ai-provider"
+                        value={aiProvider}
+                        onChange={(e) => setAiProvider(e.target.value as AIProviderType)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value="gemini">Google Gemini</option>
+                        <option value="openai">OpenAI</option>
+                      </select>
+                    </div>
+
+                    {aiProvider === "gemini" && (
+                      <div className="space-y-2">
+                        <label htmlFor="gemini-key" className="text-sm font-medium">
+                          Gemini API Key
+                        </label>
+                        <Input
+                          id="gemini-key"
+                          type="password"
+                          placeholder="AIzaSy..."
+                          value={aiGeminiKey}
+                          onChange={(e) => setAiGeminiKey(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Enter your Google Gemini API Key. Get one from Google AI Studio.
+                        </p>
+                      </div>
+                    )}
+
+                    {aiProvider === "openai" && (
+                      <div className="space-y-2">
+                        <label htmlFor="openai-key" className="text-sm font-medium">
+                          OpenAI API Key
+                        </label>
+                        <Input
+                          id="openai-key"
+                          type="password"
+                          placeholder="sk-..."
+                          value={aiOpenaiKey}
+                          onChange={(e) => setAiOpenaiKey(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Enter your OpenAI API Key.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="pt-4">
+                      <Button
+                        type="submit"
+                        className="bg-gradient-primary hover:opacity-90 transition-opacity"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        Save AI Settings
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Danger Zone Tab */}
             {activeTab === "danger" && (
               <Card className="glass border-destructive/50">
@@ -612,7 +847,7 @@ export default function Settings() {
                     </p>
                     <Button
                       variant="destructive"
-                      onClick={handleDeleteAccount}
+                      onClick={() => setShowDeleteModal(true)}
                       disabled={isDeletingAccount}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -625,36 +860,47 @@ export default function Settings() {
           </div>
         </div>
       </div>
-      <Modal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        title="Delete Account"
-        size="sm"
-      >
-        <p className="text-muted-foreground mb-6">
-          This permanently deletes your account and all data. This cannot be undone.
-        </p>
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-account-title"
+          onKeyDown={(e) => e.key === "Escape" && setShowDeleteModal(false)}
+          onClick={(e) => e.target === e.currentTarget && setShowDeleteModal(false)}
+        >
+          <Card className="w-full max-w-sm">
+            <CardHeader>
+              <CardTitle id="delete-account-title">Delete Account</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-6">
+                This permanently deletes your account and all data. This cannot be undone.
+              </p>
 
-        <div className="flex gap-3 justify-end">
-          <Button
-            variant="outline"
-            onClick={() => setShowDeleteModal(false)}
-          >
-            Cancel
-          </Button>
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDeleteModal(false)}
+                >
+                  Cancel
+                </Button>
 
-          <Button
-            variant="destructive"
-            onClick={() => {
-              setShowDeleteModal(false);
-              confirmDeleteAccount();
-            }}
-            disabled={isDeletingAccount}
-          >
-            {isDeletingAccount ? "Deleting..." : "Delete Account"}
-          </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    confirmDeleteAccount();
+                  }}
+                  disabled={isDeletingAccount}
+                >
+                  {isDeletingAccount ? "Deleting..." : "Delete Account"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </Modal>
+      )}
 
     </DashboardLayout>
   );

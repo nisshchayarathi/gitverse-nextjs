@@ -10,6 +10,8 @@ const customJestConfig = {
   testMatch: [
     '<rootDir>/lib/**/__tests__/**/*.test.ts',
     '<rootDir>/lib/**/__tests__/**/*.test.tsx',
+    '<rootDir>/app/**/__tests__/**/*.test.ts',
+    '<rootDir>/app/**/__tests__/**/*.test.tsx',
     '<rootDir>/src/**/__tests__/**/*.test.ts',
     '<rootDir>/src/**/__tests__/**/*.test.tsx',
   ],
@@ -17,7 +19,11 @@ const customJestConfig = {
   moduleNameMapper: {
     '^@/lib/(.*)$': '<rootDir>/lib/$1',
     '^@/app/(.*)$': '<rootDir>/app/$1',
-    '^@/(.*)$': '<rootDir>/src/$1',
+    '^@/services/(.*)$': '<rootDir>/services/$1',
+    '^@/(?!lib/|app/|services/)(.*)$': '<rootDir>/src/$1',
+    '^jose$': '<rootDir>/node_modules/jose/dist/node/cjs/index.js',
+    '^@panva/hkdf$': '<rootDir>/node_modules/@panva/hkdf/dist/node/cjs/index.js',
+    '^uuid$': require.resolve('uuid'),
   },
   testPathIgnorePatterns: [
     '<rootDir>/.next/',

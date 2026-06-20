@@ -1,10 +1,15 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { GitBranch, Menu, X } from 'lucide-react'
-import { Button } from '@/components/ui'
+import { Button, ThemeToggle } from '@/components/ui'
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    const styleTag = document.getElementById("navbar-inline-css");
+    if (styleTag) styleTag.remove();
+  }, []);
 
   const navLinks = [
     { name: 'Features', href: '#features' },
@@ -33,7 +38,7 @@ export const Navbar: React.FC = () => {
               <a
                 key={link.name}
                 href={link.href}
-                className="text-muted-foreground hover:text-foreground transition-colors font-medium"
+                className="nav-link text-muted-foreground hover:text-foreground transition-colors font-medium"
               >
                 {link.name}
               </a>
@@ -42,6 +47,7 @@ export const Navbar: React.FC = () => {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
             <Button className="bg-gradient-primary hover:opacity-90 transition-opacity" asChild>
               <Link href="/login">Sign In</Link>
             </Button>
@@ -68,13 +74,17 @@ export const Navbar: React.FC = () => {
                 <a
                   key={link.name}
                   href={link.href}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  className="nav-link text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => setIsOpen(false)}
                 >
                   {link.name}
                 </a>
               ))}
               <div className="flex flex-col gap-3 pt-4 border-t border-border/50">
+                <div className="flex items-center justify-between px-2 mb-1">
+                  <span className="text-sm font-medium text-muted-foreground">Theme</span>
+                  <ThemeToggle />
+                </div>
                 <Button className="bg-gradient-primary" asChild>
                   <Link href="/login">Sign In</Link>
                 </Button>

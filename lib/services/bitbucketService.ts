@@ -1,4 +1,65 @@
-import axios, { AxiosInstance } from 'axios'
+import axios, { AxiosError, AxiosInstance, isAxiosError } from 'axios'
+import { computeBackoffMs } from '@/lib/utils/retry'
+
+export class BitbucketRateLimitError extends Error {
+  retryAfterSeconds: number
+  constructor(retryAfterSeconds: number) {
+    super(
+      `Bitbucket API rate limit reached. Please retry after ${retryAfterSeconds} seconds.`
+    )
+    this.name = 'BitbucketRateLimitError'
+    this.retryAfterSeconds = retryAfterSeconds
+  }
+}
+
+function sanitizeBitbucketHeaders(headers: any): any {
+  if (headers == null) {
+    return headers
+  }
+
+  if (Array.isArray(headers)) {
+    return headers.map((value) => sanitizeBitbucketHeaders(value))
+  }
+
+  if (typeof headers !== 'object') {
+    return headers
+  }
+
+  const source =
+    typeof (headers as any).toJSON === 'function'
+      ? (headers as any).toJSON()
+      : headers
+
+  if (source == null || typeof source !== 'object') {
+    return source
+  }
+
+  const sanitized: Record<string, any> = Array.isArray(source) ? [] : {}
+
+  for (const [key, value] of Object.entries(source)) {
+    const lowerKey = key.toLowerCase()
+    if (lowerKey === 'authorization') {
+      sanitized[key] = '[REDACTED]'
+    } else if (value != null && typeof value === 'object') {
+      sanitized[key] = sanitizeBitbucketHeaders(value)
+    } else {
+      sanitized[key] = value
+    }
+  }
+
+  return sanitized
+}
+
+export function sanitizeBitbucketError(error: any) {
+  if (isAxiosError(error) && error.config) {
+    const safeConfig = {
+      ...error.config,
+      headers: sanitizeBitbucketHeaders(error.config.headers),
+    }
+    error.config = safeConfig as any
+  }
+  return error
+}
 
 export interface BitbucketRepository {
   uuid: string
@@ -35,6 +96,48 @@ export class BitbucketService {
         ...(token && { Authorization: `Bearer ${token}` }),
       },
     })
+
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (!isAxiosError(error) || !error.config) {
+          throw sanitizeBitbucketError(error)
+        }
+
+        const status = error.response?.status
+        const config = error.config as any
+
+        const headers = error.response?.headers || {}
+        if (status === 429 || status === 403) {
+          const retryAfterHeader = headers['retry-after']
+          if (status === 429 || retryAfterHeader) {
+            let retrySeconds = 60
+            if (retryAfterHeader) {
+              retrySeconds = parseInt(retryAfterHeader, 10)
+            }
+            throw new BitbucketRateLimitError(retrySeconds)
+          }
+        }
+
+        const retryStatusCodes = [502, 503, 504]
+        if (
+          (status && retryStatusCodes.includes(status)) ||
+          error.code === 'ECONNABORTED' ||
+          !error.response
+        ) {
+          config.retryCount = config.retryCount || 0
+          if (config.retryCount < 3) {
+            config.retryCount += 1
+            const backoff =
+              computeBackoffMs(config.retryCount - 1) + Math.random() * 1000
+            await new Promise((resolve) => setTimeout(resolve, backoff))
+            return this.client(config)
+          }
+        }
+
+        throw sanitizeBitbucketError(error)
+      }
+    )
   }
 
   /**

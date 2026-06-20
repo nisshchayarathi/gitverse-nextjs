@@ -26,6 +26,16 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("gitverse_remember_me");
+    if (stored === "true") {
+      setRememberMe(true);
+    }
+  }, []);
 
   const RepoGraph = ({
     className,
@@ -177,29 +187,29 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setEmailError("");
+    setPasswordError("");
+    let hasError = false;
 
-    if (!email || !password) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
-      return;
+    if (!email) {
+      setEmailError("Email is required");
+      hasError = true;
+    } else if (!email.includes("@")) {
+      setEmailError("Please enter a valid email address");
+      hasError = true;
     }
 
-    if (!email.includes("@")) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      });
-      return;
+    if (!password) {
+      setPasswordError("Password is required");
+      hasError = true;
     }
+
+    if (hasError) return;
 
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       toast({
         title: "Success!",
         description: "Welcome back to GitVerse",
@@ -262,17 +272,22 @@ export default function Login() {
                 Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${emailError ? "text-red-500" : "text-muted-foreground"}`} />
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (emailError) setEmailError("");
+                  }}
+                  className={`pl-10 ${emailError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                   required
+                  aria-invalid={!!emailError}
                 />
               </div>
+              {emailError && <p className="text-sm text-red-500 mt-1">{emailError}</p>}
             </div>
 
             <div
@@ -283,15 +298,19 @@ export default function Login() {
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${passwordError ? "text-red-500" : "text-muted-foreground"}`} />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10"
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordError) setPasswordError("");
+                  }}
+                  className={`pl-10 pr-10 ${passwordError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                   required
+                  aria-invalid={!!passwordError}
                 />
                 <button
                   type="button"
@@ -306,6 +325,7 @@ export default function Login() {
                   )}
                 </button>
               </div>
+              {passwordError && <p className="text-sm text-red-500 mt-1">{passwordError}</p>}
             </div>
 
             <div
@@ -313,7 +333,17 @@ export default function Login() {
               style={{ animationDelay: "170ms" }}
             >
               <label className="flex items-center cursor-pointer">
-                <input type="checkbox" className="mr-2 rounded border-input" />
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  className="mr-2 rounded border-input"
+                  checked={rememberMe}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setRememberMe(checked);
+                    localStorage.setItem("gitverse_remember_me", String(checked));
+                  }}
+                />
                 <span className="text-muted-foreground">Remember me</span>
               </label>
               <span
