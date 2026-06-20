@@ -10,11 +10,7 @@ const MAX_SIGNUPS = 3;
 const WINDOW_MS = 60 * 60 * 1000;
 
 function getClientIp(request: NextRequest) {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  );
+  return request.ip ?? "unknown";
 }
 
 function isRateLimited(ip: string) {
