@@ -11,6 +11,7 @@ import {
   Clock,
   Zap,
 } from "lucide-react";
+import Image from "next/image";
 import { Card } from "@/components/ui";
 import { useState, useRef, useEffect } from "react";
 
@@ -40,19 +41,13 @@ export function Contributors({ repository }: ContributorsProps) {
 
   const [selectedContributor, setSelectedContributor] =
     useState<Contributor | null>(null);
-  const [modalTop, setModalTop] = useState<number>(0);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // When opening modal, set its top position to current scroll
   useEffect(() => {
-    if (selectedContributor) {
-      setModalTop(window.scrollY);
-      if (modalRef.current) {
-        modalRef.current.scrollTop = 0;
-      }
-    }
+    if (selectedContributor && modalRef.current) {
+      modalRef.current.scrollTop = 0;
+  }
   }, [selectedContributor]);
-
   // Use real contributors from repository or empty array
   const contributors: Contributor[] =
     repository?.contributors?.map((contrib: any, index: number) => ({
@@ -116,7 +111,7 @@ export function Contributors({ repository }: ContributorsProps) {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortOption)}
-          className="glass px-4 py-2 rounded-lg hover:bg-white/10 transition-all duration-300 cursor-pointer"
+          className="glass px-4 py-2 rounded-lprisma migrate resetg hover:bg-white/10 transition-all duration-300 cursor-pointer"
         >
           <option value="commits">Most commits</option>
           <option value="additions">Most additions</option>
@@ -201,10 +196,12 @@ export function Contributors({ repository }: ContributorsProps) {
               {/* Contributor header */}
               <div className="flex items-start gap-4 mb-4">
                 <div className="relative">
-                  <img
+                  <Image
                     src={contributor.avatar}
                     alt={contributor.name}
-                    className="w-12 h-12 rounded-full ring-2 ring-primary/20"
+                    width={48}
+                    height={48}
+                    className="w-12 h-12 rounded-full ring-2 ring-primary/20 object-cover"
                   />
                   {rankBadge && (
                     <div className="absolute -top-1 -right-1 text-lg">
@@ -314,24 +311,12 @@ export function Contributors({ repository }: ContributorsProps) {
       {/* Selected contributor modal */}
       {selectedContributor && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center p-4 z-50"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
           onClick={() => setSelectedContributor(null)}
         >
-          <div
-            style={{
-              position: "absolute",
-              top: modalTop -200,
-              left: 0,
-              right: 0,
-              display: "flex",
-              justifyContent: "center",
-              pointerEvents: "none",
-            }}
-          >
             <Card
               ref={modalRef}
               className="glass max-w-3xl w-full max-h-[90vh] overflow-y-auto pb-8 animate-fade-in-up"
-              style={{ pointerEvents: "auto" }}
               onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
               {/* Close button */}
@@ -683,7 +668,6 @@ export function Contributors({ repository }: ContributorsProps) {
               </div>
             </Card>
           </div>
-        </div>
       )}
     </div>
   );

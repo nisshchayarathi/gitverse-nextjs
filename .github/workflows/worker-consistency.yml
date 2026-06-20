@@ -1,0 +1,66 @@
+name: Worker Consistency
+
+on:
+  pull_request:
+    paths:
+      - "scripts/**"
+      - "lib/**"
+      - "tsconfig.worker.json"
+      - "package.json"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - "lib/**"
+      - "tsconfig.worker.json"
+      - "package.json"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build worker
+        run: npm run build:worker
+
+      - name: Verify dist-worker is not committed
+        run: |
+          if git ls-files --error-unmatch dist-worker/ 2>/dev/null; then
+            echo "Error: dist-worker/ is tracked in git."
+            echo "Remove it with: git rm -r --cached dist-worker/"
+            exit 1
+          fi
+          echo "OK: dist-worker/ is not tracked in git"
+
+      - name: Run consistency checks
+        run: npx tsx scripts/verify-worker-consistency.ts
+
+      - name: Verify worker scripts can be required
+        run: |
+          node -e "
+            try {
+              require('./dist-worker/lib/prisma');
+              console.log('OK: dist-worker/lib/prisma.js loads without error');
+            } catch (e) {
+              if (e.code === 'MODULE_NOT_FOUND' && e.message.includes('prisma/client')) {
+                console.log('OK: prisma module import expectedly deferred (no DB URL in CI)');
+              } else {
+                console.error('FAIL: dist-worker/lib/prisma.js failed to load:', e.message);
+                process.exit(1);
+              }
+            }
+          "

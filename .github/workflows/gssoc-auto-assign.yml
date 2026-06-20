@@ -1,0 +1,102 @@
+name: Assign Request Reminder
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: assign-reminder-${{ github.event.issue.number }}-${{ github.event.comment.id }}
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  remind-assign:
+    name: Remind About /assign Command
+    runs-on: ubuntu-latest
+    if: >-
+      !github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
+      !contains(github.event.comment.body, '/assign') &&
+      !contains(github.event.comment.body, '/claim') &&
+      !contains(github.event.comment.body, '/take') &&
+      !contains(github.event.comment.body, '/unassign') &&
+      !contains(github.event.comment.body, '/drop') &&
+      !contains(github.event.comment.body, '/release') &&
+      !contains(github.event.comment.body, '/abandon') &&
+      (
+        contains(github.event.comment.body, 'assign this issue to me') ||
+        contains(github.event.comment.body, 'assign this to me') ||
+        contains(github.event.comment.body, 'please assign me') ||
+        contains(github.event.comment.body, 'can i work on this') ||
+        contains(github.event.comment.body, 'can i take this') ||
+        contains(github.event.comment.body, 'i would like to work on this') ||
+        contains(github.event.comment.body, 'i want to work on this') ||
+        contains(github.event.comment.body, 'i''d like to work on this') ||
+        contains(github.event.comment.body, 'id like to work on this') ||
+        contains(github.event.comment.body, 'i want to take this issue') ||
+        contains(github.event.comment.body, 'i want to fix this') ||
+        contains(github.event.comment.body, 'i want to contribute') ||
+        contains(github.event.comment.body, 'let me work on this') ||
+        contains(github.event.comment.body, 'let me take this') ||
+        contains(github.event.comment.body, 'can i be assigned') ||
+        contains(github.event.comment.body, 'assign me to this') ||
+        contains(github.event.comment.body, 'assign me this') ||
+        contains(github.event.comment.body, 'work on this') ||
+        contains(github.event.comment.body, 'i''ll work on this') ||
+        contains(github.event.comment.body, 'ill work on this') ||
+        contains(github.event.comment.body, 'i can work on this') ||
+        contains(github.event.comment.body, 'i am interested in this') ||
+        contains(github.event.comment.body, 'assign') ||
+        contains(github.event.comment.body, 'i''m interested in this')
+      )
+
+    steps:
+      - name: Post /assign Reminder
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commenter = context.payload.comment.user.login;
+            const { owner, repo } = context.repo;
+            const issueNumber = context.payload.issue.number;
+
+            // Check if the issue is closed — no point reminding on closed issues.
+            if (context.payload.issue.state === 'closed') return;
+
+            // Check if commenter is already assigned — no point reminding them.
+            const assignees = context.payload.issue.assignees.map(a => a.login.toLowerCase());
+            if (assignees.includes(commenter.toLowerCase())) return;
+
+            const bodyLines = [
+              `👋 Hey @${commenter}! Looks like you want to work on this issue — awesome! 🎉`,
+              ``,
+              `We don't assign issues through comments like this. Here's how our system works:`,
+              ``,
+              `## 🤖 How to Get Assigned`,
+              ``,
+              `Comment \`/assign\` on this issue and our bot will automatically assign it to you (if you're eligible).`,
+              ``,
+              `\`\`\``,
+              `/assign`,
+              `\`\`\``,
+              ``,
+              `## 📋 A Few Things to Know`,
+              ``,
+              `- You can hold a **maximum of 1 open issue** at a time — finish your current one before picking another.`,
+              `- You can be assigned up to **4 issues per day**.`,
+              `- If there's **no activity for 7 days**, the assignment will automatically expire so others can pick it up.`,
+              `- Make sure to read our **[CONTRIBUTING.md](https://github.com/${owner}/${repo}/blob/main/CONTRIBUTING.md)** before you start — it covers code style, commit conventions, and the PR checklist.`,
+              ``,
+              `Happy contributing! 🚀`,
+              ``,
+              `_GSSoC'26 · [GitVerse](https://github.com/${owner}/${repo})_`,
+            ];
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body: bodyLines.join('\n'),
+            });

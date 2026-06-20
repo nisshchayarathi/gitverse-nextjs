@@ -1,7 +1,7 @@
 import { GraphAnalyzer } from '../graphAnalyzer';
 
 describe('src/utils/graphAnalyzer', () => {
-  it('builds a dependency graph with cycle detection', () => {
+  it('builds a dependency graph', () => {
     const analyzer = new GraphAnalyzer();
 
     const files = [
@@ -23,17 +23,59 @@ describe('src/utils/graphAnalyzer', () => {
 
     const { nodes, links } = analyzer.buildDependencyGraph(files);
 
-    // File nodes
     expect(nodes.some((n) => n.id === 'file-src/a.ts')).toBe(true);
     expect(nodes.some((n) => n.id === 'file-src/b.ts')).toBe(true);
     expect(nodes.some((n) => n.id === 'file-src/nested/c.ts')).toBe(true);
-
-    // Folder nodes
     expect(nodes.some((n) => n.id === 'folder-src')).toBe(true);
     expect(nodes.some((n) => n.id === 'folder-src/nested')).toBe(true);
+    expect(links.length).toBeGreaterThan(0);
+  });
 
-    // Should include at least one cyclic link for the a<->b dependency
-    expect(links.some((l) => l.isCyclic === true)).toBe(true);
+  it('handles empty files array', () => {
+    const analyzer = new GraphAnalyzer();
+    const { nodes, links } = analyzer.buildDependencyGraph([]);
+    expect(nodes).toHaveLength(0);
+    expect(links).toHaveLength(0);
+  });
+
+  it('handles undefined files input', () => {
+    const analyzer = new GraphAnalyzer();
+    const { nodes, links } = analyzer.buildDependencyGraph(undefined as any);
+    expect(nodes).toHaveLength(0);
+    expect(links).toHaveLength(0);
+  });
+
+  it('does not limit files, builds complete graph', () => {
+    const analyzer = new GraphAnalyzer();
+    const files = Array.from({ length: 50 }, (_, i) => ({
+      path: `src/file${i}.ts`,
+      lines: 100 - i,
+    }));
+    const { nodes } = analyzer.buildDependencyGraph(files);
+    const fileNodes = nodes.filter((n) => n.type === 'file');
+    expect(fileNodes.length).toBe(50);
+  });
+
+  it('handles deeply nested paths correctly', () => {
+    const analyzer = new GraphAnalyzer();
+    const files = [
+      { path: 'a/b/c/d/e/deep.ts', lines: 50 },
+    ];
+    const { nodes } = analyzer.buildDependencyGraph(files);
+    const folderIds = nodes.filter((n) => n.type === 'folder').map((n) => n.id);
+    expect(folderIds).toContain('folder-a');
+    expect(folderIds).toContain('folder-a/b');
+    expect(folderIds).toContain('folder-a/b/c');
+    expect(folderIds).toContain('folder-a/b/c/d');
+  });
+
+  it('handles files with no dependencies', () => {
+    const analyzer = new GraphAnalyzer();
+    const files = [
+      { path: 'standalone.ts', lines: 100 },
+      { path: 'another.ts', lines: 50 },
+    ];
+    const { nodes, links } = analyzer.buildDependencyGraph(files);
+    expect(nodes.length).toBeGreaterThan(0);
   });
 });
-

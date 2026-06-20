@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "app/api/analysis/duplicate-features/route.ts",
+    "lib/services/duplicateFeatureDetector.ts",
+    "src/components/duplicate/DuplicateFeatureDetectorPanel.tsx",
+    "lib/middleware.ts",
+    "next-env.d.ts"
+  ]
+}

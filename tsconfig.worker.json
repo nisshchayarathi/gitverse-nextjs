@@ -14,6 +14,15 @@
   "include": [
     "scripts/analysisWorker.ts",
     "scripts/workerServer.ts",
+    "scripts/cronWorker.ts",
+    "scripts/webhookWorker.ts",
+    "scripts/rotate-dek.ts",
+    "scripts/kms-init.ts",
     "lib/**/*.ts"
+  ],
+  "exclude": [
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }

@@ -1,0 +1,35 @@
+name: Prisma Schema Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate and Format Schema
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Verify Schema Format
+        run: |
+          npx prisma format
+          git diff --exit-code prisma/schema.prisma || (echo "::error::Prisma schema is not formatted. Please run 'npx prisma format' locally." && exit 1)
+
+      - name: Validate Schema Syntax & Relations
+        run: npx prisma validate
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
