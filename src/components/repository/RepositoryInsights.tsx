@@ -2,7 +2,12 @@ import { CommitActivityHeatmap } from '@/components/visualizations/CommitActivit
 import { CodeDependencyGraph } from '@/components/visualizations/CodeDependencyGraph'
 import { LanguageDistributionChart } from '@/components/visualizations/LanguageDistributionChart'
 import { CodeMetrics } from './CodeMetrics'
+import RepositoryLearningPath from "./RepositoryLearningPath";
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import RepositoryEvolutionTimeline from "./RepositoryEvolutionTimeline";
+import ContributorIssueRecommendations from "./ContributorIssueRecommendations";
+import DependencyVulnerabilityScanner from "./DependencyVulnerabilityScanner";
+import CodeComplexityAnalyzer from "./CodeComplexityAnalyzer";
 import { useState } from 'react'
 import { toast } from '@/hooks/use-toast'
 import axios from 'axios'
@@ -253,6 +258,21 @@ export function RepositoryInsights({
 
       {/* Code Metrics Section */}
       <CodeMetrics repository={repository} />
+
+      {/* AI Repository Learning Path */}
+      <RepositoryLearningPath repository={repository} />
+
+      {/* Repository Evolution Timeline */}
+      <RepositoryEvolutionTimeline />
+
+      {/* Contributor Skill-Based Issue Recommendations */}
+      <ContributorIssueRecommendations />
+
+      {/* AI Code Complexity Analyzer */}
+      <CodeComplexityAnalyzer />
+
+      {/* Dependency Vulnerability Scanner */}
+      <DependencyVulnerabilityScanner />
 
     </div>
   )

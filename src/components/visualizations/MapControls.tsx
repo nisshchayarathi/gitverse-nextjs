@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Minus, Maximize2, Download, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Plus, Minus, Maximize2, Download, Image as ImageIcon, Loader2, Flame } from "lucide-react";
 
 interface MapControlsProps {
   onZoomIn: () => void;
@@ -8,9 +8,11 @@ interface MapControlsProps {
   onExportPng?: () => void;
   onExportSvg?: () => void;
   isExporting?: boolean;
+  heatmapMode?: boolean;
+  onToggleHeatmap?: () => void;
 }
 
-export function MapControls({ onZoomIn, onZoomOut, onReset, onExportPng, onExportSvg, isExporting }: MapControlsProps) {
+export function MapControls({ onZoomIn, onZoomOut, onReset, onExportPng, onExportSvg, isExporting, heatmapMode, onToggleHeatmap }: MapControlsProps) {
   return (
     <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-20">
       <div 
@@ -70,6 +72,20 @@ export function MapControls({ onZoomIn, onZoomOut, onReset, onExportPng, onExpor
               title="Export as SVG"
             >
               {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            </button>
+          </>
+        )}
+        
+        {onToggleHeatmap && (
+          <>
+            <div className="h-[1px] bg-white/10 my-0.5" />
+            <button
+              onClick={onToggleHeatmap}
+              className={`p-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 ${heatmapMode ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30' : 'bg-white/5 hover:bg-white/15 text-white active:bg-white/25'} hover:scale-105 active:scale-95`}
+              aria-label="Toggle Heatmap Mode"
+              title="Toggle Code Churn Heatmap"
+            >
+              <Flame className="h-4 w-4" />
             </button>
           </>
         )}

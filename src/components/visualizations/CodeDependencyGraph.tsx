@@ -14,9 +14,165 @@ interface CodeDependencyGraphProps {
 export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  const zoomRef = useRef<any>(null);
+  const svgSelectionRef = useRef<any>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   
-  const [selectedNode, setSelectedNode] = useState<any>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [annotations, setAnnotations] = useState<MapAnnotation[]>([]);
+  // Keep a ref always in sync with the latest annotations so the D3 tick
+  // callback can read them without causing React re-renders.
+  const annotationsRef = useRef<MapAnnotation[]>([]);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [popover, setPopover] = useState<{ isOpen: boolean, x: number, y: number, initialData?: Partial<MapAnnotation>, targetId?: string, targetType?: 'node'|'edge' } | null>(null);
+  const nodesRef = useRef<any[]>([]);
+  const linksRef = useRef<any[]>([]);
+  
+  const [selectedCommitHash, setSelectedCommitHash] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+  const [heatmapMode, setHeatmapMode] = useState(false);
+
+  const { nodeChurnMap, maxChurn } = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!repository?.commits) return { nodeChurnMap: map, maxChurn: 0 };
+    
+    repository.commits.forEach((c: any) => {
+      if (c.fileChanges) {
+        c.fileChanges.forEach((fc: any) => {
+          const path = fc.path || fc.file;
+          if (path) {
+            map.set(path, (map.get(path) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    graphData.nodes.forEach(node => {
+      if (node.type === 'folder') {
+        let count = 0;
+        for (const [filePath, fileCount] of map.entries()) {
+          if (filePath.startsWith(node.path + '/')) {
+            count += fileCount;
+          }
+        }
+        map.set(node.id, count);
+      } else {
+         map.set(node.id, map.get(node.path) || 0);
+      }
+    });
+
+    let max = 0;
+    for (const val of map.values()) {
+      if (val > max) max = val;
+    }
+    
+    return { nodeChurnMap: map, maxChurn: max };
+  }, [repository?.commits, graphData.nodes]);
+
+  // Keep annotationsRef in sync with the annotations state so the D3 tick
+  // callback always has access to the latest list without a closure over stale state.
+  useEffect(() => {
+    annotationsRef.current = annotations;
+  }, [annotations]);
+
+  const selectedCommit = useMemo(() => {
+    if (!selectedCommitHash || !repository?.commits) return null;
+    return repository.commits.find((c: any) => c.hash === selectedCommitHash || c.shortHash === selectedCommitHash) || null;
+  }, [selectedCommitHash, repository?.commits]);
+
+  const changedFiles = useMemo(() => {
+    if (!selectedCommit) return null;
+    return new Map(
+      (selectedCommit.fileChanges || []).map((fc: any) => [fc.path, fc.changeType || fc.type])
+    );
+  }, [selectedCommit]);
+
+  const { 
+    filters, toggleDirectory, toggleFileType, toggleDomain, resetFilters 
+  } = useGraphFilters();
+
+  const {
+    expandedNodes, toggleExpand, collapseAll, focusNode, setFocus, clearFocus, goBack, canGoBack
+  } = useGraphDrilldown();
+  
+  const completeGraph = useMemo(() => {
+    const analyzer = new GraphAnalyzer();
+    return analyzer.buildDependencyGraph(repository?.files || []);
+  }, [repository?.files]);
+
+  const graphData = useMemo(() => {
+    const filterService = new GraphFilteringService();
+    return filterService.applyFilters(completeGraph.nodes, completeGraph.links, {
+      expandedNodes,
+      hiddenDirectories: filters.hiddenDirectories,
+      hiddenFileTypes: filters.hiddenFileTypes,
+      visibleDomains: filters.visibleDomains
+    });
+  }, [completeGraph, expandedNodes, filters]);
+
+  const exportGraph = async (format: "png" | "svg") => {
+    if (!exportRef.current) return;
+
+    setIsExporting(true);
+    const toastId = toast.loading(`Exporting graph as ${format.toUpperCase()}...`);
+    
+    try {
+      // Create options for higher resolution output, especially for PNG
+      const options = {
+        backgroundColor: "#0f172a", // Dark background to match the theme
+        pixelRatio: 3, // High DPI for crisp text
+        cacheBust: true,
+        style: {
+          margin: "0",
+          borderRadius: "0",
+          boxShadow: "none"
+        }
+      };
+
+      // We wait a tiny bit to ensure React state has flushed (e.g. MapControls is hidden if we chose to hide them, though we exclude them by not wrapping them in exportRef)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const dataUrl =
+        format === "png"
+          ? await htmlToImage.toPng(exportRef.current, options)
+          : await htmlToImage.toSvg(exportRef.current, options);
+
+      const link = document.createElement("a");
+      const repoName = repository?.name ? `-${repository.name}` : "";
+      link.download = `gitverse${repoName}-map.${format}`;
+      link.href = dataUrl;
+      link.click();
+      
+      toast.success(`Graph exported successfully!`, { id: toastId });
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error("Failed to export the graph. Please try again.", { id: toastId });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!repository?.id) return;
+    annotationService.getAnnotations(repository.id).then(setAnnotations);
+    
+    const unsubscribe = annotationService.subscribeToAnnotations(repository.id, (event) => {
+      if (event.type === 'created' || event.type === 'updated') {
+        setAnnotations(prev => {
+          const idx = prev.findIndex(a => a.id === event.annotation.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = event.annotation;
+            return next;
+          }
+          return [...prev, event.annotation];
+        });
+      } else if (event.type === 'deleted') {
+        setAnnotations(prev => prev.filter(a => a.id !== event.annotationId));
+      }
+    });
 
 
   useEffect(() => {
@@ -59,6 +215,14 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     const typeColors: Record<string, string> = {
       folder: "#8b5cf6",
       file: "#3b82f6",
+    };
+
+    const getNodeColor = (d: any) => {
+      if (heatmapMode && maxChurn > 0) {
+        const churn = nodeChurnMap.get(d.id) || 0;
+        return d3.interpolateInferno(0.2 + (churn / maxChurn) * 0.8);
+      }
+      return typeColors[d.type];
     };
 
     // Prepare data
@@ -128,7 +292,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     node
       .append("circle")
       .attr("r", (d: any) => d.size / 3)
-      .attr("fill", (d: any) => typeColors[d.type])
+      .attr("fill", (d: any) => getNodeColor(d))
       .attr("stroke", "rgba(255,255,255,0.3)")
       .attr("stroke-width", 2)
       .on("mouseenter", function (event: any, d: any) {
@@ -145,8 +309,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           .duration(200)
           .attr("stroke", (l: any) =>
             l.source.id === d.id || l.target.id === d.id
-              ? typeColors[d.type]
-              : "rgba(255,255,255,0.1)"
+              ? getNodeColor(d)
+              : "rgba(255,255,255,0.1)",
           )
           .attr("stroke-opacity", (l: any) =>
             l.source.id === d.id || l.target.id === d.id ? 1 : 0.2
@@ -163,6 +327,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
                 <div class="font-semibold text-sm">${d.name}</div>
                 <div class="text-xs capitalize">${d.type}</div>
                 <div class="text-xs">${d.path}</div>
+                ${heatmapMode ? `<div class="text-xs text-orange-400 mt-1">Changes: ${nodeChurnMap.get(d.id) || 0}</div>` : ''}
               </div>
             `);
         }
@@ -213,7 +378,10 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .attr("fill", "currentColor")
       .attr("pointer-events", "none");
 
-    // Update positions on simulation tick
+    // Update positions on simulation tick.
+    // PERF FIX (#1994): Annotation DOM positions are updated directly via
+    // data-annotation-id attributes instead of calling setTick(), which
+    // previously caused the entire component to re-render ~60 times/second.
     simulation.on("tick", () => {
       link
         .attr("x1", (d: any) => d.source.x)
@@ -222,6 +390,29 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
         .attr("y2", (d: any) => d.target.y);
 
       node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+
+      // Directly update annotation overlay positions without triggering React re-renders.
+      annotationsRef.current.forEach((a) => {
+        const el = document.querySelector<HTMLElement>(`[data-annotation-id="${a.id}"]`);
+        if (!el) return;
+        let x = 0;
+        let y = 0;
+        if (a.targetType === 'node') {
+          const n = nodesRef.current.find((nd) => nd.id === a.targetId);
+          if (n) { x = n.x; y = n.y; }
+        } else if (a.targetType === 'edge') {
+          const parts = a.targetId.split('->');
+          const l = linksRef.current.find(
+            (lk) => lk.source.id === parts[0] && lk.target.id === parts[1]
+          );
+          if (l) {
+            x = (l.source.x + l.target.x) / 2;
+            y = (l.source.y + l.target.y) / 2;
+          }
+        }
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+      });
     });
 
     // Zoom behavior
@@ -246,31 +437,248 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     return () => {
       simulation.stop();
     };
-  }, [repository]);
+  }, [graphData, setFocus, toggleExpand, heatmapMode, nodeChurnMap, maxChurn]);
+
+  // Effect to handle focus mode fading
+  useEffect(() => {
+    if (!svgSelectionRef.current) return;
+    const { node, link } = svgSelectionRef.current;
+
+    if (!focusNode) {
+      // Restore opacity
+      node.transition().duration(300).style("opacity", 1);
+      link.transition().duration(300).attr("stroke-opacity", 0.6);
+      return;
+    }
+
+    // Determine nodes related to focusNode
+    const relatedNodes = new Set<string>();
+    relatedNodes.add(focusNode);
+    
+    linksRef.current.forEach(l => {
+      if (l.source.id === focusNode) relatedNodes.add(l.target.id);
+      if (l.target.id === focusNode) relatedNodes.add(l.source.id);
+    });
+
+    node.transition().duration(300)
+      .style("opacity", (d: any) => relatedNodes.has(d.id) ? 1 : 0.2);
+    
+    link.transition().duration(300)
+      .attr("stroke-opacity", (d: any) => 
+        (d.source.id === focusNode || d.target.id === focusNode) ? 1 : 0.1
+      );
+  }, [focusNode]);
+
+  // Effect to handle time-travel highlighting
+  useEffect(() => {
+    if (!svgSelectionRef.current) return;
+    const { node, link } = svgSelectionRef.current;
+
+    // If there is a focusNode, it overrides time-travel highlighting to prevent conflicting transitions
+    if (focusNode) return;
+
+    if (!changedFiles) {
+      // Restore normal opacity/colors
+      node.transition().duration(300)
+        .style("opacity", 1)
+        .selectAll("circle")
+        .attr("stroke", "rgba(255,255,255,0.3)")
+        .attr("stroke-width", 2);
+      
+      link.transition().duration(300).attr("stroke-opacity", 0.6);
+      return;
+    }
+
+    // Highlight modified files
+    node.transition().duration(300)
+      .style("opacity", (d: any) => {
+        if (d.type === 'file') {
+          return changedFiles.has(d.path) ? 1 : 0.2;
+        }
+        if (d.type === 'folder') {
+          for (const [path] of changedFiles.entries() as Iterable<[string, string]>) {
+            if (path.startsWith(d.path + '/')) return 1;
+          }
+          return 0.2;
+        }
+        return 0.2;
+      })
+      .selectAll("circle")
+      .attr("stroke", (d: any) => {
+         if (d.type === 'file' && changedFiles.has(d.path)) {
+           const type = changedFiles.get(d.path);
+           if (type === 'ADDED' || type === 'added') return '#22c55e'; // green
+           if (type === 'DELETED' || type === 'deleted') return '#ef4444'; // red
+           return '#eab308'; // yellow for modified
+         }
+         return "rgba(255,255,255,0.3)";
+      })
+      .attr("stroke-width", (d: any) => (d.type === 'file' && changedFiles.has(d.path) ? 3 : 2));
+      
+    // Dim links
+    link.transition().duration(300).attr("stroke-opacity", 0.1);
+  }, [changedFiles, focusNode]);
+
+  const handleZoomIn = () => {
+    if (svgRef.current) {
+      d3.select(svgRef.current).transition().call(d3.zoom().scaleBy as any, 1.2);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (svgRef.current) {
+      d3.select(svgRef.current).transition().call(d3.zoom().scaleBy as any, 0.8);
+    }
+  };
+
+  const handleReset = () => {
+    if (svgRef.current) {
+      d3.select(svgRef.current).transition().call(d3.zoom().transform as any, d3.zoomIdentity);
+    }
+  };
+
+  const handleSaveAnnotation = async (data: Partial<MapAnnotation>) => {
+    if (!repository?.id || !popover) return;
+    
+    try {
+      if (popover.initialData?.id) {
+        await annotationService.updateAnnotation(popover.initialData.id, data);
+        toast.success("Annotation updated");
+      } else {
+        await annotationService.createAnnotation({
+          ...data,
+          repositoryId: repository.id,
+          targetId: popover.targetId,
+          targetType: popover.targetType
+        });
+        toast.success("Annotation created");
+      }
+      setPopover(null);
+    } catch (e) {
+      toast.error("Failed to save annotation");
+    }
+  };
+
+  const handleDeleteAnnotation = async () => {
+    if (!popover?.initialData?.id) return;
+    try {
+      await annotationService.deleteAnnotation(popover.initialData.id);
+      toast.success("Annotation deleted");
+      setPopover(null);
+    } catch (e) {
+      toast.error("Failed to delete annotation");
+    }
+  };
 
   return (
     <div className="relative">
-    <Card className="glass p-4 sm:p-6 overflow-hidden">
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h3 className="text-base sm:text-lg font-semibold">
-            Code Dependency Graph
-          </h3>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Interactive visualization of file dependencies and relationships
-          </p>
+      <Card className="glass p-4 sm:p-6 overflow-hidden">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h3 className="text-base sm:text-lg font-semibold">
+              Code Dependency Graph
+            </h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Interactive visualization of file dependencies and relationships
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
+            <button
+              onClick={() => setPanelOpen(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-colors font-medium"
+            >
+              <MessageSquarePlus size={14} />
+              Annotations ({annotations.length})
+            </button>
+            <div className="flex gap-3">
+              {heatmapMode ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-16 h-3 rounded bg-gradient-to-r from-[#420a68] via-[#dd513a] to-[#fca50a] flex-shrink-0" />
+                  <span>Code Churn</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
+                    <span>Folders</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+                    <span>Files</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 text-xs">
-          <div className="flex gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
-              <span>Folders</span>
+
+        <div className="relative">
+          <div
+            ref={exportRef}
+            className="glass rounded-lg p-4 sm:p-6 relative overflow-visible"
+          >
+            <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">
+              Code Dependencies
+            </h3>
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <svg
+                ref={svgRef}
+                width="100%"
+                height="auto"
+                className="text-white min-h-96 sm:min-h-96"
+                style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
+                viewBox="0 0 900 600"
+                preserveAspectRatio="xMidYMid meet"
+              />
+              {/* Annotation overlay: positions are updated via direct DOM manipulation
+                 inside the D3 tick callback (see PERF FIX #1994) to avoid triggering
+                 React re-renders at 60 FPS. The transform wrapper still uses React state
+                 because zoom changes are infrequent and intentional re-renders. */}
+              <div 
+                className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible"
+                style={{
+                  transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`,
+                  transformOrigin: '0 0'
+                }}
+              >
+                {annotations.map(a => (
+                  <div
+                    key={a.id}
+                    data-annotation-id={a.id}
+                    className="absolute pointer-events-auto"
+                    style={{ left: 0, top: 0 }}
+                  >
+                    <AnnotationMarker 
+                      annotation={a} 
+                      x={0} 
+                      y={0} 
+                      onClick={() => setPopover({
+                        isOpen: true,
+                        x: 0,
+                        y: 0,
+                        initialData: a
+                      })} 
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
               <span>Files</span>
             </div>
           </div>
+
+          <MapControls 
+            onZoomIn={handleZoomIn} 
+            onZoomOut={handleZoomOut} 
+            onReset={handleReset} 
+            onExportPng={() => exportGraph("png")}
+            onExportSvg={() => exportGraph("svg")}
+            isExporting={isExporting}
+            heatmapMode={heatmapMode}
+            onToggleHeatmap={() => setHeatmapMode(prev => !prev)}
+          />
         </div>
       </div>
       <div className="glass rounded-lg p-4 sm:p-6">
