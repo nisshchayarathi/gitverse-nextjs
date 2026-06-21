@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
 import { getGeminiAnalysisCache, setGeminiAnalysisCache } from "./geminiAnalysisCacheService";
 import { buildCacheKey } from "../utils/cacheKey";
+import { HttpError } from "@/lib/middleware";
 
 const CURRENT_MODEL_VERSION = "gemini-2.5-flash";
 
@@ -124,7 +125,7 @@ export class GeminiService {
         message.includes("rate limit") ||
         message.includes("429")
       ) {
-        throw new Error("Gemini API quota exceeded. Please try again later.");
+        throw new HttpError(429, "Gemini API quota exceeded. Please try again later.");
       }
       
       if (
@@ -134,10 +135,10 @@ export class GeminiService {
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.");
+        throw new HttpError(400, "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.");
       }
 
-      throw new Error(`AI analysis failed: ${error.message}`);
+      throw new HttpError(500, `AI analysis failed: ${error.message}`);
     }
   }
 
@@ -191,7 +192,7 @@ export class GeminiService {
         message.includes("rate limit") ||
         message.includes("429")
       ) {
-        throw new Error("Gemini API quota exceeded. Please try again later.");
+        throw new HttpError(429, "Gemini API quota exceeded. Please try again later.");
       }
       
       if (
@@ -201,10 +202,10 @@ export class GeminiService {
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.");
+        throw new HttpError(400, "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.");
       }
 
-      throw new Error(`AI analysis failed: ${error.message}`);
+      throw new HttpError(500, `AI analysis failed: ${error.message}`);
     }
   }
 
@@ -245,10 +246,10 @@ export class GeminiService {
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Context is too large for AI chat. Please try again with a smaller scope.");
+        throw new HttpError(400, "Context is too large for AI chat. Please try again with a smaller scope.");
       }
 
-      throw new Error(`AI chat failed: ${error.message}`);
+      throw new HttpError(500, `AI chat failed: ${error.message}`);
     }
   }
 
@@ -309,10 +310,10 @@ export class GeminiService {
         message.includes("too large") ||
         error?.status === 400
       ) {
-        throw new Error("Prompt is too large for AI context limit. Please try again with a smaller scope.");
+        throw new HttpError(400, "Prompt is too large for AI context limit. Please try again with a smaller scope.");
       }
 
-      throw new Error(`AI chat failed: ${error.message}`);
+      throw new HttpError(500, `AI chat failed: ${error.message}`);
     }
   }
 
