@@ -1,11 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
+import { isHttpError, requireAuth , sanitizeError } from "@/lib/middleware";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
-import { ttlCache } from "@/lib/utils/ttlCache";
-import { apiError } from "@/lib/api-error";
-import { isValidGitScope } from "@/lib/utils/validators";
-import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
+import prisma from "@/lib/prisma";
+import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
+
+function kickLocalRunner(request: NextRequest) {
+  if (process.env.NODE_ENV === "production") return;
+  const origin = new URL(request.url).origin;
+  const secret = process.env.ANALYSIS_RUNNER_SECRET;
+  void fetch(`${origin}/api/internal/run-analysis`, {
+    method: "POST",
+    headers: secret ? { "x-analysis-runner-secret": secret } : undefined,
+  }).catch(() => {});
+}
+
+function kickProductionWorker() {
+  if (process.env.NODE_ENV !== "production") return;
+  void triggerAnalysisWorkerWorkflow().catch((error) => {
+    console.error("Failed to dispatch analysis worker workflow:", sanitizeError(error));
+  });
+}
 
 export async function POST(
   request: NextRequest,
@@ -15,33 +30,49 @@ export async function POST(
     const user = await requireAuth(request);
     const id = parseInt(params.id);
 
-    const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.REPOSITORY_ANALYZE);
-    if (!rl.allowed) return rateLimitResponse(rl);
-
     if (isNaN(id)) {
-      return apiError(400, "Invalid repository ID");
+      return NextResponse.json(
+        { error: "Invalid repository ID" },
+        { status: 400 }
+      );
     }
 
+    // Verify ownership
     const repository = await repositoryService.getRepository(id, user.userId);
 
     if (!repository) {
-      return apiError(404, "Repository not found");
+      return NextResponse.json(
+        { error: "Repository not found" },
+        { status: 404 }
+      );
     }
 
-    const { scope } = await request.json();
+    const existingJob = await prisma.analysisJob.findFirst({
+  where: {
+    repositoryId: id,
+    status: {
+      in: ["QUEUED", "PROCESSING"],
+    },
+  },
+});
 
-    if (scope != null && (typeof scope !== "string" || !isValidGitScope(scope))) {
-      return apiError(400, "Invalid scope. Only alphanumeric characters, underscore, dot, slash, and hyphen are allowed.");
-    }
+if (existingJob) {
+  return NextResponse.json(
+    {
+      error: "Analysis already in progress",
+      jobId: existingJob.id,
+    },
+    { status: 409 }
+  );
+}
 
     const job = await analysisJobService.createRepositoryAnalysisJob({
       repositoryId: id,
       userId: user.userId,
-      scope,
     });
 
-    // Invalidate cached stats — repo status is now "analyzing" / queued.
-    ttlCache.deleteByPrefix(`repo-stats:${id}:`);
+    kickLocalRunner(request);
+    kickProductionWorker();
 
     return NextResponse.json(
       { message: "Job queued", jobId: job.id, status: job.status },
@@ -50,8 +81,14 @@ export async function POST(
   } catch (error: any) {
     console.error("Analyze repository error:", sanitizeError(error));
     if (isHttpError(error)) {
-      return apiError(error.status, error.message);
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
     }
-    return apiError(500, "Failed to start analysis");
+    return NextResponse.json(
+      { error: "Failed to start analysis" },
+      { status: 500 }
+    );
   }
 }
