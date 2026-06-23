@@ -5,7 +5,7 @@ import { CodeMetrics } from './CodeMetrics'
 import RepositoryLearningPath from "./RepositoryLearningPath";
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import RepositoryEvolutionTimeline from "./RepositoryEvolutionTimeline";
-import ContributorIssueRecommendations from "./ContributorIssueRecommendations";
+import ContributorIssueRecommendations from "../ContributorIssueRecommendations";
 import DependencyVulnerabilityScanner from "./DependencyVulnerabilityScanner";
 import CodeComplexityAnalyzer from "./CodeComplexityAnalyzer";
 import { useState } from 'react'

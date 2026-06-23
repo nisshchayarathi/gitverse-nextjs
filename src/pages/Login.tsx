@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, GitBranch, Loader2, Eye, EyeOff } from "lucide-react";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { signIn } from "next-auth/react";
+import { buildApiUrl } from "@/services/apiConfig";
 
 export default function Login() {
   const router = useRouter();
@@ -114,11 +115,35 @@ export default function Login() {
   );
 
   const from = searchParams?.get("from") || "/dashboard";
+  const oauthErrorChecked = useRef(false);
 
   useEffect(() => {
     const error = searchParams?.get("error");
-    if (!error) return;
+    if (!error || oauthErrorChecked.current) return;
+    oauthErrorChecked.current = true;
 
+    // For state-related OAuth errors (multi-tab collision), check if the user
+    // already has a valid session. If so, redirect to dashboard instead of
+    // showing an error — the auth was completed by another tab's OAuth flow.
+    if (error === "OAuthSignin" || error === "OAuthCallback" || error === "Callback") {
+      fetch(buildApiUrl("/api/auth/session"), { credentials: "include" })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.user) {
+            // Session exists — auth succeeded in another tab, redirect to dashboard
+            router.push(from);
+          } else {
+            showOAuthError(error);
+          }
+        })
+        .catch(() => showOAuthError(error));
+    } else {
+      showOAuthError(error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const showOAuthError = (error: string) => {
     const messageByCode: Record<string, string> = {
       OAuthSignin:
         "Google sign-in could not be started. This is usually caused by a temporary cookie/CSRF issue or a local OAuth configuration problem. Try again, or clear site cookies for localhost.",
@@ -138,7 +163,7 @@ export default function Login() {
       description: messageByCode[error] || messageByCode.Default,
       variant: "destructive",
     });
-  }, [searchParams]);
+  };
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -163,6 +188,22 @@ export default function Login() {
 
       if (result?.error || errorFromUrl) {
         const code = result?.error || errorFromUrl || "Default";
+        // Multi-tab state collision: if OAuth fails but the user already has a
+        // valid session (established via another tab), redirect to dashboard.
+        if (code === "OAuthSignin" || code === "OAuthCallback" || code === "Callback") {
+          try {
+            const sessionRes = await fetch(buildApiUrl("/api/auth/session"), {
+              credentials: "include",
+            });
+            const sessionData = await sessionRes.json();
+            if (sessionData?.user) {
+              router.push(from);
+              return;
+            }
+          } catch {
+            // Fall through to show error
+          }
+        }
         toast({
           title: "Authentication Failed",
           description:
