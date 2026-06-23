@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import { toast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Grid, List, GitBranch, Clock, Activity } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -27,6 +27,7 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
 
+type StatusFilter = "all" | "completed" | "processing" | "failed";
 
 interface Repository {
   id: string;
@@ -48,12 +49,48 @@ export default function SearchPage() {
   const searchParams = useSearchParams();
   const initialUrl = searchParams?.get("repoUrl") || "";
 
-  const [searchQuery, setSearchQuery] = useState(initialUrl);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [sortBy, setSortBy] = useState<"recent" | "stars" | "name">("recent");
+  // Initialize state from URL query params for shareable links
+  const [searchQuery, setSearchQuery] = useState(searchParams?.get("q") || "");
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams?.get("q") || "");
+  const [viewMode, setViewMode] = useState<"grid" | "list">(
+    (searchParams?.get("view") as "grid" | "list") || "grid"
+  );
+  const [sortBy, setSortBy] = useState<"recent" | "stars" | "name">(
+    (searchParams?.get("sort") as "recent" | "stars" | "name") || "recent"
+  );
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(
+    (searchParams?.get("filter") as StatusFilter) || "all"
+  );
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounce search input (300ms) and persist to URL
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(value);
+    }, 300);
+  }, []);
+
+  // Persist filter state to URL query params
+  const updateUrlParams = useCallback(() => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    if (statusFilter !== "all") params.set("filter", statusFilter);
+    if (sortBy !== "recent") params.set("sort", sortBy);
+    if (viewMode !== "grid") params.set("view", viewMode);
+    const search = params.toString();
+    const newUrl = search ? `/search?${search}` : "/search";
+    window.history.replaceState(null, "", newUrl);
+  }, [debouncedSearch, statusFilter, sortBy, viewMode]);
+
+  useEffect(() => {
+    updateUrlParams();
+  }, [updateUrlParams]);
 
   useEffect(() => {
     fetchRepositories();
@@ -94,19 +131,30 @@ finally {
   };
 
   const filteredRepositories = Array.isArray(repositories)
-    ? repositories.filter(
-        (repo) =>
-          repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    ? repositories.filter((repo) => {
+        const matchesSearch =
+          !debouncedSearch ||
+          repo.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
           (repo.description || "")
             .toLowerCase()
-            .includes(searchQuery.toLowerCase())
-      )
+            .includes(debouncedSearch.toLowerCase());
+
+        const repoStatus = (repo as any).status ||
+          ((repo as any).lastAnalyzedAt ? "completed" : "pending");
+        const matchesFilter =
+          statusFilter === "all" || repoStatus === statusFilter;
+
+        return matchesSearch && matchesFilter;
+      })
     : [];
 
   const sortedRepositories = [...filteredRepositories].sort((a, b) => {
     if (sortBy === "stars") return (b.stars || 0) - (a.stars || 0);
     if (sortBy === "name") return a.name.localeCompare(b.name);
-    return 0; // 'recent' is already sorted
+    // 'recent': sort by lastAnalyzedAt or createdAt descending
+    const aTime = new Date((a as any).lastAnalyzedAt || a.createdAt).getTime();
+    const bTime = new Date((b as any).lastAnalyzedAt || b.createdAt).getTime();
+    return bTime - aTime;
   });
 
   return (
@@ -132,10 +180,40 @@ finally {
                   type="text"
                   placeholder="Search repositories..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-10 bg-background/50"
                 />
               </div>
+
+              {/* Status filter dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" aria-label="Filter by status">
+                    {statusFilter === "all"
+                      ? "All"
+                      : statusFilter === "completed"
+                      ? "Analyzed"
+                      : statusFilter === "processing"
+                      ? "Pending"
+                      : "Failed"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setStatusFilter("all")}>
+                    All
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("completed")}>
+                    Analyzed
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("processing")}>
+                    Pending
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("failed")}>
+                    Failed
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
             <div className="flex gap-2 flex-row flex-wrap justify-end">
   <div className="flex gap-2">
     <Button
@@ -205,8 +283,10 @@ finally {
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
               {sortedRepositories.length}{" "}
-              {sortedRepositories.length === 1 ? "repository" : "repositories"}{" "}
+              {sortedRepositories.length === 1 ? " repository" : " repositories"}{" "}
               found
+              {(debouncedSearch || statusFilter !== "all") &&
+                ` (filtered from ${repositories.length})`}
             </p>
           </div>
         )}
@@ -286,7 +366,11 @@ finally {
                   "Check the GitHub username",
                 ]}
                 actionLabel="Clear Search"
-                onAction={() => setSearchQuery("")}
+                onAction={() => {
+                  handleSearchChange("");
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                }}
               />
               
               {repositories.length > 0 && (
