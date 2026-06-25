@@ -15,6 +15,7 @@ import {
   Users,
   Code,
   ArrowRight,
+  GitCompare,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
@@ -655,7 +656,7 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <Button
                 variant="outline"
                 className="h-auto flex-col gap-2 p-4 sm:p-6 text-xs sm:text-sm"
@@ -676,6 +677,17 @@ export default function Dashboard() {
                 <span className="font-medium">Browse Repos</span>
                 <span className="text-xs text-muted-foreground text-center">
                   View all repositories
+                </span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto flex-col gap-2 p-4 sm:p-6 text-xs sm:text-sm"
+                onClick={() => router.push("/compare")}
+              >
+                <GitCompare className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                <span className="font-medium">Compare Repos</span>
+                <span className="text-xs text-muted-foreground text-center">
+                  Compare side-by-side
                 </span>
               </Button>
               <Button

@@ -631,5 +631,13 @@ export function initializeJWT(): boolean {
 
 // Auto-validate on import in production
 if (process.env.NODE_ENV === 'production') {
-  initializeJWT();
+  try {
+    initializeJWT();
+  } catch (error) {
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      console.warn("[JWT] Warning: JWT secret validation skipped during build phase.");
+    } else {
+      throw error;
+    }
+  }
 }

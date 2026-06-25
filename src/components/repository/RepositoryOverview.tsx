@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Loader2,
   Package,
+  GitCompare,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -552,6 +553,13 @@ export const RepositoryOverview = ({
               <span className="px-2 py-1 rounded-full text-xs bg-accent/10 text-accent flex-shrink-0">
                 {repository.language}
               </span>
+              <Link
+                href={`/compare?repo1=${encodeURIComponent(repository.url)}`}
+                className="px-2.5 py-1 rounded-full text-xs bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20 transition-all font-semibold flex items-center gap-1.5 flex-shrink-0"
+              >
+                <GitCompare className="h-3.5 w-3.5" />
+                Compare
+              </Link>
               {repositoryData?.parent && (
                 <Link
                   href={`/repo/${repositoryData.parent.id}`}

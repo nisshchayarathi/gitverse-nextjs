@@ -11,11 +11,6 @@ import {
   Loader2,
   Copy,
   RotateCw,
-  Users,
-  FileCode,
-  GitBranch,
-  TrendingUp,
-  ExternalLink,
   Info,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -24,11 +19,23 @@ import { buildApiUrl } from "@/services/apiConfig";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
+// Import our comparison components
+import { ComparisonHeader } from "@/components/comparison/ComparisonHeader";
+import { LanguageComparisonChart } from "@/components/comparison/LanguageComparisonChart";
+import { ContributorOverlap } from "@/components/comparison/ContributorOverlap";
+import { CommitActivityOverlay } from "@/components/comparison/CommitActivityOverlay";
+import { ComparePageSkeleton } from "@/components/comparison/ComparePageSkeleton";
+
 interface RepoItem {
   id: number;
   name: string;
   url: string;
   description?: string;
+  stars?: number;
+  forks?: number;
+  size?: number;
+  defaultBranch?: string;
+  lastAnalyzedAt?: string | Date;
   _count?: {
     commits: number;
     contributors: number;
@@ -41,9 +48,40 @@ interface RepoItem {
 interface DetailedRepo extends RepoItem {
   branches: Array<{ name: string; isDefault: boolean }>;
   commits: Array<{ message: string; authorName: string; committedAt: string }>;
-  contributors: Array<{ name: string; commits: number }>;
+  contributors: Array<{ name: string; email?: string; commits: number }>;
   files: Array<{ path: string; size: number }>;
 }
+
+const getRepoSlug = (url: string) => {
+  try {
+    const cleanUrl = url.trim();
+    // Try standard github match first
+    const match = cleanUrl.match(/github\.com\/([^/]+)\/([^/]+)/i);
+    if (match) {
+      const owner = match[1].toLowerCase();
+      const name = match[2].replace(/\.git$/i, "").toLowerCase();
+      return `${owner}/${name}`;
+    }
+    // Fallback: parse URL pathname
+    if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://")) {
+      const parsed = new URL(cleanUrl);
+      const pathname = parsed.pathname.replace(/^\/|\/$/g, ""); // strip leading/trailing slashes
+      const parts = pathname.split("/");
+      if (parts.length >= 2) {
+        const owner = parts[parts.length - 2].toLowerCase();
+        const name = parts[parts.length - 1].replace(/\.git$/i, "").toLowerCase();
+        return `${owner}/${name}`;
+      }
+    }
+    // If it's already a slug "owner/repo" or similar
+    if (cleanUrl.includes("/") && !cleanUrl.includes("://")) {
+      return cleanUrl.toLowerCase();
+    }
+  } catch (e) {
+    console.error("Failed to parse URL:", e);
+  }
+  return "";
+};
 
 export default function CompareRepositories() {
   const { toast } = useToast();
@@ -70,10 +108,11 @@ export default function CompareRepositories() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const repos = response.data.data?.repositories || [];
-      // Filter only analyzed/complete repositories
       setRepoList(Array.isArray(repos) ? repos : []);
     } catch (error) {
       console.error("Failed to fetch repositories:", error);
+    } finally {
+      setIsListLoading(false);
     }
   }, []);
 
@@ -102,53 +141,109 @@ export default function CompareRepositories() {
     });
   };
 
-  const handleStartCompare = async () => {
-    if (selectedIds.length < 2) {
-      toast({
-        title: "Selection Required",
-        description: "Please select at least 2 repositories to compare.",
-        variant: "destructive",
+  const handleStartCompare = useCallback(
+    async (idsToCompare: number[] = selectedIds) => {
+      if (idsToCompare.length < 2) {
+        toast({
+          title: "Selection Required",
+          description: "Please select at least 2 repositories to compare.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update URL query parameters for shareability
+      const selectedRepos = repoList.filter((r) => idsToCompare.includes(r.id));
+      const query = new URLSearchParams();
+      selectedRepos.forEach((repo, idx) => {
+        const slug = getRepoSlug(repo.url);
+        query.set(`repo${idx + 1}`, slug || repo.url);
       });
-      return;
+      window.history.replaceState({}, "", `/compare?${query.toString()}`);
+
+      try {
+        setIsComparing(true);
+        setIsAiLoading(true);
+        setHasCompared(true);
+        setDetailedRepos([]);
+        setAiSummary("");
+
+        const token = localStorage.getItem("gitverse_token");
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        // 1. Fetch detailed information for each selected repository
+        const detailsPromises = idsToCompare.map(async (id) => {
+          const response = await axios.get(buildApiUrl(`/api/repositories/${id}`), { headers });
+          return response.data;
+        });
+        const detailedData = await Promise.all(detailsPromises);
+        setDetailedRepos(detailedData);
+
+        // 2. Fetch AI comparison analysis
+        const aiResponse = await axios.post(
+          buildApiUrl("/api/ai/compare"),
+          { repositoryIds: idsToCompare },
+          { headers }
+        );
+        setAiSummary(aiResponse.data?.comparison || "");
+      } catch (error: any) {
+        console.error("Failed to compare repositories:", error);
+        toast({
+          title: "Comparison Error",
+          description: error.response?.data?.error || "Failed to compare codebases.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsComparing(false);
+        setIsAiLoading(false);
+      }
+    },
+    [repoList, selectedIds, toast]
+  );
+
+  // URL Query Parameters parsing
+  useEffect(() => {
+    if (repoList.length > 0) {
+      const searchParams = new URLSearchParams(window.location.search);
+      const r1 = searchParams.get("repo1");
+      const r2 = searchParams.get("repo2");
+      const r3 = searchParams.get("repo3");
+
+      const matchedIds: number[] = [];
+
+      const findMatchingRepo = (paramValue: string | null) => {
+        if (!paramValue) return null;
+        const normalizedParam = paramValue.toLowerCase().trim();
+        return repoList.find((r) => {
+          const slug = getRepoSlug(r.url);
+          return slug === normalizedParam;
+        });
+      };
+
+      const match1 = findMatchingRepo(r1);
+      if (match1) matchedIds.push(match1.id);
+      const match2 = findMatchingRepo(r2);
+      if (match2) matchedIds.push(match2.id);
+      const match3 = findMatchingRepo(r3);
+      if (match3) matchedIds.push(match3.id);
+
+      const uniqueMatchedIds = Array.from(new Set(matchedIds));
+
+      if (uniqueMatchedIds.length >= 2) {
+        setSelectedIds(uniqueMatchedIds);
+      }
     }
+  }, [repoList]);
 
-    try {
-      setIsComparing(true);
-      setIsAiLoading(true);
-      setHasCompared(true);
-      setDetailedRepos([]);
-      setAiSummary("");
-
-      const token = localStorage.getItem("gitverse_token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      // 1. Fetch detailed information for each selected repository
-      const detailsPromises = selectedIds.map(async (id) => {
-        const response = await axios.get(buildApiUrl(`/api/repositories/${id}`), { headers });
-        return response.data;
-      });
-      const detailedData = await Promise.all(detailsPromises);
-      setDetailedRepos(detailedData);
-
-      // 2. Fetch AI comparison analysis
-      const aiResponse = await axios.post(
-        buildApiUrl("/api/ai/compare"),
-        { repositoryIds: selectedIds },
-        { headers }
-      );
-      setAiSummary(aiResponse.data?.comparison || "");
-    } catch (error: any) {
-      console.error("Failed to compare repositories:", error);
-      toast({
-        title: "Comparison Error",
-        description: error.response?.data?.error || "Failed to compare codebases.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsComparing(false);
-      setIsAiLoading(false);
+  // Trigger comparison automatically if parameters exist
+  useEffect(() => {
+    if (selectedIds.length >= 2 && repoList.length > 0 && !hasCompared && !isComparing) {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get("repo1") && searchParams.get("repo2")) {
+        handleStartCompare(selectedIds);
+      }
     }
-  };
+  }, [selectedIds, repoList, hasCompared, isComparing, handleStartCompare]);
 
   const handleCopySummary = () => {
     if (!aiSummary) return;
@@ -164,6 +259,7 @@ export default function CompareRepositories() {
     setAiSummary("");
     setHasCompared(false);
     setSelectedIds([]);
+    window.history.replaceState({}, "", "/compare");
   };
 
   const chatMarkdownSchema = {
@@ -174,6 +270,95 @@ export default function CompareRepositories() {
       span: [...(defaultSchema.attributes?.span || []), "className"],
     },
   };
+
+  // Generate local heuristic analysis
+  const getHeuristicVerdict = () => {
+    if (detailedRepos.length < 2) return null;
+    const [repoA, repoB, repoC] = detailedRepos;
+    const insights: string[] = [];
+
+    // Stars
+    const starsA = repoA.stars ?? 0;
+    const starsB = repoB.stars ?? 0;
+    if (starsA !== starsB) {
+      const winner = starsA > starsB ? repoA.name : repoB.name;
+      const loser = starsA > starsB ? repoB.name : repoA.name;
+      const diff = Math.abs(starsA - starsB);
+      insights.push(
+        `⭐ **${winner}** holds stronger popularity on GitHub with **${diff.toLocaleString()}** more stars than **${loser}**.`
+      );
+    }
+
+    // Commits
+    const commitsA = repoA.commits?.length || repoA._count?.commits || 0;
+    const commitsB = repoB.commits?.length || repoB._count?.commits || 0;
+    if (commitsA !== commitsB) {
+      const winner = commitsA > commitsB ? repoA.name : repoB.name;
+      const loser = commitsA > commitsB ? repoB.name : repoA.name;
+      const diff = Math.abs(commitsA - commitsB);
+      insights.push(
+        `💻 **${winner}** is highly active, carrying **${diff}** more recent commits than **${loser}**.`
+      );
+    }
+
+    // Contributors
+    const contribsA = repoA.contributors?.length || repoA._count?.contributors || 0;
+    const contribsB = repoB.contributors?.length || repoB._count?.contributors || 0;
+    if (contribsA !== contribsB) {
+      const winner = contribsA > contribsB ? repoA.name : repoB.name;
+      const loser = contribsA > contribsB ? repoB.name : repoA.name;
+      const diff = Math.abs(contribsA - contribsB);
+      insights.push(
+        `👥 **${winner}** has **${diff}** more contributors, suggesting a larger, more distributed codebase ownership.`
+      );
+    }
+
+    // Size
+    const sizeA = repoA.size ?? 0;
+    const sizeB = repoB.size ?? 0;
+    if (Math.abs(sizeA - sizeB) > 1024 * 1024) {
+      const winner = sizeA > sizeB ? repoA.name : repoB.name;
+      const loser = sizeA > sizeB ? repoB.name : repoA.name;
+      const mbDiff = (Math.abs(sizeA - sizeB) / (1024 * 1024)).toFixed(1);
+      insights.push(
+        `📦 **${loser}** is a lighter codebase, saving approximately **${mbDiff} MB** of storage compared to **${winner}**.`
+      );
+    }
+
+    // Shared Contributors
+    const emailsA = new Set(repoA.contributors?.map(c => c.email || c.name.toLowerCase()) || []);
+    const emailsB = new Set(repoB.contributors?.map(c => c.email || c.name.toLowerCase()) || []);
+    const shared = [...emailsA].filter(email => emailsB.has(email));
+    if (shared.length > 0) {
+      insights.push(
+        `🤝 The projects are actively connected, sharing **${shared.length}** common developers.`
+      );
+    }
+
+    // Triple comparison lead
+    if (repoC) {
+      const starsC = repoC.stars ?? 0;
+      const maxStars = Math.max(starsA, starsB, starsC);
+      let leadRepo = repoA.name;
+      if (starsB === maxStars) leadRepo = repoB.name;
+      if (starsC === maxStars) leadRepo = repoC.name;
+      insights.push(
+        `🏆 Out of the three compared codebases, **${leadRepo}** is the most popular with **${maxStars.toLocaleString()}** GitHub stars.`
+      );
+    }
+
+    return insights;
+  };
+
+  const heuristicInsights = getHeuristicVerdict();
+
+  if (isComparing && detailedRepos.length === 0) {
+    return (
+      <DashboardLayout>
+        <ComparePageSkeleton />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -214,7 +399,7 @@ export default function CompareRepositories() {
                   </p>
                 </div>
                 <button
-                  onClick={handleStartCompare}
+                  onClick={() => handleStartCompare(selectedIds)}
                   disabled={selectedIds.length < 2 || isListLoading}
                   className="px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/95 disabled:opacity-50 disabled:pointer-events-none transition-all flex items-center gap-2 shadow-lg shadow-primary/20"
                 >
@@ -244,7 +429,16 @@ export default function CompareRepositories() {
                       <div
                         key={repo.id}
                         onClick={() => handleToggleSelect(repo.id)}
-                        className={`group cursor-pointer glass border rounded-xl p-5 transition-all duration-300 relative ${
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleToggleSelect(repo.id);
+                          }
+                        }}
+                        tabIndex={0}
+                        role="button"
+                        aria-pressed={isSelected}
+                        className={`group cursor-pointer glass border rounded-xl p-5 transition-all duration-300 relative focus:outline-none focus:ring-2 focus:ring-primary ${
                           isSelected
                             ? "border-primary bg-primary/5 ring-1 ring-primary"
                             : "border-border/50 hover:border-border hover:bg-white/5"
@@ -333,166 +527,51 @@ export default function CompareRepositories() {
                     <div key={idx} className="glass border border-border/50 rounded-2xl p-6 h-64 animate-pulse" />
                   ))
                 : detailedRepos.map((repo) => (
-                    <div
-                      key={repo.id}
-                      className="glass border border-border/50 rounded-2xl p-6 relative overflow-hidden group hover:border-border hover:shadow-xl transition-all duration-300"
-                    >
-                      {/* Gradient Backdrop Accent */}
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl rounded-full group-hover:bg-primary/10 transition-colors" />
-
-                      <div className="relative">
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                          <h2 className="text-2xl font-bold text-foreground truncate">{repo.name}</h2>
-                          <a
-                            href={repo.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-muted-foreground hover:text-primary transition-colors shrink-0"
-                            aria-label="View on GitHub"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        </div>
-                        <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem] mb-6">
-                          {repo.description || "No repository description listed."}
-                        </p>
-
-                        {/* Benchmark grid */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="glass border border-border/30 rounded-xl p-4 flex items-center gap-3">
-                            <TrendingUp className="h-5 w-5 text-primary shrink-0" />
-                            <div>
-                              <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
-                                Commits
-                              </span>
-                              <span className="text-lg font-bold text-foreground">
-                                {repo.commits?.length || repo._count?.commits || 0}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="glass border border-border/30 rounded-xl p-4 flex items-center gap-3">
-                            <Users className="h-5 w-5 text-accent shrink-0" />
-                            <div>
-                              <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
-                                Contributors
-                              </span>
-                              <span className="text-lg font-bold text-foreground">
-                                {repo.contributors?.length || repo._count?.contributors || 0}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="glass border border-border/30 rounded-xl p-4 flex items-center gap-3">
-                            <FileCode className="h-5 w-5 text-emerald-500 shrink-0" />
-                            <div>
-                              <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
-                                Files Count
-                              </span>
-                              <span className="text-lg font-bold text-foreground">
-                                {repo.files?.length || repo._count?.files || 0}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="glass border border-border/30 rounded-xl p-4 flex items-center gap-3">
-                            <GitBranch className="h-5 w-5 text-blue-500 shrink-0" />
-                            <div>
-                              <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
-                                Branches
-                              </span>
-                              <span className="text-lg font-bold text-foreground">
-                                {repo.branches?.length || repo._count?.branches || 0}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <ComparisonHeader key={repo.id} repo={repo} />
                   ))}
             </div>
 
-            {/* Language & Stack Comparison Overlay */}
-            <div className="glass border border-border/50 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                <FileCode className="h-5 w-5 text-primary" />
-                Technology Stack Comparison
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {detailedRepos.length === 0
-                  ? Array.from({ length: selectedIds.length }).map((_, idx) => (
-                      <div key={idx} className="h-32 bg-white/5 animate-pulse rounded-xl" />
-                    ))
-                  : detailedRepos.map((repo) => (
-                      <div key={repo.id} className="space-y-4">
-                        <h4 className="font-bold text-sm text-foreground">{repo.name} Languages</h4>
-                        <div className="space-y-3">
-                          {repo.languages?.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">No language stats available.</p>
-                          ) : (
-                            repo.languages.map((l) => (
-                              <div key={l.name} className="space-y-1">
-                                <div className="flex justify-between text-xs font-medium">
-                                  <span>{l.name}</span>
-                                  <span className="text-muted-foreground">{l.percentage.toFixed(1)}%</span>
-                                </div>
-                                <div className="h-2 w-full bg-white/5 border border-border/20 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-gradient-primary rounded-full transition-all duration-500"
-                                    style={{ width: `${l.percentage}%` }}
-                                  />
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    ))}
+            {/* Heuristic Insights Summary Verdict */}
+            {heuristicInsights && heuristicInsights.length > 0 && (
+              <div className="glass border border-border/50 rounded-2xl p-6 relative overflow-hidden animate-fade-in">
+                <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
+                  <Info className="h-5 w-5 text-primary" />
+                  Heuristic Metric Overviews
+                </h3>
+                <div className="space-y-3">
+                  {heuristicInsights.map((insight, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-2.5 text-sm text-muted-foreground leading-relaxed"
+                    >
+                      <span className="text-primary mt-1 select-none">•</span>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeSanitize]}
+                        components={{
+                          p: ({ children }) => <span className="m-0">{children}</span>,
+                        }}
+                      >
+                        {insight}
+                      </ReactMarkdown>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Contributor Activity & Lists */}
-            <div className="glass border border-border/50 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                Top Contributor Activity Comparison
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {detailedRepos.length === 0
-                  ? Array.from({ length: selectedIds.length }).map((_, idx) => (
-                      <div key={idx} className="h-48 bg-white/5 animate-pulse rounded-xl" />
-                    ))
-                  : detailedRepos.map((repo) => (
-                      <div key={repo.id} className="space-y-3">
-                        <h4 className="font-bold text-sm text-foreground mb-2">{repo.name} Contributors</h4>
-                        <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                          {repo.contributors?.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">No contributor details recorded.</p>
-                          ) : (
-                            repo.contributors.slice(0, 5).map((c, i) => (
-                              <div
-                                key={c.name}
-                                className="flex items-center justify-between glass border border-border/30 rounded-lg p-2.5 text-xs"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="h-6 w-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 font-bold text-primary text-[10px]">
-                                    {i + 1}
-                                  </div>
-                                  <span className="font-medium text-foreground truncate">{c.name}</span>
-                                </div>
-                                <span className="font-semibold text-muted-foreground shrink-0">
-                                  {c.commits} commits
-                                </span>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    ))}
+            {/* Charts Section: Language Bar Chart & Activity Line Chart */}
+            {detailedRepos.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <LanguageComparisonChart repos={detailedRepos} />
+                <CommitActivityOverlay repos={detailedRepos} />
               </div>
-            </div>
+            )}
+
+            {/* Contributor Activity & Overlaps */}
+            {detailedRepos.length > 0 && (
+              <ContributorOverlap repos={detailedRepos} />
+            )}
 
             {/* Principal Architect AI Comparison Section */}
             <div className="glass border border-border/50 rounded-2xl p-6 relative overflow-hidden">
@@ -522,7 +601,7 @@ export default function CompareRepositories() {
                     Copy
                   </button>
                   <button
-                    onClick={handleStartCompare}
+                    onClick={() => handleStartCompare(selectedIds)}
                     disabled={isAiLoading}
                     className="p-2 rounded-lg bg-white/5 border border-border/50 hover:bg-white/10 disabled:opacity-50 text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5 text-xs font-semibold"
                     title="Refresh AI Analysis"

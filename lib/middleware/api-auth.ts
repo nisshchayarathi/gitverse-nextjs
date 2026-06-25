@@ -7,12 +7,12 @@ export interface AuthUser {
   id: number;
   email: string;
   name: string;
+  scopes?: string[];
 }
 
-export interface AuthResult {
-  user: AuthUser | null;
-  error: NextResponse | null;
-}
+export type AuthResult =
+  | { user: AuthUser; error: null }
+  | { user: null; error: NextResponse };
 
 async function resolveSessionUser(req: NextRequest): Promise<AuthUser | null> {
   try {
@@ -20,7 +20,12 @@ async function resolveSessionUser(req: NextRequest): Promise<AuthUser | null> {
     if (token?.sub) {
       const id = Number(token.sub);
       if (Number.isFinite(id)) {
-        return { id, email: (token.email as string) || "", name: (token.name as string) || "" };
+        return {
+          id,
+          email: (token.email as string) || "",
+          name: (token.name as string) || "",
+          scopes: [],
+        };
       }
     }
   } catch {
@@ -51,7 +56,17 @@ async function resolveApiKeyUser(req: NextRequest): Promise<AuthUser | null> {
       select: { id: true, email: true, name: true },
     });
 
-    return user;
+    if (!user) return null;
+
+    let scopes: string[] = [];
+    if (apiKey.scopes && Array.isArray(apiKey.scopes)) {
+      scopes = apiKey.scopes.map(String);
+    }
+
+    return {
+      ...user,
+      scopes,
+    };
   } catch {
     return null;
   }
@@ -75,6 +90,13 @@ export function requireScopes(
   requiredScopes: string[],
 ): NextResponse | null {
   if (!authResult.user) return authResult.error;
+  if (requiredScopes.length === 0) return null;
+
+  const userScopes = new Set(authResult.user.scopes ?? []);
+  const missing = requiredScopes.filter((s) => !userScopes.has(s));
+  if (missing.length > 0) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   return null;
 }
