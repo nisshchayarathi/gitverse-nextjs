@@ -38,6 +38,7 @@ import {
 } from "@/components/ui";
 import { BeginnerModeToggle } from "@/components/repository/BeginnerModeToggle";
 import { BeginnerGuidanceCard } from "@/components/repository/BeginnerGuidanceCard";
+import { TechStackList } from "@/components/repository/TechStackList";
 import { BeginnerQuestionsPanel } from "@/components/repository/BeginnerQuestionsPanel";
 import { FirstPRSimulator } from "@/components/repository/FirstPRSimulator";
 import { ContributionPathGenerator } from "@/components/repository/ContributionPathGenerator";
@@ -566,6 +567,9 @@ export const RepositoryOverview = ({
             <p className="text-xs sm:text-sm text-muted-foreground mb-3 break-words">
               {repository.description}
             </p>
+            <div className="mb-4">
+              <TechStackList repositoryId={repository.id} />
+            </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground flex-wrap">
               <a
                 href={repository.url}

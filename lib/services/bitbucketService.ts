@@ -113,7 +113,7 @@ export class BitbucketService {
           if (status === 429 || retryAfterHeader) {
             let retrySeconds = 60
             if (retryAfterHeader) {
-              retrySeconds = parseInt(retryAfterHeader, 10)
+              retrySeconds = parseInt(String(retryAfterHeader), 10)
             }
             throw new BitbucketRateLimitError(retrySeconds)
           }
