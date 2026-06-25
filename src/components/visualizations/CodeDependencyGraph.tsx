@@ -54,43 +54,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const [announcement, setAnnouncement] = useState("");
   const [heatmapMode, setHeatmapMode] = useState(false);
 
-  const { nodeChurnMap, maxChurn } = useMemo(() => {
-    const map = new Map<string, number>();
-    if (!repository?.commits) return { nodeChurnMap: map, maxChurn: 0 };
-    
-    repository.commits.forEach((c: any) => {
-      if (c.fileChanges) {
-        c.fileChanges.forEach((fc: any) => {
-          const path = fc.path || fc.file;
-          if (path) {
-            map.set(path, (map.get(path) || 0) + 1);
-          }
-        });
-      }
-    });
-
-    graphData.nodes.forEach(node => {
-      if (node.type === 'folder') {
-        let count = 0;
-        for (const [filePath, fileCount] of map.entries()) {
-          if (filePath.startsWith(node.path + '/')) {
-            count += fileCount;
-          }
-        }
-        map.set(node.id, count);
-      } else {
-         map.set(node.id, map.get(node.path) || 0);
-      }
-    });
-
-    let max = 0;
-    for (const val of map.values()) {
-      if (val > max) max = val;
-    }
-    
-    return { nodeChurnMap: map, maxChurn: max };
-  }, [repository?.commits, graphData.nodes]);
-
   // Keep annotationsRef in sync with the annotations state so the D3 tick
   // callback always has access to the latest list without a closure over stale state.
   useEffect(() => {
@@ -131,6 +94,43 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       visibleDomains: filters.visibleDomains
     });
   }, [completeGraph, expandedNodes, filters]);
+
+  const { nodeChurnMap, maxChurn } = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!repository?.commits) return { nodeChurnMap: map, maxChurn: 0 };
+    
+    repository.commits.forEach((c: any) => {
+      if (c.fileChanges) {
+        c.fileChanges.forEach((fc: any) => {
+          const path = fc.path || fc.file;
+          if (path) {
+            map.set(path, (map.get(path) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    graphData.nodes.forEach(node => {
+      if (node.type === 'folder') {
+        let count = 0;
+        for (const [filePath, fileCount] of map.entries()) {
+          if (filePath.startsWith(node.path + '/')) {
+            count += fileCount;
+          }
+        }
+        map.set(node.id, count);
+      } else {
+         map.set(node.id, map.get(node.path) || 0);
+      }
+    });
+
+    let max = 0;
+    for (const val of map.values()) {
+      if (val > max) max = val;
+    }
+    
+    return { nodeChurnMap: map, maxChurn: max };
+  }, [repository?.commits, graphData.nodes]);
 
   const exportGraph = async (format: "png" | "svg") => {
     if (!exportRef.current) return;
