@@ -14,6 +14,7 @@ jest.mock("@/lib/prisma", () => ({
     },
     session: {
       findMany: (...args: any[]) => mockFindMany(...args),
+      deleteMany: jest.fn(),
     },
   },
 }));

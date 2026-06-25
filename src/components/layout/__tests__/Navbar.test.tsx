@@ -14,7 +14,7 @@ jest.mock("lucide-react", () => ({
 }));
 
 jest.mock("@/components/ui", () => ({
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+  Button: ({ children, asChild, ...props }: any) => <button {...props}>{children}</button>,
   ThemeToggle: () => <button data-testid="theme-toggle">Toggle</button>,
 }));
 

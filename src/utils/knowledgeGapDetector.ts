@@ -8,21 +8,7 @@ import {
 } from "@/types/knowledgeGapDetector";
 import { RepositoryAnalysisData } from "@/types/contributionPath";
 
-const DOCUMENTATION_PATTERNS = {
-  jsDoc: /\/\*\*[\s\S]*?\*\//g,
-  inlineComments: /\/\/\s*.+/g,
-  docstrings: /"""[\s\S]*?"""|'''[\s\S]*?'''/g,
-};
 
-const HIGH_IMPACT_FILES = [
-  /auth/i,
-  /middleware/i,
-  /payment/i,
-  /database/i,
-  /service/i,
-  /config/i,
-  /utils\//i,
-];
 
 function calculateComplexity(content?: string): number {
   if (!content) return 0;
@@ -57,15 +43,24 @@ function buildDependencyMap(repository?: RepositoryAnalysisData): Map<string, Fi
     return dependencyMap;
   }
 
-  repository.files.forEach((file) => {
+  const files = repository.files.map((file) =>
+    typeof file === "string"
+      ? { path: file, size: 0 }
+      : file
+  );
+
+  files.forEach((file) => {
+    const complexity = calculateComplexity();
+    const commentDensity = calculateDocumentationCoverage();
+
     dependencyMap.set(file.path, {
       file: file.path,
       inboundImports: Math.floor(Math.random() * 50),
       outboundDependencies: [],
-      complexity: Math.floor(Math.random() * 100),
+      complexity,
       size: file.size || 0,
       hasDocumentation: Math.random() > 0.5,
-      commentDensity: Math.random() * 100,
+      commentDensity,
     });
   });
 
@@ -136,7 +131,7 @@ function generateSuggestedActions(fileName: string, factors: GapFactor[], comple
   const actions: string[] = [];
 
   if (complexity > 70) {
-    actions.push("Add comprehensive architecture documentation");
+    actions.push(`Add comprehensive documentation for ${fileName}`);
     actions.push("Create a contributor guide explaining the module");
   }
 

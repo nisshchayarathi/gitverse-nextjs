@@ -12,6 +12,10 @@ concurrency:
 jobs:
   run-worker:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       ANALYSIS_RUNNER_SECRET: ${{ secrets.ANALYSIS_RUNNER_SECRET }}

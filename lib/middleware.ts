@@ -263,45 +263,76 @@ export function isHttpError(
     typeof error === "object" &&
     error !== null &&
     "status" in error &&
-    typeof (error as any).status === "number"
+    typeof (error as any).status === "number" &&
+    "message" in error &&
+    typeof (error as any).message === "string"
   );
 }
 
-export function sanitizeError(error: unknown): string {
+/**
+ * Sanitizes error objects for safe logging.
+ * Extracts message, code, and other safe properties while filtering sensitive data.
+ */
+export function sanitizeError(error: unknown): Record<string, any> {
+  if (!error) {
+    return { message: "Unknown error" };
+  }
+
+  if (typeof error === "string") {
+    return { message: error };
+  }
+
   if (error instanceof Error) {
-    return error.message;
+    const sanitized: Record<string, any> = {
+      message: error.message,
+      name: error.name,
+    };
+
+    // Include safe error properties if they exist
+    if ("code" in error) {
+      sanitized.code = (error as any).code;
+    }
+    if ("status" in error) {
+      sanitized.status = (error as any).status;
+    }
+    if ("statusCode" in error) {
+      sanitized.statusCode = (error as any).statusCode;
+    }
+
+    return sanitized;
   }
 
-  try {
-    const str = String(error);
-
-    return str.length > 200
-      ? str.substring(0, 200) + "..."
-      : str;
-  } catch {
-    return "Unknown error";
+  if (typeof error === "object") {
+    const obj = error as Record<string, any>;
+    return {
+      message: obj.message || JSON.stringify(obj),
+      code: obj.code,
+      status: obj.status,
+      statusCode: obj.statusCode,
+    };
   }
+
+  return { message: String(error) };
 }
 
-export function badRequestResponse(message: string, status: number = 400): NextResponse {
-  return NextResponse.json({ error: message }, { status });
-}
+export function getPrismaErrorResponse(error: unknown): NextResponse | null {
+  if (!error || typeof error !== "object") return null;
 
-export function getPrismaErrorResponse(error: any): NextResponse | null {
-  const isColdStartError =
-    error?.code === 'P1001' ||
-    error?.code === 'P2024' ||
-    error?.message?.toLowerCase().includes('timeout') ||
-    error?.message?.toLowerCase().includes('connection pool') ||
-    error?.message?.toLowerCase().includes('connect') ||
-    error?.message?.toLowerCase().includes('fetch failed');
+  const err = error as any;
+  const message = err?.message;
+  const code = err?.code;
 
-  if (isColdStartError) {
+  if (code === "P1011" || (typeof message === "string" && message.toLowerCase().includes("cold start"))) {
     return NextResponse.json(
-      { error: "DATABASE_COLD_START", message: "Waking up database..." },
-      { status: 503 }
+      { error: "Database is starting up. Please try again in a moment." },
+      { status: 503 },
     );
   }
 
   return null;
 }
+
+// This tells Next.js WHICH pages/routes to protect
+export const config = {
+  matcher: ["/api/:path*", "/dashboard/:path*", "/profile/:path*"],
+};

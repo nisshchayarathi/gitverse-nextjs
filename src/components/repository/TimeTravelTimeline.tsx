@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Clock } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Clock, Repeat } from 'lucide-react';
 
 interface Commit {
   hash: string;
@@ -21,6 +21,8 @@ export const TimeTravelTimeline: React.FC<TimeTravelTimelineProps> = ({
   onCommitSelect,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
+  const [isLooping, setIsLooping] = useState<boolean>(false);
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Commits are typically newest-first. We want the slider left-to-right (oldest-to-newest).
@@ -58,16 +60,19 @@ export const TimeTravelTimeline: React.FC<TimeTravelTimelineProps> = ({
       playIntervalRef.current = setInterval(() => {
         let nextIndex = currentIndex + 1;
         if (nextIndex >= chronologicalCommits.length) {
-          nextIndex = 0; // loop back to start or pause? Let's just pause
-          setIsPlaying(false);
-          return;
+          if (isLooping) {
+            nextIndex = 0;
+          } else {
+            setIsPlaying(false);
+            return;
+          }
         }
         if (nextIndex === chronologicalCommits.length - 1) {
           onCommitSelect(null);
         } else {
           onCommitSelect(chronologicalCommits[nextIndex].hash);
         }
-      }, 1000); // 1 second per step
+      }, 1000 / playbackSpeed); // dynamic speed
     } else {
       if (playIntervalRef.current) {
         clearInterval(playIntervalRef.current);
@@ -76,7 +81,7 @@ export const TimeTravelTimeline: React.FC<TimeTravelTimelineProps> = ({
     return () => {
       if (playIntervalRef.current) clearInterval(playIntervalRef.current);
     };
-  }, [isPlaying, currentIndex, chronologicalCommits, onCommitSelect]);
+  }, [isPlaying, currentIndex, chronologicalCommits, onCommitSelect, playbackSpeed, isLooping]);
 
   if (chronologicalCommits.length === 0) return null;
 
@@ -122,6 +127,28 @@ export const TimeTravelTimeline: React.FC<TimeTravelTimelineProps> = ({
           >
             <SkipForward className="h-4 w-4" />
           </button>
+
+          <div className="h-6 w-px bg-white/10 mx-1" />
+          
+          <button
+            onClick={() => setIsLooping(!isLooping)}
+            className={`p-2 rounded-full transition-colors ${isLooping ? 'bg-primary/20 text-primary' : 'hover:bg-white/10 text-muted-foreground hover:text-white'}`}
+            title="Toggle Loop"
+          >
+            <Repeat className="h-4 w-4" />
+          </button>
+
+          <select
+            value={playbackSpeed}
+            onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+            className="bg-transparent text-xs text-muted-foreground hover:text-white cursor-pointer outline-none border border-white/10 rounded px-1 py-1"
+            title="Playback Speed"
+          >
+            <option value={0.5} className="bg-black text-white">0.5x</option>
+            <option value={1} className="bg-black text-white">1x</option>
+            <option value={2} className="bg-black text-white">2x</option>
+            <option value={5} className="bg-black text-white">5x</option>
+          </select>
         </div>
 
         {/* Slider & Info */}
