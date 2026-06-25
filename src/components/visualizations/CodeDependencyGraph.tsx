@@ -54,6 +54,29 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
   const [announcement, setAnnouncement] = useState("");
   const [heatmapMode, setHeatmapMode] = useState(false);
 
+  const { 
+    filters, toggleDirectory, toggleFileType, toggleDomain, resetFilters 
+  } = useGraphFilters();
+
+  const {
+    expandedNodes, toggleExpand, collapseAll, focusNode, setFocus, clearFocus, goBack, canGoBack
+  } = useGraphDrilldown();
+  
+  const completeGraph = useMemo(() => {
+    const analyzer = new GraphAnalyzer();
+    return analyzer.buildDependencyGraph(repository?.files || []);
+  }, [repository?.files]);
+
+  const graphData = useMemo(() => {
+    const filterService = new GraphFilteringService();
+    return filterService.applyFilters(completeGraph.nodes, completeGraph.links, {
+      expandedNodes,
+      hiddenDirectories: filters.hiddenDirectories,
+      hiddenFileTypes: filters.hiddenFileTypes,
+      visibleDomains: filters.visibleDomains
+    });
+  }, [completeGraph, expandedNodes, filters]);
+
   const { nodeChurnMap, maxChurn } = useMemo(() => {
     const map = new Map<string, number>();
     if (!repository?.commits) return { nodeChurnMap: map, maxChurn: 0 };
@@ -108,29 +131,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       (selectedCommit.fileChanges || []).map((fc: any) => [fc.path, fc.changeType || fc.type])
     );
   }, [selectedCommit]);
-
-  const { 
-    filters, toggleDirectory, toggleFileType, toggleDomain, resetFilters 
-  } = useGraphFilters();
-
-  const {
-    expandedNodes, toggleExpand, collapseAll, focusNode, setFocus, clearFocus, goBack, canGoBack
-  } = useGraphDrilldown();
-  
-  const completeGraph = useMemo(() => {
-    const analyzer = new GraphAnalyzer();
-    return analyzer.buildDependencyGraph(repository?.files || []);
-  }, [repository?.files]);
-
-  const graphData = useMemo(() => {
-    const filterService = new GraphFilteringService();
-    return filterService.applyFilters(completeGraph.nodes, completeGraph.links, {
-      expandedNodes,
-      hiddenDirectories: filters.hiddenDirectories,
-      hiddenFileTypes: filters.hiddenFileTypes,
-      visibleDomains: filters.visibleDomains
-    });
-  }, [completeGraph, expandedNodes, filters]);
 
   const exportGraph = async (format: "png" | "svg") => {
     if (!exportRef.current) return;
