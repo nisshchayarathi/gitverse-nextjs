@@ -127,31 +127,5 @@ export function extractTechStack(packageJson: {
   if (depKeys.includes("graphql") || depKeys.includes("@apollo/client") || depKeys.includes("apollo-server")) {
     techStack.add("GraphQL");
   }
-
-  // Jest
-  if (depKeys.includes("jest") || depKeys.includes("ts-jest")) {
-    techStack.add("Jest");
-  }
-
-  // Playwright
-  if (depKeys.includes("@playwright/test") || depKeys.includes("playwright")) {
-    techStack.add("Playwright");
-  }
-
-  // Vitest
-  if (depKeys.includes("vitest")) {
-    techStack.add("Vitest");
-  }
-
-  // ESLint
-  if (depKeys.includes("eslint") || depKeys.includes("eslint-config-next")) {
-    techStack.add("ESLint");
-  }
-
-  // Prettier
-  if (depKeys.includes("prettier")) {
-    techStack.add("Prettier");
-  }
-
   return Array.from(techStack);
 }

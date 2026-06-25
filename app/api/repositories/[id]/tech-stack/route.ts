@@ -16,14 +16,14 @@ export async function GET(
 ) {
   try {
     const user = await requireAuth(request);
-    const id = parseInt(params.id);
-
-    if (isNaN(id)) {
+    const idStr = params.id;
+    if (!idStr || !/^\d+$/.test(idStr)) {
       return NextResponse.json(
         { error: "Invalid repository ID" },
         { status: 400, headers: securityHeaders }
       );
     }
+    const id = parseInt(idStr, 10);
 
     const repository = await prisma.repository.findFirst({
       where: { id, userId: user.userId },
@@ -34,6 +34,33 @@ export async function GET(
       return NextResponse.json(
         { error: "Repository not found" },
         { status: 404, headers: securityHeaders }
+      );
+    }
+
+    const isGitHub = repository.url.includes("github.com");
+    const isGitLab = repository.url.includes("gitlab.com");
+    const isBitbucket = repository.url.includes("bitbucket.org");
+
+    if (isGitLab || isBitbucket) {
+      const provider = isGitLab ? "GitLab" : "Bitbucket";
+      return NextResponse.json(
+        {
+          error: "Unsupported provider",
+          code: "unsupported-provider",
+          message: `${provider} is not currently supported for tech stack analysis because manifest fetch helpers do not exist for this provider.`,
+        },
+        { status: 400, headers: securityHeaders }
+      );
+    }
+
+    if (!isGitHub) {
+      return NextResponse.json(
+        {
+          error: "Unsupported provider",
+          code: "unsupported-provider",
+          message: "Only GitHub repositories are supported for tech stack analysis.",
+        },
+        { status: 400, headers: securityHeaders }
       );
     }
 

@@ -32,8 +32,10 @@ export function TechStackList({ repositoryId }: TechStackListProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     async function fetchTechStack() {
       if (!repositoryId) return;
+      setLoading(true);
       try {
         const token = localStorage.getItem("gitverse_token");
         const response = await axios.get(
@@ -42,14 +44,23 @@ export function TechStackList({ repositoryId }: TechStackListProps) {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
-        setTechStack(response.data.techStack || []);
+        if (active) {
+          setTechStack(response.data.techStack || []);
+        }
       } catch (err) {
-        console.error("Error fetching tech stack:", err);
+        if (active) {
+          console.error("Error fetching tech stack:", err);
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     }
     fetchTechStack();
+    return () => {
+      active = false;
+    };
   }, [repositoryId]);
 
   if (loading) {
