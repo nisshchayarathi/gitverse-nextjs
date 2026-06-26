@@ -1,31 +1,11 @@
-import { useEffect, useRef, useState, useMemo } from "react";
-import * as htmlToImage from "html-to-image";
+import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { Card } from "@/components/ui";
 import { GraphAnalyzer } from "@/utils/graphAnalyzer";
-import { GraphFilteringService } from "@/services/graphFilteringService";
-import { MapControls } from "./MapControls";
-import { toast } from "sonner";
-import { annotationService, MapAnnotation } from "@/services/annotationService";
-import { AnnotationMarker } from "../map/AnnotationMarker";
-import { AnnotationPopover } from "../map/AnnotationPopover";
-import { AnnotationPanel } from "../map/AnnotationPanel";
-import { MessageSquarePlus } from "lucide-react";
-import { useGraphDrilldown } from "@/hooks/useGraphDrilldown";
-import { useGraphFilters } from "@/hooks/useGraphFilters";
-import { FilterPanel } from "../map/FilterPanel";
-import { DrilldownControls } from "../map/DrilldownControls";
-import { MiniMap } from "../map/MiniMap";
-import { TimeTravelTimeline } from "../repository/TimeTravelTimeline";
+import { ModuleSummaryPanel } from "./ModuleSummaryPanel";
+import { AISettingsModal } from "../settings/AISettingsModal";
 
-interface RepositoryFile {
-  path: string;
-  lines?: number;
-}
 
-interface Repository {
-  files?: RepositoryFile[];
-}
 
 interface CodeDependencyGraphProps {
   repository?: any;
@@ -194,11 +174,12 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       }
     });
 
-    return () => unsubscribe();
-  }, [repository?.id]);
 
   useEffect(() => {
     if (!svgRef.current) return;
+
+    const graphAnalyzer = new GraphAnalyzer();
+    const graphData = graphAnalyzer.buildDependencyGraph(repository?.files || []);
 
     // If no data, show empty state
     if (graphData.nodes.length === 0) {
@@ -245,10 +226,8 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     };
 
     // Prepare data
-    const nodes = graphData.nodes.map((d) => ({ ...d }));
-    const links = graphData.links.map((d) => ({ ...d }));
-    nodesRef.current = nodes;
-    linksRef.current = links;
+    const nodes = graphData.nodes.map((d: any) => ({ ...d }));
+    const links = graphData.links.map((d: any) => ({ ...d }));
 
     // Create force simulation
     const simulation = d3
@@ -259,13 +238,13 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           .forceLink(links)
           .id((d: any) => d.id)
           .distance(100)
-          .strength((d: any) => d.strength * 0.5),
+          .strength((d: any) => d.strength * 0.5)
       )
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force(
         "collision",
-        d3.forceCollide().radius((d: any) => d.size / 2 + 10),
+        d3.forceCollide().radius((d: any) => d.size / 2 + 10)
       );
 
     // Draw links
@@ -274,22 +253,10 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .selectAll("line")
       .data(links)
       .join("line")
-      .attr("stroke", (d: any) =>
-        d.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)",
-      )
+      .attr("stroke", (d: any) => d.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)")
       .attr("stroke-width", (d: any) => d.strength * 2)
-      .attr("stroke-dasharray", (d: any) => (d.isCyclic ? "5,5" : "none"))
-      .attr("stroke-opacity", 0.6)
-      .on("contextmenu", (event: any, d: any) => {
-        event.preventDefault();
-        setPopover({
-          isOpen: true,
-          x: event.clientX,
-          y: event.clientY,
-          targetId: `${d.source.id}->${d.target.id}`,
-          targetType: 'edge'
-        });
-      });
+      .attr("stroke-dasharray", (d: any) => d.isCyclic ? "5,5" : "none")
+      .attr("stroke-opacity", 0.6);
 
     // Draw nodes
     const node = g
@@ -298,30 +265,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .data(nodes)
       .join("g")
       .style("cursor", "pointer")
-      .attr("tabindex", "0")
-      .attr("role", "button")
-      .attr("aria-label", (d: any) => `${d.type === 'folder' ? 'Directory' : 'File'}: ${d.name}, Path: ${d.path}`)
-      .on("focus", function (_event: any, d: any) {
-        const connections = linksRef.current.filter((l: any) => l.source.id === d.id || l.target.id === d.id).length;
-        setAnnouncement(`Focused on ${d.type} ${d.name}. ${connections} dependencies.`);
-        d3.select(this).select("circle")
-          .attr("stroke", "#fbbf24")
-          .attr("stroke-width", 3);
-      })
-      .on("blur", function (_event: any, d: any) {
-        d3.select(this).select("circle")
-          .attr("stroke", "rgba(255,255,255,0.3)")
-          .attr("stroke-width", 2);
-      })
-      .on("keydown", function (event: any, d: any) {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          if (d.type === 'folder') {
-            toggleExpand(d.id);
-          }
-          setFocus(d.id);
-        }
-      })
       .call(
         d3
           .drag<any, any>()
@@ -338,25 +281,12 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             if (!d.active) simulation.alphaTarget(0);
             d.fx = null;
             d.fy = null;
-          }),
-      )
-      .on("contextmenu", (event: any, d: any) => {
-        event.preventDefault();
-        setPopover({
-          isOpen: true,
-          x: event.clientX,
-          y: event.clientY,
-          targetId: d.id,
-          targetType: 'node'
-        });
-      })
-      .on("click", (event: any, d: any) => {
-        if (event.defaultPrevented) return; // Dragged
-        if (d.type === 'folder') {
-          toggleExpand(d.id);
-        }
-        setFocus(d.id);
-      });
+          })
+          .on("click", (_event: any, d: any) => {
+             // Let user click a node to view its AI summary
+             setSelectedNode(d);
+          })
+      );
 
     // Node circles
     node
@@ -383,7 +313,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
               : "rgba(255,255,255,0.1)",
           )
           .attr("stroke-opacity", (l: any) =>
-            l.source.id === d.id || l.target.id === d.id ? 1 : 0.2,
+            l.source.id === d.id || l.target.id === d.id ? 1 : 0.2
           );
 
         if (tooltipRef.current) {
@@ -409,8 +339,14 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             .style("top", `${event.clientY}px`);
         }
       })
-     .on("mouseleave", function (_event: any, d: any) {
-        // Shrink node back to original size and restore stroke
+      .on("mouseleave", function () {
+        if (tooltipRef.current) {
+          d3.select(tooltipRef.current)
+            .style("opacity", "0")
+            .style("display", "none");
+        }
+      })
+      .on("mouseleave", function (_event: any, d: any) {
         d3.select(this)
           .transition()
           .duration(200)
@@ -418,20 +354,14 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
           .attr("stroke", "rgba(255,255,255,0.3)")
           .attr("stroke-width", 2);
 
-        // Restore link colours
         link
           .transition()
           .duration(200)
-          .attr("stroke", (l: any) =>
-            l.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)",
-          )
+          .attr("stroke", (l: any) => l.isCyclic ? "#ef4444" : "rgba(255,255,255,0.2)")
           .attr("stroke-opacity", 0.6);
 
-        // Hide tooltip completely (opacity AND display)
         if (tooltipRef.current) {
-          d3.select(tooltipRef.current)
-            .style("opacity", "0")
-            .style("display", "none");
+          d3.select(tooltipRef.current).style("opacity", 0);
         }
       });
 
@@ -439,7 +369,7 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     node
       .append("text")
       .text((d: any) =>
-        d.name.length > 15 ? d.name.slice(0, 12) + "..." : d.name,
+        d.name.length > 15 ? d.name.slice(0, 12) + "..." : d.name
       )
       .attr("font-size", "10px")
       .attr("dx", 0)
@@ -491,7 +421,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .scaleExtent([0.5, 3])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
-        setTransform({ x: event.transform.x, y: event.transform.y, k: event.transform.k });
       });
 
     svg.call(zoom as any);
@@ -504,8 +433,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
       .duration(500)
       .delay((_d: any, i: number) => i * 30)
       .attr("r", (d: any) => d.size / 3);
-
-    svgSelectionRef.current = { node, link };
 
     return () => {
       simulation.stop();
@@ -736,39 +663,10 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
                 ))}
               </div>
             </div>
-            <div className="absolute bottom-2 right-3 text-[10px] text-white/70 pointer-events-none">
-              GitVerse • {repository?.name || "Repository"}
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+              <span>Files</span>
             </div>
-            
-            <FilterPanel 
-              filters={filters} 
-              toggleDirectory={toggleDirectory} 
-              toggleFileType={toggleFileType} 
-              toggleDomain={toggleDomain} 
-              resetFilters={resetFilters} 
-            />
-
-            <DrilldownControls 
-              canGoBack={canGoBack} 
-              onGoBack={goBack} 
-              onClearFocus={clearFocus} 
-              focusNode={focusNode} 
-              onResetGraph={() => {
-                collapseAll();
-                resetFilters();
-                clearFocus();
-              }} 
-            />
-
-            <MiniMap 
-              nodes={nodesRef.current} 
-              links={linksRef.current} 
-              width={svgRef.current?.parentElement?.clientWidth || 800} 
-              height={Math.min((svgRef.current?.parentElement?.clientWidth || 800) * 0.75, 600)} 
-              svgRef={svgRef} 
-              transform={transform} 
-            />
-
           </div>
 
           <MapControls 
@@ -782,72 +680,62 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
             onToggleHeatmap={() => setHeatmapMode(prev => !prev)}
           />
         </div>
-
-        <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
-          💡 Drag nodes to reposition • Scroll to zoom • Hover for details • Right-click to annotate
-        </p>
-
-        {repository?.commits && repository.commits.length > 0 && (
-          <TimeTravelTimeline 
-            commits={repository.commits} 
-            selectedCommitHash={selectedCommitHash}
-            onCommitSelect={setSelectedCommitHash} 
+      </div>
+      <div className="glass rounded-lg p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-semibold mb-4">
+          Code Dependencies
+        </h3>
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <svg
+            ref={svgRef}
+            width="100%"
+            height="auto"
+            className="text-foreground min-h-96 sm:min-h-96"
+            style={{ background: "rgba(0,0,0,0.2)", minHeight: "300px" }}
+            viewBox="0 0 900 600"
+            preserveAspectRatio="xMidYMid meet"
           />
-        )}
-
-        <div
-          ref={tooltipRef}
-          className="fixed p-3 rounded-lg pointer-events-none shadow-xl border translate-x-[-120px] translate-y-[-120px] sm:translate-x-[-250px] sm:translate-y-[-250px]"
-          style={{
-            opacity: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.9)",
-            color: "white",
-            zIndex: 9999,
-            backdropFilter: "blur(8px)",
-            left: "0px",
-            top: "0px",
-            whiteSpace: "nowrap",
-          }}
-        />
-
-        {popover?.isOpen && (
-          <AnnotationPopover 
-            x={popover.initialData ? transform.x + (nodesRef.current.find(n => n.id === popover.initialData?.targetId)?.x || 0) * transform.k : popover.x}
-            y={popover.initialData ? transform.y + (nodesRef.current.find(n => n.id === popover.initialData?.targetId)?.y || 0) * transform.k : popover.y}
-            initialData={popover.initialData}
-            onSave={handleSaveAnnotation}
-            onCancel={() => setPopover(null)}
-            onDelete={popover.initialData?.id ? handleDeleteAnnotation : undefined}
-          />
-        )}
-
-        <AnnotationPanel 
-          isOpen={panelOpen} 
-          onClose={() => setPanelOpen(false)} 
-          annotations={annotations} 
-          onSelect={(a) => {
-            let x = 0, y = 0;
-            if (a.targetType === 'node') {
-              const node = nodesRef.current.find(n => n.id === a.targetId);
-              if (node) { x = node.x; y = node.y; }
-            }
-            // Animate D3 zoom to annotation
-            if (svgRef.current && (x !== 0 || y !== 0)) {
-              const width = svgRef.current.clientWidth;
-              const height = svgRef.current.clientHeight;
-              d3.select(svgRef.current)
-                .transition()
-                .duration(750)
-                .call(d3.zoom().transform as any, d3.zoomIdentity.translate(width/2, height/2).scale(1.5).translate(-x, -y));
-            }
-          }} 
-        />
-        
-        {/* Screen reader announcement region */}
-        <div className="sr-only" aria-live="polite" aria-atomic="true">
-          {announcement}
         </div>
-      </Card>
+      </div>
+      <p className="text-xs text-muted-foreground mt-2 px-4 sm:px-0">
+        💡 Drag nodes to reposition • Scroll to zoom • Hover for details
+      </p>
+      <div
+  ref={tooltipRef}
+  className="
+    fixed p-3 rounded-lg pointer-events-none shadow-xl border
+    translate-x-[-120px] translate-y-[-120px]
+    sm:translate-x-[-250px] sm:translate-y-[-250px]
+  "
+  style={{
+    opacity: 1, // control with state later
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    color: "white",
+    zIndex: 9999,
+    backdropFilter: "blur(8px)",
+    left: "0px",
+    top: "0px",
+    whiteSpace: "nowrap",
+  }}
+/>
+
+    </Card>
+
+    {selectedNode && (
+      <ModuleSummaryPanel
+        nodeId={selectedNode.id}
+        nodeName={selectedNode.name}
+        nodeType={selectedNode.type}
+        repositoryFiles={repository?.files || []}
+        onClose={() => setSelectedNode(null)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
+    )}
+
+    <AISettingsModal 
+      isOpen={isSettingsOpen} 
+      onClose={() => setIsSettingsOpen(false)} 
+    />
     </div>
   );
 }

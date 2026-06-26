@@ -5,11 +5,11 @@ import { buildCacheKey } from "../utils/cacheKey";
 const CURRENT_MODEL_VERSION = "gemini-2.5-flash";
 
 const HIGH_CONFIDENCE_SECRETS = [
-  { name: 'GitHub Token', pattern: /(?:gh[pousr]_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})/g },
-  { name: 'Google API Key', pattern: /AIza[0-9A-Za-z\-_]{35}/g },
-  { name: 'AWS Access Key', pattern: /AKIA[0-9A-Z]{16}/g },
-  { name: 'Slack Token', pattern: /xox[baprs]-[0-9]{12}-[0-9]{12}-[a-zA-Z0-9]{24}/g },
-  { name: 'RSA Private Key', pattern: /-----BEGIN RSA PRIVATE KEY-----[\s\S]*?-----END RSA PRIVATE KEY-----/g },
+  { name: 'GitHub Token', pattern: /(?:gh[pousr]_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})/ },
+  { name: 'Google API Key', pattern: /AIza[0-9A-Za-z\-_]{35}/ },
+  { name: 'AWS Access Key', pattern: /AKIA[0-9A-Z]{16}/ },
+  { name: 'Slack Token', pattern: /xox[baprs]-[0-9]{12}-[0-9]{12}-[a-zA-Z0-9]{24}/ },
+  { name: 'RSA Private Key', pattern: /-----BEGIN RSA PRIVATE KEY-----[\s\S]*?-----END RSA PRIVATE KEY-----/ },
 ];
 
 const SUSPECTED_SECRETS = [
