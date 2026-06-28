@@ -16,6 +16,33 @@ import {
 const MAX_SIGNUPS = 3;
 const WINDOW_MS = 60 * 60 * 1000;
 
+/**
+ * Determines if an error is transient (should be retried by client) vs permanent.
+ * Transient: connection timeout, pool exhaustion, cold start
+ * Permanent: unique constraint, validation, auth errors
+ */
+function isTransientError(error: any): boolean {
+  if (!error) return false;
+
+  const code = error?.code;
+  const message = (error?.message || "").toLowerCase();
+
+  // Connection-level errors (should have been retried server-side, but client should be aware)
+  if (
+    code === "P1001" ||
+    code === "P2024" ||
+    code === "P1011" ||
+    message.includes("timeout") ||
+    message.includes("connection pool") ||
+    message.includes("fetch failed") ||
+    message.includes("cold start")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 export async function POST(request: NextRequest) {
   let normalizedEmail = "";
   try {
@@ -60,6 +87,9 @@ export async function POST(request: NextRequest) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // $transaction is now wrapped with retry logic in lib/prisma.ts
+    // Transient errors (P1001, P2024, timeout) will be retried automatically
     const txResult = await prisma.$transaction(async (tx) => {
       const existingUser = await tx.user.findUnique({
         where: { email: normalizedEmail },
@@ -136,10 +166,15 @@ export async function POST(request: NextRequest) {
       { status: 201 },
     );
   } catch (error: any) {
-    if (error?.code === "P2002") {
+    const code = error?.code;
+    const message = (error?.message || "").toLowerCase();
+
+    // P2002: Unique constraint violation (email already exists)
+    // This should not happen if the transaction check passed, but guard anyway
+    if (code === "P2002") {
       logger.info(
-        { email: normalizedEmail, err: error },
-        "Signup attempt failed: Database unique constraint violation (email already exists)",
+        { email: normalizedEmail, err: sanitizeError(error) },
+        "Signup failed: unique constraint violation (email already exists)",
       );
       return NextResponse.json(
         {
@@ -152,6 +187,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Transient connection errors (should have been retried, but inform client on final failure)
+    if (isTransientError(error)) {
+      logger.warn(
+        { email: normalizedEmail, err: sanitizeError(error) },
+        "Signup failed: transient database error after retries",
+      );
+      return NextResponse.json(
+        {
+          error: "Database service temporarily unavailable. Please try again in a moment.",
+          message: "Database service temporarily unavailable. Please try again in a moment.",
+          retryable: true,
+        },
+        { status: 503 },
+      );
+    }
+
+    // Generic server error with sanitized logging
     const rawIp = getClientIp(request);
     let ipFingerprint = "unknown";
     if (rawIp !== "unknown") {
@@ -164,7 +216,10 @@ export async function POST(request: NextRequest) {
           .substring(0, 16);
       }
     }
-    logger.error({ err: sanitizeError(error), ipFingerprint }, "Signup error");
+    logger.error(
+      { err: sanitizeError(error), ipFingerprint },
+      "Signup error"
+    );
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

@@ -84,10 +84,48 @@ function getRetryConfig() {
   };
 }
 
+/**
+ * Determines if an error is a transient database error that should be retried.
+ * Includes connection pool exhaustion, timeouts, connection failures, and Neon-specific errors.
+ */
+function isRetryableError(error: any): boolean {
+  if (!error) return false;
+
+  const code = error?.code;
+  const message = (error?.message || "").toLowerCase();
+
+  // Standard Prisma transient error codes
+  if (code === "P1001" || code === "P2024") return true;
+
+  // Connection-level errors
+  if (
+    message.includes("timeout") ||
+    message.includes("connection pool") ||
+    message.includes("connect") ||
+    message.includes("fetch failed") ||
+    message.includes("econnrefused") ||
+    message.includes("enotfound")
+  ) {
+    return true;
+  }
+
+  // Neon-specific cold start detection
+  if (code === "P1011" || message.includes("cold start")) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Wraps Prisma client with automatic retry logic for transient database errors.
+ * Applies to both model operations (findUnique, create, etc.) and transactions.
+ */
 function withRetry(client: PrismaClient) {
   const { maxRetries, baseBackoffMs } = getRetryConfig();
 
-  return client.$extends({
+  // Step 1: Wrap model operations with retry logic
+  const extended = client.$extends({
     query: {
       $allModels: {
         async $allOperations({ operation, model, args, query }) {
@@ -96,21 +134,13 @@ function withRetry(client: PrismaClient) {
             try {
               return await query(args);
             } catch (error: any) {
-              const isRetryableError =
-                error?.code === "P1001" ||
-                error?.code === "P2024" ||
-                error?.message?.toLowerCase().includes("timeout") ||
-                error?.message?.toLowerCase().includes("connection pool") ||
-                error?.message?.toLowerCase().includes("connect") ||
-                error?.message?.toLowerCase().includes("fetch failed");
-
-              if (!isRetryableError || retries >= maxRetries) {
+              if (!isRetryableError(error) || retries >= maxRetries) {
                 throw error;
               }
               retries++;
               const backoff = Math.pow(2, retries) * baseBackoffMs;
               console.warn(
-                `[Prisma Retry] DB connection error (attempt ${retries}/${maxRetries}). Retrying in ${backoff}ms...`
+                `[Prisma Retry] ${model}.${operation} — DB connection error (attempt ${retries}/${maxRetries}). Retrying in ${backoff}ms...`
               );
               await new Promise((r) => setTimeout(r, backoff));
             }
@@ -119,6 +149,34 @@ function withRetry(client: PrismaClient) {
       },
     },
   });
+
+  // Step 2: Wrap $transaction method to add retry logic
+  // This is critical for signup, annotations, and any multi-statement operations.
+  const origTransaction = extended.$transaction.bind(extended);
+
+  (extended as any).$transaction = async function transactionWithRetry(
+    callback: any,
+    options?: any
+  ) {
+    let retries = 0;
+    while (true) {
+      try {
+        return await origTransaction(callback, options);
+      } catch (error: any) {
+        if (!isRetryableError(error) || retries >= maxRetries) {
+          throw error;
+        }
+        retries++;
+        const backoff = Math.pow(2, retries) * baseBackoffMs;
+        console.warn(
+          `[Prisma Retry] $transaction — connection error (attempt ${retries}/${maxRetries}). Retrying in ${backoff}ms...`
+        );
+        await new Promise((r) => setTimeout(r, backoff));
+      }
+    }
+  };
+
+  return extended;
 }
 
 function createPrismaClient() {
