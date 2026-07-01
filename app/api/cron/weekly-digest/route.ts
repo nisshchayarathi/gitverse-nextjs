@@ -6,10 +6,10 @@ import { secretDetector } from '@/lib/services/secret-detector';
 import { RiskScorer } from '@/lib/services/riskScorer';
 import { DependencyGraphAnalyzer } from '@/lib/services/dependencyGraphAnalyzer';
 import { getGeminiService } from '@/lib/services/geminiService';
+import { isCronAuthorized } from '@/lib/utils/internalAuth';
 
 export async function GET(req: Request) {
-  const authHeader = req.headers.get('authorization');
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(req.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
