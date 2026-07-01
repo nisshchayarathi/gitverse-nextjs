@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { isHttpError, requireAuth, sanitizeError } from "@/lib/middleware";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,8 @@ interface ActivityAnalysisRequest {
  */
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth(request);
+
     const body: ActivityAnalysisRequest = await request.json();
 
     if (!body.repositoryId) {
@@ -42,10 +45,13 @@ export async function POST(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error) {
+  } catch (error: any) {
+    if (isHttpError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error("Error analyzing activity:", error);
     return NextResponse.json(
-      { success: false, message: "Failed to analyze activity" },
+      { success: false, message: sanitizeError(error) || "Failed to analyze activity" },
       { status: 500 }
     );
   }
@@ -59,6 +65,8 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireAuth(request);
+
     const searchParams = request.nextUrl.searchParams;
     const repositoryId = searchParams.get("repositoryId");
     const timeWindow = (searchParams.get("timeWindow") || "month") as
@@ -83,10 +91,13 @@ export async function GET(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error) {
+  } catch (error: any) {
+    if (isHttpError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error("Error retrieving activity:", error);
     return NextResponse.json(
-      { success: false, message: "Failed to retrieve activity" },
+      { success: false, message: sanitizeError(error) || "Failed to retrieve activity" },
       { status: 500 }
     );
   }
