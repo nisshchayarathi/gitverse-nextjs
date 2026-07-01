@@ -123,9 +123,9 @@ export class GitLabService {
             let retrySeconds = 60
 
             if (retryAfterHeader) {
-              retrySeconds = parseInt(retryAfterHeader, 10)
+              retrySeconds = parseInt(String(retryAfterHeader), 10)
             } else if (resetHeader) {
-              const resetTime = parseInt(resetHeader, 10) * 1000
+              const resetTime = parseInt(String(resetHeader), 10) * 1000
               retrySeconds = Math.max(
                 1,
                 Math.ceil((resetTime - Date.now()) / 1000)
