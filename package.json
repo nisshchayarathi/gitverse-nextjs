@@ -27,7 +27,7 @@
     "prisma:studio": "prisma studio",
     "test:validation": "tsx scripts/test-validation.ts",
     "test:e2e": "cross-env PLAYWRIGHT_TEST=true playwright test",
-    "test": "jest --config jest.config.cjs",
+    "test": "jest --config jest.config.cjs --forceExit",
     "db:seed": "tsx prisma/seed.ts",
     "kms:init": "tsx scripts/kms-init.ts",
     "rotate:dek": "tsx scripts/rotate-dek.ts"

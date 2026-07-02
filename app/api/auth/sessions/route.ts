@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser , sanitizeError } from "@/lib/middleware";
+import { getAuthUser, sanitizeError } from "@/lib/middleware";
 import prisma from "@/lib/prisma";
 import { toJsonSafe } from "@/lib/utils/jsonSafe";
 import { SAFE_SESSION_SELECT } from "@/lib/utils/sessionResponse";
+import { getToken } from "next-auth/jwt";
+import { getNextAuthSecret } from "@/lib/config/env";
+import { appendClearCookieHeaders } from "@/lib/utils/authCookie";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +17,16 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    // Increment tokenVersion to immediately invalidate all JWT bearer tokens
     await prisma.user.update({
       where: { id: user.userId },
       data: { tokenVersion: { increment: 1 }, passwordChangedAt: new Date() },
+    });
+
+    // Delete all DB sessions for this user (clears NextAuth database sessions
+    // and prevents orphaned session rows from accumulating)
+    await prisma.session.deleteMany({
+      where: { userId: user.userId },
     });
 
     const response = NextResponse.json({
@@ -24,6 +34,22 @@ export async function DELETE(request: NextRequest) {
     });
 
     response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+
+    // If the request was authenticated via a NextAuth session cookie (i.e. no
+    // Bearer token in the Authorization header), clear the session cookies from
+    // the browser immediately so the user cannot remain "logged in" while the
+    // JWT callback hasn't fired yet (up to ~5 min window).
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      const nextAuthToken = await getToken({
+        req: request,
+        secret: getNextAuthSecret(),
+      });
+
+      if (nextAuthToken) {
+        appendClearCookieHeaders(response);
+      }
+    }
 
     return response;
   } catch (error: any) {

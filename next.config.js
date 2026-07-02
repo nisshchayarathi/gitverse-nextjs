@@ -2,7 +2,24 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['avatars.githubusercontent.com', 'gitlab.com', 'bitbucket.org', 'api.dicebear.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'avatars.githubusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'gitlab.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'bitbucket.org',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.dicebear.com',
+      },
+    ],
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",

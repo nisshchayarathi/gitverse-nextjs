@@ -28,6 +28,14 @@ export default function Login() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("gitverse_remember_me");
+    if (stored === "true") {
+      setRememberMe(true);
+    }
+  }, []);
 
   const RepoGraph = ({
     className,
@@ -201,7 +209,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       toast({
         title: "Success!",
         description: "Welcome back to GitVerse",
@@ -325,7 +333,17 @@ export default function Login() {
               style={{ animationDelay: "170ms" }}
             >
               <label className="flex items-center cursor-pointer">
-                <input type="checkbox" className="mr-2 rounded border-input" />
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  className="mr-2 rounded border-input"
+                  checked={rememberMe}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setRememberMe(checked);
+                    localStorage.setItem("gitverse_remember_me", String(checked));
+                  }}
+                />
                 <span className="text-muted-foreground">Remember me</span>
               </label>
               <span

@@ -28,9 +28,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
-    if (!newPassword) {
+    if (!newPassword || typeof newPassword !== "string") {
       return NextResponse.json(
-        { error: "New password is required" },
+        { error: "New password is required and must be a string" },
         { status: 400 }
       );
     }

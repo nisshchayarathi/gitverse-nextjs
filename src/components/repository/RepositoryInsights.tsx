@@ -2,7 +2,17 @@ import { CommitActivityHeatmap } from '@/components/visualizations/CommitActivit
 import { CodeDependencyGraph } from '@/components/visualizations/CodeDependencyGraph'
 import { LanguageDistributionChart } from '@/components/visualizations/LanguageDistributionChart'
 import { CodeMetrics } from './CodeMetrics'
+import RepositoryLearningPath from "./RepositoryLearningPath";
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import RepositoryEvolutionTimeline from "./RepositoryEvolutionTimeline";
+import ContributorIssueRecommendations from "./ContributorIssueRecommendations";
+import DependencyVulnerabilityScanner from "./DependencyVulnerabilityScanner";
+import CodeComplexityAnalyzer from "./CodeComplexityAnalyzer";
+import ContributorOnboardingChatbot from "./ContributorOnboardingChatbot";
+import RepositoryHealthDashboard from "./RepositoryHealthDashboard";
+import ArchitectureChangeComparison from "./ArchitectureChangeComparison";
+import DocumentationGenerator from "./DocumentationGenerator";
+import PullRequestReviewAssistant from "./PullRequestReviewAssistant";
 import { useState } from 'react'
 import { toast } from '@/hooks/use-toast'
 import axios from 'axios'
@@ -253,6 +263,36 @@ export function RepositoryInsights({
 
       {/* Code Metrics Section */}
       <CodeMetrics repository={repository} />
+
+      {/* AI Repository Learning Path */}
+      <RepositoryLearningPath repository={repository} />
+
+      {/* Repository Evolution Timeline */}
+      <RepositoryEvolutionTimeline />
+
+      {/* Contributor Skill-Based Issue Recommendations */}
+      <ContributorIssueRecommendations />
+
+      {/* AI Code Complexity Analyzer */}
+      <CodeComplexityAnalyzer />
+
+      {/* Dependency Vulnerability Scanner */}
+      <DependencyVulnerabilityScanner />
+
+      {/* AI Contributor Onboarding Chatbot */}
+      <ContributorOnboardingChatbot />
+
+      {/* Smart Repository Health Dashboard */}
+      <RepositoryHealthDashboard />
+
+      {/* Repository Architecture Change Comparison */}
+      <ArchitectureChangeComparison />
+
+      {/* AI-Based Documentation Generator */}
+      <DocumentationGenerator />
+
+      {/* AI-Powered Pull Request Review Assistant */}
+      <PullRequestReviewAssistant />
 
     </div>
   )

@@ -14,18 +14,20 @@ describe("contributor journey simulator", () => {
       ],
       commits: [
         {
-          hash: "abc1234",
+          hash: "abc123",
+          shortHash: "abc123",
           message: "Fix auth provider flow",
-          author: "Author A",
-          date: new Date(),
-          filesChanged: 1,
+          author: "Dev",
+          date: new Date("2025-01-01T00:00:00.000Z"),
+          filesChanged: 2,
         },
         {
-          hash: "def5678",
+          hash: "def456",
+          shortHash: "def456",
           message: "Improve login session handling",
-          author: "Author B",
-          date: new Date(),
-          filesChanged: 1,
+          author: "Dev",
+          date: new Date("2025-01-02T00:00:00.000Z"),
+          filesChanged: 3,
         },
       ],
     };

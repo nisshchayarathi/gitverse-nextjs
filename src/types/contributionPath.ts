@@ -22,7 +22,8 @@ export interface RepositoryFile {
   type?: string;
   importance?: number;
   category?: string;
-  [key: string]: any;
+  dependencies?: string[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface ContributorInfo {
@@ -58,6 +59,7 @@ export interface RepositoryInsight {
 
 export interface RepositoryAnalysisData {
   id?: string | number;
+  repositoryId?: string | number;
   name?: string;
   description?: string;
   url?: string;
@@ -84,6 +86,7 @@ export interface RepositoryAnalysisData {
     averageContributorCommits?: number;
   };
   issues?: Array<{ id?: string | number; title?: string; labels?: Array<{ name: string }>; state?: string }>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ContributionDayPlan {
