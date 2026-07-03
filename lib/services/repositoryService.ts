@@ -72,6 +72,7 @@ export class RepositoryService {
   private async tryReadmeFromRepoPath(repoPath: string): Promise<{
     path: string;
     text: string;
+    truncated: boolean;
   } | null> {
     const candidates = [
       "readme.md",
