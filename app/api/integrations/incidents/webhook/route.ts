@@ -56,7 +56,8 @@ export async function POST(req: NextRequest) {
       ? (sourceHeader as any) 
       : "generic";
 
-    console.log(`[WebhookRoute] Received incident webhook from ${source}`);
+    // source is validated to a known provider string above — safe to log
+    console.info(`[WebhookRoute] Received incident webhook from ${source}`);
 
     // 1. Ingest
     const ingestionService = getIncidentIngestionService();
@@ -126,10 +127,11 @@ export async function POST(req: NextRequest) {
       { success: true, report, error: rollbackResult?.error },
       { status: 200 }
     );
-  } catch (error: any) {
-    console.error("[WebhookRoute] Error processing webhook:", error);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[WebhookRoute] Error processing webhook: ${message}`);
     return NextResponse.json(
-      { success: false, error: error.message || "Internal server error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }
