@@ -1,9 +1,58 @@
 import { ImageResponse } from 'next/og'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'edge'
 
+const OG_RATE_LIMIT = 20
+const OG_WINDOW_MS = 60_000
+
+// In-memory rate limiter keyed by client IP.
+// Suitable for Edge runtime where database-backed limiters are unavailable.
+// State is lost on cold-start, which is acceptable for a DoS mitigation layer.
+const ipWindows = new Map<string, number[]>()
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now()
+  const window = OG_WINDOW_MS
+
+  const timestamps = ipWindows.get(ip) ?? []
+  const valid = timestamps.filter(t => now - t < window)
+
+  if (valid.length >= OG_RATE_LIMIT) {
+    return true
+  }
+
+  valid.push(now)
+  ipWindows.set(ip, valid)
+
+  // Prune stale entries periodically to prevent unbounded memory growth
+  if (ipWindows.size > 10000) {
+    const cutoff = now - window
+    for (const [key, vals] of ipWindows) {
+      const fresh = vals.filter(t => t > cutoff)
+      if (fresh.length === 0) ipWindows.delete(key)
+      else ipWindows.set(key, fresh)
+    }
+  }
+
+  return false
+}
+
+function getClientIp(req: NextRequest): string {
+  const forwarded = req.headers.get('x-forwarded-for')
+  if (forwarded) return forwarded.split(',')[0]?.trim() ?? 'unknown'
+  const realIp = req.headers.get('x-real-ip')
+  if (realIp) return realIp
+  return 'unknown'
+}
+
 export async function GET(request: NextRequest) {
+  const ip = getClientIp(request)
+
+  if (isRateLimited(ip)) {
+    return new Response('Rate limit exceeded', { status: 429 })
+  }
+
   try {
     const { searchParams } = new URL(request.url)
 
@@ -154,9 +203,7 @@ export async function GET(request: NextRequest) {
         height: 630,
       }
     )
-  } catch (e: any) {
-    return new Response(`Failed to generate dynamic OG Image: ${e.message}`, {
-      status: 500,
-    })
+  } catch (e: unknown) {
+    return new Response('Failed to generate dynamic OG Image', { status: 500 })
   }
 }
