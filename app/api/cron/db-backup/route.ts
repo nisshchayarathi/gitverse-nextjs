@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error("[BackupCron] Backup failed:", error);
     return NextResponse.json(
-      { error: "Database backup failed", details: error?.message },
+      { error: "Database backup failed" },
       { status: 500 },
     );
   }
