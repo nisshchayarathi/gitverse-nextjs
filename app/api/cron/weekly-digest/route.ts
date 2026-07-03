@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { GitHubService } from '@/lib/services/githubService';
 import { getDecryptedGitHubToken } from '@/lib/utils/githubToken';
@@ -6,10 +6,10 @@ import { secretDetector } from '@/lib/services/secret-detector';
 import { RiskScorer } from '@/lib/services/riskScorer';
 import { DependencyGraphAnalyzer } from '@/lib/services/dependencyGraphAnalyzer';
 import { getGeminiService } from '@/lib/services/geminiService';
+import { isCronAuthorized } from '@/lib/utils/internalAuth';
 
-export async function GET(req: Request) {
-  const authHeader = req.headers.get('authorization');
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+export async function GET(req: NextRequest) {
+  if (!isCronAuthorized(req.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -59,11 +59,13 @@ export async function GET(req: Request) {
 
       try {
         await githubService.createIssue(owner, repoName, `Weekly Health Digest - ${new Date().toISOString().split('T')[0]}`, digestBody);
-      } catch (e) { console.warn('Failed to create github issue', e); }
+      } catch (e) {
+        console.warn('[weekly-digest] Failed to create GitHub issue:', e?.message);
+      }
     }
 
     return NextResponse.json({ success: true, processedCount: repos.length });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Weekly digest failed' }, { status: 500 });
   }
 }
