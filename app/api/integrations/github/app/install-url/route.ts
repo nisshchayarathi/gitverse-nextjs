@@ -8,6 +8,12 @@ function getRequiredEnv(name: string): string {
   return value.trim();
 }
 
+function isGitHubAppConfigured(): boolean {
+  return !!process.env.GITHUB_APP_ID?.trim() &&
+    !!process.env.GITHUB_APP_PRIVATE_KEY?.trim() &&
+    !!process.env.GITHUB_APP_SLUG?.trim();
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
@@ -30,6 +36,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: error.message },
         { status: error.status },
+      );
+    }
+    // Distinguish between misconfiguration and runtime errors (issue #53).
+    if (!isGitHubAppConfigured()) {
+      return NextResponse.json(
+        {
+          error:
+            "GitHub App is not configured on this server. Please contact the administrator to set GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, and GITHUB_APP_SLUG environment variables.",
+          code: "GITHUB_APP_NOT_CONFIGURED",
+        },
+        { status: 503 },
       );
     }
     return NextResponse.json(
