@@ -100,12 +100,12 @@ export class RepositoryService {
         const trimmed = content.trim();
         if (!trimmed) return null;
 
-        // Prevent huge README payloads from bloating DB / responses.
+        // Prevent huge README payloads from bloating DB / responses (issue #82).
         const maxChars = 200_000;
-        const safeText =
-          trimmed.length > maxChars ? trimmed.slice(0, maxChars) : trimmed;
+        const isTruncated = trimmed.length > maxChars;
+        const safeText = isTruncated ? trimmed.slice(0, maxChars) : trimmed;
 
-        return { path: actual, text: safeText };
+        return { path: actual, text: safeText, truncated: isTruncated };
       }
 
       return null;
@@ -173,7 +173,7 @@ export class RepositoryService {
         },
       });
 
-      return updated;
+      return { ...updated, truncated: readme?.truncated ?? false };
     } finally {
       if (gitService) {
         await gitService.cleanup();

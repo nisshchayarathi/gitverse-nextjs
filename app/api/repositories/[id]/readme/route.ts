@@ -28,6 +28,7 @@ export async function POST(
         readmePath: repository.readmePath,
         readmeText: repository.readmeText,
         readmeFetchedAt: repository.readmeFetchedAt,
+        truncated: (repository as any).truncated ?? false,
       },
     });
   } catch (error: any) {
