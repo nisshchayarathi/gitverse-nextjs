@@ -218,7 +218,7 @@ describe("POST /api/integrations/github/connect", () => {
   describe("rate limit handling", () => {
     it("returns 429 with retryAfter when rate limit error occurs", async () => {
       const retryAfterSeconds = 60;
-      (GitHubService as jest.Mock).mockImplementation(() => ({
+      (GitHubService as unknown as jest.Mock).mockImplementation(() => ({
         getAuthenticatedUser: jest.fn().mockRejectedValue(
           new GitHubRateLimitError(retryAfterSeconds)
         ),
@@ -235,7 +235,7 @@ describe("POST /api/integrations/github/connect", () => {
 
     it("includes retry-after header in rate limit response", async () => {
       const retryAfterSeconds = 120;
-      (GitHubService as jest.Mock).mockImplementation(() => ({
+      (GitHubService as unknown as jest.Mock).mockImplementation(() => ({
         getAuthenticatedUser: jest.fn().mockRejectedValue(
           new GitHubRateLimitError(retryAfterSeconds)
         ),
@@ -248,7 +248,7 @@ describe("POST /api/integrations/github/connect", () => {
 
     it("handles different retry after durations", async () => {
       for (const seconds of [30, 60, 300, 3600]) {
-        (GitHubService as jest.Mock).mockImplementation(() => ({
+        (GitHubService as unknown as jest.Mock).mockImplementation(() => ({
           getAuthenticatedUser: jest.fn().mockRejectedValue(
             new GitHubRateLimitError(seconds)
           ),
@@ -265,7 +265,7 @@ describe("POST /api/integrations/github/connect", () => {
   describe("token sanitization in logs", () => {
     it("sanitizes errors before logging", async () => {
       const testError = new Error("Test error");
-      (GitHubService as jest.Mock).mockImplementation(() => ({
+      (GitHubService as unknown as jest.Mock).mockImplementation(() => ({
         getAuthenticatedUser: jest.fn().mockRejectedValue(testError),
       }));
 

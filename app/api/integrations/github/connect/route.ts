@@ -70,16 +70,20 @@ export async function POST(request: NextRequest) {
     );
   } catch (error: any) {
     if (error instanceof GitHubRateLimitError) {
+      const retryAfterSeconds =
+        Number.isFinite(error.retryAfterSeconds) && error.retryAfterSeconds > 0
+          ? Math.floor(error.retryAfterSeconds)
+          : 60;
       return NextResponse.json(
         {
           error: "GITHUB_RATE_LIMIT",
           message: error.message,
-          retryAfter: error.retryAfterSeconds,
+          retryAfter: retryAfterSeconds,
         },
         {
           status: 429,
           headers: {
-            "Retry-After": String(error.retryAfterSeconds),
+            "Retry-After": String(retryAfterSeconds),
           },
         },
       );
