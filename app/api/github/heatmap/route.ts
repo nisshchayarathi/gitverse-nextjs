@@ -1,21 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, sanitizeError } from "@/lib/middleware";
+import { checkAiRateLimit } from "@/lib/utils/ipRateLimit";
+import { getClientIp } from "@/lib/services/rateLimitService";
 
 const GITHUB_GRAPHQL = "https://api.github.com/graphql";
 
+const HEATMAP_RATE_LIMIT = 30;
+const HEATMAP_WINDOW_MS = 60_000;
+
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const username = searchParams.get("username");
+  try {
+    const user = await requireAuth(req);
 
-  if (!username) {
-    return NextResponse.json({ error: "username is required" }, { status: 400 });
-  }
+    const allowed = await checkAiRateLimit(
+      String(user.userId),
+      "userId",
+      "heatmap",
+      HEATMAP_RATE_LIMIT,
+      HEATMAP_WINDOW_MS,
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before requesting another heatmap." },
+        { status: 429 },
+      );
+    }
 
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    return NextResponse.json({ error: "GitHub token not configured" }, { status: 500 });
-  }
+    const { searchParams } = new URL(req.url);
+    const username = searchParams.get("username");
 
-  const query = `
+    if (!username) {
+      return NextResponse.json({ error: "username is required" }, { status: 400 });
+    }
+
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) {
+      return NextResponse.json({ error: "GitHub token not configured" }, { status: 500 });
+    }
+
+    const query = `
     query ($login: String!) {
       user(login: $login) {
         contributionsCollection {
@@ -34,7 +57,6 @@ export async function GET(req: NextRequest) {
     }
   `;
 
-  try {
     const response = await fetch(GITHUB_GRAPHQL, {
       method: "POST",
       headers: {
@@ -63,7 +85,10 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json(calendar);
-  } catch (err) {
-    return NextResponse.json({ error: "Failed to fetch heatmap" }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: "Failed to fetch heatmap" },
+      { status: 500 },
+    );
   }
 }
