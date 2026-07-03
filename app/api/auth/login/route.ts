@@ -26,7 +26,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password, rememberMe } = body;
 
-    if (!email || !password) {
+    // Guard against type confusion: if email or password is not a string,
+    // the truthiness check passes but toLowerCase() throws (issue #2413).
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      !email ||
+      !password
+    ) {
       return apiError(400, "Email and password are required");
     }
 
