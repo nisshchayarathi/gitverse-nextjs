@@ -14,6 +14,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "repositoryId is required" }, { status: 400 });
     }
 
+    // Verify the user owns or has access to this repository before returning annotations.
+    // Without this check, any authenticated user could read annotations from any private
+    // repository by guessing the repositoryId (IDOR vulnerability, issue #2353).
+    const repository = await prisma.repository.findFirst({
+      where: {
+        id: parseInt(repositoryId),
+        OR: [
+          { userId: user.userId },
+          { organization: { members: { some: { userId: user.userId } } } },
+        ],
+      },
+    });
+
+    if (!repository) {
+      // Return 404 to avoid leaking information about repository existence
+      return NextResponse.json({ error: "Repository not found" }, { status: 404 });
+    }
+
     const annotations = await prisma.mapAnnotation.findMany({
       where: {
         repositoryId: parseInt(repositoryId),
