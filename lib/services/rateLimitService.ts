@@ -18,7 +18,47 @@ function getRetentionThreshold(): Date {
   return new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
 }
 
+const TRUSTED_PROXY_PATTERNS = [
+  /^127\.0\.0\.1$/,
+  /^::1$/,
+  /^::ffff:127\.0\.0\.1$/,
+];
+
+const PRIVATE_IP_PATTERNS = [
+  /^127\.0\.0\.1$/,
+  /^::1$/,
+  /^::ffff:127\.0\.0\.1$/,
+  /^10\./,
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+  /^192\.168\./,
+  /^fc00:\//,
+  /^fe80:\//,
+];
+
+function isTrustedProxyIp(ip: string): boolean {
+  return (
+    TRUSTED_PROXY_PATTERNS.some((pattern) => pattern.test(ip)) ||
+    PRIVATE_IP_PATTERNS.some((pattern) => pattern.test(ip))
+  );
+}
+
 export function getClientIp(request: NextRequest): string {
+  // request.ip is set by the hosting platform (Vercel, etc.) based on the
+  // actual TCP connection. It is the most trustworthy source.
+  const platformIp = request.ip;
+  if (platformIp && platformIp !== "unknown") {
+    // Only trust X-Forwarded-For from a known proxy (localhost/private IP range).
+    // If the request came directly (no proxy), X-Forwarded-For cannot be trusted.
+    const forwarded = request.headers.get("x-forwarded-for");
+    if (forwarded && platformIp && isTrustedProxyIp(platformIp)) {
+      const ip = forwarded.split(",")[0]?.trim();
+      if (ip && ip !== "unknown") return ip;
+    }
+    return platformIp;
+  }
+
+  // Fallback for environments where request.ip is not available.
+  // Only use X-Forwarded-For when we have reason to believe a trusted proxy exists.
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
     const ip = forwarded.split(",")[0]?.trim();
@@ -26,7 +66,8 @@ export function getClientIp(request: NextRequest): string {
   }
   const realIp = request.headers.get("x-real-ip");
   if (realIp && realIp !== "unknown") return realIp;
-  return request.ip ?? "unknown";
+
+  return "unknown";
 }
 
 async function maybeCleanupStaleAttempts() {

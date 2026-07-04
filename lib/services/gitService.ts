@@ -9,6 +9,7 @@ import readline from "readline";
 import { normalizeKnownRepoHttpUrl } from "@/lib/utils/repositoryUtils";
 
 const DEFAULT_GIT_TIMEOUT_MS = 2 * 60 * 1000;
+const MAX_BRANCHES_TO_ANALYZE = 1000;
 const GIT_CLONE_TIMEOUT_MS = 10 * 60 * 1000;
 const GIT_LOG_TIMEOUT_MS = 5 * 60 * 1000;
 const FORCE_KILL_DELAY_MS = 5_000;
@@ -194,6 +195,8 @@ export interface BranchData {
   isProtected: boolean;
   commitCount: number;
   lastCommitAt: Date;
+  /** Set to true when the branch list was truncated due to MAX_BRANCHES_TO_ANALYZE limit (issue #2354). */
+  isTruncated?: boolean;
 }
 
 export interface ContributorData {
@@ -432,7 +435,7 @@ export class GitService {
 
       const lines = stdout.trim().split("\n").filter(Boolean);
       const seenBranches = new Set<string>();
-      const refEntries: { name: string; fullName: string; date: string }[] = [];
+      let refEntries: { name: string; fullName: string; date: string }[] = [];
 
       for (const line of lines) {
         const [fullName, date] = line.split("|");
@@ -448,6 +451,13 @@ export class GitService {
         seenBranches.add(name);
 
         refEntries.push({ name, fullName, date });
+      }
+
+      // Hard-limit branch count to prevent DoS via repositories with thousands of branches
+      // (issue #2354). Repos exceeding this limit are truncated to protect server resources.
+      const hasMore = refEntries.length > MAX_BRANCHES_TO_ANALYZE;
+      if (hasMore) {
+        refEntries = refEntries.slice(0, MAX_BRANCHES_TO_ANALYZE);
       }
 
       // 🔥 FIX: Process in chunks to prevent process bombs on repositories with many branches
@@ -467,6 +477,7 @@ export class GitService {
       }
 
       const branches: BranchData[] = refEntries.map((entry, i) => {
+        const isLastTruncatedEntry = hasMore && i === refEntries.length - 1;
         const result = countResults[i];
         const commitCount = result.status === "fulfilled" ? result.value : 0;
 
@@ -484,6 +495,7 @@ export class GitService {
           ),
           commitCount,
           lastCommitAt: new Date(entry.date),
+          isTruncated: isLastTruncatedEntry ? true : undefined,
         };
       });
 
