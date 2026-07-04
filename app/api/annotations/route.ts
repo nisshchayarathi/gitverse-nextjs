@@ -22,7 +22,15 @@ export async function GET(request: NextRequest) {
         id: parseInt(repositoryId),
         OR: [
           { userId: user.userId },
-          { organization: { members: { some: { userId: user.userId } } } },
+          {
+            policyAssignment: {
+              organization: {
+                members: {
+                  some: { userId: user.userId },
+                },
+              },
+            },
+          },
         ],
       },
     });
