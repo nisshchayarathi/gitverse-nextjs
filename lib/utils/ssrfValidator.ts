@@ -1,4 +1,5 @@
 import * as dns from 'dns/promises';
+import { logger } from '@/lib/logger';
 
 /**
  * Checks whether an IP address belongs to a private, loopback, or cloud-metadata block.
@@ -84,7 +85,9 @@ export async function validateSafeUrl(urlString: string): Promise<boolean> {
     
     return true;
   } catch (error) {
-    // If DNS resolution fails, consider it unsafe
+    // Log DNS resolution failures so operators can distinguish transient network errors
+    // from genuinely invalid/malicious URLs; still fail-safe return false for SSRF defense.
+    logger.warn({ err: error, hostname }, "validateSafeUrl: DNS resolution failed, rejecting URL as unsafe");
     return false;
   }
 }
