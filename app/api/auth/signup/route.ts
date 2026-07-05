@@ -1,4 +1,5 @@
 import { sanitizeError } from "@/lib/middleware";
+import { apiError } from "@/lib/api-error";
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
@@ -25,10 +26,7 @@ export async function POST(request: NextRequest) {
     const { email, password, name } = body;
 
     if (!email || !password || !name) {
-      return NextResponse.json(
-        { error: "Email, password, and name are required" },
-        { status: 400 },
-      );
+      return apiError(400, "Email, password, and name are required");
     }
 
     normalizedEmail = email.toLowerCase();
@@ -43,20 +41,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (!PASSWORD_REGEX.test(password)) {
-      return NextResponse.json(
-        {
-          error:
-            "Password must be at least 8 characters and include uppercase, lowercase, and a number",
-        },
-        { status: 400 },
+      return apiError(
+        400,
+        "Password must be at least 8 characters and include uppercase, lowercase, and a number",
       );
     }
 
     if (new TextEncoder().encode(password).length > 72) {
-      return NextResponse.json(
-        { error: "Password must be at most 72 bytes" },
-        { status: 400 },
-      );
+      return apiError(400, "Password must be at most 72 bytes");
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -99,12 +91,7 @@ export async function POST(request: NextRequest) {
       );
 
       return NextResponse.json(
-        {
-          error:
-            "Unable to complete registration. Please verify your information and try again.",
-          message:
-            "Unable to complete registration. Please verify your information and try again.",
-        },
+        { error: { message: "Email address is already registered." } },
         { status: 409 },
       );
     }
@@ -142,12 +129,7 @@ export async function POST(request: NextRequest) {
         "Signup attempt failed: Database unique constraint violation (email already exists)",
       );
       return NextResponse.json(
-        {
-          error:
-            "Unable to complete registration. Please verify your information and try again.",
-          message:
-            "Unable to complete registration. Please verify your information and try again.",
-        },
+        { error: { message: "Email address is already registered." } },
         { status: 409 },
       );
     }
