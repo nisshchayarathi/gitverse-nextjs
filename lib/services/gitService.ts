@@ -115,7 +115,7 @@ type ParsedCommitHeader = {
 };
 
 function parseCommitHeaderLine(line: string): ParsedCommitHeader | null {
-  const parts = line.split("|");
+  const parts = line.split("|", 8);
   if (parts.length < 8) return null;
   const [
     hash,
