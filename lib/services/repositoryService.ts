@@ -954,14 +954,8 @@ export class RepositoryService {
       prisma.analysisJob.deleteMany({
         where: { repositoryId: id },
       }),
-      // Repository deletion handles the rest via Cascade
-      prisma.repository.delete({
-        where: { id },
-      }),
     ]);
-    await prisma.repository.delete({
-      where: { id },
-    });
+    // Repository was already deleted by deleteMany above; only cascade cleanup remains.
 
     // Invalidate cached stats — repository no longer exists.
     ttlCache.deleteByPrefix(`repo-stats:${id}:`);
