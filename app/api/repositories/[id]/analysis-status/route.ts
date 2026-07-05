@@ -5,7 +5,7 @@ import { analysisJobService } from "@/lib/services/analysisJobService";
 import { apiError } from "@/lib/api-error";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // max duration for edge/serverless functions if configured
+export const maxDuration = 900; // 15 minutes: large repos (>1000 files) exceed the default 300s Vercel limit
 
 export async function GET(
   request: NextRequest,
