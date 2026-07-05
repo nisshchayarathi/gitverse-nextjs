@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAuth, isHttpError , sanitizeError } from "@/lib/middleware";
 import { analysisJobService } from "@/lib/services/analysisJobService";
+import { logger } from "@/lib/logger";
 
 import { shouldThrottleJobKick } from "@/lib/utils/analysisRunner";
 
@@ -16,7 +17,9 @@ async function kickLocalRunner(request: NextRequest, jobId: string) {
   void fetch(`${origin}/api/internal/run-analysis`, {
     method: "POST",
     headers: secret ? { "x-analysis-runner-secret": secret } : undefined,
-  }).catch(() => {});
+  }).catch((err) => {
+    logger.warn({ err }, `kickLocalRunner: failed to trigger local analysis runner for job ${jobId}`);
+  });
 }
 
 
