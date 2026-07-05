@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 import { verifyGitHubWebhookSignature } from "@/lib/utils/githubWebhook";
 import { GithubWebhookVerifier } from "@/lib/services/githubWebhookVerifier";
 import prisma from "@/lib/prisma";
@@ -237,7 +238,9 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXTAUTH_URL || `http://${request.headers.get("host") || "localhost:3000"}`;
     await webhookQueue.enqueueWebhook(payload, event || "unknown", action, baseUrl, deliveryId);
 
-    webhookRetryService.requeueFailedJobs().catch(() => {});
+    webhookRetryService.requeueFailedJobs().catch((err) => {
+      logger.warn({ err }, "webhookRetryService.requeueFailedJobs failed");
+    });
 
     return NextResponse.json(
       { ok: true, message: "Webhook accepted and queued for processing" },
