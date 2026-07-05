@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, sanitizeError } from "@/lib/middleware";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,8 @@ interface SnapshotQueryResponse {
  */
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth(request);
+
     const body: SnapshotRequest = await request.json();
 
     if (!body.repositoryId || !body.snapshot) {
@@ -48,8 +51,9 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("Error storing snapshot:", error);
+  } catch (error: any) {
+    console.error("Error storing snapshot:", sanitizeError(error));
+    if (error?.status === 401) return NextResponse.json({ error: error.message }, { status: 401 });
     return NextResponse.json(
       { error: "Failed to store snapshot" },
       { status: 500 }
@@ -66,6 +70,8 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireAuth(request);
+
     const searchParams = request.nextUrl.searchParams;
     const repositoryId = searchParams.get("repositoryId");
     const days = parseInt(searchParams.get("days") || "30", 10);
@@ -89,8 +95,9 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json(response, { status: 200 });
-  } catch (error) {
-    console.error("Error retrieving snapshots:", error);
+  } catch (error: any) {
+    console.error("Error retrieving snapshots:", sanitizeError(error));
+    if (error?.status === 401) return NextResponse.json({ error: error.message }, { status: 401 });
     return NextResponse.json(
       { error: "Failed to retrieve snapshots" },
       { status: 500 }
@@ -106,6 +113,8 @@ export async function GET(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await requireAuth(request);
+
     const searchParams = request.nextUrl.searchParams;
     const repositoryId = searchParams.get("repositoryId");
     const olderThanDays = parseInt(
@@ -131,8 +140,9 @@ export async function DELETE(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error) {
-    console.error("Error deleting snapshots:", error);
+  } catch (error: any) {
+    console.error("Error deleting snapshots:", sanitizeError(error));
+    if (error?.status === 401) return NextResponse.json({ error: error.message }, { status: 401 });
     return NextResponse.json(
       { error: "Failed to delete snapshots" },
       { status: 500 }
