@@ -28,8 +28,8 @@ function kickLocalRunner(request: NextRequest) {
   void fetch(`${origin}/api/internal/run-analysis`, {
     method: "POST",
     headers: { "x-analysis-runner-secret": secret },
-  }).catch(() => {
-    // Best-effort only.
+  }).catch((err) => {
+    logger.warn({ err }, "kickLocalRunner: failed to trigger local analysis runner");
   });
 }
 
