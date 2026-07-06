@@ -265,7 +265,7 @@ export function RepositoryInsights({
       <CodeMetrics repository={repository} />
 
       {/* AI Repository Learning Path */}
-      <RepositoryLearningPath repository={repository} />
+      <RepositoryLearningPath />
 
       {/* Repository Evolution Timeline */}
       <RepositoryEvolutionTimeline />
