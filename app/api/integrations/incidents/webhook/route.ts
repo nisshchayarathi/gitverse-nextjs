@@ -128,8 +128,9 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     console.error("[WebhookRoute] Error processing webhook:", error);
+    const message = process.env.NODE_ENV === "development" ? error.message : "Internal server error";
     return NextResponse.json(
-      { success: false, error: error.message || "Internal server error" },
+      { success: false, error: message },
       { status: 500 }
     );
   }
