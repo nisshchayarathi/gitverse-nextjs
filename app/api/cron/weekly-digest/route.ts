@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
 
       try {
         await githubService.createIssue(owner, repoName, `Weekly Health Digest - ${new Date().toISOString().split('T')[0]}`, digestBody);
-      } catch (e) {
+      } catch (e: any) {
         console.warn('[weekly-digest] Failed to create GitHub issue:', e?.message);
       }
     }
