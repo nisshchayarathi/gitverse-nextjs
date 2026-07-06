@@ -199,8 +199,13 @@ export async function PUT(
 
     if (!githubRepo || githubRepo.installationId === null) {
       return NextResponse.json(
-        { error: "No GitHub installation found for this repository" },
-        { status: 404, headers: securityHeaders }
+        {
+          error: "GitHub App is not installed for this repository",
+          code: "GITHUB_APP_NOT_INSTALLED",
+          setupUrl: "https://github.com/apps/unknown/installations/new",
+          message: "Install the GitVerse GitHub App to enable billing features for this repository.",
+        },
+        { status: 503, headers: securityHeaders }
       );
     }
 
