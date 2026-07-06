@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!repo) {
-      return NextResponse.json({ error: "Repository not found or access denied" }, { status: 403 });
+      return NextResponse.json({ error: "Repository not found or access denied" }, { status: 404 });
     }
 
     const annotation = await prisma.mapAnnotation.create({

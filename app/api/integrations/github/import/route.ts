@@ -90,6 +90,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Handle specific GitHub API errors
+    const status = error?.response?.status;
+    if (status === 403) {
+      return NextResponse.json(
+        { error: "Access forbidden: Insufficient permissions to access this repository. Please ensure the repository is public or you have been granted access." },
+        { status: 403 }
+      );
+    }
+
+    if (status === 404) {
+      return NextResponse.json(
+        { error: "Repository not found: The specified repository does not exist or is not accessible. Please verify the URL is correct." },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to import from GitHub" },
       { status: 500 }
