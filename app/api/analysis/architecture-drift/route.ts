@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/middleware";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,9 @@ interface SnapshotQueryResponse {
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth;
+
     const body: SnapshotRequest = await request.json();
 
     if (!body.repositoryId || !body.snapshot) {
@@ -66,6 +70,9 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth;
+
     const searchParams = request.nextUrl.searchParams;
     const repositoryId = searchParams.get("repositoryId");
     const days = parseInt(searchParams.get("days") || "30", 10);
@@ -106,6 +113,9 @@ export async function GET(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await requireAuth(request);
+    if (!auth.ok) return auth;
+
     const searchParams = request.nextUrl.searchParams;
     const repositoryId = searchParams.get("repositoryId");
     const olderThanDays = parseInt(
