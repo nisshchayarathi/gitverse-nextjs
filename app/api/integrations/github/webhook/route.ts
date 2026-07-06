@@ -42,6 +42,47 @@ type WebhookPayload = {
 };
 
 /**
+ * Maximum age for webhook events to prevent replay attacks (5 minutes).
+ * GitHub-recommended threshold for stale event rejection.
+ */
+const MAX_WEBHOOK_AGE_MS = 5 * 60 * 1000;
+
+/**
+ * Extracts the event timestamp from a GitHub webhook payload.
+ * Returns null if no reliable timestamp is found.
+ */
+function extractEventTimestamp(payload: WebhookPayload): number | null {
+  if (payload.pull_request?.updated_at) {
+    return new Date(payload.pull_request.updated_at).getTime();
+  }
+  if (payload.issue?.updated_at) {
+    return new Date(payload.issue.updated_at).getTime();
+  }
+  if ((payload as any).head_commit?.timestamp) {
+    return new Date((payload as any).head_commit.timestamp).getTime();
+  }
+  return null;
+}
+
+/**
+ * Validates that a webhook event is not too old (replay protection).
+ * Returns { valid: true } if the event is within the allowed age window,
+ * or { valid: false, reason: string } if it is stale.
+ */
+function validateWebhookTimestamp(payload: WebhookPayload): { valid: boolean; reason?: string } {
+  const timestamp = extractEventTimestamp(payload);
+  if (timestamp === null) return { valid: true };
+  const age = Date.now() - timestamp;
+  if (age > MAX_WEBHOOK_AGE_MS) {
+    return {
+      valid: false,
+      reason: `Webhook event too old: ${Math.round(age / 1000)}s > ${MAX_WEBHOOK_AGE_MS / 1000}s`,
+    };
+  }
+  return { valid: true };
+}
+
+/**
  * We only process PR events that materially change the diff or state:
  * - opened: new PR submitted
  * - reopened: closed PR brought back
@@ -139,6 +180,19 @@ export async function POST(request: NextRequest) {
     payload = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  /*
+   * ┌──────────────────────────────────────────────────────────┐
+   * │ 2b. Timestamp validation (replay protection)              │
+   * │    Reject webhook events older than 5 minutes to prevent │
+   * │    replay attacks with otherwise valid signatures.        │
+   * └──────────────────────────────────────────────────────────┘
+   */
+  const tsCheck = validateWebhookTimestamp(payload);
+  if (!tsCheck.valid) {
+    console.warn(`[WebhookRoute] Rejected stale webhook: ${tsCheck.reason}`);
+    return NextResponse.json({ error: "Webhook event too old", reason: tsCheck.reason }, { status: 400 });
   }
 
   const action = payload.action;
