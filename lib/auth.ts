@@ -458,8 +458,9 @@ export async function batchInvalidateUserTokens(
 }
 
 /**
- * Token rotation for session security
- * Creates a new token while invalidating the old one
+ * Rotates a user's token by atomically incrementing the token version.
+ * This prevents race conditions where concurrent rotations could produce
+ * duplicate valid tokens or allow session hijacking.
  */
 export async function rotateToken(
   oldToken: string,
@@ -472,35 +473,21 @@ export async function rotateToken(
     if (!payload || payload.userId !== userId) {
       return null;
     }
-    
-    // Get current token version
-    const user = await prisma.user.findUnique({
+
+    // Atomic increment — no read-before-write race
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
-      select: { tokenVersion: true }
+      data: { tokenVersion: { increment: 1 } },
+      select: { tokenVersion: true },
     });
-    
-    if (!user) {
-      return null;
-    }
-    
-    const oldVersion = user.tokenVersion;
-    
-    // Generate new token with incremented version
-    const newVersion = oldVersion + 1;
-    
+
+    const newVersion = updatedUser.tokenVersion;
+    const oldVersion = newVersion - 1;
+
+    // Generate token AFTER the DB write succeeds
     const newToken = createSignedToken(userId, email, newVersion);
-    
-    // Update database
-    await prisma.user.update({
-      where: { id: userId },
-      data: { tokenVersion: newVersion }
-    });
-    
-    return {
-      newToken,
-      oldVersion,
-      newVersion,
-    };
+
+    return { newToken, oldVersion, newVersion };
   } catch (error) {
     console.error(`[JWT] Token rotation failed for user ${userId}:`, error);
     return null;
