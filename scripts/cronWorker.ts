@@ -32,19 +32,24 @@ process.on("unhandledRejection", async (reason) => {
 });
 
 let shuttingDown = false;
-const acquiredJobIds: string[] = [];
+const acquiredJobs: Map<string, { workerId: string; lockToken: string }> = new Map();
 
 const releaseAllLocks = async () => {
-  if (acquiredJobIds.length === 0) return;
-  console.log(`[CronWorker] Releasing ${acquiredJobIds.length} lock(s) before exit`);
-  for (const jobId of acquiredJobIds) {
+  if (acquiredJobs.size === 0) return;
+  console.log(`[CronWorker] Releasing ${acquiredJobs.size} lock(s) before exit`);
+  const entries = Array.from(acquiredJobs.entries());
+  for (const [jobId, lock] of entries) {
     try {
-      await analysisJobService.releaseLock({ jobId, workerId: WORKER_ID });
+      await analysisJobService.releaseLock({
+        jobId,
+        workerId: lock.workerId,
+        lockToken: lock.lockToken,
+      });
     } catch (err) {
       console.error(`[CronWorker] Failed to release lock for job ${jobId}:`, err);
     }
   }
-  acquiredJobIds.length = 0;
+  acquiredJobs.clear();
 };
 
 const shutdown = async (signal: string) => {
@@ -71,6 +76,12 @@ const checkDatabaseConnectivity = async (): Promise<boolean> => {
 };
 
 const processJob = async (jobId: string): Promise<boolean> => {
+  const lock = acquiredJobs.get(jobId);
+  if (!lock) {
+    console.error(`[CronWorker] No lock found for job ${jobId}`);
+    return false;
+  }
+
   try {
     const dbJob = await analysisJobService.getJob({ jobId, userId: 0 });
     if (!dbJob) {
@@ -82,7 +93,8 @@ const processJob = async (jobId: string): Promise<boolean> => {
       console.warn(`[CronWorker] Unsupported job type for ${jobId}: ${dbJob.type}`);
       await analysisJobService.markFailed({
         jobId,
-        workerId: WORKER_ID,
+        workerId: lock.workerId,
+        lockToken: lock.lockToken,
         error: `Unsupported job type: ${dbJob.type}`,
         attempts: dbJob.attempts,
         maxAttempts: dbJob.maxAttempts,
@@ -99,7 +111,11 @@ const processJob = async (jobId: string): Promise<boolean> => {
       });
     }
 
-    await analysisJobService.markDone({ jobId, workerId: WORKER_ID });
+    await analysisJobService.markDone({
+      jobId,
+      workerId: lock.workerId,
+      lockToken: lock.lockToken,
+    });
     console.log(`[CronWorker] Job ${jobId} completed successfully`);
     return true;
   } catch (err: any) {
@@ -107,12 +123,14 @@ const processJob = async (jobId: string): Promise<boolean> => {
     console.error(`[CronWorker] Job ${jobId} failed:`, message);
 
     try {
+      const dbJob = await analysisJobService.getJob({ jobId, userId: 0 });
       await analysisJobService.markFailed({
         jobId,
-        workerId: WORKER_ID,
+        workerId: lock.workerId,
+        lockToken: lock.lockToken,
         error: message,
-        attempts: (await analysisJobService.getJob({ jobId, userId: 0 }))?.attempts ?? 0,
-        maxAttempts: 3,
+        attempts: dbJob?.attempts ?? 0,
+        maxAttempts: dbJob?.maxAttempts ?? 3,
       });
     } catch (markErr) {
       console.error(`[CronWorker] Failed to mark job ${jobId} as failed:`, markErr);
@@ -147,13 +165,12 @@ const runOnce = async (): Promise<number> => {
       break;
     }
 
-    acquiredJobIds.push(job.id);
+    acquiredJobs.set(job.id, { workerId: WORKER_ID, lockToken: job.lockToken! });
     try {
       await processJob(job.id);
       processed++;
     } finally {
-      const idx = acquiredJobIds.indexOf(job.id);
-      if (idx !== -1) acquiredJobIds.splice(idx, 1);
+      acquiredJobs.delete(job.id);
     }
   }
 

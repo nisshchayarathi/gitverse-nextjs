@@ -249,9 +249,12 @@ export class AnalysisJobService {
 
   /**
    * Updates a job's progress percentage and message.
-   * If workerId is provided, also extends the lock by extendLockMs.
+   * If workerId and lockToken are provided, also extends the lock by extendLockMs.
    * This is called periodically by the repository analysis logic to
    * report progress and prevent lock expiry during long analyses.
+   *
+   * When extending the lock, both workerId and lockToken are required
+   * to prevent progress updates from orphaned workers.
    */
   async updateProgress(params: {
     jobId: string;
@@ -267,10 +270,8 @@ export class AnalysisJobService {
       : undefined;
 
     const where: any = { id: params.jobId };
-    if (params.workerId) {
+    if (params.workerId && params.lockToken) {
       where.lockedBy = params.workerId;
-    }
-    if (params.lockToken) {
       where.lockToken = params.lockToken;
     }
 
@@ -280,7 +281,7 @@ export class AnalysisJobService {
         progressPercent: pct,
         progressMessage: params.update.progressMessage,
         progressDetails: params.update.progressDetails as any,
-        ...(params.workerId
+        ...(params.workerId && params.lockToken
           ? {
               lockExpiresAt: new Date(Date.now() + lockExtension),
             }
@@ -291,18 +292,16 @@ export class AnalysisJobService {
 
   /**
    * Marks a job as DONE with 100% progress and clears all lock fields.
-   * Requires workerId in the WHERE clause so only the owning worker can
-   * complete a job. This prevents a race where two workers both think
-   * they own the same job.
+   * Requires both workerId and lockToken in the WHERE clause so only
+   * the owning worker can complete a job. This prevents a race where
+   * two workers both think they own the same job.
    */
-  async markDone(params: { jobId: string; workerId?: string; lockToken?: string }): Promise<void> {
-    const where: any = { id: params.jobId };
-    if (params.workerId) {
-      where.lockedBy = params.workerId;
-    }
-    if (params.lockToken) {
-      where.lockToken = params.lockToken;
-    }
+  async markDone(params: { jobId: string; workerId: string; lockToken: string }): Promise<void> {
+    const where: any = {
+      id: params.jobId,
+      lockedBy: params.workerId,
+      lockToken: params.lockToken,
+    };
 
     await prisma.analysisJob.update({
       where,
@@ -327,22 +326,23 @@ export class AnalysisJobService {
    * Non-retryable errors or exhausted attempts result in a permanent FAILED state.
    * Lock fields are cleared in both cases so other workers can pick up
    * retried jobs.
+   *
+   * Requires both workerId and lockToken to ensure only the owning worker
+   * can mark a job as failed.
    */
   async markFailed(params: {
     jobId: string;
-    workerId?: string;
-    lockToken?: string;
+    workerId: string;
+    lockToken: string;
     error: string;
     attempts: number;
     maxAttempts: number;
   }): Promise<void> {
-    const where: any = { id: params.jobId };
-    if (params.workerId) {
-      where.lockedBy = params.workerId;
-    }
-    if (params.lockToken) {
-      where.lockToken = params.lockToken;
-    }
+    const where: any = {
+      id: params.jobId,
+      lockedBy: params.workerId,
+      lockToken: params.lockToken,
+    };
 
     const shouldRetry =
       params.attempts < params.maxAttempts &&
@@ -467,25 +467,69 @@ export class AnalysisJobService {
   }
 
   /**
+   * Atomically claims a specific job by ID for a worker.
+   *
+   * Uses a single UPDATE with conditional WHERE to atomically:
+   * 1. Check the job is available (QUEUED or PROCESSING with expired lock)
+   * 2. Set the lock fields (locked_by, lock_token, lock_expires_at)
+   * 3. Return the lock token
+   *
+   * This is used by the BullMQ worker to claim a specific job that was
+   * dispatched to it, ensuring exactly-once processing even when multiple
+   * workers are running.
+   *
+   * @returns The lock token if claimed successfully, null otherwise
+   */
+  async claimJob(params: {
+    jobId: string;
+    workerId: string;
+    lockMs?: number;
+  }): Promise<{ lockToken: string } | null> {
+    const lockMs = params.lockMs ?? DEFAULT_LOCK_MS;
+
+    const result = await prisma.$executeRaw`
+      UPDATE analysis_jobs
+      SET
+        status = 'PROCESSING',
+        locked_at = NOW(),
+        locked_by = ${params.workerId},
+        lock_expires_at = NOW() + (${lockMs}::int * INTERVAL '1 millisecond'),
+        lock_token = gen_random_uuid(),
+        started_at = COALESCE(started_at, NOW()),
+        updated_at = NOW()
+      WHERE id = ${params.jobId}::uuid
+        AND (
+          status = 'QUEUED'
+          OR (status = 'PROCESSING' AND (lock_expires_at IS NULL OR lock_expires_at < NOW()))
+        )
+      RETURNING lock_token
+    ` as any[];
+
+    if (result.length === 0) return null;
+
+    return { lockToken: result[0].lock_token };
+  }
+
+  /**
    * Immediately expires a job's lock by setting lockExpiresAt to now.
    * This makes the job available for reclamation on the next cycle.
    * Called during graceful worker shutdown so queued jobs are not
    * blocked for the full DEFAULT_LOCK_MS duration.
+   *
+   * Requires both workerId and lockToken to prevent releasing locks
+   * held by other workers.
    */
   async releaseLock(params: {
     jobId: string;
-    workerId?: string;
-    lockToken?: string;
+    workerId: string;
+    lockToken: string;
   }): Promise<void> {
-    const where: any = { id: params.jobId };
-    if (params.workerId) {
-      where.lockedBy = params.workerId;
-    }
-    if (params.lockToken) {
-      where.lockToken = params.lockToken;
-    }
     await prisma.analysisJob.update({
-      where,
+      where: {
+        id: params.jobId,
+        lockedBy: params.workerId,
+        lockToken: params.lockToken,
+      },
       data: {
         lockExpiresAt: new Date(),
       },
@@ -546,22 +590,22 @@ export class AnalysisJobService {
    * lock fields and sets nextRunAt to now so the job is immediately
    * available for the next worker. Used when the cron worker exits to
    * ensure jobs are not stuck waiting for the next cron cycle.
+   *
+   * Requires both workerId and lockToken to prevent releasing jobs
+   * held by other workers.
    */
   async markDrainReleased(params: {
     jobId: string;
-    workerId?: string;
-    lockToken?: string;
+    workerId: string;
+    lockToken: string;
     error: string;
   }): Promise<void> {
-    const where: any = { id: params.jobId };
-    if (params.workerId) {
-      where.lockedBy = params.workerId;
-    }
-    if (params.lockToken) {
-      where.lockToken = params.lockToken;
-    }
     await prisma.analysisJob.update({
-      where,
+      where: {
+        id: params.jobId,
+        lockedBy: params.workerId,
+        lockToken: params.lockToken,
+      },
       data: {
         status: "QUEUED",
         lockExpiresAt: new Date(),
