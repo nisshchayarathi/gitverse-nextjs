@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
+import { getClientIp } from "@/lib/utils/ip";
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 let lastCleanupAt = 0;
@@ -18,16 +19,8 @@ function getRetentionThreshold(): Date {
   return new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
 }
 
-export function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const ip = forwarded.split(",")[0]?.trim();
-    if (ip && ip !== "unknown") return ip;
-  }
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp && realIp !== "unknown") return realIp;
-  return request.ip ?? "unknown";
-}
+// Re-export centralized IP extraction for backward compatibility
+export { getClientIp } from "@/lib/utils/ip";
 
 async function maybeCleanupStaleAttempts() {
   const now = Date.now();
