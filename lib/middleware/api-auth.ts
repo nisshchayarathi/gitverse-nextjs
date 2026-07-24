@@ -12,6 +12,7 @@ export interface AuthUser {
 export interface AuthResult {
   user: AuthUser | null;
   error: NextResponse | null;
+  scopes: string[];
 }
 
 async function resolveSessionUser(req: NextRequest): Promise<AuthUser | null> {
@@ -29,17 +30,17 @@ async function resolveSessionUser(req: NextRequest): Promise<AuthUser | null> {
   return null;
 }
 
-async function resolveApiKeyUser(req: NextRequest): Promise<AuthUser | null> {
+async function resolveApiKeyUser(req: NextRequest): Promise<{ user: AuthUser | null; scopes: string[] }> {
   const authHeader = req.headers.get("authorization");
   const rawKey = extractBearerToken(authHeader);
-  if (!rawKey) return null;
+  if (!rawKey) return { user: null, scopes: [] };
 
   const hashed = hashApiKey(rawKey);
   try {
     const apiKey = await prisma.apiKey.findUnique({ where: { hashedKey: hashed } });
-    if (!apiKey) return null;
+    if (!apiKey) return { user: null, scopes: [] };
 
-    if (apiKey.expiresAt < new Date()) return null;
+    if (apiKey.expiresAt < new Date()) return { user: null, scopes: [] };
 
     await prisma.apiKey.update({
       where: { id: apiKey.id },
@@ -51,22 +52,25 @@ async function resolveApiKeyUser(req: NextRequest): Promise<AuthUser | null> {
       select: { id: true, email: true, name: true },
     });
 
-    return user;
+    const scopes = Array.isArray(apiKey.scopes) ? (apiKey.scopes as string[]) : [];
+
+    return { user, scopes };
   } catch {
-    return null;
+    return { user: null, scopes: [] };
   }
 }
 
 export async function authenticateRequest(req: NextRequest): Promise<AuthResult> {
-  let user = await resolveApiKeyUser(req);
-  if (user) return { user, error: null };
+  const apiKeyResult = await resolveApiKeyUser(req);
+  if (apiKeyResult.user) return { user: apiKeyResult.user, error: null, scopes: apiKeyResult.scopes };
 
-  user = await resolveSessionUser(req);
-  if (user) return { user, error: null };
+  const sessionUser = await resolveSessionUser(req);
+  if (sessionUser) return { user: sessionUser, error: null, scopes: [] };
 
   return {
     user: null,
     error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    scopes: [],
   };
 }
 
@@ -75,6 +79,19 @@ export function requireScopes(
   requiredScopes: string[],
 ): NextResponse | null {
   if (!authResult.user) return authResult.error;
+
+  const hasAllRequired = requiredScopes.every(scope => authResult.scopes.includes(scope));
+
+  if (!hasAllRequired) {
+    return NextResponse.json(
+      {
+        error: "Insufficient scopes",
+        required: requiredScopes,
+        granted: authResult.scopes,
+      },
+      { status: 403 }
+    );
+  }
 
   return null;
 }
