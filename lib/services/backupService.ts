@@ -1,5 +1,4 @@
-import { exec } from "child_process";
-import { promisify } from "util";
+import { spawn } from "child_process";
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
@@ -7,8 +6,6 @@ import { createGzip } from "zlib";
 import { pipeline } from "stream/promises";
 import { createWriteStream, createReadStream } from "fs";
 import { logger } from "@/lib/logger";
-
-const execAsync = promisify(exec);
 
 const BACKUP_DIR = process.env.BACKUP_DIR || "/tmp/db-backups";
 const BACKUP_S3_BUCKET = process.env.BACKUP_S3_BUCKET || "";
@@ -34,6 +31,15 @@ function generateBackupId(): string {
   return `backup-${date}-${suffix}`;
 }
 
+function validateDatabaseUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "postgresql:" || parsed.protocol === "postgres:";
+  } catch {
+    return false;
+  }
+}
+
 async function computeSha256(filePath: string): Promise<string> {
   const hash = crypto.createHash("sha256");
   const stream = createReadStream(filePath);
@@ -49,28 +55,54 @@ async function getFileSize(filePath: string): Promise<number> {
 }
 
 async function runPgDump(databaseUrl: string, outputPath: string): Promise<void> {
-  const dumpCmd = `pg_dump --no-owner --no-acl --quote-all-identifiers "${databaseUrl}"`;
-  const gzip = createGzip({ level: 6 });
-  const outStream = createWriteStream(outputPath);
-
-  try {
-    await execAsync(`${dumpCmd} | gzip -c > ${outputPath}`, {
-      timeout: 5 * 60 * 1000,
-      maxBuffer: 1024 * 1024 * 1024,
-    });
-  } catch {
-    await execAsync(dumpCmd, {
-      timeout: 5 * 60 * 1000,
-      maxBuffer: 1024 * 1024 * 1024,
-    }).then(async (result) => {
-      const source = Buffer.from(result.stdout, "utf-8");
-      await pipeline(
-        require("stream").Readable.from(source),
-        gzip,
-        outStream,
-      );
-    });
+  if (!validateDatabaseUrl(databaseUrl)) {
+    throw new Error("Invalid database URL format. Expected postgresql:// or postgres:// URL.");
   }
+
+  return new Promise((resolve, reject) => {
+    const pgDump = spawn("pg_dump", [
+      "--no-owner",
+      "--no-acl",
+      "--quote-all-identifiers",
+      databaseUrl,
+    ]);
+
+    const gzip = createGzip({ level: 6 });
+    const outStream = createWriteStream(outputPath);
+
+    pgDump.stdout.pipe(gzip).pipe(outStream);
+
+    let stderrData = "";
+    pgDump.stderr.on("data", (chunk) => {
+      stderrData += chunk;
+    });
+
+    const timer = setTimeout(() => {
+      pgDump.kill("SIGTERM");
+      reject(new Error("pg_dump timed out after 5 minutes"));
+    }, 5 * 60 * 1000);
+
+    pgDump.on("error", (err) => {
+      clearTimeout(timer);
+      reject(new Error(`Failed to start pg_dump: ${err.message}`));
+    });
+
+    outStream.on("error", (err) => {
+      clearTimeout(timer);
+      pgDump.kill();
+      reject(err);
+    });
+
+    pgDump.on("close", (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        outStream.destroy();
+        reject(new Error(`pg_dump exited with code ${code}: ${stderrData}`));
+      } else {
+        outStream.on("finish", () => resolve());
+      }
+    });
+  });
 }
 
 async function uploadToS3(

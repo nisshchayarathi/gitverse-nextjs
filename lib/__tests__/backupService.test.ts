@@ -2,15 +2,13 @@ import fs from "fs/promises";
 import path from "path";
 import { createGzip } from "zlib";
 import { pipeline } from "stream/promises";
-import { Readable } from "stream";
+import { Readable, PassThrough } from "stream";
 import { createWriteStream } from "fs";
+import { EventEmitter } from "events";
 
-const mockExecAsync = jest.fn();
-jest.mock("util", () => ({
-  promisify: () => mockExecAsync,
-}));
+const mockSpawn = jest.fn();
 jest.mock("child_process", () => ({
-  exec: jest.fn(),
+  spawn: (...args: any[]) => mockSpawn(...args),
 }));
 
 jest.mock("@/lib/logger", () => ({
@@ -54,6 +52,46 @@ async function createGzipFile(filePath: string, content: string): Promise<void> 
   await pipeline(Readable.from([Buffer.from(content, "utf-8")]), gzip, createWriteStream(filePath));
 }
 
+function createSuccessfulMockSpawn(preCreatedFile?: string) {
+  return (...args: any[]) => {
+    const proc = new EventEmitter() as any;
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    proc.stdout = stdout;
+    proc.stderr = stderr;
+    proc.kill = jest.fn();
+
+    process.nextTick(() => {
+      if (preCreatedFile) {
+        const fsSync = require("fs");
+        const data = fsSync.readFileSync(preCreatedFile);
+        stdout.end(data);
+      } else {
+        stdout.end(Buffer.from(""));
+      }
+      proc.emit("close", 0);
+    });
+    return proc;
+  };
+}
+
+function createFailingMockSpawn(stderrMsg: string) {
+  return (...args: any[]) => {
+    const proc = new EventEmitter() as any;
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    proc.stdout = stdout;
+    proc.stderr = stderr;
+    proc.kill = jest.fn();
+
+    process.nextTick(() => {
+      stderr.end(Buffer.from(stderrMsg));
+      proc.emit("close", 1);
+    });
+    return proc;
+  };
+}
+
 describe("backupService", () => {
   let backupService: typeof import("../services/backupService");
 
@@ -93,13 +131,13 @@ describe("backupService", () => {
       process.env.BACKUP_DATABASE_URL = TEST_DB_URL;
     });
 
-    it("runs pg_dump via exec and writes a compressed file", async () => {
+    it("runs pg_dump via spawn and writes a compressed file", async () => {
       const content = "CREATE TABLE test (id int);\n";
-      mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/(backup-.+?)\.sql/);
-        if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), content).then(() => ({ stdout: content, stderr: "" }));
-        return Promise.resolve({ stdout: content, stderr: "" });
-      });
+      const backupId = `backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-test`;
+      const gzipPath = path.join(BACKUP_DIR, `${backupId}.sql.gz`);
+      await createGzipFile(gzipPath, content);
+
+      mockSpawn.mockImplementation(createSuccessfulMockSpawn(gzipPath));
 
       const result = await backupService.handleBackup();
       expect(result.success).toBe(true);
@@ -111,11 +149,12 @@ describe("backupService", () => {
     });
 
     it("writes a metadata JSON file alongside the backup", async () => {
-      mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/(backup-.+?)\.sql/);
-        if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
-        return Promise.resolve({ stdout: "data", stderr: "" });
-      });
+      const content = "data";
+      const backupId = `backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-test`;
+      const gzipPath = path.join(BACKUP_DIR, `${backupId}.sql.gz`);
+      await createGzipFile(gzipPath, content);
+
+      mockSpawn.mockImplementation(createSuccessfulMockSpawn(gzipPath));
 
       const result = await backupService.handleBackup();
       const metaPath = path.join(BACKUP_DIR, `${result.backupId}.meta.json`);
@@ -129,11 +168,12 @@ describe("backupService", () => {
 
     it("falls back to local storage when S3 bucket is not configured", async () => {
       delete process.env.BACKUP_S3_BUCKET;
-      mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/(backup-.+?)\.sql/);
-        if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
-        return Promise.resolve({ stdout: "data", stderr: "" });
-      });
+      const content = "data";
+      const backupId = `backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-test`;
+      const gzipPath = path.join(BACKUP_DIR, `${backupId}.sql.gz`);
+      await createGzipFile(gzipPath, content);
+
+      mockSpawn.mockImplementation(createSuccessfulMockSpawn(gzipPath));
 
       const result = await backupService.handleBackup();
       expect(result.success).toBe(true);
@@ -143,11 +183,12 @@ describe("backupService", () => {
     it("uploads to S3 when BACKUP_S3_BUCKET is set", async () => {
       process.env.BACKUP_S3_BUCKET = "test-backup-bucket";
       process.env.BACKUP_S3_REGION = "us-east-1";
-      mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/(backup-.+?)\.sql/);
-        if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
-        return Promise.resolve({ stdout: "data", stderr: "" });
-      });
+      const content = "data";
+      const backupId = `backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-test`;
+      const gzipPath = path.join(BACKUP_DIR, `${backupId}.sql.gz`);
+      await createGzipFile(gzipPath, content);
+
+      mockSpawn.mockImplementation(createSuccessfulMockSpawn(gzipPath));
       mockS3Client.send.mockResolvedValue({});
 
       const result = await backupService.handleBackup();
@@ -160,11 +201,12 @@ describe("backupService", () => {
 
     it("logs and recovers when S3 upload fails", async () => {
       process.env.BACKUP_S3_BUCKET = "failing-bucket";
-      mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/(backup-.+?)\.sql/);
-        if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
-        return Promise.resolve({ stdout: "data", stderr: "" });
-      });
+      const content = "data";
+      const backupId = `backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-test`;
+      const gzipPath = path.join(BACKUP_DIR, `${backupId}.sql.gz`);
+      await createGzipFile(gzipPath, content);
+
+      mockSpawn.mockImplementation(createSuccessfulMockSpawn(gzipPath));
       mockS3Client.send.mockRejectedValue(new Error("S3 error"));
 
       const result = await backupService.handleBackup();
@@ -175,19 +217,20 @@ describe("backupService", () => {
     });
 
     it("returns failure when pg_dump errors", async () => {
-      mockExecAsync.mockRejectedValue(new Error("pg_dump: connection to server failed"));
+      mockSpawn.mockImplementation(createFailingMockSpawn("pg_dump: connection to server failed"));
 
       const result = await backupService.handleBackup();
       expect(result.success).toBe(false);
-      expect(result.error).toContain("pg_dump: connection");
+      expect(result.error).toContain("pg_dump");
     });
 
     it("generates unique backup IDs with timestamp and random suffix", async () => {
-      mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/(backup-.+?)\.sql/);
-        if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
-        return Promise.resolve({ stdout: "data", stderr: "" });
-      });
+      const content = "data";
+      const backupId = `backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-test`;
+      const gzipPath = path.join(BACKUP_DIR, `${backupId}.sql.gz`);
+      await createGzipFile(gzipPath, content);
+
+      mockSpawn.mockImplementation(createSuccessfulMockSpawn(gzipPath));
 
       const r1 = await backupService.handleBackup();
       const r2 = await backupService.handleBackup();
@@ -197,11 +240,12 @@ describe("backupService", () => {
     });
 
     it("sets a meaningful location path", async () => {
-      mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/(backup-.+?)\.sql/);
-        if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
-        return Promise.resolve({ stdout: "data", stderr: "" });
-      });
+      const content = "data";
+      const backupId = `backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-test`;
+      const gzipPath = path.join(BACKUP_DIR, `${backupId}.sql.gz`);
+      await createGzipFile(gzipPath, content);
+
+      mockSpawn.mockImplementation(createSuccessfulMockSpawn(gzipPath));
 
       const result = await backupService.handleBackup();
       expect(result.location).toBeTruthy();
@@ -209,7 +253,7 @@ describe("backupService", () => {
     });
 
     it("reports zero sizeBytes on failure", async () => {
-      mockExecAsync.mockRejectedValue(new Error("failure"));
+      mockSpawn.mockImplementation(createFailingMockSpawn("failure"));
 
       const result = await backupService.handleBackup();
       expect(result.success).toBe(false);
@@ -217,13 +261,43 @@ describe("backupService", () => {
     });
 
     it("cleanupOldBackups does not throw on empty backup dir", async () => {
-      mockExecAsync.mockImplementation((cmd: string) => {
-        const m = cmd.match(/(backup-.+?)\.sql/);
-        if (m) return createGzipFile(path.join(BACKUP_DIR, `${m[1]}.sql.gz`), "data").then(() => ({ stdout: "data", stderr: "" }));
-        return Promise.resolve({ stdout: "data", stderr: "" });
-      });
+      const content = "data";
+      const backupId = `backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-test`;
+      const gzipPath = path.join(BACKUP_DIR, `${backupId}.sql.gz`);
+      await createGzipFile(gzipPath, content);
+
+      mockSpawn.mockImplementation(createSuccessfulMockSpawn(gzipPath));
       const result = await backupService.handleBackup();
       expect(result.success).toBe(true);
+    });
+
+    it("rejects invalid database URLs", async () => {
+      process.env.BACKUP_DATABASE_URL = "not-a-valid-url";
+      backupService = require("../services/backupService");
+
+      const result = await backupService.handleBackup();
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Invalid database URL");
+
+      process.env.BACKUP_DATABASE_URL = TEST_DB_URL;
+    });
+
+    it("passes correct arguments to pg_dump spawn", async () => {
+      const content = "data";
+      const backupId = `backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-test`;
+      const gzipPath = path.join(BACKUP_DIR, `${backupId}.sql.gz`);
+      await createGzipFile(gzipPath, content);
+
+      mockSpawn.mockImplementation(createSuccessfulMockSpawn(gzipPath));
+
+      await backupService.handleBackup();
+
+      expect(mockSpawn).toHaveBeenCalledWith("pg_dump", [
+        "--no-owner",
+        "--no-acl",
+        "--quote-all-identifiers",
+        TEST_DB_URL,
+      ]);
     });
   });
 });
