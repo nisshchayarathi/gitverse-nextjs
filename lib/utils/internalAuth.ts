@@ -34,10 +34,6 @@ export function isCronAuthorized(authHeader: string | null): boolean {
   const secret = process.env.CRON_SECRET || process.env.ANALYSIS_RUNNER_SECRET;
   if (!secret) return false;
 
-  const directMatch =
-    authHeader != null && authHeader === `Bearer ${secret}`;
-  if (directMatch) return true;
-
   return validateAuthorizationHeader(authHeader, secret);
 }
 

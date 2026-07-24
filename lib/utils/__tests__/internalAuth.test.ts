@@ -125,21 +125,22 @@ describe("internalAuth utilities", () => {
       expect(isCronAuthorized(token)).toBe(true);
     });
 
-    it("returns false when no secrets are set", () => {
+    it("rejects token when no secrets are set", () => {
       delete process.env.CRON_SECRET;
       delete process.env.ANALYSIS_RUNNER_SECRET;
 
       expect(isCronAuthorized("Bearer any-token")).toBe(false);
     });
 
-    it("accepts direct Bearer token for CRON_SECRET", () => {
+    it("rejects raw secret (not hashed) for CRON_SECRET", () => {
       process.env.CRON_SECRET = "direct-cron-secret";
-      expect(isCronAuthorized("Bearer direct-cron-secret")).toBe(true);
+      expect(isCronAuthorized("Bearer direct-cron-secret")).toBe(false);
     });
 
-    it("rejects mismatched direct token for CRON_SECRET", () => {
+    it("rejects mismatched token for CRON_SECRET", () => {
       process.env.CRON_SECRET = "real-cron-secret";
-      expect(isCronAuthorized("Bearer wrong-secret")).toBe(false);
+      const wrongToken = deriveBearerToken("wrong-secret");
+      expect(isCronAuthorized(wrongToken)).toBe(false);
     });
   });
 
