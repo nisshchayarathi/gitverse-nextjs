@@ -5,6 +5,7 @@ import type { JWTPayload } from "./auth";
 import prisma from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
 import { hashApiKey } from "@/lib/utils/api-key";
+import { validateCsrfOrigin, isSessionCookieAuth } from "@/lib/utils/csrf";
 
 export interface AuthenticatedRequest {
   user: JWTPayload;
@@ -195,6 +196,7 @@ export async function getAuthUser(
 /**
  * Ensures the incoming request is authenticated.
  * Throws an HttpError if authentication fails.
+ * Also validates CSRF origin for session-cookie authenticated requests.
  */
 export async function requireAuth(
   request: NextRequest
@@ -203,6 +205,12 @@ export async function requireAuth(
 
   if (!user) {
     throw new HttpError(401, "Unauthorized");
+  }
+
+  // CSRF protection: validate Origin/Referer for session-cookie auth.
+  // JWT Bearer tokens and API keys are inherently CSRF-safe.
+  if (isSessionCookieAuth(request) && !validateCsrfOrigin(request)) {
+    throw new HttpError(403, "CSRF validation failed");
   }
 
   return user;

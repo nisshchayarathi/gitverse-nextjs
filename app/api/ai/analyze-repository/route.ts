@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     if (!body.repositoryId || isNaN(repositoryId) || !type) {
       return NextResponse.json(
         { error: "Valid Repository ID and analysis type are required" },
-        { status: 400 }
+        { status: 400, headers: { "Cache-Control": "no-store" } }
       );
     }
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     if (!repository) {
       return NextResponse.json(
         { error: "Repository not found" },
-        { status: 404 }
+        { status: 404, headers: { "Cache-Control": "no-store" } }
       );
     }
 
@@ -115,7 +115,10 @@ export async function POST(request: NextRequest) {
     const cached = await getGeminiAnalysisCache(cacheKey);
 
     if (cached.hit && cached.result != null) {
-      return NextResponse.json({ analysis: cached.result, type, cached: true, isTruncated });
+      return NextResponse.json(
+        { analysis: cached.result, type, cached: true, isTruncated },
+        { headers: { "Cache-Control": "no-store" } }
+      );
     }
 
     const analysis = await getGeminiService().analyzeRepository({
@@ -126,19 +129,22 @@ export async function POST(request: NextRequest) {
 
     await setGeminiAnalysisCache(cacheKey, analysis);
 
-    return NextResponse.json({ analysis, type, cached: false, isTruncated });
+    return NextResponse.json(
+      { analysis, type, cached: false, isTruncated },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error: any) {
     console.error("Repository analysis error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status, headers: { "Cache-Control": "no-store" } }
       );
     }
     return NextResponse.json(
       { error: "Failed to analyze repository" },
-      { status: 500 }
+      { status: 500, headers: { "Cache-Control": "no-store" } }
     );
   }
 }

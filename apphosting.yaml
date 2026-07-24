@@ -12,6 +12,16 @@ env:
   - variable: JWT_SECRET
     secret: jwt-secret
 
+   # Adding GITHUB App Variables
+  - variable: GITHUB_APP_ID
+    secret: github-app-id
+  - variable: GITHUB_APP_PRIVATE_KEY
+    secret: github-app-private-key
+  - variable: GITHUB_APP_SLUG
+    secret: github-app-slug
+  - variable: GITHUB_WEBHOOK_SECRET
+    secret: github-webhook-secret
+
   # NextAuth (Google OAuth)
   # NOTE: NEXTAUTH_URL must match your deployed origin (e.g. https://<your-domain>).
   - variable: NEXTAUTH_URL
@@ -30,6 +40,10 @@ env:
     secret: analysis-runner-secret
   - variable: TOKEN_ENCRYPTION_KEY
     secret: token-encryption-key
+
+   # Adding REDIS
+  - variable: REDIS_URL
+    secret: redis-url
 
   # Prisma / Postgres tuning (safe defaults for Cloud Run)
   - variable: PRISMA_ADAPTER

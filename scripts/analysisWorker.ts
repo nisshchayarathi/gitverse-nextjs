@@ -40,6 +40,17 @@ export async function startAnalysisWorkerLoop(opts?: {
         throw new Error(`Job ${jobId} not found in DB for user ${userId}`);
       }
 
+      // Claim a lock to ensure exactly-once processing
+      const claimed = await analysisJobService.claimJob({
+        jobId,
+        workerId,
+        lockMs: 5 * 60 * 1000, // 5 minutes
+      });
+      if (!claimed) {
+        console.log(`Job ${jobId} already claimed by another worker, skipping`);
+        return;
+      }
+
       let lastProgressWriteAt = 0;
       let lastProgressPercent: number | undefined;
       let lastProgressMessage: string | undefined;
@@ -65,6 +76,8 @@ export async function startAnalysisWorkerLoop(opts?: {
 
         await analysisJobService.updateProgress({
           jobId,
+          workerId,
+          lockToken: claimed.lockToken,
           update,
         });
 
@@ -101,13 +114,19 @@ export async function startAnalysisWorkerLoop(opts?: {
           await writeProgress({ progressPercent: 100, progressMessage: "Architecture analysis complete" });
         }
 
-        await analysisJobService.markDone({ jobId });
+        await analysisJobService.markDone({
+          jobId,
+          workerId,
+          lockToken: claimed.lockToken,
+        });
       } catch (err: any) {
         const message = err?.message ? String(err.message) : String(err);
         console.error(`Job ${jobId} failed:`, err);
 
         await analysisJobService.markFailed({
           jobId,
+          workerId,
+          lockToken: claimed.lockToken,
           error: message,
           attempts: job.attemptsMade + 1,
           maxAttempts: dbJob.maxAttempts,

@@ -458,8 +458,9 @@ export async function batchInvalidateUserTokens(
 }
 
 /**
- * Token rotation for session security
- * Creates a new token while invalidating the old one
+ * Rotates a user's token by atomically incrementing the token version.
+ * This prevents race conditions where concurrent rotations could produce
+ * duplicate valid tokens or allow session hijacking.
  */
 export async function rotateToken(
   oldToken: string,
@@ -472,35 +473,21 @@ export async function rotateToken(
     if (!payload || payload.userId !== userId) {
       return null;
     }
-    
-    // Get current token version
-    const user = await prisma.user.findUnique({
+
+    // Atomic increment — no read-before-write race
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
-      select: { tokenVersion: true }
+      data: { tokenVersion: { increment: 1 } },
+      select: { tokenVersion: true },
     });
-    
-    if (!user) {
-      return null;
-    }
-    
-    const oldVersion = user.tokenVersion;
-    
-    // Generate new token with incremented version
-    const newVersion = oldVersion + 1;
-    
+
+    const newVersion = updatedUser.tokenVersion;
+    const oldVersion = newVersion - 1;
+
+    // Generate token AFTER the DB write succeeds
     const newToken = createSignedToken(userId, email, newVersion);
-    
-    // Update database
-    await prisma.user.update({
-      where: { id: userId },
-      data: { tokenVersion: newVersion }
-    });
-    
-    return {
-      newToken,
-      oldVersion,
-      newVersion,
-    };
+
+    return { newToken, oldVersion, newVersion };
   } catch (error) {
     console.error(`[JWT] Token rotation failed for user ${userId}:`, error);
     return null;
@@ -598,38 +585,92 @@ export function getJWTConfig(): JWTConfig {
 }
 
 /**
- * Validates JWT configuration before server start
+ * Known placeholder patterns that must never be used in production.
+ * Derived from .env.example and common defaults.
+ */
+const PLACEHOLDER_SECRET_PATTERNS = [
+  'your-secret-key',
+  'your-super-secret-jwt-key-change-this-in-production',
+  'your-nextauth-secret-key-change-this-in-production',
+  'change-this',
+  'placeholder',
+  'changeme',
+  'secret',
+  'password',
+  'test-secret',
+  'development-jwt-secret',
+  'development-nextauth-secret',
+];
+
+/**
+ * Validates that a secret is strong enough for production use.
+ * Returns null if valid, or an error message if invalid.
+ */
+function validateSecret(value: string | undefined, name: string): string | null {
+  if (!value) {
+    return `[JWT] FATAL: ${name} is not set`;
+  }
+
+  if (value.length < 32) {
+    return `[JWT] FATAL: ${name} must be at least 32 characters (got ${value.length})`;
+  }
+
+  const lowerValue = value.toLowerCase();
+  const matchedPattern = PLACEHOLDER_SECRET_PATTERNS.find((p) =>
+    lowerValue.includes(p.toLowerCase()),
+  );
+  if (matchedPattern) {
+    return `[JWT] FATAL: ${name} contains a known placeholder pattern "${matchedPattern}"`;
+  }
+
+  return null;
+}
+
+/**
+ * Validates JWT and NextAuth configuration before server start.
+ * Throws in production if any secret is weak or missing.
+ * Returns a boolean in non-production for graceful degradation.
  */
 export function validateJWTConfig(): boolean {
-  const config = getJWTConfig();
-  
-  if (!config.secret || config.secret.length < 32) {
-    console.error('[JWT] JWT_SECRET must be at least 32 characters');
+  const isProd = process.env.NODE_ENV === 'production';
+
+  const jwtError = validateSecret(process.env.JWT_SECRET, 'JWT_SECRET');
+  if (jwtError) {
+    if (isProd) throw new Error(jwtError);
+    console.error(jwtError);
     return false;
   }
-  
-  if (config.secret === 'your-secret-key') {
-    console.error('[JWT] JWT_SECRET is using default value - this is insecure!');
+
+  const nextauthError = validateSecret(process.env.NEXTAUTH_SECRET, 'NEXTAUTH_SECRET');
+  if (nextauthError) {
+    if (isProd) throw new Error(nextauthError);
+    console.error(nextauthError);
     return false;
   }
-  
+
   return true;
 }
 
 /**
- * Initial JWT validation on application startup
+ * Initial JWT validation on application startup.
+ * In production, throws if validation fails to prevent insecure startup.
  */
 export function initializeJWT(): boolean {
   if (!validateJWTConfig()) {
     console.error('[JWT] Configuration validation failed');
     return false;
   }
-  
+
   console.log('[JWT] JWT configuration validated successfully');
   return true;
 }
 
-// Auto-validate on import in production
+// Auto-validate on import in production — throw to prevent insecure startup
 if (process.env.NODE_ENV === 'production') {
-  initializeJWT();
+  try {
+    initializeJWT();
+  } catch (err) {
+    console.error('[JWT] Server cannot start with invalid JWT configuration:', (err as Error).message);
+    process.exit(1);
+  }
 }

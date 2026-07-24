@@ -361,11 +361,33 @@ export class GitHubService {
   }
 
   /**
-   * Get repository branches
+   * Get repository branches with pagination
    */
   async getBranches(owner: string, repo: string): Promise<GitHubBranch[]> {
-    const response = await this.client.get(`/repos/${owner}/${repo}/branches`);
-    return response.data;
+    const allBranches: GitHubBranch[] = [];
+    let page = 1;
+    const perPage = 100;
+
+    while (true) {
+      const response = await this.client.get(`/repos/${owner}/${repo}/branches`, {
+        params: { per_page: perPage, page },
+      });
+      const branches: GitHubBranch[] = response.data;
+      allBranches.push(...branches);
+
+      // Check for next page in Link header
+      const linkHeader = response.headers?.link as string | undefined;
+      const hasNextPage = linkHeader && (
+        linkHeader.includes('rel="next"') ||
+        linkHeader.includes("rel='next'")
+      );
+      if (!hasNextPage) {
+        break;
+      }
+      page++;
+    }
+
+    return allBranches;
   }
 
   /**

@@ -10,6 +10,7 @@
  */
 
 import redis from "@/lib/redis";
+import { getClientIp } from "@/lib/utils/ip";
 import { NextRequest, NextResponse } from "next/server";
 import CircuitBreaker from "opossum";
 import { LRUCache } from "lru-cache";
@@ -202,13 +203,5 @@ export function rateLimitResponse(result: RateLimitResult): NextResponse {
   );
 }
 
-/**
- * Helper: extract client IP from Next.js request headers.
- */
-export function getClientIp(request: NextRequest): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    request.headers.get("x-real-ip") ??
-    "unknown"
-  );
-}
+// Re-export centralized IP extraction for backward compatibility
+export { getClientIp } from "@/lib/utils/ip";

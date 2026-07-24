@@ -58,6 +58,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
+# MISSING in runner stage:
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/tsconfig.worker.json ./tsconfig.worker.json
 
 # Compile background worker in the runner stage so it always runs
 # even when the builder layer is served from cache and dist-worker/
