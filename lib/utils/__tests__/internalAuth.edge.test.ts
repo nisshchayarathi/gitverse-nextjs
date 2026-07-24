@@ -154,11 +154,11 @@ describe("InternalAuth Edge Cases", () => {
       expect(isCronAuthorized(cronToken)).toBe(true);
     });
 
-    it("also accepts direct CRON_SECRET token", () => {
+    it("rejects raw secret (not hashed) even when CRON_SECRET is set", () => {
       process.env.CRON_SECRET = "cron-secret";
       process.env.ANALYSIS_RUNNER_SECRET = "runner-secret";
 
-      expect(isCronAuthorized("Bearer cron-secret")).toBe(true);
+      expect(isCronAuthorized("Bearer cron-secret")).toBe(false);
     });
 
     it("prefers CRON_SECRET over ANALYSIS_RUNNER_SECRET", () => {
