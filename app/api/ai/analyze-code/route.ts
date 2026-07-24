@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to analyze code" },
+      { error: error?.message || "Failed to analyze code" },
       { status: 500 }
     );
   }

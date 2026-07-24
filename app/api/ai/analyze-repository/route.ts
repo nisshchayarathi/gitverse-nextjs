@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to analyze repository" },
+      { error: error?.message || "Failed to analyze repository" },
       { status: 500, headers: { "Cache-Control": "no-store" } }
     );
   }

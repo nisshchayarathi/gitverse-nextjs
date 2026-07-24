@@ -349,7 +349,7 @@ Do not include any Markdown formatting like \`\`\`json, explanation, or extra ch
     }
 
     return NextResponse.json(
-      { error: "Failed to process chat" },
+      { error: error?.message || "Failed to process chat" },
       { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
