@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/middleware";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
 const GITHUB_GRAPHQL = "https://api.github.com/graphql";
 
 export async function GET(req: NextRequest) {
+  // Require authentication so only logged-in users can query contribution heatmaps
+  const authUser = await requireAuth(req);
+
+  // Per-user rate limiting to prevent abuse of the GitHub GraphQL API
+  const rl = await checkRateLimit(String(authUser.userId), RATE_LIMITS.GITHUB_HEATMAP);
+  if (!rl.allowed) return rateLimitResponse(rl);
+
   const { searchParams } = new URL(req.url);
   const username = searchParams.get("username");
 
