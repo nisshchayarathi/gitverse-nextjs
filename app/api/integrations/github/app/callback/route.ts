@@ -98,26 +98,21 @@ export async function GET(request: NextRequest) {
         installationId: BigInt(installationId),
       }));
 
-      // Insert new rows (ignore duplicates on (userId, repoFullName)).
-      await prisma.gitHubRepo.createMany({
-        data: rows,
-        skipDuplicates: true,
-      });
-
-      // Update installationId for any existing rows for these repos.
-      // Batch to keep query sizes reasonable.
-      const chunkSize = 200;
-      for (let i = 0; i < all.length; i += chunkSize) {
-        const chunk = all.slice(i, i + chunkSize).map((r) => r.full_name);
-        await prisma.gitHubRepo.updateMany({
-          where: {
-            userId,
-            repoFullName: { in: chunk },
-          },
-          data: {
-            installationId: BigInt(installationId),
-          },
-        });
+      // Upsert each repo: creates if absent, updates installationId if present.
+      // Using upsert instead of createMany+skipDuplicates avoids P2002 on
+      // re-adding previously deleted repos (GitHubRepo records are hard-deleted
+      // on App uninstall, so skipDuplicates cannot catch the missing-row case).
+      const chunkSize = 50;
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        await Promise.all(
+          rows.slice(i, i + chunkSize).map((row) =>
+            prisma.gitHubRepo.upsert({
+              where: { userId_repoFullName: { userId: row.userId, repoFullName: row.repoFullName } },
+              update: { installationId: row.installationId },
+              create: row,
+            }),
+          ),
+        );
       }
     }
 
