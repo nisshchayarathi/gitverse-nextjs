@@ -47,7 +47,11 @@ export const calculateCouplingScore = (snapshot: ArchitectureSnapshot): number =
   const baseCoupling = Math.min((metrics.averageCoupling / 3) * 100, 100);
   const circularPenalty = metrics.circularDependencyCount * 5;
   const highDepModules = modules.filter((m) => m.dependencies.length > 5).length;
-  const highDepPenalty = (highDepModules / modules.length) * 20;
+  // Guard against an empty modules array; otherwise 0 / 0 = NaN propagates into
+  // the health score. Mirrors the modules.length === 0 guards in the sibling
+  // modularity/cohesion scorers.
+  const highDepPenalty =
+    modules.length > 0 ? (highDepModules / modules.length) * 20 : 0;
 
   return Math.round(Math.min(100, baseCoupling + circularPenalty + highDepPenalty));
 };
