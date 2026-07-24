@@ -21,8 +21,10 @@ export function scanAndRedactPayload(payload: string): string {
   // 1. Check for high-confidence secrets
   for (const rule of HIGH_CONFIDENCE_SECRETS) {
     if (rule.pattern.test(payload)) {
+      rule.pattern.lastIndex = 0; // reset stateful /g regex to prevent skips in subsequent calls
       throw new Error(`High-confidence secret detected: ${rule.name}. Halting PR review to prevent secret leak to AI provider.`);
     }
+    rule.pattern.lastIndex = 0; // reset after test() to ensure consistent matching next invocation
   }
 
   // 2. Redact suspected tokens
@@ -31,6 +33,7 @@ export function scanAndRedactPayload(payload: string): string {
     redactedPayload = redactedPayload.replace(rule.pattern, (match, secretToken) => {
       return match.replace(secretToken, '[REDACTED_SECRET]');
     });
+    rule.pattern.lastIndex = 0; // reset /g regex after replace() to prevent stateful skips
   }
 
   return redactedPayload;
