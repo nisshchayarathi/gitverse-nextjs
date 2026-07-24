@@ -130,25 +130,15 @@ export async function POST(request: NextRequest) {
 
     // Now user identity is verified.
     // Check if the account is temporarily locked.
+    // NOTE: Return same status/message as "invalid credentials" to prevent
+    // account enumeration (attacker could otherwise distinguish locked vs
+    // non-existent accounts via HTTP status code).
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       logger.info(
         { email: normalizedEmail },
         "Login blocked: Account is locked",
       );
-      return NextResponse.json(
-        {
-          error:
-            "Account is temporarily locked due to too many failed attempts. Please try again later.",
-        },
-        {
-          status: 423,
-          headers: {
-            "Retry-After": String(
-              Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000),
-            ),
-          },
-        },
-      );
+      return apiError(401, "Invalid email or password");
     }
 
     await prisma.user.update({
