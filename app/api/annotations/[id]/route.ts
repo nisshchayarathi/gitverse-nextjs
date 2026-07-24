@@ -27,7 +27,7 @@ export async function PATCH(
 
     // Only author or repo owner can edit
     if (existing.authorId !== user.userId && existing.repository.userId !== user.userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
     }
 
     const updated = await prisma.mapAnnotation.update({
@@ -83,8 +83,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
     }
 
+    // Only author or repo owner can delete
     if (existing.authorId !== user.userId && existing.repository.userId !== user.userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
     }
 
     // Capture repositoryId before deletion for broadcasting

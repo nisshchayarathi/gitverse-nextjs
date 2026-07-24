@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     if (!repositoryId || !question) {
       return NextResponse.json(
         { error: "repositoryId and question/prompt are required" },
-        { status: 400 },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
       );
     }
 
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
           error:
             "Too many requests. Please wait before sending another message.",
         },
-        { status: 429 },
+        { status: 429, headers: { "Cache-Control": "no-store" } },
       );
     }
 
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       if (!Array.isArray(conversationHistory)) {
         return NextResponse.json(
           { error: "conversationHistory must be an array" },
-          { status: 400 },
+          { status: 400, headers: { "Cache-Control": "no-store" } },
         );
       }
       for (const msg of conversationHistory) {
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
               error:
                 "Each conversationHistory entry must have a valid role ('user', 'model', or 'assistant') and a non-empty content string",
             },
-            { status: 400 },
+            { status: 400, headers: { "Cache-Control": "no-store" } },
           );
         }
         standardizedHistory.push({
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     if (!repository) {
       return NextResponse.json(
         { error: "Repository not found" },
-        { status: 404 },
+        { status: 404, headers: { "Cache-Control": "no-store" } },
       );
     }
 
@@ -334,20 +334,23 @@ Do not include any Markdown formatting like \`\`\`json, explanation, or extra ch
       endpoint: "chat",
     });
 
-    return NextResponse.json({ response, question });
+    return NextResponse.json(
+      { response, question },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error: any) {
     console.error("AI chat error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status },
+        { status: error.status, headers: { "Cache-Control": "no-store" } },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to process chat" },
-      { status: 500 },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
 }

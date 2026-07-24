@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     if (!allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please wait before comparing again." },
-        { status: 429 }
+        { status: 429, headers: { "Cache-Control": "no-store" } }
       );
     }
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json(
         { error: "Invalid or empty request body" },
-        { status: 400 }
+        { status: 400, headers: { "Cache-Control": "no-store" } }
       );
     }
 
@@ -51,14 +51,14 @@ export async function POST(request: NextRequest) {
     if (!repositoryIds || !Array.isArray(repositoryIds)) {
       return NextResponse.json(
         { error: "repositoryIds must be an array" },
-        { status: 400 }
+        { status: 400, headers: { "Cache-Control": "no-store" } }
       );
     }
 
     if (repositoryIds.length < 2) {
       return NextResponse.json(
         { error: "At least two repository IDs are required for comparison" },
-        { status: 400 }
+        { status: 400, headers: { "Cache-Control": "no-store" } }
       );
     }
 
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         {
           error: `Maximum ${MAX_REPOSITORIES} repositories can be compared at once. You provided ${repositoryIds.length}.`,
         },
-        { status: 400 }
+        { status: 400, headers: { "Cache-Control": "no-store" } }
       );
     }
 
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       if (isNaN(repoId)) {
         return NextResponse.json(
           { error: `Invalid repository ID: ${id}` },
-          { status: 400 }
+          { status: 400, headers: { "Cache-Control": "no-store" } }
         );
       }
 
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       if (!repo) {
         return NextResponse.json(
           { error: `Repository not found: ${id}` },
-          { status: 404 }
+          { status: 404, headers: { "Cache-Control": "no-store" } }
         );
       }
       repositories.push(repo);
@@ -136,20 +136,23 @@ Keep the response comprehensive, deeply architectural, and structured with clear
       endpoint: "compare",
     });
 
-    return NextResponse.json({ comparison: comparisonResult });
+    return NextResponse.json(
+      { comparison: comparisonResult },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error: any) {
     console.error("Repository comparison AI error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status, headers: { "Cache-Control": "no-store" } }
       );
     }
 
     return NextResponse.json(
       { error: "Failed to generate comparison analysis" },
-      { status: 500 }
+      { status: 500, headers: { "Cache-Control": "no-store" } }
     );
   }
 }
