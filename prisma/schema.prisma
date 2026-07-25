@@ -861,3 +861,37 @@ model MfaConfig {
   @@index([userId])
   @@map("mfa_configs")
 }
+// Add this to the bottom of prisma/schema.prisma
+
+model PublicSnapshot {
+  id            String   @id @default(uuid()) @db.Uuid
+  repositoryId  Int      @map("repository_id")
+  createdByUserId Int    @map("created_by_user_id")
+  
+  // Frozen snapshot data (architecture map, insights, dependency risk, dead-code analysis)
+  snapshotData  Json     @map("snapshot_data") @db.Text
+  
+  // Expiration and access tracking
+  expiresAt     DateTime @map("expires_at")
+  viewCount     Int      @default(0) @map("view_count")
+  
+  // Timestamps
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  repository    Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdByUser User       @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  
+  @@index([repositoryId])
+  @@index([createdByUserId])
+  @@index([expiresAt])
+  // Fast lookup: GET /public/repo/:id/snapshot/:snapshotId
+  @@index([repositoryId, id])
+  @@map("public_snapshots")
+}
+
+// Update Repository model to add relation:
+// In the Repository model, add this line in the model block:
+// publicSnapshots    PublicSnapshot[]
+
