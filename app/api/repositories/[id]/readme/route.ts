@@ -27,6 +27,7 @@ export async function POST(
         id: repository.id,
         readmePath: repository.readmePath,
         readmeText: repository.readmeText,
+        readmeTruncated: (repository as any).readmeTruncated ?? false,
         readmeFetchedAt: repository.readmeFetchedAt,
       },
     });

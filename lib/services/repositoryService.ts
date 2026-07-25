@@ -72,6 +72,7 @@ export class RepositoryService {
   private async tryReadmeFromRepoPath(repoPath: string): Promise<{
     path: string;
     text: string;
+    truncated: boolean;
   } | null> {
     const candidates = [
       "readme.md",
@@ -101,11 +102,11 @@ export class RepositoryService {
         if (!trimmed) return null;
 
         // Prevent huge README payloads from bloating DB / responses.
-        const maxChars = 200_000;
-        const safeText =
-          trimmed.length > maxChars ? trimmed.slice(0, maxChars) : trimmed;
+        const MAX_README_CHARS = 200_000;
+        const isTruncated = trimmed.length > MAX_README_CHARS;
+        const safeText = isTruncated ? trimmed.slice(0, MAX_README_CHARS) : trimmed;
 
-        return { path: actual, text: safeText };
+        return { path: actual, text: safeText, truncated: isTruncated };
       }
 
       return null;
@@ -170,6 +171,7 @@ export class RepositoryService {
           readmePath: readme?.path ?? "README.md",
           readmeText: readme?.text ?? "doesnt exist",
           readmeFetchedAt: new Date(),
+          readmeTruncated: readme?.truncated ?? false,
         },
       });
 
@@ -441,6 +443,7 @@ export class RepositoryService {
           data: {
             readmePath: readme?.path ?? "README.md",
             readmeText: readme?.text ?? "doesnt exist",
+            readmeTruncated: readme?.truncated ?? false,
             readmeFetchedAt: new Date(),
           },
         });
