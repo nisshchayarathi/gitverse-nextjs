@@ -128,7 +128,11 @@ export async function GET(request: NextRequest) {
   } catch (e: any) {
     console.error("GitHub App callback error:", sanitizeError(e));
     redirectUrl.searchParams.set("install", "error");
-    redirectUrl.searchParams.set("reason", e?.message || "unknown");
+    // Return a generic reason to avoid leaking internal error details in the redirect URL.
+    // Axios errors include verbose messages like "Request failed with status code 404".
+    const isAxiosError = e?.isAxiosError || (e?.response && typeof e.response?.status === "number");
+    const reason = isAxiosError ? "installation_failed" : "unknown_error";
+    redirectUrl.searchParams.set("reason", reason);
     return NextResponse.redirect(redirectUrl);
   }
 }
