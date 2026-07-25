@@ -70,16 +70,20 @@ Provide ONLY the valid JSON object and nothing else.
       const parsed = JSON.parse(responseText);
 
       return {
-        likelyPrNumber: parsed.likelyPrNumber,
-        likelyCommitSha: parsed.likelyCommitSha,
-        impactedFiles: parsed.impactedFiles || [],
-        impactedServices: parsed.impactedServices || [],
-        confidenceScore: parsed.confidenceScore || 0,
-        analysisDetails: parsed.analysisDetails || "No detailed analysis provided.",
+        likelyPrNumber: typeof parsed.likelyPrNumber === "number" ? parsed.likelyPrNumber : undefined,
+        likelyCommitSha: typeof parsed.likelyCommitSha === "string" ? parsed.likelyCommitSha : undefined,
+        impactedFiles: Array.isArray(parsed.impactedFiles) ? parsed.impactedFiles : [],
+        impactedServices: Array.isArray(parsed.impactedServices) ? parsed.impactedServices : [],
+        confidenceScore: typeof parsed.confidenceScore === "number" && parsed.confidenceScore >= 0 && parsed.confidenceScore <= 100
+          ? parsed.confidenceScore
+          : 0,
+        analysisDetails: typeof parsed.analysisDetails === "string" ? parsed.analysisDetails : "No detailed analysis provided.",
       };
     } catch (error) {
       console.error("[IncidentCorrelation] Failed to correlate incident:", error);
       return {
+        likelyPrNumber: undefined,
+        likelyCommitSha: undefined,
         impactedFiles: [],
         impactedServices: [],
         confidenceScore: 0,
