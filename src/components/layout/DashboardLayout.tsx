@@ -231,6 +231,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           alt={user.name}
                           width={32}
                           height={32}
+                          unoptimized
                           className="rounded-full h-full w-full object-cover"
                         />
                       ) : (

@@ -201,6 +201,7 @@ export function Contributors({ repository }: ContributorsProps) {
                     alt={contributor.name}
                     width={48}
                     height={48}
+                    unoptimized
                     className="w-12 h-12 rounded-full ring-2 ring-primary/20 object-cover"
                   />
                   {rankBadge && (

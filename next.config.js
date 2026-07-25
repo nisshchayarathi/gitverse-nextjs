@@ -20,9 +20,9 @@ const nextConfig = {
         hostname: 'api.dicebear.com',
       },
     ],
-    dangerouslyAllowSVG: true,
-    contentDispositionType: 'attachment',
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    // NOTE: dangerouslyAllowSVG removed — SVG files are not processed through
+    // Next.js image optimization. DiceBear avatar URLs use unoptimized={true} instead.
+    // This prevents XSS via malicious SVG payloads in avatar/image fields.
   },
   webpack: (config) => {
     config.resolve.alias.canvas = false
