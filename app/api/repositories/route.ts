@@ -216,6 +216,9 @@ export async function POST(request: NextRequest) {
     if (isHttpError(error)) {
       return apiError(error.message, error.status);
     }
+    if (error?.code === "P2002") {
+      return apiError("A repository with this name already exists. Please use a different name or delete the existing one.", 409);
+    }
     return apiError("Failed to create repository", 500);
   }
 }
