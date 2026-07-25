@@ -100,10 +100,11 @@ export async function DELETE(
       );
     }
 
-    if (error.message === "Repository not found") {
+    // Handle Prisma P2025 (record not found) and custom "not found" messages consistently as 404.
+    if (error?.code === "P2025" || error.message === "Repository not found") {
       return NextResponse.json(
-        { error: "Repository not found or you don't have permission to delete it" },
-        { status: 403, headers: securityHeaders }
+        { error: "Repository not found" },
+        { status: 404, headers: securityHeaders }
       );
     }
 
