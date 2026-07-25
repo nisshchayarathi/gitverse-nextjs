@@ -218,7 +218,7 @@ model Repository {
   targetDirectory              String?                       @map("target_directory")
   readmePath                   String?                       @map("readme_path")
   readmeText                   String?                       @map("readme_text") @db.Text
-  readmeTruncated              Boolean  @default(false)       @map("readme_truncated")
+  readmeTruncated              Boolean                       @default(false) @map("readme_truncated")
   readmeFetchedAt              DateTime?                     @map("readme_fetched_at")
   defaultBranch                String                        @default("main") @map("default_branch")
   isPrivate                    Boolean                       @default(false) @map("is_private")
