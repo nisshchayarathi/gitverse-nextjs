@@ -11,6 +11,7 @@ import {
 } from "@/lib/utils/incidentWebhook";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 import { getClientIp } from "@/lib/services/rateLimitService";
+import { sanitizeError } from "@/lib/middleware";
 
 export async function POST(req: NextRequest) {
   try {
@@ -127,9 +128,10 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (error: any) {
-    console.error("[WebhookRoute] Error processing webhook:", error);
+    console.error("[WebhookRoute] Error processing webhook:", sanitizeError(error));
+    const sanitized = sanitizeError(error);
     return NextResponse.json(
-      { success: false, error: error.message || "Internal server error" },
+      { success: false, error: sanitized.message || "Internal server error" },
       { status: 500 }
     );
   }
