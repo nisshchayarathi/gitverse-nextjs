@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { recoverStuckEvents } from "@/lib/services/webhookRecoveryService";
+import { recoverStuckEvents, pruneExpiredWebhookEvents } from "@/lib/services/webhookRecoveryService";
 import { isCronAuthorized } from "@/lib/utils/internalAuth";
 
 export const runtime = "nodejs";
@@ -11,9 +11,13 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await recoverStuckEvents();
+    const pruneResult = await pruneExpiredWebhookEvents();
     return NextResponse.json({
       ok: true,
-      ...result,
+      recovered: result.recovered,
+      retried: result.retried,
+      skipped: result.skipped,
+      pruned: pruneResult.deleted,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {

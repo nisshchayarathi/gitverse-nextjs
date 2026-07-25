@@ -4,6 +4,14 @@ import { nextRetryDate } from "@/lib/utils/retry";
 const STUCK_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
+ * TTL for webhook event records.
+ * Events are deleted after this many days to prevent unbounded database growth.
+ * Terminal states (completed, failed, dlq) are pruned.
+ * Active states (pending, processing) are never auto-deleted.
+ */
+const WEBHOOK_RETENTION_DAYS = 30;
+
+/**
  * Recovery service uses longer backoff delays than the worker
  * (1 minute base, 30 minute max) since recovery runs periodically
  * and doesn't need to be as aggressive.
@@ -140,4 +148,29 @@ export async function recoverStuckEvents(): Promise<{
   }
 
   return { recovered, retried, skipped };
+}
+
+/**
+ * Prunes webhook event records older than WEBHOOK_RETENTION_DAYS.
+ * Only terminal states are deleted: completed, failed, dlq.
+ * Active states (pending, processing) are preserved.
+ */
+export async function pruneExpiredWebhookEvents(): Promise<{
+  deleted: number;
+}> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - WEBHOOK_RETENTION_DAYS);
+
+  const result = await prisma.webhookEvent.deleteMany({
+    where: {
+      status: { in: ["completed", "failed", "dlq"] },
+      createdAt: { lt: cutoff },
+    },
+  });
+
+  console.log(
+    `[WebhookPrune] Deleted ${result.count} webhook events older than ${WEBHOOK_RETENTION_DAYS} days`
+  );
+
+  return { deleted: result.count };
 }
