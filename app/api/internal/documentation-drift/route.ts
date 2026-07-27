@@ -93,6 +93,6 @@ async function handleDriftDetection(request: NextRequest) {
 
   } catch (error: any) {
     console.error("[DocumentationDriftJob] Failed:", error);
-    return NextResponse.json({ error: error.message || "Failed to run drift detection" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to run documentation drift detection" }, { status: 500 });
   }
 }
