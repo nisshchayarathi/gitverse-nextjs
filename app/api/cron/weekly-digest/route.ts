@@ -64,6 +64,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ success: true, processedCount: repos.length });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to generate weekly digest" }, { status: 500 });
   }
 }
