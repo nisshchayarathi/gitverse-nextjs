@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   } catch (e: any) {
     console.error("[RotateDEK] Rotation failed:", e.message);
     return NextResponse.json(
-      { error: `DEK rotation failed: ${e.message}` },
+      { error: "DEK rotation failed" },
       { status: 500 },
     );
   }
