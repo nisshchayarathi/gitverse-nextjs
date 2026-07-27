@@ -41,6 +41,6 @@ export async function POST(
     return NextResponse.json({ ok: true, eventId: params.id });
   } catch (error: any) {
     console.error("Webhook replay error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to replay webhook event" }, { status: 500 });
   }
 }
