@@ -19,15 +19,21 @@ const SUSPECTED_SECRETS = [
 
 export function scanAndRedactPayload(payload: string): string {
   // 1. Check for high-confidence secrets
+  // Reset lastIndex before each test() call to ensure consistent matching
+  // across invocations, since these patterns carry the /g flag.
   for (const rule of HIGH_CONFIDENCE_SECRETS) {
+    rule.pattern.lastIndex = 0;
     if (rule.pattern.test(payload)) {
       throw new Error(`High-confidence secret detected: ${rule.name}. Halting PR review to prevent secret leak to AI provider.`);
     }
   }
 
   // 2. Redact suspected tokens
+  // Reset lastIndex before each replace() to ensure all occurrences are found
+  // regardless of prior calls with the same global pattern.
   let redactedPayload = payload;
   for (const rule of SUSPECTED_SECRETS) {
+    rule.pattern.lastIndex = 0;
     redactedPayload = redactedPayload.replace(rule.pattern, (match, secretToken) => {
       return match.replace(secretToken, '[REDACTED_SECRET]');
     });
