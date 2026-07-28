@@ -44,6 +44,8 @@ export const calculateCohesionScore = (snapshot: ArchitectureSnapshot): number =
 export const calculateCouplingScore = (snapshot: ArchitectureSnapshot): number => {
   const { metrics, modules } = snapshot;
   
+  if (modules.length === 0) return 0;
+
   const baseCoupling = Math.min((metrics.averageCoupling / 3) * 100, 100);
   const circularPenalty = metrics.circularDependencyCount * 5;
   const highDepModules = modules.filter((m) => m.dependencies.length > 5).length;
