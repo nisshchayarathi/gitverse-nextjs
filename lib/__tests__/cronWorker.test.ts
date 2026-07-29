@@ -192,7 +192,8 @@ describe("cronWorker — job processing", () => {
       "../services/repositoryService"
     );
 
-    await analysisJobService.markDone({ jobId: "job-1", workerId: "cron-test" });
+    await analysisJobService.markDone({ jobId: "job-1", workerId: "cron-test" ,
+      lockToken: "test-token" });
     expect(mockMarkDone).toHaveBeenCalledWith({
       jobId: "job-1",
       workerId: "cron-test",
@@ -216,7 +217,8 @@ describe("cronWorker — job processing", () => {
       "../services/analysisJobService"
     );
 
-    await analysisJobService.markDone({ jobId: "job-2", workerId: "cron-test" });
+    await analysisJobService.markDone({ jobId: "job-2", workerId: "cron-test" ,
+      lockToken: "test-token" });
     expect(mockMarkDone).toHaveBeenCalledWith({
       jobId: "job-2",
       workerId: "cron-test",
@@ -248,6 +250,7 @@ describe("cronWorker — job processing", () => {
       error: "Analysis engine crashed",
       attempts: 1,
       maxAttempts: 3,
+      lockToken: "test-token",
     });
 
     expect(mockMarkFailed).toHaveBeenCalledWith(
@@ -280,6 +283,7 @@ describe("cronWorker — job processing", () => {
       error: "Unsupported job type: unknown_type",
       attempts: 0,
       maxAttempts: 3,
+      lockToken: "test-token",
     });
 
     expect(mockMarkFailed).toHaveBeenCalledWith(
@@ -317,6 +321,7 @@ describe("cronWorker — lock management", () => {
     await analysisJobService.releaseLock({
       jobId: "job-1",
       workerId: "cron-test",
+      lockToken: "test-token",
     });
     expect(mockReleaseLock).toHaveBeenCalledWith({
       jobId: "job-1",
@@ -335,6 +340,7 @@ describe("cronWorker — lock management", () => {
       analysisJobService.releaseLock({
         jobId: "job-1",
         workerId: "cron-test",
+        lockToken: "test-token",
       }),
     ).rejects.toThrow("DB error");
   });
@@ -400,6 +406,7 @@ describe("cronWorker — batch processing limits", () => {
         await analysisJobService.markDone({
           jobId: job.id,
           workerId: "cron-test",
+          lockToken: "test-token",
         });
       }
     }
