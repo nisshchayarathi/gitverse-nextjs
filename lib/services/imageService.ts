@@ -174,8 +174,8 @@ export async function validateHttpAvatarUrl(url: string): Promise<ImageValidatio
       return { valid: false, error: "Invalid URL hostname" };
     }
 
-    const safe = await validateSafeUrl(url);
-    if (!safe) {
+    const safeResult = await validateSafeUrl(url);
+    if (!safeResult.safe) {
       return { valid: false, error: "URL resolves to a restricted address" };
     }
 
@@ -218,8 +218,8 @@ export async function fetchAndValidateAvatarUrl(
       return { valid: false, error: "Invalid URL hostname" };
     }
 
-    const safe = await validateSafeUrl(url);
-    if (!safe) {
+    const safeResult = await validateSafeUrl(url);
+    if (!safeResult.safe) {
       return { valid: false, error: "URL resolves to a restricted address" };
     }
 
