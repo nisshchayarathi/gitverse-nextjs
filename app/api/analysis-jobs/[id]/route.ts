@@ -5,6 +5,12 @@ import { analysisJobService } from "@/lib/services/analysisJobService";
 
 import { shouldThrottleJobKick } from "@/lib/utils/analysisRunner";
 
+const securityHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+};
+
 
 async function kickLocalRunner(request: NextRequest, jobId: string) {
   if (process.env.NODE_ENV === "production") return;
@@ -34,7 +40,7 @@ export async function GET(
     });
 
     if (!job) {
-      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      return NextResponse.json({ error: "Job not found" }, { status: 404, headers: securityHeaders });
     }
 
     if (job.status === "QUEUED") {
@@ -59,20 +65,20 @@ export async function GET(
         updatedAt: job.updatedAt,
         createdAt: job.createdAt,
       },
-    });
+    }, { headers: securityHeaders });
   } catch (error: any) {
     console.error("Get analysis job error:", sanitizeError(error));
 
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status, headers: securityHeaders }
       );
     }
 
     return NextResponse.json(
       { error: "Failed to get analysis job" },
-      { status: 500 }
+      { status: 500, headers: securityHeaders }
     );
   }
 }
