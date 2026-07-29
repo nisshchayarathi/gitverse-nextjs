@@ -487,7 +487,7 @@ export class AnalysisJobService {
   }): Promise<{ lockToken: string } | null> {
     const lockMs = params.lockMs ?? DEFAULT_LOCK_MS;
 
-    const result = await prisma.$executeRaw`
+    const result = await prisma.$queryRaw<{ lock_token: string }[]>`
       UPDATE analysis_jobs
       SET
         status = 'PROCESSING',
@@ -503,7 +503,7 @@ export class AnalysisJobService {
           OR (status = 'PROCESSING' AND (lock_expires_at IS NULL OR lock_expires_at < NOW()))
         )
       RETURNING lock_token
-    ` as any[];
+    `;
 
     if (result.length === 0) return null;
 

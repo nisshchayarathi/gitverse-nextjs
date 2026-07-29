@@ -163,7 +163,7 @@ describe("Edge Middleware", () => {
   describe("mock-session cookie with HMAC verification", () => {
     it("should accept valid HMAC-signed mock session in non-production", async () => {
       process.env.PLAYWRIGHT_TEST = "true";
-      process.env.NODE_ENV = "development";
+      (process.env as Record<string,string>).NODE_ENV = "development";
       (getToken as jest.Mock).mockResolvedValue(null);
 
       const cookie = createMockSessionCookie();
@@ -177,7 +177,7 @@ describe("Edge Middleware", () => {
 
     it("should reject mock session with invalid HMAC signature", async () => {
       process.env.PLAYWRIGHT_TEST = "true";
-      process.env.NODE_ENV = "development";
+      (process.env as Record<string,string>).NODE_ENV = "development";
       (getToken as jest.Mock).mockResolvedValue(null);
 
       const req = createRequest("/dashboard", "", "mock-session=true.invalidsignature");
@@ -191,7 +191,7 @@ describe("Edge Middleware", () => {
 
     it("should reject mock session when MOCK_SESSION_HMAC_KEY is not set", async () => {
       process.env.PLAYWRIGHT_TEST = "true";
-      process.env.NODE_ENV = "development";
+      (process.env as Record<string,string>).NODE_ENV = "development";
       delete process.env.MOCK_SESSION_HMAC_KEY;
       (getToken as jest.Mock).mockResolvedValue(null);
 
@@ -207,7 +207,7 @@ describe("Edge Middleware", () => {
 
     it("should reject mock session in production even with valid HMAC", async () => {
       process.env.PLAYWRIGHT_TEST = "true";
-      process.env.NODE_ENV = "production";
+      (process.env as Record<string,string>).NODE_ENV = "production";
       (getToken as jest.Mock).mockResolvedValue(null);
 
       const cookie = createMockSessionCookie();
@@ -222,7 +222,7 @@ describe("Edge Middleware", () => {
 
     it("should reject mock session when PLAYWRIGHT_TEST is not set", async () => {
       delete process.env.PLAYWRIGHT_TEST;
-      process.env.NODE_ENV = "development";
+      (process.env as Record<string,string>).NODE_ENV = "development";
       (getToken as jest.Mock).mockResolvedValue(null);
 
       const cookie = createMockSessionCookie();
@@ -236,7 +236,7 @@ describe("Edge Middleware", () => {
 
     it("should reject mock session with expired timestamp", async () => {
       process.env.PLAYWRIGHT_TEST = "true";
-      process.env.NODE_ENV = "development";
+      (process.env as Record<string,string>).NODE_ENV = "development";
       (getToken as jest.Mock).mockResolvedValue(null);
 
       // Create a cookie with a timestamp from 25 hours ago
@@ -252,7 +252,7 @@ describe("Edge Middleware", () => {
 
     it("should reject mock session with malformed value (no timestamp)", async () => {
       process.env.PLAYWRIGHT_TEST = "true";
-      process.env.NODE_ENV = "development";
+      (process.env as Record<string,string>).NODE_ENV = "development";
       (getToken as jest.Mock).mockResolvedValue(null);
 
       const malformedValue = "true";
@@ -267,7 +267,7 @@ describe("Edge Middleware", () => {
 
     it("should reject mock session with no dot separator", async () => {
       process.env.PLAYWRIGHT_TEST = "true";
-      process.env.NODE_ENV = "development";
+      (process.env as Record<string,string>).NODE_ENV = "development";
       (getToken as jest.Mock).mockResolvedValue(null);
 
       const req = createRequest("/dashboard", "", "mock-session=nodotatall");
@@ -280,7 +280,7 @@ describe("Edge Middleware", () => {
 
     it("should fall back to real auth when mock session is invalid", async () => {
       process.env.PLAYWRIGHT_TEST = "true";
-      process.env.NODE_ENV = "development";
+      (process.env as Record<string,string>).NODE_ENV = "development";
       (getToken as jest.Mock).mockResolvedValue({ sub: "123" });
 
       const req = createRequest("/dashboard", "", "mock-session=invalid");
