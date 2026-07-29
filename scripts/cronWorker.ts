@@ -24,6 +24,39 @@ const TIMEOUT_MS = parseInt(process.env.CRON_WORKER_TIMEOUT_MS || "300000", 10);
  */
 const BATCH_LIMIT = parseInt(process.env.CRON_WORKER_BATCH || "5", 10);
 
+/**
+ * TTL for completed WebhookEvent records.
+ * Completed events older than this are permanently deleted to prevent unbounded table growth.
+ * Retained in days; set via WEBHOOK_EVENT_RETENTION_DAYS env var (default: 30).
+ */
+const WEBHOOK_RETENTION_DAYS = parseInt(
+  process.env.WEBHOOK_EVENT_RETENTION_DAYS || "30",
+  10,
+);
+
+const cleanUpOldWebhookEvents = async (): Promise<number> => {
+  if (WEBHOOK_RETENTION_DAYS <= 0) {
+    // Disabled by setting WEBHOOK_EVENT_RETENTION_DAYS=0
+    return 0;
+  }
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - WEBHOOK_RETENTION_DAYS);
+
+  try {
+    const result = await prisma.webhookEvent.deleteMany({
+      where: {
+        status: { in: ["completed", "failed", "rate_limited"] },
+        createdAt: { lt: cutoff },
+      },
+    });
+    return result.count;
+  } catch (err) {
+    console.error("[CronWorker] WebhookEvent cleanup error:", err);
+    return 0;
+  }
+};
+
 process.on("unhandledRejection", async (reason) => {
   console.error("[CronWorker] FATAL unhandled rejection:", reason);
   await releaseAllLocks();
@@ -148,6 +181,11 @@ const runOnce = async (): Promise<number> => {
   const reclaimed = await analysisJobService.reclaimOrphanedJobs();
   if (reclaimed > 0) {
     console.log(`[CronWorker] Reclaimed ${reclaimed} orphaned job(s)`);
+  }
+
+  const cleanedWebhookEvents = await cleanUpOldWebhookEvents();
+  if (cleanedWebhookEvents > 0) {
+    console.log(`[CronWorker] Cleaned up ${cleanedWebhookEvents} old WebhookEvent record(s)`);
   }
 
   const deadline = Date.now() + TIMEOUT_MS;
