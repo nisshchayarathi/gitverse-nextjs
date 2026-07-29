@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password, rememberMe } = body;
 
-    if (!email || !password) {
+    if (typeof email !== "string" || !email || typeof password !== "string" || !password) {
       return apiError(400, "Email and password are required");
     }
 
