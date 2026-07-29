@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAnnotationEvent } from "@/lib/services/annotationSync";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
+const securityHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+};
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request);
@@ -11,7 +17,7 @@ export async function GET(request: NextRequest) {
     const repositoryId = searchParams.get("repositoryId");
 
     if (!repositoryId) {
-      return NextResponse.json({ error: "repositoryId is required" }, { status: 400 });
+      return NextResponse.json({ error: "repositoryId is required" }, { status: 400, headers: securityHeaders });
     }
 
     const annotations = await prisma.mapAnnotation.findMany({
@@ -26,9 +32,9 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     });
 
-    return NextResponse.json(annotations);
+    return NextResponse.json(annotations, { headers: securityHeaders });
   } catch (error: any) {
-    return NextResponse.json({ error: "Failed to fetch annotations" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch annotations" }, { status: 500, headers: securityHeaders });
   }
 }
 
@@ -42,7 +48,7 @@ export async function POST(request: NextRequest) {
     const { repositoryId, targetType, targetId, content, annotationType, positionX, positionY } = body;
 
     if (!repositoryId || !targetType || !targetId || !content || !annotationType) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400, headers: securityHeaders });
     }
 
     // Verify user has access to repo (simple check, assume requireAuth is sufficient or add repo ownership check)
@@ -54,7 +60,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!repo) {
-      return NextResponse.json({ error: "Repository not found or access denied" }, { status: 404 });
+      return NextResponse.json({ error: "Repository not found or access denied" }, { status: 404, headers: securityHeaders });
     }
 
     const annotation = await prisma.mapAnnotation.create({
@@ -89,9 +95,9 @@ export async function POST(request: NextRequest) {
       annotation
     });
 
-    return NextResponse.json(annotation, { status: 201 });
+    return NextResponse.json(annotation, { status: 201, headers: securityHeaders });
   } catch (error: any) {
     console.error("Failed to create annotation", error);
-    return NextResponse.json({ error: "Failed to create annotation" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create annotation" }, { status: 500, headers: securityHeaders });
   }
 }
