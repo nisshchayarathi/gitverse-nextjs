@@ -150,7 +150,6 @@ export function CodeDependencyGraph({ repository }: CodeDependencyGraphProps) {
     filters.hiddenFileTypes,
     filters.visibleDomains,
   ]);
-  }, [repository?.commits]);
 
   // Keep annotationsRef in sync with the annotations state so the D3 tick
   // callback always has access to the latest list without a closure over stale state.
