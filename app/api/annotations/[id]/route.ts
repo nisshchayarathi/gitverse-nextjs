@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAnnotationEvent } from "@/lib/services/annotationSync";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
+const securityHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+};
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -22,12 +28,12 @@ export async function PATCH(
     });
 
     if (!existing) {
-      return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
+      return NextResponse.json({ error: "Annotation not found" }, { status: 404, headers: securityHeaders });
     }
 
     // Only author or repo owner can edit
     if (existing.authorId !== user.userId && existing.repository.userId !== user.userId) {
-      return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
+      return NextResponse.json({ error: "Annotation not found" }, { status: 404, headers: securityHeaders });
     }
 
     const updated = await prisma.mapAnnotation.update({
@@ -58,9 +64,9 @@ export async function PATCH(
       annotation: updated
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json(updated, { headers: securityHeaders });
   } catch (error: any) {
-    return NextResponse.json({ error: "Failed to update annotation" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update annotation" }, { status: 500, headers: securityHeaders });
   }
 }
 
@@ -80,12 +86,12 @@ export async function DELETE(
     });
 
     if (!existing) {
-      return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
+      return NextResponse.json({ error: "Annotation not found" }, { status: 404, headers: securityHeaders });
     }
 
     // Only author or repo owner can delete
     if (existing.authorId !== user.userId && existing.repository.userId !== user.userId) {
-      return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
+      return NextResponse.json({ error: "Annotation not found" }, { status: 404, headers: securityHeaders });
     }
 
     // Capture repositoryId before deletion for broadcasting
@@ -106,8 +112,8 @@ export async function DELETE(
       annotationId: id
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: securityHeaders });
   } catch (error: any) {
-    return NextResponse.json({ error: "Failed to delete annotation" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to delete annotation" }, { status: 500, headers: securityHeaders });
   }
 }

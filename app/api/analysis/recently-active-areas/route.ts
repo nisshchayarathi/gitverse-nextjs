@@ -4,8 +4,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/middleware";
+import prisma from "@/lib/prisma";
 
 export const runtime = "nodejs";
+
+const securityHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+};
 
 interface ActivityAnalysisRequest {
   repositoryId: string;
@@ -18,12 +26,43 @@ interface ActivityAnalysisRequest {
  */
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth(request);
+
     const body: ActivityAnalysisRequest = await request.json();
 
     if (!body.repositoryId) {
       return NextResponse.json(
         { success: false, message: "Missing required field: repositoryId" },
-        { status: 400 }
+        { status: 400, headers: securityHeaders }
+      );
+    }
+
+    // Validate repository ownership
+    const repositoryId = Number(body.repositoryId);
+    if (isNaN(repositoryId)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid repository ID" },
+        { status: 400, headers: securityHeaders }
+      );
+    }
+
+    const repository = await prisma.repository.findUnique({
+      where: { id: repositoryId },
+      select: { userId: true },
+    });
+
+    if (!repository) {
+      return NextResponse.json(
+        { success: false, message: "Repository not found" },
+        { status: 404, headers: securityHeaders }
+      );
+    }
+
+    // Verify user has access to this repository
+    if (repository.userId !== user.userId) {
+      return NextResponse.json(
+        { success: false, message: "Access denied" },
+        { status: 403, headers: securityHeaders }
       );
     }
 
@@ -40,13 +79,13 @@ export async function POST(request: NextRequest) {
         data: analysis,
         message: "Activity analysis completed successfully",
       },
-      { status: 200 }
+      { status: 200, headers: securityHeaders }
     );
   } catch (error) {
     console.error("Error analyzing activity:", error);
     return NextResponse.json(
       { success: false, message: "Failed to analyze activity" },
-      { status: 500 }
+      { status: 500, headers: securityHeaders }
     );
   }
 }
@@ -59,35 +98,66 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireAuth(request);
+
     const searchParams = request.nextUrl.searchParams;
-    const repositoryId = searchParams.get("repositoryId");
+    const repositoryIdParam = searchParams.get("repositoryId");
     const timeWindow = (searchParams.get("timeWindow") || "month") as
       | "week"
       | "twoWeeks"
       | "month"
       | "quarter";
 
-    if (!repositoryId) {
+    if (!repositoryIdParam) {
       return NextResponse.json(
         { success: false, message: "Missing required query parameter: repositoryId" },
-        { status: 400 }
+        { status: 400, headers: securityHeaders }
       );
     }
 
-    const analysis = generateMockAnalysis(repositoryId, timeWindow, 10);
+    // Validate repository ownership
+    const repositoryId = Number(repositoryIdParam);
+    if (isNaN(repositoryId)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid repository ID" },
+        { status: 400, headers: securityHeaders }
+      );
+    }
+
+    const repository = await prisma.repository.findUnique({
+      where: { id: repositoryId },
+      select: { userId: true },
+    });
+
+    if (!repository) {
+      return NextResponse.json(
+        { success: false, message: "Repository not found" },
+        { status: 404, headers: securityHeaders }
+      );
+    }
+
+    // Verify user has access to this repository
+    if (repository.userId !== user.userId) {
+      return NextResponse.json(
+        { success: false, message: "Access denied" },
+        { status: 403, headers: securityHeaders }
+      );
+    }
+
+    const analysis = generateMockAnalysis(repositoryIdParam, timeWindow, 10);
 
     return NextResponse.json(
       {
         success: true,
         data: analysis,
       },
-      { status: 200 }
+      { status: 200, headers: securityHeaders }
     );
   } catch (error) {
     console.error("Error retrieving activity:", error);
     return NextResponse.json(
       { success: false, message: "Failed to retrieve activity" },
-      { status: 500 }
+      { status: 500, headers: securityHeaders }
     );
   }
 }
