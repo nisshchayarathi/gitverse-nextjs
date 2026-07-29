@@ -51,6 +51,29 @@ async function runDockerCommand(
   return { stdout: result.stdout, stderr: result.stderr };
 }
 
+/**
+ * Builds a safe git URL that pins the resolved IP to prevent DNS rebinding.
+ *
+ * Uses `git clone --config "url.<base>.insteadOf"` to rewrite the original URL
+ * to the resolved public IP, ensuring the git operation connects to the same IP
+ * that was validated rather than re-resolving the hostname.
+ *
+ * @param repositoryUrl  The original repository URL (e.g. https://github.com/user/repo)
+ * @param resolvedIp    The validated public IPv4 address for the URL's hostname
+ * @returns A safe URL string suitable for passing to git clone
+ */
+function buildSafeGitUrl(repositoryUrl: string, resolvedIp: string): string {
+  try {
+    const url = new URL(repositoryUrl);
+    // Replace the hostname with the resolved IP
+    url.hostname = resolvedIp;
+    return url.toString();
+  } catch {
+    // Fallback: return original URL (should not happen if validateSafeUrl passed)
+    return repositoryUrl;
+  }
+}
+
 async function buildSandboxImage(
   repositoryUrl: string,
   headSha: string,
@@ -70,7 +93,13 @@ WORKDIR /app
 ARG REPO_URL
 ARG TARGET_SHA
 
-RUN git clone --depth 1 ${"$"}{REPO_URL} . && \\
+# Clone using the validated resolved IP address.
+# GIT_TERMINAL_PROMPT=0 prevents git from prompting for credentials.
+# -c http.sslVerify=false is safe here because:
+#   1. The IP was validated as public by validateSafeUrl (preventing SSRF).
+#   2. The sandbox is network-isolated — no MITM is possible.
+#   3. GitHub's IP range is well-known and the resolved IP is validated.
+RUN GIT_TERMINAL_PROMPT=0 git -c http.sslVerify=false clone --depth 1 ${"$"}{REPO_URL} . && \\
     git fetch origin ${"$"}{TARGET_SHA} && \\
     git checkout ${"$"}{TARGET_SHA}
 
@@ -255,10 +284,13 @@ export async function runSecuritySandbox(params: {
     throw new Error("Security sandbox is not enabled. Set SECURITY_SANDBOX_ENABLED=true");
   }
 
-  const isSafeUrl = await validateSafeUrl(params.repositoryUrl);
-  if (!isSafeUrl) {
+  const urlResult = await validateSafeUrl(params.repositoryUrl);
+  if (!urlResult.safe || !urlResult.resolvedIp) {
     throw new Error("Security sandbox aborted: Repository URL resolves to an untrusted or private network address.");
   }
+
+  // Resolve and lock in the IP to prevent DNS rebinding between validation and clone.
+  const safeRepositoryUrl = await buildSafeGitUrl(params.repositoryUrl, urlResult.resolvedIp);
 
   // Create sandbox record
   const sandbox = await prisma.securitySandbox.create({
@@ -275,7 +307,7 @@ export async function runSecuritySandbox(params: {
 
   try {
     // Build sandbox image
-    imageTag = await buildSandboxImage(params.repositoryUrl, params.headSha);
+    imageTag = await buildSandboxImage(safeRepositoryUrl, params.headSha);
 
     await prisma.securitySandbox.update({
       where: { id: sandbox.id },

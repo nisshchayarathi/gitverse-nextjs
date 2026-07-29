@@ -52,39 +52,58 @@ export function isPrivateIP(ip: string): boolean {
 }
 
 /**
+ * Result of validateSafeUrl — includes safe flag and resolved public IP for safe reuse.
+ */
+export interface SafeUrlResult {
+  safe: boolean;
+  /** The first resolved public IPv4 address, usable to prevent DNS rebinding. */
+  resolvedIp?: string;
+}
+
+/**
  * Validates a URL at the network level by resolving its hostname and checking the resolved IP.
  * Defends against Server-Side Request Forgery (SSRF) and DNS rebinding attacks to private IPs.
  *
  * @param urlString The full URL to check.
- * @returns true if safe, false if the URL is invalid or resolves to a restricted IP.
+ * @returns SafeUrlResult with safe=true and resolvedIp when the URL is safe.
  */
-export async function validateSafeUrl(urlString: string): Promise<boolean> {
+export async function validateSafeUrl(urlString: string): Promise<SafeUrlResult> {
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(urlString);
   } catch {
-    return false; // Invalid URL
+    return { safe: false }; // Invalid URL
   }
 
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return false;
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    return { safe: false };
   }
 
   const hostname = parsedUrl.hostname;
 
+  // If the hostname is already an IP, validate it directly
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+    return { safe: !isPrivateIP(hostname), resolvedIp: hostname };
+  }
+
   try {
     const records = await dns.lookup(hostname, { all: true });
-    
+
     // Check all resolved IPs for the hostname
+    let firstPublicIp: string | undefined;
     for (const record of records) {
       if (isPrivateIP(record.address)) {
-        return false;
+        return { safe: false };
+      }
+      if (!firstPublicIp && record.family === 2) {
+        // Prefer IPv4 as resolved IP (IPv6 is harder to use in git/GET)
+        firstPublicIp = record.address;
       }
     }
-    
-    return true;
-  } catch (error) {
+
+    return { safe: true, resolvedIp: firstPublicIp };
+  } catch {
     // If DNS resolution fails, consider it unsafe
-    return false;
+    return { safe: false };
   }
 }

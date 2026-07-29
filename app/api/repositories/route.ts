@@ -100,8 +100,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isSafe = await validateSafeUrl(normalizedUrl);
-    if (!isSafe) {
+    const urlResult = await validateSafeUrl(normalizedUrl);
+    if (!urlResult.safe) {
       return apiError(
         "Invalid repository URL. The URL resolves to an untrusted or private network address.",
         400,
