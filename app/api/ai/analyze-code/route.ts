@@ -9,6 +9,12 @@ import {
 } from "@/lib/utils/aiRequestValidation";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
+const securityHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+};
+
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
@@ -22,7 +28,7 @@ export async function POST(request: NextRequest) {
     if (!allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please wait before retrying." },
-        { status: 429 }
+        { status: 429, headers: securityHeaders }
       );
     }
 
@@ -35,14 +41,14 @@ export async function POST(request: NextRequest) {
     if (!code || !language || !analysisType) {
       return NextResponse.json(
         { error: "Code, language, and analysis type are required" },
-        { status: 400 }
+        { status: 400, headers: securityHeaders }
       );
     }
 
     if (code.length > 10000) {
       return NextResponse.json(
         { error: "Code snippet too large (max 10000 characters)" },
-        { status: 400 }
+        { status: 400, headers: securityHeaders }
       );
     }
 
@@ -51,7 +57,7 @@ export async function POST(request: NextRequest) {
         {
           error: `Context too long (max ${AI_REQUEST_LIMITS.MAX_CONTEXT_CHARS} characters)`,
         },
-        { status: 400 }
+        { status: 400, headers: securityHeaders }
       );
     }
 
@@ -68,18 +74,18 @@ export async function POST(request: NextRequest) {
       endpoint: "analyze-code",
     });
 
-    return NextResponse.json({ analysis, analysisType });
+    return NextResponse.json({ analysis, analysisType }, { headers: securityHeaders });
   } catch (error: any) {
     console.error("Code analysis error:", sanitizeError(error));
     if (isHttpError(error)) {
       return NextResponse.json(
         { error: error.message },
-        { status: error.status }
+        { status: error.status, headers: securityHeaders }
       );
     }
     return NextResponse.json(
       { error: "Failed to analyze code" },
-      { status: 500 }
+      { status: 500, headers: securityHeaders }
     );
   }
 }
