@@ -250,7 +250,7 @@ describe("AnalysisJobService – releaseLock", () => {
   it("sets lockExpiresAt to current time for a job", async () => {
     asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
 
-    await service.releaseLock({ jobId: "job-1", workerId: "worker-A" });
+    await service.releaseLock({ jobId: "job-1", workerId: "worker-A", lockToken: "test-token" });
 
     const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
     expect(call.where.id).toBe("job-1");
@@ -261,7 +261,7 @@ describe("AnalysisJobService – releaseLock", () => {
   it("releases lock without workerId filter", async () => {
     asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
 
-    await service.releaseLock({ jobId: "job-1" });
+    await service.releaseLock({ jobId: "job-1", workerId: "test-worker", lockToken: "test-token" });
 
     const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
     expect(call.where.id).toBe("job-1");
@@ -273,7 +273,7 @@ describe("AnalysisJobService – releaseLock", () => {
       new Error("connection refused"),
     );
 
-    await expect(service.releaseLock({ jobId: "job-1" })).rejects.toThrow("connection refused");
+    await expect(service.releaseLock({ jobId: "job-1", workerId: "test-worker", lockToken: "test-token" })).rejects.toThrow("connection refused");
   });
 });
 
@@ -291,6 +291,7 @@ describe("AnalysisJobService – markDrainReleased", () => {
       jobId: "job-1",
       workerId: "worker-A",
       error: "Worker shutting down",
+      lockToken: "test-token",
     });
 
     const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
@@ -310,6 +311,7 @@ describe("AnalysisJobService – markDrainReleased", () => {
       jobId: "job-1",
       workerId: "worker-B",
       error: "timeout",
+      lockToken: "test-token",
     });
 
     const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
@@ -321,7 +323,9 @@ describe("AnalysisJobService – markDrainReleased", () => {
 
     await service.markDrainReleased({
       jobId: "job-1",
+      workerId: "test-worker",
       error: "shutdown",
+      lockToken: "test-token",
     });
 
     const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
@@ -334,7 +338,7 @@ describe("AnalysisJobService – markDrainReleased", () => {
     );
 
     await expect(
-      service.markDrainReleased({ jobId: "job-1", error: "err" }),
+      service.markDrainReleased({ jobId: "job-1", workerId: "test-worker", lockToken: "test-token", error: "err" }),
     ).rejects.toThrow("deadlock detected");
   });
 });
@@ -467,7 +471,7 @@ describe("AnalysisJobService – markDone with lockToken", () => {
   it("only uses id when workerId and lockToken are omitted", async () => {
     asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
 
-    await service.markDone({ jobId: "job-1" });
+    await service.markDone({ jobId: "job-1", workerId: "test-worker", lockToken: "test-token" });
 
     const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
     expect(call.where.id).toBe("job-1");
@@ -526,6 +530,8 @@ describe("AnalysisJobService – markFailed with lockToken", () => {
 
     await service.markFailed({
       jobId: "job-1",
+      workerId: "test-worker",
+      lockToken: "test-token",
       error: "error",
       attempts: 3,
       maxAttempts: 3,
@@ -640,7 +646,7 @@ describe("AnalysisJobService – releaseLock with lockToken", () => {
   it("skips lockToken when not provided", async () => {
     asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
 
-    await service.releaseLock({ jobId: "job-1" });
+    await service.releaseLock({ jobId: "job-1", workerId: "test-worker", lockToken: "test-token" });
 
     const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
     expect(call.where.lockToken).toBeUndefined();
@@ -822,10 +828,10 @@ describe("AnalysisJobService – concurrent claim scenarios", () => {
     expect(interpolated).toContain("tok-wrong");
   });
 
-  it("direct markDone without workerId does not require lockToken", async () => {
+  it("direct markDone requires workerId and lockToken", async () => {
     asMock(mockPrisma.analysisJob.update).mockResolvedValueOnce({});
 
-    await service.markDone({ jobId: "job-direct" });
+    await service.markDone({ jobId: "job-direct", workerId: "test-worker", lockToken: "test-token" });
 
     const call = asMock(mockPrisma.analysisJob.update).mock.calls[0][0];
     expect(call.where.id).toBe("job-direct");
