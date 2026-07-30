@@ -760,8 +760,9 @@
     left: 50%;
     bottom: -4px;
     width: 72%;
-    height: 2px;
-    background-color: currentcolor;
+    height: 3px;
+    border-radius: 2px;
+    background-color: hsl(var(--primary));
     transform: translateX(-50%) scaleX(0);
     transform-origin: center;
     transition: transform 0.3s ease;
