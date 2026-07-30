@@ -14,36 +14,12 @@ import {
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { getGithubAccessToken } from "@/lib/services/githubAuthService";
-import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
+import { kickLocalRunner, kickProductionWorker } from "@/lib/utils/kickWorkerUtils";
 import { GitService } from "@/lib/services/gitService";
 import { logger } from "@/lib/logger";
 import { apiError, apiSuccess } from "@/lib/utils/apiResponse";
 import { isValidGitScope } from "@/lib/utils/validators";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
-function kickLocalRunner(request: NextRequest) {
-  if (process.env.NODE_ENV === "production") return;
-  const origin = new URL(request.url).origin;
-  const secret = process.env.ANALYSIS_RUNNER_SECRET;
-  if (!secret) return;
-  void fetch(`${origin}/api/internal/run-analysis`, {
-    method: "POST",
-    headers: { "x-analysis-runner-secret": secret },
-  }).catch(() => {
-    // Best-effort only.
-  });
-}
-
-function kickProductionWorker() {
-  if (process.env.NODE_ENV !== "production") return;
-
-  void triggerAnalysisWorkerWorkflow().catch((error) => {
-    logger.error(
-      { err: sanitizeError(error) },
-      "Failed to dispatch analysis worker workflow",
-    );
-  });
-}
-
 function normalizeGitHubRepoUrl(input: string): string | null {
   const trimmed = input.trim();
 

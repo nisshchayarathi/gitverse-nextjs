@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 import { repositoryService } from "@/lib/services/repositoryService";
 import { analysisJobService } from "@/lib/services/analysisJobService";
 import { sanitizeError } from "@/lib/middleware";
-import { triggerAnalysisWorkerWorkflow } from "@/lib/services/analysisWorkerTriggerService";
+import { kickLocalRunner, kickProductionWorker } from "@/lib/utils/kickWorkerUtils";
 import { normalizeTargetDirectory } from "@/lib/utils/repositoryUtils";
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "@/lib/middleware/rateLimit";
 
@@ -31,30 +31,6 @@ function normalizeKnownRepoHttpUrl(input: string): string | null {
   if (!owner || !repo) return null;
 
   return `${parsed.protocol}//${parsed.host}/${owner}/${repo}`;
-}
-
-function kickLocalRunner(request: NextRequest) {
-  if (process.env.NODE_ENV === "production") return;
-  const origin = new URL(request.url).origin;
-  const secret = process.env.ANALYSIS_RUNNER_SECRET;
-  if (!secret) return;
-  void fetch(`${origin}/api/internal/run-analysis`, {
-    method: "POST",
-    headers: { "x-analysis-runner-secret": secret },
-  }).catch(() => {
-    // Best-effort only.
-  });
-}
-
-function kickProductionWorker() {
-  if (process.env.NODE_ENV !== "production") return;
-
-  void triggerAnalysisWorkerWorkflow().catch((error) => {
-    logger.error(
-      { err: sanitizeError(error), operation: "dispatch-analysis-worker-workflow" },
-      "Failed to dispatch analysis worker workflow"
-    );
-  });
 }
 
 export async function POST(request: NextRequest) {

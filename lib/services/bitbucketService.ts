@@ -55,8 +55,8 @@ export function sanitizeBitbucketError(error: any) {
     const safeConfig = {
       ...error.config,
       headers: sanitizeBitbucketHeaders(error.config.headers),
-    }
-    error.config = safeConfig as any
+    } as any
+    error.config = safeConfig 
   }
   return error
 }
