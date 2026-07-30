@@ -296,16 +296,16 @@ export class RepositoryService {
 
       // Clone repository
       await report({
-        progressPercent: 5,
+        progressPercent: 10,
         progressMessage: "Cloning repository...",
       });
       gitService = await GitService.cloneRepository(repository.url, tempDir, {
         signal,
         accessToken: token,
         onProgress: (pct, msg) => {
-          const analysisPct = 5 + Math.round((pct / 100) * 3);
+          const analysisPct = 10 + Math.round((pct / 100) * 10);
           report({
-            progressPercent: Math.min(8, analysisPct),
+            progressPercent: Math.min(20, analysisPct),
             progressMessage: msg,
           });
         },
@@ -314,7 +314,7 @@ export class RepositoryService {
       checkAborted();
 
       // Read phases: all git/fs operations happen before the write transaction.
-      await report({ progressPercent: 8, progressMessage: "Reading README" });
+      await report({ progressPercent: 22, progressMessage: "Reading README" });
       const scopedReadmePath = repository.targetDirectory
         ? path.join(tempDir, repository.targetDirectory)
         : null;
@@ -328,11 +328,11 @@ export class RepositoryService {
       // Check for monorepo workspaces if this is the root project
       let subPackages: string[] = [];
       if (!repository.targetDirectory) {
-        await report({ progressPercent: 9, progressMessage: "Detecting Monorepo sub-packages..." });
+        await report({ progressPercent: 25, progressMessage: "Detecting Monorepo sub-packages..." });
         subPackages = await detectMonorepoPackages(tempDir);
       }
 
-      await report({ progressPercent: 10, progressMessage: "Checking AI context configuration" });
+      await report({ progressPercent: 30, progressMessage: "Checking AI context configuration" });
 
       let knowledgeJson: ParsedRepositoryKnowledge | undefined = undefined;
       let knowledgeMd: ParsedRepositoryKnowledge | undefined = undefined;
@@ -379,7 +379,7 @@ export class RepositoryService {
       checkAborted();
 
       await report({
-        progressPercent: 10,
+        progressPercent: 35,
         progressMessage: "Calculating repository size...",
       });
       const [size, branches] = await Promise.all([
@@ -392,7 +392,7 @@ export class RepositoryService {
       const defaultBranch = branches.find((b) => b.isDefault)?.name || "main";
 
       await report({
-        progressPercent: 25,
+        progressPercent: 38,
         progressMessage: "Fetching commit history...",
       });
       const commits = await gitService.getCommits("--all", 1000, signal);
@@ -400,19 +400,15 @@ export class RepositoryService {
       checkAborted();
 
       await report({
-        progressPercent: 65,
-        progressMessage: "Scanning files",
+        progressPercent: 40,
+        progressMessage: "Parsing file structure & AST...",
       });
       const files = await gitService.getFileTree(opts?.scope || repository.targetDirectory || undefined, signal);
       checkAborted();
 
       await report({
-        progressPercent: 80,
-        progressMessage: "Analyzing contributor activity...",
-      });
-      await report({
-        progressPercent: 85,
-        progressMessage: "Detecting programming languages...",
+        progressPercent: 70,
+        progressMessage: "Building dependency graph nodes/edges...",
       });
 
       const [contributors, languages] = await Promise.all([
@@ -421,6 +417,11 @@ export class RepositoryService {
       ]);
 
       checkAborted();
+
+      await report({
+        progressPercent: 95,
+        progressMessage: "Saving records to Postgres...",
+      });
 
       // Write phase: all database writes in a single atomic transaction.
       // This ensures that a failure mid-way rolls back all changes, preventing
