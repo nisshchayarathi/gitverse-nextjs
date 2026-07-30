@@ -191,41 +191,293 @@ The background analysis worker runs as a separate process to handle long-running
 
 ```
 gitverse-nextjs/
-├── app/
-│   ├── api/                 # API routes
-│   │   ├── auth/            # Authentication endpoints
-│   │   ├── repositories/    # Repository management
-│   │   ├── ai/              # AI-powered features
-│   │   ├── users/           # User management
-│   │   └── integrations/    # Git platform integrations
-│   ├── (pages)/             # Page routes
-│   ├── layout.tsx           # Root layout
-│   └── page.tsx             # Home page
-├── src/
-│   ├── components/          # React components
-│   │   ├── ai/              # AI components
-│   │   ├── auth/            # Authentication components
-│   │   ├── layout/          # Layout components
-│   │   ├── repository/      # Repository components
-│   │   ├── ui/              # Reusable UI components
-│   │   └── visualizations/  # Data visualization components
-│   ├── contexts/            # React contexts
-│   ├── hooks/               # Custom React hooks
-│   ├── pages/               # Page components
-│   ├── services/            # API service functions
-│   └── utils/               # Utility functions
+├── .github/
+│   ├── ISSUE_TEMPLATE/
+│   │   └── workerless-analysis-vercel.md
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── workflows/
+│       └── run-analysis-cron.yml
+├── app/                           # Next.js App Router
+│   ├── analysis/
+│   │   └── [jobId]/
+│   │       └── page.tsx
+│   ├── analyze/
+│   │   └── route.ts
+│   ├── api/                       # Next.js App Router
+│   │   ├── ai/                    # AI-powered features
+│   │   │   ├── analyze-code/
+│   │   │   │   └── route.ts
+│   │   │   ├── analyze-repository/
+│   │   │   │   └── route.ts
+│   │   │   ├── chat/
+│   │   │   │   └── route.ts
+│   │   │   ├── explain-file/
+│   │   │   │   └── route.ts
+│   │   │   ├── review-pr/
+│   │   │   │   └── route.ts
+│   │   │   └── suggest-commit/
+│   │   │       └── route.ts
+│   │   ├── analysis/
+│   │   │   └── [jobId]/
+│   │   │       └── route.ts
+│   │   ├── analysis-jobs/
+│   │   │   └── [id]/
+│   │   │       └── route.ts
+│   │   ├── auth/                  # Authentication endpoints
+│   │   │   ├── [...nextauth]/
+│   │   │   │   └── route.ts
+│   │   │   ├── login/
+│   │   │   │   └── route.ts
+│   │   │   ├── logout/
+│   │   │   │   └── route.ts
+│   │   │   ├── me/
+│   │   │   │   └── route.ts
+│   │   │   ├── sessions/
+│   │   │   │   └── route.ts
+│   │   │   └── signup/
+│   │   │       └── route.ts
+│   │   ├── integrations/          # Git platform integrations
+│   │   │   └── github/
+│   │   │       ├── app/
+│   │   │       │   ├── callback/
+│   │   │       │   │   └── route.ts
+│   │   │       │   ├── delete/
+│   │   │       │   │   └── route.ts
+│   │   │       │   ├── install-url/
+│   │   │       │   │   └── route.ts
+│   │   │       │   └── sync/
+│   │   │       │       └── route.ts
+│   │   │       ├── connect/
+│   │   │       │   └── route.ts
+│   │   │       ├── connected-repos/
+│   │   │       │   └── route.ts
+│   │   │       ├── import/
+│   │   │       │   └── route.ts
+│   │   │       ├── pr-reviews/
+│   │   │       │   └── route.ts
+│   │   │       ├── repositories/
+│   │   │       │   └── route.ts
+│   │   │       └── select-repos/
+│   │   │           └── route.ts
+│   │   ├── internal/
+│   │   │   └── run-analysis/
+│   │   │       └── route.ts
+│   │   ├── repositories/          # Repository management
+│   │   │   ├── [id]/
+│   │   │   │   ├── analyze/
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── readme/
+│   │   │   │   │   └── route.ts
+│   │   │   │   ├── route.ts
+│   │   │   │   └── stats/
+│   │   │   │       └── route.ts
+│   │   │   └── route.ts
+│   │   ├── users/                 # User management
+│   │   │   ├── change-password/
+│   │   │   │   └── route.ts
+│   │   │   ├── me/
+│   │   │   │   └── route.ts
+│   │   │   └── profile/
+│   │   │       └── route.ts
+│   │   └── webhooks/
+│   │       └── github/
+│   │           └── route.ts
+│   ├── contribute/
+│   │   └── page.tsx
+│   ├── dashboard/
+│   │   └── page.tsx
+│   ├── globals.css
+│   ├── layout.tsx                 # Root layout
+│   ├── login/
+│   │   └── page.tsx
+│   ├── page.tsx                   # Home page
+│   ├── repo/
+│   │   └── [id]/
+│   │       └── page.tsx
+│   ├── search/
+│   │   └── page.tsx
+│   ├── settings/
+│   │   └── page.tsx
+│   └── signup/
+│       └── page.tsx
+├── deploy/
+│   └── deploy_new_gcp_project.sh
+├── dist-worker/
+│   ├── lib/
+│   │   ├── auth-config.js
+│   │   ├── auth.js
+│   │   ├── middleware.js
+│   │   ├── prisma.js
+│   │   ├── services/
+│   │   │   ├── analysisJobService.js
+│   │   │   ├── analysisWorkerTriggerService.js
+│   │   │   ├── bitbucketService.js
+│   │   │   ├── geminiService.js
+│   │   │   ├── githubAppService.js
+│   │   │   ├── githubService.js
+│   │   │   ├── gitlabService.js
+│   │   │   ├── gitService.js
+│   │   │   ├── prReviewService.js
+│   │   │   └── repositoryService.js
+│   │   ├── utils/
+│   │   │   ├── githubWebhook.js
+│   │   │   ├── jsonSafe.js
+│   │   │   ├── repositoryUtils.js
+│   │   │   └── signedState.js
+│   │   └── utils.js
+│   └── scripts/
+│       ├── analysisWorker.js
+│       └── workerServer.js
 ├── lib/
-│   ├── services/            # Backend services
-│   │   ├── gitService.ts    # Git operations
-│   │   ├── geminiService.ts # AI integration
-│   │   └── repositoryService.ts # Repository logic
-│   ├── prisma.ts            # Prisma client
-│   ├── auth.ts              # Authentication utilities
-│   └── middleware.ts        # Auth middleware
+│   ├── services/                  # Backend services
+│   │   ├── analysisJobService.ts
+│   │   ├── analysisWorkerTriggerService.ts
+│   │   ├── bitbucketService.ts
+│   │   ├── geminiService.ts       # AI integration
+│   │   ├── githubAppService.ts
+│   │   ├── githubService.ts
+│   │   ├── gitlabService.ts
+│   │   ├── gitService.ts          # Git operations
+│   │   ├── prReviewService.ts
+│   │   └── repositoryService.ts   # Repository logic
+│   ├── utils/
+│   │   ├── githubWebhook.ts
+│   │   ├── jsonSafe.ts
+│   │   ├── repositoryUtils.ts
+│   │   └── signedState.ts
+│   ├── auth-config.ts
+│   ├── auth.ts                    # Authentication utilities
+│   ├── env.ts
+│   ├── middleware.ts              # Auth middleware
+│   ├── prisma.ts                  # Prisma client
+│   └── utils.ts
 ├── prisma/
-│   └── schema.prisma        # Database schema
-├── public/                  # Static assets
-└── package.json             # Dependencies
+│   ├── migrations/
+│   │   ├── 20260102162531_add_commit_parents_and_tag/
+│   │   │   └── migration.sql
+│   │   ├── 20260104132000_add_analysis_jobs/
+│   │   │   └── migration.sql
+│   │   ├── 20260108070444_add_oauth_support/
+│   │   │   └── migration.sql
+│   │   ├── 20260108073235_nextauth_user_fields/
+│   │   │   └── migration.sql
+│   │   ├── 20260117081022_add_github_pr_review_models/
+│   │   │   └── migration.sql
+│   │   ├── 20260118000000_add_repository_readme/
+│   │   │   └── migration.sql
+│   │   ├── 20260523122400_prevent_duplicate_analysis_jobs/
+│   │   │   └── migration.sql
+│   │   └── migration_lock.toml
+│   └── schema.prisma              # Database schema
+│
+├── public/                        # Static assets
+│   ├── .gitkeep
+│   └── readme/
+│       └── README_ASSETS.md
+├── scripts/
+│   ├── analysisWorker.ts
+│   ├── seed.ts
+│   ├── test-validation.ts
+│   ├── vercel-build.js
+│   └── workerServer.ts
+├── src/
+│   ├── components/                # React components
+│   │   ├── ai/                    # AI components
+│   │   │   ├── AIChatInterface.tsx
+│   │   │   ├── AIRepoMentorSection.tsx
+│   │   │   ├── AIRepositoryOverlay.tsx
+│   │   │   ├── CodeAnalysisPanel.tsx
+│   │   │   └── RepositoryMentorTab.tsx
+│   │   ├── auth/                  # Authentication components
+│   │   │   ├── NextAuthProvider.tsx
+│   │   │   └── ProtectedRoute.tsx
+│   │   ├── layout/                # Layout components
+│   │   │   ├── Breadcrumbs.tsx
+│   │   │   ├── DashboardLayout.tsx
+│   │   │   ├── Footer.tsx
+│   │   │   ├── index.ts
+│   │   │   └── Navbar.tsx
+│   │   ├── repository/            # Repository components
+│   │   │   ├── BranchVisualization.tsx
+│   │   │   ├── CodeMetrics.tsx
+│   │   │   ├── CommitHistory.tsx
+│   │   │   ├── Contributors.tsx
+│   │   │   ├── FileStructure.tsx
+│   │   │   ├── RepositoryInsights.tsx
+│   │   │   └── RepositoryOverview.tsx
+│   │   ├── ui/                    # Reusable UI components
+│   │   │   ├── Button.tsx
+│   │   │   ├── Card.tsx
+│   │   │   ├── dropdown-menu.tsx
+│   │   │   ├── EmptyState.tsx
+│   │   │   ├── index.ts
+│   │   │   ├── Input.tsx
+│   │   │   ├── Modal.tsx
+│   │   │   ├── Skeleton.tsx
+│   │   │   ├── Spinner.tsx
+│   │   │   ├── toast.tsx
+│   │   │   └── toaster.tsx
+│   │   └── visualizations/        # Data visualization components
+│   │       ├── CodeDependencyGraph.tsx
+│   │       ├── CommitActivityHeatmap.tsx
+│   │       └── LanguageDistributionChart.tsx
+│   ├── context/
+│   │   └── ThemeContext.tsx
+│   ├── contexts/                  # React contexts
+│   │   └── AuthContext.tsx
+│   ├── hooks/                     # Custom React hooks
+│   │   └── use-toast.ts
+│   ├── lib/
+│   │   └── utils.ts
+│   ├── pages/                     # Page components
+│   │   ├── _app.tsx
+│   │   ├── Contribute.tsx
+│   │   ├── Dashboard.tsx
+│   │   ├── LandingPage.tsx
+│   │   ├── Login.tsx
+│   │   ├── RepositoryAnalysis.tsx
+│   │   ├── SearchPage.tsx
+│   │   ├── Settings.tsx
+│   │   └── Signup.tsx
+│   ├── services/                  # API service functions
+│   │   ├── apiConfig.ts
+│   │   └── gemini.ts
+│   └── utils/                     # Utility functions
+│       ├── cn.ts
+│       └── helpers.ts
+├── types/
+│   └── next-auth.d.ts
+├── .dockerignore
+├── .env.example
+├── .eslintrc.json
+├── .firebaserc
+├── .gcloudignore
+├── .gitignore
+├── apphosting.yaml
+├── batch_create.ts
+├── CONTRIBUTING.md
+├── Dockerfile
+├── firebase.json
+├── GETTING_STARTED.md
+├── GIT_GRAPH_SETUP.md
+├── GOOGLE_OAUTH_INTEGRATION.md
+├── GOOGLE_OAUTH_SETUP.md
+├── MIGRATION_COMPLETE.md
+├── MIGRATION_SUMMARY.md
+├── migrations_oauth.sql
+├── next.config.js
+├── package-lock.json
+├── package.json                   # Dependencies
+├── postcss.config.js
+├── prisma.config.ts
+├── QUICKSTART_OAUTH.md
+├── README.md
+├── START_HERE.md
+├── tailwind.config.js
+├── test.txt
+├── tsconfig.json
+├── tsconfig.worker.json
+└── vercel.json
 ```
 
 ### Background Processing Architecture
