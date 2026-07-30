@@ -138,6 +138,18 @@ That’s the MVP: turn repo complexity into a contributor roadmap.
 
 GitVerse follows a layered architecture with clear separation between the frontend, API layer, service layer, and background processing.
 
+```mermaid
+graph TD
+    A[Frontend<br/>Next.js / React] --> B[API Routes<br/>app/api]
+    B --> C[Service Layer<br/>lib/services]
+    C --> D[Prisma ORM]
+    D --> E[(PostgreSQL Database)]
+    C --> F[Background Analysis Worker]
+    F --> G[Gemini AI]
+    G --> F
+    F --> D
+```
+
 ### Frontend Layer (src/)
 
 The React frontend uses the Next.js App Router with client and server components:
