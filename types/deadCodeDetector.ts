@@ -1,4 +1,4 @@
-import { RepositoryFile } from "@/types/firstPRSimulator";
+import { RepositoryFile } from "./firstPRSimulator";
 
 export type DeadCodeCategory =
   | "Component"
