@@ -14,6 +14,7 @@ import {
 } from "@/components/ui";
 import { LoadingSpinner } from "@/components/ui/Spinner";
 import { buildContributionPathPlan } from "@/services/contributionPathService";
+import { Compass } from "lucide-react";
 import {
   ContributionPreference,
   ContributionPathPlan,
@@ -69,6 +70,7 @@ export function ContributionPathGenerator({ repository, loading = false }: Contr
         </CardHeader>
         <CardContent>
           <EmptyState
+            icon={Compass}
             title="No repository selected"
             description="Open a repository to generate a contribution path tailored to your experience and focus."
           />

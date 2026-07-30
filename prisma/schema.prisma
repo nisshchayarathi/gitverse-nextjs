@@ -442,7 +442,6 @@ model FileChange {
   fileId     Int?           @map("file_id")
   file       File?          @relation(fields: [fileId], references: [id], onDelete: SetNull)
   createdAt  DateTime       @default(now()) @map("created_at")
-
   @@index([fileId], map: "file_changes_file_id_idx")
   @@index([commitId])
   @@map("file_changes")

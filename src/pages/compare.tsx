@@ -85,6 +85,14 @@ export default function CompareRepositories() {
     fetchRepositories();
   }, [isAuthLoading, isAuthenticated, router, fetchRepositories]);
 
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push("/login");
+      return;
+    }
+    fetchRepositories();
+  }, [isAuthLoading, isAuthenticated, router, fetchRepositories]);
+
   const handleToggleSelect = (id: number) => {
     setSelectedIds((prev) => {
       if (prev.includes(id)) {

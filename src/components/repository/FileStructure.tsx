@@ -822,43 +822,7 @@ export const FileStructure = ({ repository }: FileStructureProps) => {
               />
             </div>
 
-            {/* Change Summary */}
-            <div className="bg-gradient-to-r from-primary/10 to-transparent rounded-lg p-6 border border-white/10">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary" />
-                Summary
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">
-                    Total Modifications
-                  </p>
-                  <p className="text-lg font-semibold">
-                    {selectedFileStats?.commitCount || 0}{" "}
-                    {(selectedFileStats?.commitCount || 0) === 1
-                      ? "commit"
-                      : "commits"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">
-                    Impact
-                  </p>
-                  <p className="text-lg font-semibold">
-                    {selectedFileTotalChanges.toLocaleString()}{" "}
-                    changes
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground uppercase text-xs tracking-wide mb-1">
-                    Current Size
-                  </p>
-                  <p className="text-lg font-semibold">
-                    {selectedFile.lines?.toLocaleString() || 0} lines
-                  </p>
-                </div>
-              </div>
-            </div>
+
             <AIExplanationPanel
               isOpen={isAIPanelOpen}
               onClose={() => setIsAIPanelOpen(false)}

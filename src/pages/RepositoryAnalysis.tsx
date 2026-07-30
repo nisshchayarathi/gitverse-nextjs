@@ -16,7 +16,7 @@ import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
 import { AIRepositoryOverlay } from "@/components/ai/AIRepositoryOverlay";
 import { SyncStatusCard } from "@/components/repository/SyncStatusCard";
-
+import { GitTimeMachine } from "@/components/visualizations/GitTimeMachine";
 import {
   Home,
   FolderTree,
@@ -27,12 +27,12 @@ import {
   ArrowLeft,
   Trash2,
   Activity,
+  FileX2,
+  MessageSquare,
   CheckCircle2,
   Clock,
   Loader2,
   XCircle,
-  FileX2,
-  MessageSquare,
 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
@@ -47,7 +47,8 @@ type TabType =
   | "contributors"
   | "mentor"
   | "insights"
-  | "dead-code";
+  | "dead-code"
+  | "timemachine";
 
 interface Tab {
   id: TabType;
@@ -78,6 +79,11 @@ const tabs: Tab[] = [
     id: "dead-code",
     label: "Dead Code",
     icon: <FileX2 className="h-4 w-4" />,
+  },
+  {
+    id: "timemachine",
+    label: "Time Machine",
+    icon: <Activity className="h-4 w-4" />,
   },
 ];
 
@@ -424,6 +430,8 @@ export default function RepositoryAnalysis() {
         return <RepositoryMentorTab repositoryData={repository} />;
       case "insights":
         return <RepositoryInsights repository={repository} />;
+      case "timemachine":
+        return <GitTimeMachine repository={repository} />;
       default:
         return <RepositoryOverview />;
     }
