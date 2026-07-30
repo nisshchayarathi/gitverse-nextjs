@@ -1,3 +1,9 @@
+<<<<<<< HEAD
+.history/
+node_modules/
+.next/
+.env.local
+=======
 # dependencies
 node_modules/
 .pnp
@@ -50,3 +56,4 @@ next-env.d.ts
 *.swo
 *~
 
+>>>>>>> upstream/main

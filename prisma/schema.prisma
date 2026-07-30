@@ -228,8 +228,11 @@ model Repository {
   size                         Int                           @default(0) // Size in bytes
   lastAnalyzedAt               DateTime?                     @map("last_analyzed_at")
   status                       String                        @default("pending") // pending, analyzing, completed, failed
+<<<<<<< HEAD
+=======
   isPinned                     Boolean                       @default(false) @map("is_pinned")
   pinnedAt                     DateTime?                     @map("pinned_at")
+>>>>>>> upstream/main
   userId                       Int                           @map("user_id")
   user                         User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
   parentId                     Int?                          @map("parent_id")
@@ -844,9 +847,14 @@ model ApiKey {
 model MfaConfig {
   id             Int       @id @default(autoincrement())
   userId         Int       @unique @map("user_id")
+<<<<<<< HEAD
+  /// Base32-encoded TOTP secret (should be encrypted at rest via application-layer encryption)
+  totpSecret     String    @map("totp_secret") @db.Text
+=======
   /// Base32-encoded TOTP secret (encrypted at rest via application-layer encryption)
   totpSecret     String    @map("totp_secret") @db.Text
   tokenEncrypted Boolean   @default(false) @map("token_encrypted")
+>>>>>>> upstream/main
   /// Whether TOTP MFA is active for this user
   isEnabled      Boolean   @default(false) @map("is_enabled")
   /// One-time backup codes (stored as bcrypt hashes, comma-separated)
