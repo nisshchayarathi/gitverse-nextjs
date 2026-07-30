@@ -930,18 +930,31 @@ export class RepositoryService {
   }
 
   /**
-   * Delete a repository and all its data
+   * Delete a repository and all its data.
+   * Also cleans up the corresponding GitHubRepo record to prevent
+   * P2002 unique-constraint violations when the same repo is re-added.
    */
   async deleteRepository(id: number, userId: number) {
-    const result = await prisma.repository.deleteMany({
+    // Fetch the repo URL before deletion to extract repoFullName for GitHubRepo cleanup.
+    const repo = await prisma.repository.findFirst({
       where: { id, userId },
+      select: { url: true },
     });
 
-    if (result.count === 0) {
+    if (!repo) {
       throw new Error("Repository not found");
     }
 
+    // Extract owner/repo from https://github.com/owner/repo
+    const urlObj = new URL(repo.url);
+    const repoFullName = `${urlObj.pathname.replace(/^\//, "")}`;
+
     await prisma.$transaction([
+      // Clean up the GitHubRepo record so re-adding the same repo does not
+      // hit P2002 on the unique(userId, repoFullName) constraint.
+      prisma.gitHubRepo.deleteMany({
+        where: { userId, repoFullName },
+      }),
       // Explicitly delete file changes linked to commits of this repository
       prisma.fileChange.deleteMany({
         where: { commit: { repositoryId: id } },
@@ -954,14 +967,11 @@ export class RepositoryService {
       prisma.analysisJob.deleteMany({
         where: { repositoryId: id },
       }),
-      // Repository deletion handles the rest via Cascade
+      // Repository deletion — cascade handles the rest
       prisma.repository.delete({
         where: { id },
       }),
     ]);
-    await prisma.repository.delete({
-      where: { id },
-    });
 
     // Invalidate cached stats — repository no longer exists.
     ttlCache.deleteByPrefix(`repo-stats:${id}:`);
