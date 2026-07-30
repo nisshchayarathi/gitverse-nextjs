@@ -871,6 +871,12 @@ File uploads and data URLs are processed server-side — the image data is decod
 
 
 ---
+## 🛡️ Security Guardrails for Contributors
+
+When creating new endpoints under `app/api/**`, never rely on UI gating or unverified URL payloads alone. Always enforce server-side authentication checks right at the beginning of your request lifecycle:
+
+- Enforce Session Verification: Use `const user = await requireAuth(request);` at the top of all user-scoped handlers.
+- Cross-Reference Resource Ownership: Ensure queried database records are explicitly filtered by the authenticated `user.userId`.
 
 ## 🛡️ API Security Reference
 
