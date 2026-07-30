@@ -114,30 +114,8 @@ export class GeminiService {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       return response.text();
-    } catch (error: any) {
-      console.error("Gemini analysis error:", error);
-
-      const message = error?.message?.toLowerCase() || "";
-
-      if (
-        message.includes("quota") ||
-        message.includes("rate limit") ||
-        message.includes("429")
-      ) {
-        throw new Error("Gemini API quota exceeded. Please try again later.");
-      }
-      
-      if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
-        message.includes("maximum context length") ||
-        message.includes("too large") ||
-        error?.status === 400
-      ) {
-        throw new Error("Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.");
-      }
-
-      throw new Error(`AI analysis failed: ${error.message}`);
+    } catch (error) {
+      throw this.handleGeminiError(error, "AI analysis");
     }
   }
 
@@ -181,30 +159,8 @@ export class GeminiService {
       }
 
       return text;
-    } catch (error: any) {
-      console.error("Gemini analysis error:", error);
-
-      const message = error?.message?.toLowerCase() || "";
-
-      if (
-        message.includes("quota") ||
-        message.includes("rate limit") ||
-        message.includes("429")
-      ) {
-        throw new Error("Gemini API quota exceeded. Please try again later.");
-      }
-      
-      if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
-        message.includes("maximum context length") ||
-        message.includes("too large") ||
-        error?.status === 400
-      ) {
-        throw new Error("Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope.");
-      }
-
-      throw new Error(`AI analysis failed: ${error.message}`);
+    } catch (error) {
+      throw this.handleGeminiError(error, "AI analysis");
     }
   }
 
@@ -225,30 +181,12 @@ export class GeminiService {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       return response.text();
-    } catch (error: any) {
-      console.error("Gemini chat error:", error);
-
-      const message = error?.message?.toLowerCase() || "";
-
-      if (
-        message.includes("quota") ||
-        message.includes("rate limit") ||
-        message.includes("429")
-      ) {
-        throw new Error("Gemini API quota exceeded. Please try again later.");
-      }
-      
-      if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
-        message.includes("maximum context length") ||
-        message.includes("too large") ||
-        error?.status === 400
-      ) {
-        throw new Error("Context is too large for AI chat. Please try again with a smaller scope.");
-      }
-
-      throw new Error(`AI chat failed: ${error.message}`);
+    } catch (error) {
+      throw this.handleGeminiError(
+        error,
+        "AI chat",
+        "Context is too large for AI chat. Please try again with a smaller scope."
+      );
     }
   }
 
@@ -289,30 +227,12 @@ export class GeminiService {
         const tokensConsumed = response.usageMetadata?.totalTokenCount || Math.ceil((prompt.length + text.length) / 4);
         return { text, tokensConsumed };
       }
-    } catch (error: any) {
-      console.error("Gemini chat error:", error);
-
-      const message = error?.message?.toLowerCase() || "";
-
-      if (
-        message.includes("quota") ||
-        message.includes("rate limit") ||
-        message.includes("429")
-      ) {
-        throw new Error("Gemini API quota exceeded. Please try again later.");
-      }
-
-      if (
-        message.includes("400 bad request") || 
-        message.includes("token limit") || 
-        message.includes("maximum context length") ||
-        message.includes("too large") ||
-        error?.status === 400
-      ) {
-        throw new Error("Prompt is too large for AI context limit. Please try again with a smaller scope.");
-      }
-
-      throw new Error(`AI chat failed: ${error.message}`);
+    } catch (error) {
+      throw this.handleGeminiError(
+        error,
+        "AI chat",
+        "Prompt is too large for AI context limit. Please try again with a smaller scope."
+      );
     }
   }
 
@@ -355,13 +275,79 @@ Provide only the commit messages, one per line.
         .split("\n")
         .filter((line) => line.trim())
         .slice(0, 3);
-    } catch (error: any) {
-      console.error("Commit message suggestion error:", error);
+    } catch (error) {
+      throw this.handleGeminiError(error, "Commit message suggestion");
+    }
+  }
 
+  /**
+   * Centralized helper method to handle Gemini API errors.
+   * Centralized error handling avoids DRY violations by unifying error logs
+   * and error parsing logic, ensuring user-friendly errors and consistent rate-limit checking
+   * across all Gemini API methods.
+   *
+   * @param error The unknown error caught in catch block.
+   * @param context The descriptive context string (e.g. "AI analysis").
+   * @param custom400Message An optional custom error message for 400 / token limit / payload too large errors.
+   * @throws A quota-exceeded error if rate-limited, otherwise a formatted context error.
+   */
+  private handleGeminiError(error: unknown, context: string, custom400Message?: string): never {
+    // Determine the proper log prefix based on context to match original error logs
+    const logContext =
+      context === "AI analysis"
+        ? "Gemini analysis"
+        : context === "AI chat"
+        ? "Gemini chat"
+        : context;
+
+    console.error(`${logContext} error:`, error);
+
+    // Extract message from various error shapes:
+    // - Error instances (most common)
+    // - Non-Error objects with a `message` string property (common in some API clients)
+    // - Plain string throws
+    // This preserves rate-limit/quota detection for all error shapes.
+    let message: string;
+    if (error instanceof Error) {
+      message = error.message || "Unknown Gemini API error";
+    } else if (
+      typeof error === "object" &&
+      error !== null &&
+      "message" in error &&
+      typeof (error as { message: unknown }).message === "string"
+    ) {
+      message = (error as { message: string }).message || "Unknown Gemini API error";
+    } else if (typeof error === "string") {
+      message = error || "Unknown Gemini API error";
+    } else {
+      message = "Unknown Gemini API error";
+    }
+
+    // How quota/rate-limit detection works:
+    // It checks if the error message (case-insensitive) contains "quota", "rate limit", or "429".
+    const lowerMessage = message.toLowerCase();
+    if (
+      lowerMessage.includes("quota") ||
+      lowerMessage.includes("rate limit") ||
+      lowerMessage.includes("429")
+    ) {
+      throw new Error("Gemini API quota exceeded. Please try again later.");
+    }
+
+    // Detect token-limit / payload-too-large errors (merged from main).
+    if (
+      lowerMessage.includes("token limit") ||
+      lowerMessage.includes("maximum context length") ||
+      lowerMessage.includes("too large") ||
+      lowerMessage.includes("input too long")
+    ) {
       throw new Error(
-        error?.message || "Failed to generate commit message suggestions"
+        custom400Message ||
+        "Repository or payload is too large for AI analysis context limit. Please try again with a smaller scope."
       );
     }
+
+    throw new Error(`${context} failed: ${message}`);
   }
 
   /**

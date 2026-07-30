@@ -1,8 +1,9 @@
 import { simulateContributorJourney } from "../contributorJourneySimulator";
+import { RepositoryAnalysisData } from "@/types/contributionPath";
 
 describe("contributor journey simulator", () => {
   it("infers authentication category and ranks auth files highly", () => {
-    const repository = {
+    const repository: RepositoryAnalysisData = {
       files: [
         { path: "src/auth.ts", size: 18_000 },
         { path: "src/middleware.ts", size: 9_000 },
