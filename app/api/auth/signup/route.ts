@@ -16,6 +16,13 @@ import {
 const MAX_SIGNUPS = 3;
 const WINDOW_MS = 60 * 60 * 1000;
 
+function getClientIp(request: NextRequest) {
+  return request.ip ?? "unknown";
+}
+
+function isRateLimited(ip: string) {
+  const now = Date.now();
+  const record = signupAttempts.get(ip);
 export async function POST(request: NextRequest) {
   let normalizedEmail = "";
   try {
