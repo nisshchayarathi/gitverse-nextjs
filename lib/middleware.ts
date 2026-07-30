@@ -182,6 +182,10 @@ export async function getAuthUser(
     if (finalUser.lockedUntil && finalUser.lockedUntil > new Date()) {
       return null;
     }
+
+    if (authHeader && authHeader.startsWith("Bearer ") && userPayload.tokenVersion !== finalUser.tokenVersion) {
+      return null;
+    }
   } catch (error) {
     console.error(
       "Database check failed in auth middleware:",
