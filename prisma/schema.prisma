@@ -861,3 +861,14 @@ model MfaConfig {
   @@index([userId])
   @@map("mfa_configs")
 }
+
+model DataEncryptionKey {
+  id         String   @id @default(uuid()) @db.Uuid
+  wrappedKey String   @unique @map("wrapped_key")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("data_encryption_keys")
+}
+
