@@ -18,6 +18,14 @@ jest.mock("@/lib/middleware", () => ({
   sanitizeError: jest.fn((err) => err?.message || "Unknown error"),
 }));
 
+jest.mock("@/lib/logger", () => ({
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
 jest.mock("@/lib/prisma", () => ({
   __esModule: true,
   default: {
