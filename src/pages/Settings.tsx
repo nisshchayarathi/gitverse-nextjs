@@ -33,6 +33,7 @@ export default function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const didInitProfileForm = useRef(false);
@@ -92,12 +93,12 @@ export default function Settings() {
   }, [authLoading, fetchUserInfo]);
 
   useEffect(() => {
-  return () => {
-    if (avatar?.startsWith("blob:")) {
-      URL.revokeObjectURL(avatar);
-    }
-  };
-}, [avatar]);
+    return () => {
+      if (avatar?.startsWith("blob:")) {
+        URL.revokeObjectURL(avatar);
+      }
+    };
+  }, [avatar]);
 
   // AI Settings State
   const { settings, updateSettings, isLoaded: isAISettingsLoaded } = useAISettings();
@@ -324,12 +325,12 @@ export default function Settings() {
     // Convert to base64
     const previewUrl = URL.createObjectURL(file);
 
-     setAvatar(previewUrl);
+    setAvatar(previewUrl);
 
-     toast ({
-     title: "Avatar Updated",
-    description: 'Click "Save Changes" to confirm the update',
-});
+    toast({
+      title: "Avatar Updated",
+      description: 'Click "Save Changes" to confirm the update',
+    });
   };
 
   const confirmDeleteAccount = async () => {
@@ -449,8 +450,8 @@ export default function Settings() {
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left ${activeTab === tab.id
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
                         }`}
                     >
                       <tab.icon className="h-5 w-5" />
@@ -623,11 +624,10 @@ export default function Settings() {
                         onClick={() => setTheme('light')}
                         aria-pressed={theme === 'light'}
                         aria-label="Use light mode"
-                        className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${
-                          theme === 'light'
+                        className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${theme === 'light'
                             ? 'border-primary bg-primary/5 text-primary'
                             : 'border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground'
-                        }`}
+                          }`}
                       >
                         <Sun className="h-8 w-8 mb-2" />
                         <span className="font-semibold text-sm">Light Mode</span>
@@ -638,11 +638,10 @@ export default function Settings() {
                         onClick={() => setTheme('dark')}
                         aria-pressed={theme === 'dark'}
                         aria-label="Use dark mode"
-                        className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${
-                          theme === 'dark'
+                        className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${theme === 'dark'
                             ? 'border-primary bg-primary/5 text-primary'
                             : 'border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground'
-                        }`}
+                          }`}
                       >
                         <Moon className="h-8 w-8 mb-2" />
                         <span className="font-semibold text-sm">Dark Mode</span>
@@ -874,6 +873,17 @@ export default function Settings() {
               <CardTitle id="delete-account-title">Delete Account</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="space-y-2 mb-6">
+                <label className="text-sm font-medium">
+                  Type DELETE to confirm
+                </label>
+
+                <Input
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder="DELETE"
+                />
+              </div>
               <p className="text-muted-foreground mb-6">
                 This permanently deletes your account and all data. This cannot be undone.
               </p>
@@ -881,7 +891,10 @@ export default function Settings() {
               <div className="flex gap-3 justify-end">
                 <Button
                   variant="outline"
-                  onClick={() => setShowDeleteModal(false)}
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeleteConfirmation("");
+                  }}
                 >
                   Cancel
                 </Button>
@@ -891,8 +904,9 @@ export default function Settings() {
                   onClick={() => {
                     setShowDeleteModal(false);
                     confirmDeleteAccount();
+                    setDeleteConfirmation("");
                   }}
-                  disabled={isDeletingAccount}
+                  disabled={isDeletingAccount || deleteConfirmation !== "DELETE"}
                 >
                   {isDeletingAccount ? "Deleting..." : "Delete Account"}
                 </Button>
