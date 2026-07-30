@@ -69,6 +69,7 @@ describe("POST /api/upload/avatar", () => {
   };
 
   beforeEach(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     mockCheckRateLimit = jest.fn();
     mockRateLimitResponse = jest.fn();
     jest.clearAllMocks();
@@ -79,6 +80,10 @@ describe("POST /api/upload/avatar", () => {
     mockRateLimitResponse.mockReturnValue(
       new Response(JSON.stringify({ error: true, message: "Too many requests", code: 429 }), { status: 429 })
     );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe("Authentication", () => {

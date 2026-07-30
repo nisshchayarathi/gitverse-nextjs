@@ -234,6 +234,7 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
        * outdated string inputs to ensure the system rejects all unauthorized values and fails closed.
        */
       const testInvalidRole = async (injectedRoleValue: any) => {
+        const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
         (prisma.repository.findUnique as jest.Mock).mockResolvedValue({
           id: targetRepoId,
           userId: directOwnerId,
@@ -250,6 +251,8 @@ describe("Repository IDOR & RBAC Authorization Engine", () => {
         expect(result.role).toBeUndefined();
         expect(result.reason).toContain("Invalid organization role");
         expect(result.repositoryExists).toBe(true);
+        
+        consoleErrorSpy.mockRestore();
       };
 
       it("blocks 'super_admin' role injection attempts", async () => {
