@@ -39,3 +39,23 @@ export function isValidGitSha(value: string): boolean {
  * - At least one digit
  */
 export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+const ALLOWED_GIT_HOSTS = [
+  "github.com",
+  "gitlab.com",
+  "bitbucket.org",
+  "gitea.com",
+  "gitee.com",
+];
+
+export function isValidGitUrl(url: string): boolean {
+  if (!url || typeof url !== "string") return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    const hostname = parsed.hostname.replace(/^www\./, "");
+    return ALLOWED_GIT_HOSTS.includes(hostname);
+  } catch {
+    return false;
+  }
+}
