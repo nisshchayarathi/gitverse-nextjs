@@ -1,4 +1,4 @@
-import { RepositoryAnalysisData } from "@/types/contributionPath";
+import { RepositoryAnalysisData } from "./contributionPath";
 
 export const CONTRIBUTOR_JOURNEY_CATEGORIES = [
   "Authentication",

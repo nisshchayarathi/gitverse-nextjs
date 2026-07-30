@@ -22,9 +22,9 @@
       }
     ],
     "paths": {
-      "@/lib/*": ["./lib/*", "./src/lib/*"],
+      "@/lib/*": ["./lib/*"],
       "@/app/*": ["./app/*"],
-      "@/types/*": ["./types/*", "./src/types/*"],
+      "@/types/*": ["./types/*"],
       "@/services/security/*": ["./services/security/*"],
       "@/middleware/*": ["./middleware/*"],
       "@/*": ["./src/*"]
