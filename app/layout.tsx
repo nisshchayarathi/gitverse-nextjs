@@ -2,13 +2,15 @@ import "@/lib/env";
 import { ReactNode } from "react";
 import { Metadata } from "next";
 import { Inter, Source_Sans_3 } from "next/font/google";
-import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NextAuthProvider } from "@/components/auth/NextAuthProvider";
+import SessionGuard from "@/components/auth/SessionGuard"; 
 import { Toaster } from "@/components/ui/toaster";
-import { SessionExpiryHandler } from "@/components/auth/SessionExpiryHandler";
+import { ScrollToTop } from "@/components/ui/ScrollToTop";
+import { FocusRingManager } from "@/components/ui/FocusRingManager";
+import ProgressBarProvider from "@/components/providers/ProgressBarProvider";
 import "./globals.css";
-
 
 const inter = Inter({
   subsets: ["latin"],
@@ -84,10 +86,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ThemeProvider>
           <NextAuthProvider>
             <AuthProvider>
-              <SessionExpiryHandler />
-              {children}
-              <Toaster />
-            </AuthProvider>
+              <SessionGuard>
+                <FocusRingManager />
+                <ProgressBarProvider>
+                  <main id="main-content">
+                    {children}
+                  </main>
+                </ProgressBarProvider>
+
+                <Toaster />
+                <ScrollToTop />
+              </SessionGuard>
+            </AuthProvider> 
           </NextAuthProvider>
         </ThemeProvider>
       </body>
