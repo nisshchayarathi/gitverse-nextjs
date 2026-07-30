@@ -60,6 +60,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     { icon: Search, label: "Search", path: "/search" },
     { icon: GitPullRequest, label: "Contribute", path: "/contribute" },
     { icon: Settings, label: "Settings", path: "/settings" },
+    { icon: Clock, label: "History", path: "/history" },
   ];
 
   const isActive = (path: string) => pathname === path;
