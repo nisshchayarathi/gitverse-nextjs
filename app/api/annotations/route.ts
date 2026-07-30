@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     });
 
-    return NextResponse.json(annotations);
+    return NextResponse.json({ annotations });
   } catch (error: any) {
     return NextResponse.json({ error: "Failed to fetch annotations" }, { status: 500 });
   }
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       annotation
     });
 
-    return NextResponse.json(annotation, { status: 201 });
+    return NextResponse.json({ annotation }, { status: 201 });
   } catch (error: any) {
     console.error("Failed to create annotation", error);
     return NextResponse.json({ error: "Failed to create annotation" }, { status: 500 });
