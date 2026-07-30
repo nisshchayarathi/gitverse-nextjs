@@ -1,5 +1,5 @@
 import prisma from "../prisma";
-import type { AnalysisJob } from "@prisma/client";
+import type { AnalysisJob,AnalysisJobType } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { isRetryableError, computeBackoffMs } from "../utils/retry";
 import { analysisQueue } from "../queue/analysisQueue";
@@ -107,7 +107,7 @@ export class AnalysisJobService {
           data: {
             repositoryId: params.repositoryId,
             userId: params.userId,
-            type: "repository_analysis",
+            type: AnalysisJobType.REPOSITORY_ANALYSIS,
             status: "QUEUED",
             progressPercent: 0,
             progressMessage: "Queued",
