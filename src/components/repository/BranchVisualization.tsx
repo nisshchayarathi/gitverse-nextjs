@@ -75,7 +75,7 @@ const toSafeIso = (value?: string | Date) => {
 
 const getBranchAgeInDays = (timestamp: string | Date) => {
   return Math.floor(
-    (new Date().getTime() - new Date(timestamp).getTime()) /
+    (Date.now() - new Date(timestamp).getTime()) /
       (1000 * 60 * 60 * 24)
   );
 };
