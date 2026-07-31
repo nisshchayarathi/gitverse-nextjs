@@ -23,7 +23,7 @@ export class RepositoryRegistry {
   isRegistryStale(orgName: string, ttlMs: number = 3600000): boolean {
     const lastSync = this.lastSynced.get(orgName);
     if (!lastSync) return true;
-    return (new Date().getTime() - lastSync.getTime()) > ttlMs;
+    return (Date.now() - lastSync.getTime()) > ttlMs;
   }
 }
 
