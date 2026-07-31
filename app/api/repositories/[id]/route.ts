@@ -15,7 +15,7 @@ export async function GET(
 ) {
   try {
     const user = await requireAuth(request);
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
 
     if (isNaN(id)) {
       return NextResponse.json(
@@ -70,7 +70,7 @@ export async function DELETE(
 ) {
   try {
     const user = await requireAuth(request);
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
 
     if (isNaN(id)) {
       return NextResponse.json(
