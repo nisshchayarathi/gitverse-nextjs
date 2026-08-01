@@ -126,19 +126,23 @@ export class SecurityAnalysisEngine {
       findings.push(...this.scanForVulnerabilities(file));
       
       // Scan for injection attacks
-      findings.push(...this.scanForInjections(file));
+        // TODO: implement scanForInjections
+      // findings.push(...this.scanForInjections(file));
       
       // Scan for XSS
       findings.push(...this.scanForXSS(file));
       
       // Scan for SSRF
-      findings.push(...this.scanForSSRF(file));
+        // TODO: implement scanForSSRF
+      // findings.push(...this.scanForSSRF(file));
       
       // Scan for authentication issues
-      findings.push(...this.scanForAuthIssues(file));
+        // TODO: implement scanForAuthIssues
+      // findings.push(...this.scanForAuthIssues(file));
       
       // Scan for command injection
-      findings.push(...this.scanForCommandInjection(file));
+        // TODO: implement scanForCommandInjection
+      // findings.push(...this.scanForCommandInjection(file));
     }
 
     // Calculate overall severity

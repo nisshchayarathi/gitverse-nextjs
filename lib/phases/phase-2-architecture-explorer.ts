@@ -88,6 +88,7 @@ export class ArchitectureExplorerService {
     const nodes: DependencyNode[] = [];
     const edges: DependencyEdge[] = [];
     const moduleMap = new Map<string, Set<string>>();
+    const fileContentMap = new Map<string, { content: string; language?: string }>();
 
     // Process files to create nodes
     for (const file of files) {
@@ -108,18 +109,24 @@ export class ArchitectureExplorerService {
         language: file.language
       });
 
+      // Store content for dependency extraction
+      if (file.content) {
+        fileContentMap.set(file.path, { content: file.content, language: file.language });
+      }
+
       // Group by module (folder)
-      const module = pathParts.slice(0, -1).join('/') || 'root';
-      if (!moduleMap.has(module)) {
-        moduleMap.set(module, new Set());
+      modulePath = pathParts.slice(0, -1).join('/') || 'root';
+      if (!moduleMap.has(modulePath)) {
+        moduleMap.set(modulePath, new Set());
       }
       moduleMap.get(module)!.add(file.path);
     }
 
     // Build dependency edges
     for (const node of nodes) {
-      if (node.content) {
-        const deps = this.extractDependencies(node.content, node.language);
+      const fileData = fileContentMap.get(node.path);
+      if (fileData) {
+        const deps = this.extractDependencies(fileData.content, fileData.language);
         for (const dep of deps) {
           const targetNode = nodes.find(n => n.path === dep || n.name === dep);
           if (targetNode) {

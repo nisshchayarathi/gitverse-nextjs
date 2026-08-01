@@ -454,11 +454,11 @@ export class TimelineIntelligenceService {
       return acc;
     }, {});
     
-    return Object.entries(counts)
+    return (Object.entries(counts) as [string, number][])
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([type]) => this.extractTechnology(`.${type}`))
-      .filter(Boolean);
+      .filter((t): t is string => t !== null && t !== undefined);
   }
 }
 

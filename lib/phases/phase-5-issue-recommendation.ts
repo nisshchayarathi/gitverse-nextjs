@@ -5,9 +5,13 @@
  * ENHANCED: Added full skill-to-issue matching, GitHub integration
  */
 
-import { issueTriageService } from '../services/issue-triage';
-import { issueComplexityService } from '../services/issue-complexity';
-import { issueClassifier } from '../services/issue-classifier';
+import { IssueTriageService } from '../services/issue-triage';
+import { IssueComplexityService } from '../services/issue-complexity';
+import { IssueClassifierService } from '../services/issue-classifier';
+
+const issueTriageService = new IssueTriageService();
+const issueComplexityService = new IssueComplexityService();
+const issueClassifier = new IssueClassifierService();
 
 export const PHASE_5_STATUS = {
   completed: true,
@@ -83,7 +87,7 @@ export class IssueRecommendationEngine {
       issues.map(async (issue) => {
         const score = await this.calculateMatchScore(issue, userSkills);
         const skills = await this.extractRequiredSkills(issue);
-        const complexity = await issueComplexityService.assessComplexity(issue);
+        const complexity = await issueComplexityService.estimateComplexity(issue.title, issue.body);
         
         return {
           issue: {
@@ -95,7 +99,7 @@ export class IssueRecommendationEngine {
           },
           matchScore: score,
           reasons: await this.generateMatchReasons(issue, userSkills),
-          estimatedTime: complexity.timeEstimate || '2-4 hours',
+          estimatedTime: this.complexityToTimeEstimate(complexity.complexity),
           skills
         };
       })
@@ -206,7 +210,7 @@ export class IssueRecommendationEngine {
     const goodFirstLabels = ['good-first-issue', 'beginner', 'help-wanted', 'easy'];
     
     const filtered = allIssues.filter(issue =>
-      issue.labels.some(label => 
+      issue.labels.some((label: string) => 
         goodFirstLabels.some(good => label.toLowerCase().includes(good))
       )
     );
@@ -255,10 +259,12 @@ export class IssueRecommendationEngine {
     }
 
     // Bonus for experience match
-    const complexity = await issueComplexityService.assessComplexity(issue);
+    const complexity = await issueComplexityService.estimateComplexity(issue.title, issue.body);
+    const isEasy = complexity.beginnerFriendly;
+    const isComplex = complexity.complexity === 'L' || complexity.complexity === 'XL';
     if (
-      (userSkills.experience === 'junior' && complexity.difficulty === 'easy') ||
-      (userSkills.experience === 'senior' && complexity.difficulty === 'complex')
+      (userSkills.experience === 'junior' && isEasy) ||
+      (userSkills.experience === 'senior' && isComplex)
     ) {
       score += 20;
     }
@@ -318,6 +324,17 @@ export class IssueRecommendationEngine {
       return 'advanced';
     }
     return 'intermediate';
+  }
+
+  private complexityToTimeEstimate(complexity: string): string {
+    switch (complexity) {
+      case 'XS': return '15-30 mins';
+      case 'S': return '1-2 hours';
+      case 'M': return '2-4 hours';
+      case 'L': return '4-8 hours';
+      case 'XL': return '1-2 days';
+      default: return '2-4 hours';
+    }
   }
 
   private getExperienceLevel(experience: string): SkillMatch['userLevel'] {

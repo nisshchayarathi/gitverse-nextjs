@@ -193,7 +193,6 @@ export class BugDetectionService {
     return files.map(file => {
       const complexity = this.calculateComplexity(file.content);
       const dependencyCount = this.countDependencies(file.content);
-      const { bugs } = this.scanForBugs(file.content, 'typescript');
       const bugHistory = 0; // Would come from issue tracker integration
       const coverage = file.testCoverage || 0;
 
@@ -264,14 +263,14 @@ export class BugDetectionService {
   /**
    * Predict probability of bugs in new code
    */
-  predictBugRisk(
+  async predictBugRisk(
     code: string,
     authorHistory?: { totalCommits: number; bugRate: number }
-  ): {
+  ): Promise<{
     risk: 'low' | 'medium' | 'high' | 'critical';
     score: number;
     factors: string[];
-  } {
+  }> {
     let score = 20; // Base score
 
     const factors: string[] = [];
@@ -287,11 +286,11 @@ export class BugDetectionService {
     }
 
     // Check for bug patterns
-    const { bugs } = this.scanForBugs(code, 'typescript');
-    if (bugs.some(b => b.pattern.severity === 'critical')) {
+    const { bugs } = await this.scanForBugs(code, 'typescript');
+    if (bugs.some((b: { pattern: { severity: string } }) => b.pattern.severity === 'critical')) {
       score += 40;
       factors.push('Contains critical bug patterns');
-    } else if (bugs.some(b => b.pattern.severity === 'high')) {
+    } else if (bugs.some((b: { pattern: { severity: string } }) => b.pattern.severity === 'high')) {
       score += 25;
       factors.push('Contains high severity issues');
     }

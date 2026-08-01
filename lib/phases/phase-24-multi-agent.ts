@@ -175,7 +175,7 @@ export class MultiAgentCollaborationSystem {
       relevantAgents.map(agent => this.delegateTask({
         ...task,
         id: `${task.id}-${agent.role}`
-      }))
+      } as Omit<AgentTask, 'id' | 'status'>))
     );
 
     // Wait for results
@@ -276,7 +276,7 @@ export class MultiAgentCollaborationSystem {
       return acc;
     }, {});
 
-    const consensusTheme = Object.entries(themeCounts)
+    const consensusTheme = (Object.entries(themeCounts) as [string, number][])
       .filter(([_, count]) => count > results.length / 2)
       .map(([theme]) => theme)[0];
 

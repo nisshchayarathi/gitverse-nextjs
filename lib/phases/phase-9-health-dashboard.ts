@@ -107,7 +107,7 @@ export class RepositoryHealthService {
     codeMetrics: any;
     securityData: any;
   }): Promise<HealthMetrics> {
-    const codeQuality = this.calculateCodeQualityScore(codeMetrics);
+    const codeQuality = this.calculateCodeQualityScore(repositoryData.codeMetrics);
     const activity = this.calculateActivityScore(repositoryData.commits, repositoryData.prs);
     const maintenance = this.calculateMaintenanceScore(repositoryData.issues);
     const security = this.calculateSecurityScore(repositoryData.securityData);

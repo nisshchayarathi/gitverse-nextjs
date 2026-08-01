@@ -291,8 +291,8 @@ export class AIContributorMentor {
     const parts = last.split('/');
     
     // Suggest the next file in the same module
-    const module = parts.slice(0, -1).join('/');
-    return `${module}/next-file.ts`; // Simplified suggestion
+    const modulePath = parts.slice(0, -1).join('/');
+    return `${modulePath}/next-file.ts`; // Simplified suggestion
   }
 
   private parseTaskIntoSteps(analysis: string): ImplementationGuide['steps'] {

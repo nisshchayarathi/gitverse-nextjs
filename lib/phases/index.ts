@@ -13,6 +13,9 @@ export * from './phase-3-understanding-engine';
 export * from './phase-4-contributor-onboarding';
 export * from './phase-5-issue-recommendation';
 export * from './phase-6-ai-mentor';
+// Re-export Exercise with namespace to avoid conflict with phase-7
+import { Exercise as Phase4Exercise } from './phase-4-contributor-onboarding';
+export type { Phase4Exercise as Exercise };
 export * from './phase-7-learning-mode';
 export * from './phase-8-bug-detection';
 export * from './phase-9-health-dashboard';
