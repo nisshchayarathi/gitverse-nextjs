@@ -1,4 +1,5 @@
 import prisma from "../prisma";
+import { HttpError } from "../middleware";
 import { GitService } from "./gitService";
 import * as path from "path";
 import * as os from "os";
@@ -933,12 +934,21 @@ export class RepositoryService {
    * Delete a repository and all its data
    */
   async deleteRepository(id: number, userId: number) {
-    const result = await prisma.repository.deleteMany({
-      where: { id, userId },
+    // Check existence and ownership separately so we can distinguish a
+    // genuinely non-existent repo (404) from one that exists but belongs
+    // to another user (403), instead of leaking existence via a shared
+    // "not found" response for both cases.
+    const repo = await prisma.repository.findUnique({
+      where: { id },
+      select: { id: true, userId: true },
     });
 
-    if (result.count === 0) {
-      throw new Error("Repository not found");
+    if (!repo) {
+      throw new HttpError(404, "Repository not found");
+    }
+
+    if (repo.userId !== userId) {
+      throw new HttpError(403, "Forbidden");
     }
 
     await prisma.$transaction([
@@ -959,9 +969,6 @@ export class RepositoryService {
         where: { id },
       }),
     ]);
-    await prisma.repository.delete({
-      where: { id },
-    });
 
     // Invalidate cached stats — repository no longer exists.
     ttlCache.deleteByPrefix(`repo-stats:${id}:`);
