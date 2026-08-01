@@ -57,6 +57,14 @@ describe("repositoryService.deleteRepository", () => {
       repositoryService.deleteRepository(1, 42)
     ).rejects.toMatchObject({ status: 403 });
 
+    // The existence lookup must query by repository id only — ownership
+    // is compared separately against the returned record, not baked
+    // into the query itself.
+    expect(prisma.repository.findUnique).toHaveBeenCalledWith({
+      where: { id: 1 },
+      select: { id: true, userId: true },
+    });
+
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -70,6 +78,23 @@ describe("repositoryService.deleteRepository", () => {
     const result = await repositoryService.deleteRepository(1, 42);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+
+    const transactionArg = (prisma.$transaction as any).mock.calls[0][0];
+    expect(transactionArg).toHaveLength(4);
+
+    expect(prisma.fileChange.deleteMany).toHaveBeenCalledWith({
+      where: { commit: { repositoryId: 1 } },
+    });
+    expect(prisma.commit.deleteMany).toHaveBeenCalledWith({
+      where: { repositoryId: 1 },
+    });
+    expect(prisma.analysisJob.deleteMany).toHaveBeenCalledWith({
+      where: { repositoryId: 1 },
+    });
+    expect(prisma.repository.delete).toHaveBeenCalledWith({
+      where: { id: 1 },
+    });
+
     expect(ttlCache.deleteByPrefix).toHaveBeenCalledWith("repo-stats:1:");
     expect(result).toEqual({ success: true });
   });
