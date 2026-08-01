@@ -115,11 +115,11 @@ export class ArchitectureExplorerService {
       }
 
       // Group by module (folder)
-      modulePath = pathParts.slice(0, -1).join('/') || 'root';
+      const modulePath = pathParts.slice(0, -1).join('/') || 'root';
       if (!moduleMap.has(modulePath)) {
         moduleMap.set(modulePath, new Set());
       }
-      moduleMap.get(module)!.add(file.path);
+      moduleMap.get(modulePath)!.add(file.path);
     }
 
     // Build dependency edges
