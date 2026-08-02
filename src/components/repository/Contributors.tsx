@@ -183,7 +183,7 @@ export function Contributors({ repository }: ContributorsProps) {
 
       {/* Contributors list */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {sortedContributors.map((contributor) => {
+        {(sortedContributors ?? []).map((contributor) => {
           const rankBadge = getRankBadge(contributor.rank);
           const maxActivity = Math.max(...contributor.weeklyActivity);
 
