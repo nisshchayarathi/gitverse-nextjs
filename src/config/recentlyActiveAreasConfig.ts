@@ -140,7 +140,7 @@ export function getVelocityDisplay(velocity: string): {
   }
 
   return {
-    label: velocity.charAt(0).toUpperCase() + velocity.slice(1),
+    label: velocity[0].toUpperCase() + velocity.slice(1),
     description: desc,
     color,
     icon,
@@ -175,7 +175,7 @@ export function getHealthIndicatorDisplay(indicator: string): {
   }
 
   return {
-    label: indicator.charAt(0).toUpperCase() + indicator.slice(1),
+    label: indicator[0].toUpperCase() + indicator.slice(1),
     description: desc,
     color,
     icon,
