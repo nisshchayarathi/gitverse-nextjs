@@ -75,7 +75,7 @@ const toSafeIso = (value?: string | Date) => {
 
 const getBranchAgeInDays = (timestamp: string | Date) => {
   return Math.floor(
-    (new Date().getTime() - new Date(timestamp).getTime()) /
+    (Date.now() - new Date(timestamp).getTime()) /
       (1000 * 60 * 60 * 24)
   );
 };
@@ -252,7 +252,7 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
                 </p>
               </Card>
             ) : (
-              filteredBranches.map((branch) => (
+              (filteredBranches ?? []).map((branch) => (
                 <Card
                   key={branch.id}
                   className="glass hover:bg-white/10 transition-all duration-300 cursor-pointer p-4"
