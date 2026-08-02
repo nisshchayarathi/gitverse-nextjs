@@ -39,7 +39,7 @@ export function ModuleSelector({
         <option value="">{placeholder}</option>
         {modules.map((module) => (
           <option key={module} value={module}>
-            {module.charAt(0).toUpperCase() + module.slice(1)} /
+            {module[0].toUpperCase() + module.slice(1)} /
           </option>
         ))}
       </select>
