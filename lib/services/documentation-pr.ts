@@ -27,7 +27,7 @@ export class DocumentationPRService {
       const headSha = defaultBranchInfo.commit.sha;
 
       // 2. Create a new branch
-      const timestamp = new Date().getTime();
+      const timestamp = Date.now();
       // Replace non-alphanumeric chars for branch name safety
       const safePath = filePath.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
       const newBranchName = `docs/auto-drift-fix-${safePath}-${timestamp}`;
