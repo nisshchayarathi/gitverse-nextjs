@@ -250,7 +250,7 @@ export default function PRSimulator() {
                     className="w-full bg-background border border-border/50 rounded-lg p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none transition-all"
                   >
                     <option value="">No repository context</option>
-                    {repoList.map((repo) => (
+                    {(repoList ?? []).map((repo) => (
                       <option key={repo.id} value={repo.id}>
                         {repo.name}
                       </option>
@@ -329,7 +329,7 @@ export default function PRSimulator() {
                 {/* File Uploader and Text input area */}
                 <div className="flex flex-col h-[500px]">
                   {/* File Upload Zone */}
-                  {diffInput.trim() === "" && (
+                  {diffInput.trim().length === 0 && (
                     <div className="flex-1 flex flex-col items-center justify-center p-6 border-b border-border/20 text-center relative">
                       <input
                         type="file"
