@@ -465,7 +465,7 @@ export function Contributors({ repository }: ContributorsProps) {
                       </p>
                       <p className="text-xs text-muted-foreground mt-2">
                         {Math.floor(
-                          (new Date().getTime() -
+                          (Date.now() -
                             new Date(
                               selectedContributor.firstCommit
                             ).getTime()) /
@@ -484,7 +484,7 @@ export function Contributors({ repository }: ContributorsProps) {
                       </p>
                       <p className="text-xs text-muted-foreground mt-2">
                         {Math.floor(
-                          (new Date().getTime() -
+                          (Date.now() -
                             new Date(
                               selectedContributor.lastCommit
                             ).getTime()) /
