@@ -329,7 +329,7 @@ export default function PRSimulator() {
                 {/* File Uploader and Text input area */}
                 <div className="flex flex-col h-[500px]">
                   {/* File Upload Zone */}
-                  {diffInput.trim() === "" && (
+                  {diffInput.trim().length === 0 && (
                     <div className="flex-1 flex flex-col items-center justify-center p-6 border-b border-border/20 text-center relative">
                       <input
                         type="file"
