@@ -37,7 +37,7 @@ export function ModuleSelector({
         aria-label={label || placeholder}
       >
         <option value="">{placeholder}</option>
-        {modules.map((module) => (
+        {(modules ?? []).map((module) => (
           <option key={module} value={module}>
             {module[0].toUpperCase() + module.slice(1)} /
           </option>
