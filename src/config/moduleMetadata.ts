@@ -181,7 +181,7 @@ export function getComplexityColor(
 }
 
 export function getAvailableModules(): string[] {
-  return Object.keys(MODULE_METADATA).sort();
+  return Object.keys(MODULE_METADATA).sort((a, b) => a - b);
 }
 
 export function getModuleMetadata(moduleName: string): ModuleMetadata | null {
