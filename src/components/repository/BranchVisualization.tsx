@@ -252,7 +252,7 @@ export function BranchVisualization({ repository }: BranchVisualizationProps) {
                 </p>
               </Card>
             ) : (
-              filteredBranches.map((branch) => (
+              (filteredBranches ?? []).map((branch) => (
                 <Card
                   key={branch.id}
                   className="glass hover:bg-white/10 transition-all duration-300 cursor-pointer p-4"

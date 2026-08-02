@@ -456,7 +456,7 @@ export class GitService {
       for (let i = 0; i < refEntries.length; i += concurrencyLimit) {
         const batch = refEntries.slice(i, i + concurrencyLimit);
         const batchResults = await Promise.allSettled(
-          batch.map((entry) =>
+          (batch ?? []).map((entry) =>
             this.spawnGit(
               ["rev-list", "--count", entry.fullName],
               { timeout: DEFAULT_GIT_TIMEOUT_MS, signal },
