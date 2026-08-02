@@ -53,7 +53,7 @@ function verifyMockSessionCookie(cookieValue: string): boolean {
   const pipeIndex = value.lastIndexOf("|");
   if (pipeIndex === -1) return false;
 
-  const timestamp = parseInt(value.substring(pipeIndex + 1), 10);
+  const timestamp = parseInt(value.substring(pipeIndex + 1, 10), 10);
   if (isNaN(timestamp)) return false;
 
   const MAX_AGE_MS = 24 * 60 * 60 * 1000;

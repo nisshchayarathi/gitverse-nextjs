@@ -230,8 +230,8 @@ export async function GET(request: NextRequest) {
 
     const result = await repositoryService.listRepositories(
       user.userId,
-      limitParam ? parseInt(limitParam) : 10,
-      cursorParam ? parseInt(cursorParam) : undefined,
+      limitParam ? parseInt(limitParam, 10) : 10,
+      cursorParam ? parseInt(cursorParam, 10) : undefined,
     );
 
     return apiSuccess({
