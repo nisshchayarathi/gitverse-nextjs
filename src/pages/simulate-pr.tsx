@@ -250,7 +250,7 @@ export default function PRSimulator() {
                     className="w-full bg-background border border-border/50 rounded-lg p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none transition-all"
                   >
                     <option value="">No repository context</option>
-                    {repoList.map((repo) => (
+                    {(repoList ?? []).map((repo) => (
                       <option key={repo.id} value={repo.id}>
                         {repo.name}
                       </option>
