@@ -20,7 +20,7 @@ export async function GET(
 ) {
   try {
     const repositoryId = Number(params.id);
-    if (isNaN(repositoryId)) {
+    if (Number.isNaN(repositoryId)) {
       return NextResponse.json(
         { error: "Invalid repository ID" },
         { status: 400, headers: securityHeaders }
