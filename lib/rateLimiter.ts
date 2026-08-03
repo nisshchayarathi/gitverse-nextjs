@@ -81,6 +81,26 @@ const fallbackCache = new LRUCache<string, { count: number; resetAt: number }>({
   ttl: 1000 * 60 * 60, // 1 hour max TTL
 });
 
+// Mutex map: ensures only one read-modify-write per key at a time in the LRU fallback.
+// Prevents TOCTOU race condition where concurrent requests could read the same stale record
+// and lose increments.
+const lruMutex = new Map<string, Promise<void>>();
+
+async function withMutex<T>(key: string, fn: () => T): Promise<T> {
+  // Wait for any in-flight operation on this key to complete first.
+  const previous = lruMutex.get(key);
+  if (previous) await previous;
+
+  // Register a settled promise so the next caller waits for THIS operation.
+  lruMutex.set(key, Promise.resolve());
+
+  try {
+    return fn();
+  } finally {
+    lruMutex.delete(key);
+  }
+}
+
 // 2. Opossum Circuit Breaker
 const redisLimiterCircuit = new CircuitBreaker(
   async (key: string, windowSec: number) => {
@@ -145,26 +165,30 @@ export async function checkRateLimit(
     console.error("[RateLimit] Circuit Breaker opened or Redis failed, falling back to LRU:", err.message);
 
     try {
-      // 4. Fallback to LRU Cache
-      const now = Date.now();
-      let record = fallbackCache.get(key);
+      // 4. Fallback to LRU Cache with mutex to prevent TOCTOU race condition.
+      const result = await withMutex(key, () => {
+        const now = Date.now();
+        let record = fallbackCache.get(key);
 
-      if (!record || record.resetAt <= now) {
-        // Expired or missing
-        record = { count: 0, resetAt: now + windowSec * 1000 };
-      }
+        if (!record || record.resetAt <= now) {
+          // Expired or missing
+          record = { count: 0, resetAt: now + windowSec * 1000 };
+        }
 
-      record.count += 1;
-      
-      // Update cache
-      fallbackCache.set(key, record, { ttl: record.resetAt - now });
+        record = { count: record.count + 1, resetAt: record.resetAt };
 
-      const count = record.count;
-      const remaining = Math.max(0, limit - count);
-      const allowed = count <= limit;
-      const resetInSec = Math.ceil((record.resetAt - now) / 1000);
+        // Update cache
+        fallbackCache.set(key, record, { ttl: record.resetAt - now });
 
-      return { allowed, remaining, windowSec, limit, resetInSec };
+        const count = record.count;
+        const remaining = Math.max(0, limit - count);
+        const allowed = count <= limit;
+        const resetInSec = Math.ceil((record.resetAt - now) / 1000);
+
+        return { allowed, remaining, windowSec, limit, resetInSec } as RateLimitResult;
+      });
+
+      return result;
     } catch (fallbackErr) {
       console.error("[RateLimit] LRU Fallback also failed:", fallbackErr);
       return {

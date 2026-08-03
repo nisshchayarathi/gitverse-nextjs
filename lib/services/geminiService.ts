@@ -20,7 +20,13 @@ const SUSPECTED_SECRETS = [
 export function scanAndRedactPayload(payload: string): string {
   // 1. Check for high-confidence secrets
   for (const rule of HIGH_CONFIDENCE_SECRETS) {
+    // Reset lastIndex before each test() call to prevent stateful RegExp leak.
+    // With the /g flag, .test() mutates lastIndex on match; without resetting,
+    // subsequent calls on the same global RegExp skip content before lastIndex,
+    // potentially leaking secrets in future payloads.
+    rule.pattern.lastIndex = 0;
     if (rule.pattern.test(payload)) {
+      rule.pattern.lastIndex = 0;
       throw new Error(`High-confidence secret detected: ${rule.name}. Halting PR review to prevent secret leak to AI provider.`);
     }
   }

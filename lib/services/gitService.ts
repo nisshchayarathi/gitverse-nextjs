@@ -14,6 +14,7 @@ const GIT_LOG_TIMEOUT_MS = 5 * 60 * 1000;
 const FORCE_KILL_DELAY_MS = 5_000;
 const MAX_COMMITS_DEFAULT = 1000;
 const MAX_CONTRIBUTOR_COMMITS = 3000;
+const MAX_BRANCHES_TO_ANALYZE = 1000; // Cap branch analysis to prevent DoS on repos with thousands of branches
 const MAX_FILE_BYTES_TO_READ_FOR_LINECOUNT = 256 * 1024; // 256KB
 
 function countLinesReadStream(filePath: string): Promise<number> {
@@ -448,6 +449,9 @@ export class GitService {
         seenBranches.add(name);
 
         refEntries.push({ name, fullName, date });
+
+        // Hard cap to prevent unbounded processing of repositories with thousands of branches
+        if (refEntries.length >= MAX_BRANCHES_TO_ANALYZE) break;
       }
 
       // 🔥 FIX: Process in chunks to prevent process bombs on repositories with many branches
