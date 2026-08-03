@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { nextRetryDate } from "@/lib/utils/retry";
+import { webhookQueueInstance } from "@/lib/queue/webhookQueue";
 
 const STUCK_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -137,6 +138,38 @@ export async function recoverStuckEvents(): Promise<{
       },
     });
     retried++;
+  }
+
+  // Re-enqueue all recovered/retry events to BullMQ.
+  // Previously the recovery service only updated the DB status to "pending"
+  // without adding jobs to the queue.  Since the BullMQ worker only consumes
+  // from the queue, recovered events were stuck forever.
+  const allRecoveredIds = [
+    ...stuckEvents.filter((e) => {
+      const rc = (e as any).retryCount ?? 0;
+      const mr = (e as any).maxRetries ?? 3;
+      return rc < mr;
+    }).map((e) => e.id),
+    ...pendingRetryEvents.filter((e) => {
+      const rc = (e as any).retryCount ?? 0;
+      const mr = (e as any).maxRetries ?? 3;
+      return rc < mr;
+    }).map((e) => e.id),
+    ...failedEvents.filter((e) => {
+      const rc = (e as any).retryCount ?? 0;
+      const mr = (e as any).maxRetries ?? 3;
+      return rc < mr;
+    }).map((e) => e.id),
+  ];
+
+  if (allRecoveredIds.length > 0) {
+    await webhookQueueInstance.addBulk(
+      allRecoveredIds.map((id) => ({
+        name: "process-webhook",
+        data: { eventId: id },
+      }))
+    );
+    console.log(`[WebhookRecovery] Enqueued ${allRecoveredIds.length} recovered events to BullMQ.`);
   }
 
   return { recovered, retried, skipped };
