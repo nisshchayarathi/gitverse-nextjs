@@ -145,6 +145,9 @@ const runOnce = async (): Promise<number> => {
     throw new Error("Database connectivity check failed — aborting cron worker run");
   }
 
+  // Purge stale WebhookEvent records before claiming new work.
+  await cleanupStaleWebhookEvents();
+
   const reclaimed = await analysisJobService.reclaimOrphanedJobs();
   if (reclaimed > 0) {
     console.log(`[CronWorker] Reclaimed ${reclaimed} orphaned job(s)`);
@@ -176,6 +179,32 @@ const runOnce = async (): Promise<number> => {
 
   console.log(`[CronWorker] Processed ${processed} job(s) this cycle`);
   return processed;
+};
+
+/**
+ * Purges completed and DLQ WebhookEvent records older than WEBHOOK_EVENT_TTL_DAYS.
+ * Prevents unbounded table growth (issue #2647). Only completed/dlq records are
+ * removed — pending and processing records are retained.
+ */
+const WEBHOOK_EVENT_TTL_DAYS = parseInt(process.env.WEBHOOK_EVENT_TTL_DAYS || "30", 10);
+
+const cleanupStaleWebhookEvents = async (): Promise<number> => {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - WEBHOOK_EVENT_TTL_DAYS);
+
+  try {
+    const result = await prisma.webhookEvent.deleteMany({
+      where: {
+        status: { in: ["completed", "dlq"] },
+        createdAt: { lt: cutoff },
+      },
+    });
+    console.log(`[CronWorker] Purged ${result.count} stale WebhookEvent record(s) older than ${WEBHOOK_EVENT_TTL_DAYS} days`);
+    return result.count;
+  } catch (err) {
+    console.error("[CronWorker] Failed to purge stale WebhookEvent records:", err);
+    return 0;
+  }
 };
 
 const main = async () => {
