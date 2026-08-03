@@ -56,9 +56,14 @@ export function validateCsrfOrigin(request: NextRequest): boolean {
 
   const allowedOrigins = getAllowedOrigins();
 
-  // If no origins are configured, skip validation (fail open for dev)
+  // If no origins are configured, fail closed — missing security configuration
+  // should never silently disable CSRF protection, even in development.
   if (allowedOrigins.length === 0) {
-    return true;
+    console.warn(
+      "[CSRF] No allowed origins configured. Rejecting request. " +
+      "Set NEXTAUTH_URL or NEXT_PUBLIC_API_URL to enable CSRF validation."
+    );
+    return false;
   }
 
   const origin = request.headers.get("origin");
