@@ -11,7 +11,7 @@ function clampInt(
   min: number,
   max: number,
 ) {
-  const n = value == null ? NaN : Number(value);
+  const n = value === null ? NaN : Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, Math.floor(n)));
 }
