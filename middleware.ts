@@ -75,11 +75,14 @@ export async function middleware(request: NextRequest) {
   const mockSessionCookie = request.cookies?.get?.("mock-session")?.value;
   const isPlaywrightTest = process.env.PLAYWRIGHT_TEST === "true";
   const isProduction = process.env.NODE_ENV === "production";
+  // Require MOCK_SESSION_HMAC_KEY to be explicitly set — prevents accidental activation
+  // if PLAYWRIGHT_TEST leaks into a staging/production environment (issue #2648).
+  const mockHmacKeyConfigured = !!process.env.MOCK_SESSION_HMAC_KEY;
 
-  if (isPlaywrightTest && !isProduction && mockSessionCookie) {
+  if (isPlaywrightTest && !isProduction && mockHmacKeyConfigured && mockSessionCookie) {
     if (verifyMockSessionCookie(mockSessionCookie)) {
       console.warn(
-        "[Auth] ⚠️  MOCK SESSION ACTIVE — this must NEVER appear in production. " +
+        "[Auth] MOCK SESSION ACTIVE — this must NEVER appear in production. " +
         "Request: " + pathname
       );
       token = { name: "Test User", email: "test@test.com", sub: "1" } as any;
