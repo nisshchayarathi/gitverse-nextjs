@@ -13,7 +13,7 @@ export async function POST(
 ) {
   try {
     const user = await requireAuth(request);
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
 
     const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.REPOSITORY_ANALYZE);
     if (!rl.allowed) return rateLimitResponse(rl);
