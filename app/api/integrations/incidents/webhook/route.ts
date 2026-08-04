@@ -21,11 +21,17 @@ export async function POST(req: NextRequest) {
 
     if (rl.fallbackFailed) {
       console.error("[WebhookRoute] Rate limiters completely failed. DLQing incident webhook.");
+      let dlqPayload: string | object = rawBody;
+      try {
+        dlqPayload = JSON.parse(rawBody);
+      } catch {
+        dlqPayload = rawBody;
+      }
       try {
         await prisma.webhookEvent.create({
           data: {
             event: "incident",
-            payload: rawBody,
+            payload: dlqPayload,
             status: "dlq",
             error: "Rate limiter and fallback completely failed",
           },
