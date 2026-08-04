@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const repositoryId = searchParams.get("repositoryId");
-    const days = parseInt(searchParams.get("days") || "30", 10);
+    const days = parseInt(searchParams.get("days", 10) || "30", 10);
     const limit = parseInt(searchParams.get("limit") || "10", 10);
 
     if (!repositoryId) {
