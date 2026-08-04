@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/middleware";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,7 @@ interface ActivityAnalysisRequest {
  */
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth(request);
     const body: ActivityAnalysisRequest = await request.json();
 
     if (!body.repositoryId) {
@@ -59,6 +61,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    await requireAuth(request);
     const searchParams = request.nextUrl.searchParams;
     const repositoryId = searchParams.get("repositoryId");
     const timeWindow = (searchParams.get("timeWindow") || "month") as
