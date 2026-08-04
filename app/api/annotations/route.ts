@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     const annotations = await prisma.mapAnnotation.findMany({
       where: {
-        repositoryId: parseInt(repositoryId),
+        repositoryId: parseInt(repositoryId, 10),
       },
       include: {
         author: {
