@@ -19,7 +19,7 @@ export async function POST(
             return NextResponse.json({ error: "Invalid repository ID format" }, { status: 400 });
         }
 
-        const id = parseInt(params.id);
+        const id = parseInt(params.id, 10);
 
         const repository = await repositoryService.getRepository(id, user.userId);
         if (!repository) {
