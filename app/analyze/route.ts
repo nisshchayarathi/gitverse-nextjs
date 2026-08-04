@@ -41,8 +41,9 @@ function kickLocalRunner(request: NextRequest) {
   void fetch(`${origin}/api/internal/run-analysis`, {
     method: "POST",
     headers: { "x-analysis-runner-secret": secret },
-  }).catch(() => {
-    // Best-effort only.
+  }).catch((err) => {
+    // Best-effort only — but log it so there is at least a trail.
+    console.warn("[kickLocalRunner] Failed to trigger local analysis runner:", sanitizeError(err));
   });
 }
 
