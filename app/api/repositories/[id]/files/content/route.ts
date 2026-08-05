@@ -119,7 +119,7 @@ export async function GET(
     const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.FILE_CONTENT);
     if (!rl.allowed) return rateLimitResponse(rl);
 
-    if (isNaN(id)) {
+    if (Number.isNaN(id)) {
       return NextResponse.json(
         { error: "Invalid repository ID" },
         { status: 400 }
