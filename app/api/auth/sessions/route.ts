@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     let limit = 10;
     if (limitParam) {
       const parsedLimit = parseInt(limitParam, 10);
-      if (!isNaN(parsedLimit) && parsedLimit > 0) {
+      if (!Number.isNaN(parsedLimit) && parsedLimit > 0) {
         limit = Math.min(parsedLimit, 50);
       }
     }
