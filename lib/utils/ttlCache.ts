@@ -77,7 +77,7 @@ class TtlCache {
    */
   get<T>(key: string): T | undefined {
     const entry = this.store.get(key) as CacheEntry<T> | undefined;
-    if (!entry) return undefined;
+    if (!entry) return;
 
     if (Date.now() > entry.expiresAt) {
       this.store.delete(key);
