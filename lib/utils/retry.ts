@@ -204,7 +204,7 @@ function extractAllErrorMessages(error: unknown): string[] {
 
   function collect(obj: unknown, depth: number = 0): void {
     if (depth > 5) return; // prevent infinite recursion
-    if (obj == null) return;
+    if (obj === null) return;
 
     if (typeof obj === "string") {
       messages.push(obj);
