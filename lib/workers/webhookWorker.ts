@@ -50,7 +50,7 @@ async function processWebhookEvent(eventId: string): Promise<void> {
 
   const deliveryId = webhookEvent.deliveryId;
   const idempotencyKey = deliveryId ? generateWebhookKey(deliveryId, webhookEvent.event, webhookEvent.action || undefined) : null;
-  const markIdempotentCompleted = async () => { if (idempotencyKey) await completeIdempotency(idempotencyKey).catch(() => {}); };
+  const markIdempotentCompleted = async () => { if (idempotencyKey) await completeIdempotency(idempotencyKey).catch( => console.error()); };
   const markIdempotentFailed = async () => { if (idempotencyKey) await failIdempotency(idempotencyKey).catch(() => {}); };
 
   const timeoutEstimator = new TimeoutEstimatorService();
