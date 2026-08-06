@@ -15,7 +15,7 @@ export async function GET(
     const user = await requireAuth(request);
     const id = parseInt(params.id);
 
-    if (isNaN(id)) {
+    if (Number.isNaN(id)) {
       return apiError(400, "Invalid repository ID");
     }
 
