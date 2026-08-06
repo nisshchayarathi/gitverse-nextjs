@@ -11,7 +11,7 @@ export async function GET(
     const user = await requireAuth(request);
     const repositoryId = parseInt(params.id, 10);
 
-    if (isNaN(repositoryId)) {
+    if (Number.isNaN(repositoryId)) {
       return NextResponse.json({ error: "Invalid repository ID" }, { status: 400 });
     }
 
