@@ -126,7 +126,7 @@ export async function GET(
       );
     }
 
-    if (!filePath || filePath.trim() === "") {
+    if (!filePath || filePath.trim().length === 0) {
       return NextResponse.json(
         { error: "File path is required" },
         { status: 400 }
