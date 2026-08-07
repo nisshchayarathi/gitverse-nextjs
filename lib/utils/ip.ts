@@ -48,7 +48,7 @@ function ipMatchesCidr(ip: string, cidr: string): boolean {
   const prefix = parseInt(prefixStr, 10);
 
   // Simple exact match for non-CIDR entries
-  if (isNaN(prefix)) return ip === range;
+  if (Number.isNaN(prefix)) return ip === range;
 
   // Convert IPs to numeric form for comparison
   const ipNum = ipToNumber(ip);
