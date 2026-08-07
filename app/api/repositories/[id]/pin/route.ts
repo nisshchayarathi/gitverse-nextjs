@@ -14,7 +14,7 @@ export async function PATCH(
     const user = await requireAuth(request);
     const repoId = parseInt(params.id, 10);
 
-    if (isNaN(repoId) || repoId <= 0) {
+    if (Number.isNaN(repoId) || repoId <= 0) {
       return NextResponse.json(
         { message: "Invalid repository ID" },
         { status: 400 },
