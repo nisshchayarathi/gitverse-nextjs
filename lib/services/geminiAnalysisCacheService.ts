@@ -16,7 +16,7 @@ const MAX_CACHE_ENTRIES_PER_REPO = 500;
 
 function getCacheTtlMs(): number {
   const raw = process.env.GEMINI_ANALYSIS_CACHE_TTL_SECONDS;
-  const ttlSeconds = raw == null ? 7 * 24 * 60 * 60 : Number(raw);
+  const ttlSeconds = raw === null ? 7 * 24 * 60 * 60 : Number(raw);
 
   if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
     return 0;
