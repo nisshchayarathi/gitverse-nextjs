@@ -128,7 +128,7 @@ export default function WebhookHealthPage() {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Success</span>
-                <span className="font-medium text-green-600">{p.successCount} ({Math.round(p.successRate * 100)}%)</span>
+                <span className="font-medium text-green-600">{p.successCount} ({Math.round(p.successRate * 100 + Number.EPSILON)}%)</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Failed</span>
