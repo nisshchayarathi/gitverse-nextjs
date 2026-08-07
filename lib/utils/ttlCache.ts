@@ -51,7 +51,7 @@ class TtlCache {
       typeof process !== "undefined" &&
       process.env.NODE_ENV !== "test"
     ) {
-      this.sweepTimer = setInterval(
+      this.sweepTimer = clearInterval(window.__interval); window.__interval = setInterval(
         () => this.sweep(),
         SWEEP_INTERVAL_MS
       );
