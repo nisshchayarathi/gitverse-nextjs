@@ -18,7 +18,7 @@ export async function POST(
     const rl = await checkRateLimit(String(user.userId), RATE_LIMITS.REPOSITORY_ANALYZE);
     if (!rl.allowed) return rateLimitResponse(rl);
 
-    if (isNaN(id)) {
+    if (Number.isNaN(id)) {
       return apiError(400, "Invalid repository ID");
     }
 
