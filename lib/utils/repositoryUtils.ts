@@ -271,7 +271,7 @@ export function normalizeKnownRepoHttpUrl(input: string): string | null {
 }
 
 export function normalizeTargetDirectory(input?: string | null): string | null {
-  if (input == null) return null;
+  if (input === null) return null;
 
   const trimmed = String(input).trim();
   if (!trimmed) return null;
