@@ -1,6 +1,6 @@
 function toJsonSafeInner(value: unknown, seen: WeakSet<object>): unknown {
   if (typeof value === "bigint") return value.toString();
-  if (value == null) return value;
+  if (value === null) return value;
   if (value instanceof Date) return value;
 
   if (typeof value === "object") {
