@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     let url = repoUrl;
     if (!url && repositoryId) {
       const repoId = Number(repositoryId);
-      if (isNaN(repoId)) {
+      if (Number.isNaN(repoId)) {
         return NextResponse.json(
           { error: "Invalid repository ID" },
           { status: 400 }
