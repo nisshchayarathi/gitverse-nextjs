@@ -112,7 +112,7 @@ export async function GET(
 ) {
   try {
     const user = await requireAuth(request);
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
     const searchParams = request.nextUrl.searchParams;
     const filePath = searchParams.get("path");
 
