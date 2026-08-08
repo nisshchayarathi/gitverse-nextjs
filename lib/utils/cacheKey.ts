@@ -70,7 +70,7 @@ function stableStringify(
     for (const item of value) {
       items.push(stableStringify(item, seen));
     }
-    items.sort();
+    items.sort((a, b) => a - b);
     return `[${items.join(",")}]`;
   }
 
