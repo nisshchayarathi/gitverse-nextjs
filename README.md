@@ -1,4 +1,4 @@
-<div align="center">
+6<div align="center">
 
 # GitVerse 🗺️
 
@@ -1060,3 +1060,29 @@ File uploads and data URLs are processed server-side — the image data is decod
 Made with ❤️ by the GitVerse Team
 
 <!-- test branch change -->
+
+## Troubleshooting
+
+### Installation fails
+- Ensure you are using the supported Node.js version.
+- Run `npm install` or `npm ci`.
+- Delete `node_modules` and reinstall dependencies if necessary.
+
+### Environment variables not loading
+- Verify that a `.env` file exists.
+- Ensure all required variables are defined.
+- Restart the development server after making changes.
+
+## FAQ
+
+### How do I start the project?
+Run:
+
+```bash
+npm install
+npm run dev
+```
+
+### How do I report a bug?
+Please open a GitHub issue with reproduction steps and relevant logs.
+
