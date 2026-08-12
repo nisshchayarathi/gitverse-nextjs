@@ -56,6 +56,40 @@ describe('src/utils/helpers', () => {
     it('returns null for unsupported URLs', () => {
       expect(extractRepoInfo('https://example.com/a/b')).toBeNull();
     });
+
+    it('strips the .git suffix from clone URLs', () => {
+      expect(
+        extractRepoInfo('https://github.com/octocat/Hello-World.git')
+      ).toEqual({
+        platform: 'github',
+        owner: 'octocat',
+        repo: 'Hello-World',
+      });
+
+      expect(
+        extractRepoInfo('https://gitlab.com/group/my.repo.git')
+      ).toEqual({
+        platform: 'gitlab',
+        owner: 'group',
+        repo: 'my.repo',
+      });
+
+      expect(
+        extractRepoInfo('https://bitbucket.org/team/repo-name.git')
+      ).toEqual({
+        platform: 'bitbucket',
+        owner: 'team',
+        repo: 'repo-name',
+      });
+    });
+
+    it('does not strip .git from repositories that legitimately end in .git', () => {
+      expect(extractRepoInfo('https://github.com/octocat/my.git')).toEqual({
+        platform: 'github',
+        owner: 'octocat',
+        repo: 'my',
+      });
+    });
   });
 
   describe('formatNumber', () => {

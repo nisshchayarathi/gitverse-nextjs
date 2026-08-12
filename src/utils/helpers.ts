@@ -6,20 +6,24 @@ export const validateRepoUrl = (url: string): boolean => {
   return githubRegex.test(url) || gitlabRegex.test(url) || bitbucketRegex.test(url)
 }
 
+const stripGitSuffix = (repo: string): string => {
+  return repo.replace(/\.git$/i, '')
+}
+
 export const extractRepoInfo = (url: string): { platform: string; owner: string; repo: string } | null => {
   const githubMatch = url.match(/github\.com\/([\w-]+)\/([\w.-]+)/)
   if (githubMatch) {
-    return { platform: 'github', owner: githubMatch[1], repo: githubMatch[2] }
+    return { platform: 'github', owner: githubMatch[1], repo: stripGitSuffix(githubMatch[2]) }
   }
   
   const gitlabMatch = url.match(/gitlab\.com\/([\w-]+)\/([\w.-]+)/)
   if (gitlabMatch) {
-    return { platform: 'gitlab', owner: gitlabMatch[1], repo: gitlabMatch[2] }
+    return { platform: 'gitlab', owner: gitlabMatch[1], repo: stripGitSuffix(gitlabMatch[2]) }
   }
   
   const bitbucketMatch = url.match(/bitbucket\.org\/([\w-]+)\/([\w.-]+)/)
   if (bitbucketMatch) {
-    return { platform: 'bitbucket', owner: bitbucketMatch[1], repo: bitbucketMatch[2] }
+    return { platform: 'bitbucket', owner: bitbucketMatch[1], repo: stripGitSuffix(bitbucketMatch[2]) }
   }
   
   return null
