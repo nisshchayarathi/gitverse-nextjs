@@ -77,9 +77,7 @@ export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositories
       }
 
       const response = await axios.get(url.toString(), {
-        headers: {
-          Authorization: "Bearer ",
-        },
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         signal: controller.signal,
       });
 
