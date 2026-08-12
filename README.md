@@ -611,7 +611,7 @@ User submits HTTP URL → validateHttpAvatarUrl()
 Required:
 
 - `DATABASE_URL` - PostgreSQL connection string
-- `JWT_SECRET` - JWT signing secret. The app will crash on startup without it.
+- `JWT_SECRET` - JWT signing secret used for email/password sessions. Required in production — the app will crash on startup without it. This is a separate secret from `NEXTAUTH_SECRET`: NextAuth (Google/GitHub OAuth) uses `NEXTAUTH_SECRET`, while custom JWT sessions use `JWT_SECRET`.
 - `GEMINI_API_KEY` - Google Gemini API key
 
 OAuth (Google / NextAuth):
